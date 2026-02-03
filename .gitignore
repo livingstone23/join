@@ -416,3 +416,30 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+
+# === Custom Senior Additions ===
+
+# Ignore local secret settings (Production-ready apps use secrets, not appsettings.json)
+**/appsettings.Development.json
+**/appsettings.Local.json
+
+# If you use User Secrets in .NET
+**/secrets.json
+
+# Docker & Containers
+.dockerignore
+**/obj/Docker/
+
+# MacOS specific (if you or someone else uses Mac)
+.DS_Store
+
+# IDE and Environment
+.env
+.env.*
+!.env.example
+
+# Terraform / Infrastructure as Code (if you add it later)
+*.tfstate
+*.tfstate.backup
+.terraform/

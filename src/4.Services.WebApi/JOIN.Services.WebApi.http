@@ -1,0 +1,6 @@
+@JOIN.Services.WebApi_HostAddress = http://localhost:5267
+
+GET {{JOIN.Services.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
