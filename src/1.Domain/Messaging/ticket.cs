@@ -4,7 +4,7 @@
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
-using JOIN.Domain.Messaging;
+using JOIN.Domain.Security;
 using JOIN.Domain.Support;
 
 
@@ -35,6 +35,7 @@ public class Ticket : BaseAuditableEntity
 
     // --- Context & Hierarchy ---
     public Guid CompanyId { get; set; } // Requerido
+    public Guid? CustomerId { get; set; }
     public Guid? ProjectId { get; set; } // Opcional
     public Guid? AreaId { get; set; }    // Opcional
     public Guid ChannelId { get; set; } // Canal de creación (Bot, Web, etc.)
@@ -47,18 +48,27 @@ public class Ticket : BaseAuditableEntity
     /// </summary>
     /// <value></value>   
     public bool IsVisibleToExternals { get; set; } = false;
-
+    
     // --- Ownership ---
-    public string CreatedByUserId { get; set; } = string.Empty; // Usuario creó
-    public string? AssignedToUserId { get; set; } // Usuario gestiona
+    public Guid CreatedByUserId { get; set; } // Usuario creó
+    public Guid? AssignedToUserId { get; set; } // Usuario gestiona
+
 
     // --- Navigation ---
     public virtual Company Company { get; set; } = null!;
-    public virtual Customer Customer { get; set; } = null!;
+    public virtual Customer? Customer { get; set; }
+    public virtual Project? Project { get; set; }
+    public virtual Area? Area { get; set; }
+    public virtual CommunicationChannel Channel { get; set; } = null!;
+
+    public virtual ApplicationUser CreatedByUser { get; set; } = null!;
+    public virtual ApplicationUser? AssignedToUser { get; set; }
+
     public virtual TicketStatus Status { get; set; } = null!;
     public virtual TicketComplexity Complexity { get; set; } = null!;
     public virtual TimeUnit TimeUnit { get; set; } = null!;
-    public virtual CommunicationChannel CreationChannel { get; set; } = null!;
+    
     public virtual Ticket? PrecedentTicket { get; set; }
     public virtual ICollection<TicketNotification> Notifications { get; set; } = new List<TicketNotification>();
+
 }

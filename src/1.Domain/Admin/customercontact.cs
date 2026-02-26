@@ -3,6 +3,9 @@ using JOIN.Domain.Audit;
 
 
 
+namespace JOIN.Domain.Admin;
+
+
 
 /// <summary>
 /// Represents a specific contact method for a Customer.

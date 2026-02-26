@@ -24,12 +24,12 @@ public class CommunicationChannel : BaseAuditableEntity
     /// <summary>
     /// Gets or sets the technical provider or agent handling the channel (e.g., "n8n", "Twilio", "Internal").
     /// </summary>
-    public string Provider { get; set; } = string.Empty;
+    public string? Provider { get; set; }
 
     /// <summary>
     /// Internal code to facilitate logic in the Application layer (e.g., WHATSAPP_01).
     /// </summary>
-    public string Code { get; set; } = string.Empty;
+    public string? Code { get; set; }
 
     /// <summary>
     /// Indicates if the channel is enabled for sending and receiving messages.
@@ -40,4 +40,5 @@ public class CommunicationChannel : BaseAuditableEntity
     
     /// <summary> Tickets created through this channel. </summary>
     public virtual ICollection<Ticket> CreatedTickets { get; set; } = new List<Ticket>();
+    
 }

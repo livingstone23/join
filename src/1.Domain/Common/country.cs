@@ -1,6 +1,7 @@
 
 
 
+using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 
 
@@ -38,4 +39,9 @@ public class Country : BaseAuditableEntity
     /// Used as a non-mandatory grouping for administrative or commercial purposes.
     /// </summary>
     public virtual ICollection<Region> Regions { get; set; } = new List<Region>();
+
+    /// <summary>
+    /// Collection of customer addresses located within this specific country.
+    /// </summary>
+    public virtual ICollection<CustomerAddress> CustomerAddresses { get; set; } = new List<CustomerAddress>();
 }

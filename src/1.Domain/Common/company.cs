@@ -1,5 +1,6 @@
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
+using JOIN.Domain.Messaging;
 
 
 
@@ -67,4 +68,12 @@ public class Company : BaseAuditableEntity
     /// Collection of projects managed under this company's umbrella.
     /// </summary>
     public virtual ICollection<Project> Projects { get; set; } = new List<Project>();
+
+
+    /// <summary>
+    /// Collection of tickets under this company's humbrella
+    /// </summary>
+    public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
+    
 }
+

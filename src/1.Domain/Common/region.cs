@@ -25,7 +25,7 @@ public class Region : BaseAuditableEntity
     /// Gets or sets the administrative or ISO code for the region. 
     /// Essential for electronic invoicing and logistics integrations.
     /// </summary>
-    public string Code { get; set; } = string.Empty;
+    public string? Code { get; set; } 
 
     /// <summary>
     /// Gets or sets the foreign key of the parent Country.

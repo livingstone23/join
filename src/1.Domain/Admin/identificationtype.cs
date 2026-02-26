@@ -1,3 +1,4 @@
+
 using JOIN.Domain.Audit;
 
 
@@ -12,6 +13,7 @@ namespace JOIN.Domain.Admin;
 /// </summary>
 public class IdentificationType : BaseAuditableEntity
 {
+
     /// <summary> Short name or abbreviation (e.g., "DNI", "RUC"). </summary>
     public string Name { get; set; } = string.Empty;
 
@@ -20,4 +22,5 @@ public class IdentificationType : BaseAuditableEntity
 
     /// <summary> Regex pattern to validate the identification number if necessary. </summary>
     public string? ValidationPattern { get; set; }
+    
 }

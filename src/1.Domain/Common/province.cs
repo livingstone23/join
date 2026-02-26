@@ -1,6 +1,7 @@
 
 
 
+using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
 
@@ -52,5 +53,11 @@ public class Province : BaseAuditableEntity
     /// Collection of municipalities or local districts within this province.
     /// </summary>
     public virtual ICollection<Municipality> Municipalities { get; set; } = new List<Municipality>();
+
+
+    /// <summary>
+    /// Collection of customer addresses located within this specific municipality.
+    /// </summary>
+    public virtual ICollection<CustomerAddress> CustomerAddresses { get; set; } = new List<CustomerAddress>();
 
 }
