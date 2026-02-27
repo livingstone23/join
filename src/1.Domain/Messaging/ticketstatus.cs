@@ -16,12 +16,10 @@ namespace JOIN.Domain.Messaging;
 public class TicketStatus : BaseAuditableEntity
 {
     public string Name { get; set; } = string.Empty;
+    
     public string? Description { get; set; }
     
-    /// <summary>
-    /// Logical code for internal evaluation (e.g., 10 for Draft, 50 for Resolved).
-    /// </summary>
-    public int Code { get; set; }
+    public string? Code { get; set; }
 
     public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
     

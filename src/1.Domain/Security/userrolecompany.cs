@@ -13,6 +13,7 @@ namespace JOIN.Domain.Security;
 /// </summary>
 public class UserRoleCompany : BaseAuditableEntity
 {
+    
     /// <summary>
     /// Foreign key to the ApplicationUser.
     /// </summary>
@@ -32,4 +33,5 @@ public class UserRoleCompany : BaseAuditableEntity
     public virtual ApplicationUser User { get; set; } = null!;
     public virtual ApplicationRole Role { get; set; } = null!;
     public virtual Company Company { get; set; } = null!;
+
 }

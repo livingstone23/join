@@ -24,6 +24,6 @@ public class TimeUnit : BaseAuditableEntity
 
     public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
 
-    
+    public virtual ICollection<TicketComplexity> TicketComplexities { get; set; } = new List<TicketComplexity>();
 
 }

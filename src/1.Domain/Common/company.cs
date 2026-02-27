@@ -1,6 +1,7 @@
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Messaging;
+using JOIN.Domain.Security;
 
 
 
@@ -74,6 +75,17 @@ public class Company : BaseAuditableEntity
     /// Collection of tickets under this company's humbrella
     /// </summary>
     public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
+
+
+    /// <summary>
+    /// Collection of UserRoles under this company's humbrella
+    /// </summary>
+    public virtual ICollection<UserRoleCompany> UserRoleCompanies { get; set; } = new List<UserRoleCompany>();
+
+    /// <summary>
+    /// Collection of users that have been granted access to this company.
+    /// </summary>
+    public virtual ICollection<UserCompany> UserCompanies { get; set; } = new List<UserCompany>();
     
 }
 

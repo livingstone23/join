@@ -1,5 +1,6 @@
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
+using JOIN.Domain.Enums;
 
 
 
@@ -27,7 +28,7 @@ public class CustomerContact : BaseAuditableEntity
     /// Common values include: 'Mobile', 'Email', 'WhatsApp', 'Landline', 'Emergency'.
     /// </summary>
     /// <example>WhatsApp</example>
-    public string ContactType { get; set; } = string.Empty;
+    public ContactType ContactType { get; set; }
 
 
     /// <summary>

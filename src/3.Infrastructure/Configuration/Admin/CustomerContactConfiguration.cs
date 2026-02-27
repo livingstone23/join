@@ -33,7 +33,13 @@ public class CustomerContactConfiguration : IEntityTypeConfiguration<CustomerCon
 
         // --- Properties ---
 
-        builder.Property(cc => cc.ContactType).IsRequired().HasMaxLength(50);
+
+        // ContactType is an enum, configured to be stored as a string.
+        builder.Property(c => c.ContactType)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(50);
+
         builder.Property(cc => cc.ContactValue).IsRequired().HasMaxLength(150);
         builder.Property(cc => cc.IsPrimary).IsRequired();
         builder.Property(cc => cc.Comments).HasMaxLength(500);

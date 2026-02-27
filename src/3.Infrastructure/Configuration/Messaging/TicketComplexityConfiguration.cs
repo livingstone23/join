@@ -20,6 +20,10 @@ public class TicketComplexityConfiguration : IEntityTypeConfiguration<TicketComp
     /// <param name="builder">The builder to be used for configuring the entity.</param>
     public void Configure(EntityTypeBuilder<TicketComplexity> builder)
     {
+
+        // Maps the entity to the "TicketComplexities" table in the "Messaging" schema.
+        builder.ToTable("TicketComplexities", "Messaging");
+
         // Sets the primary key for the entity.
         builder.HasKey(p => p.Id);
 
@@ -49,7 +53,9 @@ public class TicketComplexityConfiguration : IEntityTypeConfiguration<TicketComp
             .HasForeignKey(p => p.TimeUnitId)
             .OnDelete(DeleteBehavior.Restrict); // Prevents deleting a TimeUnit if it's in use.
 
-        // Maps the entity to the "TicketComplexities" table in the "Messaging" schema.
-        builder.ToTable("TicketComplexities", "Messaging");
+        // Apply a soft-delete filter to automatically exclude records marked as deleted.
+        builder.HasQueryFilter(a => a.GcRecord == 0);
+        
+        
     }
 }

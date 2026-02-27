@@ -20,6 +20,9 @@ public class TicketStatusConfiguration : IEntityTypeConfiguration<TicketStatus>
     /// <param name="builder">The builder to be used for configuring the entity.</param>
     public void Configure(EntityTypeBuilder<TicketStatus> builder)
     {
+        // Maps the entity to the "TicketStatuses" table in the "Messaging" schema.
+        builder.ToTable("TicketStatuses", "Messaging");
+
         // Sets the primary key for the entity.
         builder.HasKey(p => p.Id);
 
@@ -28,12 +31,21 @@ public class TicketStatusConfiguration : IEntityTypeConfiguration<TicketStatus>
             .IsRequired()
             .HasMaxLength(50);
 
+
+        // Configures the 'Description' property: it is required and has a maximum length of 200 characters.
+        builder.Property(p => p.Code)
+            .IsRequired(false)
+            .HasMaxLength(50);
+
+
         // Configures the 'Description' property: it is required and has a maximum length of 200 characters.
         builder.Property(p => p.Description)
-            .IsRequired()
+            .IsRequired(false)
             .HasMaxLength(200);
 
-        // Maps the entity to the "TicketStatuses" table in the "Messaging" schema.
-        builder.ToTable("TicketStatuses", "Messaging");
+        // Apply a soft-delete filter to automatically exclude records marked as deleted.
+        builder.HasQueryFilter(a => a.GcRecord == 0);
+
+        
     }
 }

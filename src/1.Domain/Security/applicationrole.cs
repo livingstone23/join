@@ -12,6 +12,7 @@ namespace JOIN.Domain.Security;
 /// </summary>
 public class ApplicationRole : IdentityRole<Guid>
 {
+    
     /// <summary>
     /// Detailed description of the role's permissions or purpose.
     /// </summary>
@@ -24,4 +25,5 @@ public class ApplicationRole : IdentityRole<Guid>
 
     // --- Navigation Properties ---
     public virtual ICollection<UserRoleCompany> UserRoleCompanies { get; set; } = new List<UserRoleCompany>();
+    
 }

@@ -20,6 +20,10 @@ public class TimeUnitConfiguration : IEntityTypeConfiguration<TimeUnit>
     /// <param name="builder">The builder to be used for configuring the entity.</param>
     public void Configure(EntityTypeBuilder<TimeUnit> builder)
     {
+                
+        // Maps the entity to the "TimeUnits" table in the "Messaging" schema.
+        builder.ToTable("TimeUnits", "Messaging");
+
         // Sets the primary key for the entity.
         builder.HasKey(p => p.Id);
 
@@ -40,7 +44,9 @@ public class TimeUnitConfiguration : IEntityTypeConfiguration<TimeUnit>
             .WithOne(t => t.TimeUnit)
             .HasForeignKey(t => t.TimeUnitId);
 
-        // Maps the entity to the "TimeUnits" table in the "Messaging" schema.
-        builder.ToTable("TimeUnits", "Messaging");
+        // Apply a soft-delete filter to automatically exclude records marked as deleted.
+        builder.HasQueryFilter(a => a.GcRecord == 0);
+
+
     }
 }

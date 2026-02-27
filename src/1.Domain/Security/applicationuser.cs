@@ -29,9 +29,11 @@ public class ApplicationUser : IdentityUser<Guid>, IAuditableEntity
     public string? CreatedBy { get; set; }
     public DateTime? LastModified { get; set; }
     public string? LastModifiedBy { get; set; }
+    public int GcRecord { get; set; } = 0;
 
     // --- Navigation Properties ---
     public virtual ICollection<UserCompany> UserCompanies { get; set; } = new List<UserCompany>();
+    public virtual ICollection<UserRoleCompany> UserRoleCompanies { get; set; } = new List<UserRoleCompany>();
     public virtual ICollection<UserCommunicationChannel> Channels { get; set; } = new List<UserCommunicationChannel>();
-    public int GcRecord { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+    
 }

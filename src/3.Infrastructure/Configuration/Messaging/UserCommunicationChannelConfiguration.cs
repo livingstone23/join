@@ -20,6 +20,11 @@ public class UserCommunicationChannelConfiguration : IEntityTypeConfiguration<Us
     /// <param name="builder">The builder to be used for configuring the entity.</param>
     public void Configure(EntityTypeBuilder<UserCommunicationChannel> builder)
     {
+
+        // Maps the entity to the "UserCommunicationChannels" table in the "Messaging" schema.
+        builder.ToTable("UserCommunicationChannels", "Messaging");
+
+
         // Sets the primary key for the entity.
         builder.HasKey(p => p.Id);
 
@@ -46,11 +51,15 @@ public class UserCommunicationChannelConfiguration : IEntityTypeConfiguration<Us
 
         // --- Indexes ---
 
+
         // Creates a unique index on UserId and CommunicationChannelId to ensure
         // a user can only be mapped to a specific channel once.
         builder.HasIndex(p => new { p.UserId, p.CommunicationChannelId }).IsUnique();
 
-        // Maps the entity to the "UserCommunicationChannels" table in the "Messaging" schema.
-        builder.ToTable("UserCommunicationChannels", "Messaging");
+
+        // Apply a soft-delete filter to automatically exclude records marked as deleted.
+        builder.HasQueryFilter(a => a.GcRecord == 0);
+        
+
     }
 }

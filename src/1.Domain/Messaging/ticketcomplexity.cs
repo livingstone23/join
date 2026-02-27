@@ -17,12 +17,13 @@ public class TicketComplexity : BaseAuditableEntity
 {
     
     public string Name { get; set; } = string.Empty;
+    
     public string? Description { get; set; }
-
+    
     /// <summary>
     /// Numeric weight of the complexity (e.g., 1 for Low, 4 for Critical).
     /// </summary>
-    public int Code { get; set; }
+    public string? Code { get; set; }
 
     /// <summary>
     /// The numeric value representing the allocated time to resolve this ticket.

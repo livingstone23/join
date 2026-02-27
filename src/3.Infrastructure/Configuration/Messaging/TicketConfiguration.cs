@@ -26,6 +26,10 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
     /// <param name="builder">The builder to be used for configuring the entity.</param>
     public void Configure(EntityTypeBuilder<Ticket> builder)
     {
+
+        // Maps the entity to the "Tickets" table in the "Messaging" schema.
+        builder.ToTable("Tickets", "Messaging");
+
         // Sets the primary key for the entity.
         builder.HasKey(t => t.Id);
 
@@ -117,7 +121,9 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 
         // --- Table Mapping ---
 
-        // Maps the entity to the "Tickets" table in the "Messaging" schema.
-        builder.ToTable("Tickets", "Messaging");
+        // Apply a soft-delete filter to automatically exclude records marked as deleted.
+        builder.HasQueryFilter(a => a.GcRecord == 0);
+
+        
     }
 }

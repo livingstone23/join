@@ -1,7 +1,11 @@
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
 
+
+
 namespace JOIN.Domain.Security;
+
+
 
 /// <summary>
 /// Intersect entity that grants a User access to a specific Company (Tenant).
