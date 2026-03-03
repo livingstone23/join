@@ -20,13 +20,8 @@ namespace JOIN.Infrastructure.Configuration.Messaging;
 /// </summary>
 public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 {
-    /// <summary>
-    /// Configures the <see cref="Ticket"/> entity.
-    /// </summary>
-    /// <param name="builder">The builder to be used for configuring the entity.</param>
     public void Configure(EntityTypeBuilder<Ticket> builder)
     {
-
         // Maps the entity to the "Tickets" table in the "Messaging" schema.
         builder.ToTable("Tickets", "Messaging");
 
@@ -34,18 +29,12 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.HasKey(t => t.Id);
 
         // --- Properties ---
-
-        // Configures the 'Code' property: it is required, has a max length, and must be unique.
-        builder.Property(t => t.Code)
-            .IsRequired()
-            .HasMaxLength(50);
+        builder.Property(t => t.Code).IsRequired().HasMaxLength(50);
         builder.HasIndex(t => t.Code).IsUnique();
 
-        // Configures 'Name' and 'Description' properties with length constraints.
         builder.Property(t => t.Name).IsRequired().HasMaxLength(150);
         builder.Property(t => t.Description).HasMaxLength(2000);
 
-        // Configures time-related properties with precision.
         builder.Property(t => t.EstimatedTime).HasPrecision(18, 2);
         builder.Property(t => t.ConsumedTime).HasPrecision(18, 2);
         
@@ -53,16 +42,16 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 
         // Required relationship with Company (multi-tenant boundary).
         builder.HasOne(t => t.Company)
-            .WithMany()
+            .WithMany(c => c.Tickets) // CORREGIDO: Evita shadow property CompanyId1
             .HasForeignKey(t => t.CompanyId)
             .OnDelete(DeleteBehavior.Restrict);
 
         // Optional relationship with Customer.
         builder.HasOne(t => t.Customer)
-            .WithMany()
+            .WithMany(c => c.Tickets) // CORREGIDO: Evita shadow property CustomerId1
             .HasForeignKey(t => t.CustomerId)
             .IsRequired(false)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.NoAction); // CORREGIDO: Evita error de ciclos en SQL Server
 
         // Required relationship with the user who created the ticket.
         builder.HasOne(t => t.CreatedByUser)
@@ -74,7 +63,7 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.HasOne(t => t.AssignedToUser)
             .WithMany()
             .HasForeignKey(t => t.AssignedToUserId)
-            .IsRequired(false) // A ticket might not have an assigned user.
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
 
         // Relationships with catalogs: Status, Complexity, and TimeUnit.
@@ -95,7 +84,7 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         
         // Relationship with the channel of creation.
         builder.HasOne(t => t.Channel)
-            .WithMany()
+            .WithMany(c => c.CreatedTickets) // CORREGIDO: Evita shadow property ChannelId1
             .HasForeignKey(t => t.ChannelId)
             .OnDelete(DeleteBehavior.Restrict);
 
@@ -104,26 +93,22 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             .WithMany()
             .HasForeignKey(t => t.PrecedentTicketId)
             .IsRequired(false)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.NoAction); // CORREGIDO: El fix más importante para SQL Server
 
         // Optional relationships with Project and Area.
         builder.HasOne(t => t.Project)
-            .WithMany()
+            .WithMany(p => p.Tickets) // CORREGIDO: Evita shadow property ProjectId1
             .HasForeignKey(t => t.ProjectId)
             .IsRequired(false)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.NoAction); // CORREGIDO: Evita error de ciclos
 
         builder.HasOne(t => t.Area)
-            .WithMany()
+            .WithMany(a => a.Tickets) // CORREGIDO: Evita shadow property AreaId1
             .HasForeignKey(t => t.AreaId)
             .IsRequired(false)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.NoAction); // CORREGIDO: Evita error de ciclos
 
         // --- Table Mapping ---
-
-        // Apply a soft-delete filter to automatically exclude records marked as deleted.
         builder.HasQueryFilter(a => a.GcRecord == 0);
-
-        
     }
 }

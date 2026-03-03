@@ -1,6 +1,14 @@
+using JOIN.Application;
+using JOIN.Application.Common;
 using JOIN.Application.Interface;
+using JOIN.Domain.Security;
+using JOIN.Infrastructure.Configuration;
 using JOIN.Infrastructure.Contexts;
+using JOIN.Services.WebApi.Middlewares;
 using JOIN.Services.WebApi.Services;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Scalar.AspNetCore; // <-- New using for modern API UI
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,42 +16,33 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. ADD CORE SERVICES (Dependency Injection)
 // ============================================================================
 
-// Enables the use of standard API Controllers instead of Minimal APIs
 builder.Services.AddControllers();
 
-// Enables OpenAPI/Swagger documentation
-builder.Services.AddOpenApi();
+// .NET 10 Native OpenAPI generation (Replaces AddSwaggerGen)
+builder.Services.AddOpenApi(); 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(); // Standard Swagger UI support
+
+// Register the Global Exception Handler (RFC 7807 Problem Details)
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 // ============================================================================
-// 2. ADD INFRASTRUCTURE & PERSISTENCE SERVICES
+// 2. ADD CLEAN ARCHITECTURE LAYERS
 // ============================================================================
 
-// Register the HttpContextAccessor (Required to read the JWT token claims)
 builder.Services.AddHttpContextAccessor();
-
-// Register Application Services
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
-// Register the EF Core Interceptor for Auditing and Soft Delete
-builder.Services.AddScoped<AuditableEntitySaveChangesInterceptor>();
+// Application Layer (MediatR, FluentValidation Pipeline)
+builder.Services.AddApplicationServices();
 
-// Register the Database Context
-// NOTE: Replace "DefaultConnection" with your actual connection string name in appsettings.json
-builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
-{
-    var interceptor = sp.GetRequiredService<AuditableEntitySaveChangesInterceptor>();
-    
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
-           .AddInterceptors(interceptor);
-});
+// Infrastructure Layer (EF Core, Dapper Context, Repositories, UnitOfWork)
+builder.Services.AddInfrastructureServices(builder.Configuration);
 
 // ============================================================================
 // 3. ADD IDENTITY & SECURITY SERVICES
 // ============================================================================
 
-// Configure ASP.NET Core Identity for Multi-tenant RBAC
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 {
     options.Password.RequireDigit = true;
@@ -52,29 +51,53 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
-// TODO later: .AddClaimsPrincipalFactory<CustomUserClaimsPrincipalFactory>()
 
 var app = builder.Build();
 
 // ============================================================================
-// 4. CONFIGURE THE HTTP REQUEST PIPELINE (Middleware)
+// 4. AUTOMATIC DATABASE MIGRATION
 // ============================================================================
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    
+    try
+    {
+        
+        logger.LogInformation("Applying database migrations...");
+        var context = services.GetRequiredService<ApplicationDbContext>();
+        await context.Database.MigrateAsync();
+        logger.LogInformation("Database migrations applied successfully.");
+
+        var seeder = services.GetRequiredService<JOIN.Infrastructure.Persistence.DatabaseSeeder>();
+        await seeder.SeedAsync(); // Seed the database with initial data (roles, default users, etc.)
+
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred while migrating the database.");
+        throw; 
+    }
+}
+
+// ============================================================================
+// 5. CONFIGURE THE HTTP REQUEST PIPELINE (Middleware)
+// ============================================================================
+
+app.UseExceptionHandler(); 
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.MapOpenApi(); // Generates the JSON document at /openapi/v1.json
+    app.MapScalarApiReference(); // The modern UI at /scalar/v1
 }
 
 app.UseHttpsRedirection();
 
-// SECURITY MIDDLEWARES: Order is critical here!
-app.UseAuthentication(); // 1. Who are you? (Validates JWT/Cookies)
-app.UseAuthorization();  // 2. Are you allowed to do this? (Validates Roles/Policies)
+app.UseAuthentication(); 
+app.UseAuthorization();  
 
-// Map standard Controller endpoints
 app.MapControllers();
 
-// Start the application
 app.Run();
