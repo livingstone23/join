@@ -32,6 +32,8 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddSingleton<ICurrentUserService, CurrentUserService>();
+builder.Services.AddTransient<ICurrentUserService, CurrentUserService>();
 
 // Application Layer (MediatR, FluentValidation Pipeline)
 builder.Services.AddApplicationServices();
