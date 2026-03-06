@@ -102,4 +102,10 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet("/", () => Results.Redirect("/scalar/v1"));
+}
+
 app.Run();
