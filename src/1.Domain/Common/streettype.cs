@@ -23,6 +23,11 @@ public class StreetType : BaseAuditableEntity
     /// </summary>
     public string Abbreviation { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Indicates if the street type is currently active and can be used in addresses.
+    /// </summary>
+    public bool IsActive { get; set; } = true;
+    
     // --- Navigation Properties ---
     public virtual ICollection<CustomerAddress> CustomerAddresses { get; set; } = new List<CustomerAddress>();
 }

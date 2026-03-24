@@ -14,13 +14,9 @@ namespace JOIN.Domain.Admin;
 /// This entity is a core part of the CRM module and is strictly tied to a Company (Tenant)
 /// to ensure data isolation and security in a multi-tenant environment.
 /// </summary>
-public class Customer : BaseAuditableEntity
+public class Customer : BaseTenantEntity
 {
-    /// <summary>
-    /// Gets or sets the unique identifier of the Company that owns this customer.
-    /// Essential for the Global Query Filter (Multi-tenancy).
-    /// </summary>
-    public Guid CompanyId { get; set; }
+
 
     /// <summary>
     /// Categorizes the customer as Physical (Natural Person) or Legal (Company/Organization).
@@ -42,7 +38,7 @@ public class Customer : BaseAuditableEntity
     /// <summary>
     /// Gets or sets the first surname of the customer.
     /// </summary>
-    public string LastName { get; set; } = string.Empty;
+    public string? LastName { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the second surname of the customer.
@@ -67,10 +63,7 @@ public class Customer : BaseAuditableEntity
 
     // --- Navigation Properties ---
 
-    /// <summary>
-    /// Reference to the owner Company.
-    /// </summary>
-    public virtual Company Company { get; set; } = null!;
+
 
     /// <summary>
     /// Reference to the specific Identification Type catalog entry.

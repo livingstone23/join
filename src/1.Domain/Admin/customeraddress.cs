@@ -12,8 +12,10 @@ namespace JOIN.Domain.Admin;
 /// Optimized for international standards, supporting a full geographical hierarchy:
 /// Country -> Region -> Province -> Municipality.
 /// </summary>
-public class CustomerAddress : BaseAuditableEntity
+public class CustomerAddress : BaseTenantEntity
 {
+
+
     /// <summary>
     /// Foreign key for the Customer who owns this address.
     /// </summary>
@@ -46,6 +48,12 @@ public class CustomerAddress : BaseAuditableEntity
     /// </summary>
     public Guid CountryId { get; set; }
 
+
+    /// <summary>
+    /// Foreign key to the Region catalog.
+    /// </summary>
+    public Guid? RegionId { get; set; }
+
     /// <summary>
     /// Foreign key to the Province catalog (Secondary administrative division).
     /// </summary>
@@ -69,6 +77,9 @@ public class CustomerAddress : BaseAuditableEntity
     /// <summary> Navigation to Country catalog. </summary>
     public virtual Country Country { get; set; } = null!;
 
+    /// <summary> Navigation to Region catalog. </summary>
+    public virtual Region? Region { get; set; } = null!;
+
     /// <summary> Navigation to Province/State catalog. </summary>
     public virtual Province Province { get; set; } = null!;
 
@@ -77,4 +88,6 @@ public class CustomerAddress : BaseAuditableEntity
 
     /// <summary> Navigation to StreetType catalog. </summary>
     public virtual StreetType StreetType { get; set; } = null!;
+    
+
 }

@@ -12,7 +12,7 @@ namespace JOIN.Domain.Admin;
 /// Represents a specific contact method for a Customer.
 /// Links a customer with different communication channels like Email, Phone, etc.
 /// </summary>
-public class CustomerContact : BaseAuditableEntity
+public class CustomerContact : BaseTenantEntity
 {
 
 

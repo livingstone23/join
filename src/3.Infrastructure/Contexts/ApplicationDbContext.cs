@@ -2,6 +2,7 @@
 
 
 using System.Reflection;
+using JOIN.Application.Interface;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
@@ -18,122 +19,132 @@ namespace JOIN.Infrastructure.Contexts;
 
 
 /// <summary>
-/// Represents the core database context for the JOIN application.
-/// Integrates ASP.NET Core Identity for user management and role-based access control (RBAC),
-/// specifically tailored for a multi-tenant architecture.
+/// Core database context for the JOIN CRM.
+/// Inherits from IdentityDbContext to support ASP.NET Core Identity with Guid keys.
+/// Enforces Multi-Tenancy (CompanyId) and Soft Delete (GcRecord) globally via Query Filters.
 /// </summary>
 public class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>
 {
-    private readonly AuditableEntitySaveChangesInterceptor _auditableEntitySaveChangesInterceptor;
+    private readonly AuditableEntitySaveChangesInterceptor _auditableInterceptor;
+    private readonly ICurrentUserService _currentUserService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ApplicationDbContext"/> class.
     /// </summary>
-    /// <param name="options">The options to be used by a <see cref="DbContext"/>.</param>
-    /// <param name="auditableEntitySaveChangesInterceptor">
-    /// The interceptor responsible for automatically updating audit fields (Created/Modified) on save.
-    /// </param>
+    /// <param name="options">The options to be used by a DbContext.</param>
+    /// <param name="auditableInterceptor">Interceptor to handle audit and multi-tenant fields.</param>
+    /// <param name="currentUserService">Service to retrieve the current user's Tenant (CompanyId).</param>
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options,
-        AuditableEntitySaveChangesInterceptor auditableEntitySaveChangesInterceptor)
-        : base(options)
+        AuditableEntitySaveChangesInterceptor auditableInterceptor,
+        ICurrentUserService currentUserService) : base(options)
     {
-        _auditableEntitySaveChangesInterceptor = auditableEntitySaveChangesInterceptor;
+        _auditableInterceptor = auditableInterceptor;
+        _currentUserService = currentUserService;
     }
 
-    // ========================================================================
-    // SECURITY & MULTI-TENANCY DBSETS
-    // ========================================================================
+    // --- SECURITY MODULE (Identity already provides Users and Roles DbSets) ---
+    public DbSet<UserCompany> UserCompanies { get; set; }
+    public DbSet<UserRoleCompany> UserRoleCompanies { get; set; }
+    public DbSet<UserConnectionLog> UserConnectionLogs { get; set; }
+
+    // --- ADMINISTRATIVE MODULE ---
+    public DbSet<Company> Companies { get; set; }
+    public DbSet<SystemModule> SystemModules { get; set; }
+    public DbSet<CompanyModule> CompanyModules { get; set; }
+    public DbSet<SystemOption> SystemOptions { get; set; }
+    public DbSet<RoleSystemOption> RoleSystemOptions { get; set; }
+
+    // --- GLOBAL CATALOGS ---
+    public DbSet<Country> Countries { get; set; }
+    public DbSet<Region> Regions { get; set; }
+    public DbSet<Province> Provinces { get; set; }
+    public DbSet<Municipality> Municipalities { get; set; }
+    public DbSet<StreetType> StreetTypes { get; set; }
+    public DbSet<IdentificationType> IdentificationTypes { get; set; }
+
+    // --- CUSTOMERS MODULE ---
+    public DbSet<Customer> Customers { get; set; }
+    public DbSet<CustomerAddress> CustomerAddresses { get; set; }
+    public DbSet<CustomerContact> CustomerContacts { get; set; }
+
+    // --- TICKETS MODULE (CORE) ---
+    public DbSet<Ticket> Tickets { get; set; }
+    public DbSet<Project> Projects { get; set; }
+    public DbSet<Area> Areas { get; set; }
+    public DbSet<TicketStatus> TicketStatuses { get; set; }
+    public DbSet<TicketComplexity> TicketComplexities { get; set; }
+    public DbSet<TimeUnit> TimeUnits { get; set; }
+    public DbSet<TicketNotification> TicketNotifications { get; set; }
+    public DbSet<CommunicationChannel> CommunicationChannels { get; set; }
 
     /// <summary>
-    /// Gets or sets the set of User-Role-Company relationships.
-    /// Defines which specific roles a user possesses within a given tenant (Company).
+    /// Configures the database schema, relationships, and global query filters.
     /// </summary>
-    public DbSet<UserRoleCompany> UserRoleCompanies => Set<UserRoleCompany>();
-
-    /// <summary>
-    /// Gets or sets the set of User-Company relationships.
-    /// Defines the tenants (Companies) a user has been granted access to.
-    /// </summary>
-    public DbSet<UserCompany> UserCompanies => Set<UserCompany>();
-
-
-    // ========================================================================
-    // BUSINESS DOMAIN DBSETS
-    // ========================================================================
-    
-    // --- Catálogos Geográficos ---
-    public DbSet<Country> Countries => Set<Country>();
-    public DbSet<Province> Provinces => Set<Province>();
-    public DbSet<Region> Regions => Set<Region>();
-    public DbSet<Municipality> Municipalities => Set<Municipality>();
-    public DbSet<StreetType> StreetTypes => Set<StreetType>();
-
-    // --- Administración & Clientes ---
-    public DbSet<Company> Companies => Set<Company>();
-    public DbSet<Customer> Customers => Set<Customer>();
-    public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
-    public DbSet<CustomerContact> CustomerContacts => Set<CustomerContact>();
-    public DbSet<IdentificationType> IdentificationTypes => Set<IdentificationType>();
-    public DbSet<Project> Projects => Set<Project>();
-    public DbSet<Area> Areas => Set<Area>();
-    public DbSet<EntityStatus> EntityStatuses => Set<EntityStatus>();
-
-
-    // --- Omnicanalidad & Tickets (Soporte) ---
-    public DbSet<Ticket> Tickets => Set<Ticket>();
-    public DbSet<TicketStatus> TicketStatuses => Set<TicketStatus>();
-    public DbSet<TicketComplexity> TicketComplexities => Set<TicketComplexity>();
-    public DbSet<TimeUnit> TimeUnits => Set<TimeUnit>();
-    public DbSet<TicketNotification> TicketNotifications => Set<TicketNotification>();
-    public DbSet<CommunicationChannel> CommunicationChannels => Set<CommunicationChannel>();
-    public DbSet<UserCommunicationChannel> UserCommunicationChannels => Set<UserCommunicationChannel>();
-
-
-    // ========================================================================
-    // CONFIGURATIONS & OVERRIDES
-    // ========================================================================
-
-    /// <summary>
-    /// Configures the schema needed for the identity framework and applies custom entity configurations.
-    /// </summary>
-    /// <param name="builder">The builder being used to construct the model for this context.</param>
     protected override void OnModelCreating(ModelBuilder builder)
     {
-        // CRITICAL: base.OnModelCreating(builder) MUST be called first.
-        // This ensures that Identity framework configures the base tables 
-        // (AspNetUsers, AspNetRoles, AspNetUserRoles, etc.) before any custom configurations are applied.
+        // 1. CRITICAL: Call the base method to ensure ASP.NET Identity tables are configured correctly.
         base.OnModelCreating(builder);
 
-        // Dynamically load all Fluent API configurations (IEntityTypeConfiguration<T>)
-        // defined within the current assembly (e.g., UserRoleCompanyConfiguration).
+        // 2. Apply separate Fluent API configurations (IEntityTypeConfiguration<T>) from the assembly.
         builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+
+        // 3. SPECIAL CONFIGURATIONS: Prevent multiple cascade paths in SQL Server.
+        
+        // Ticket -> CreatedByUser Relationship
+        builder.Entity<Ticket>()
+            .HasOne(t => t.CreatedByUser)
+            .WithMany()
+            .HasForeignKey(t => t.CreatedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Ticket -> AssignedToUser Relationship
+        builder.Entity<Ticket>()
+            .HasOne(t => t.AssignedToUser)
+            .WithMany()
+            .HasForeignKey(t => t.AssignedToUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Ticket -> PrecedentTicket Relationship (Self-referencing loop)
+        builder.Entity<Ticket>()
+            .HasOne(t => t.PrecedentTicket)
+            .WithMany(t => t.ChildTickets)
+            .HasForeignKey(t => t.PrecedentTicketId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // 4. GLOBAL QUERY FILTERS (Automated Multi-tenancy and Soft Delete)
+        // EF Core will dynamically evaluate _currentUserService.CompanyId at query execution time.
+
+        // Filter for Core Transactional Entities (Must belong to the current Tenant AND not be deleted)
+        builder.Entity<Ticket>().HasQueryFilter(t => t.GcRecord == 0 && t.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<Customer>().HasQueryFilter(c => c.GcRecord == 0 && c.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CustomerAddress>().HasQueryFilter(ca => ca.GcRecord == 0 && ca.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CustomerContact>().HasQueryFilter(cc => cc.GcRecord == 0 && cc.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<Project>().HasQueryFilter(p => p.GcRecord == 0 && p.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<Area>().HasQueryFilter(a => a.GcRecord == 0 && a.CompanyId == _currentUserService.CompanyId);
+
+        // Filter for Global Catalogs (Only Soft Delete, as they are shared across all Tenants)
+        builder.Entity<Country>().HasQueryFilter(c => c.GcRecord == 0);
+        builder.Entity<Region>().HasQueryFilter(r => r.GcRecord == 0);
+        builder.Entity<Province>().HasQueryFilter(p => p.GcRecord == 0);
+        builder.Entity<Municipality>().HasQueryFilter(m => m.GcRecord == 0);
+        builder.Entity<TicketStatus>().HasQueryFilter(ts => ts.GcRecord == 0);
+        builder.Entity<TicketComplexity>().HasQueryFilter(tc => tc.GcRecord == 0);
+        builder.Entity<TimeUnit>().HasQueryFilter(tu => tu.GcRecord == 0);
+        builder.Entity<CommunicationChannel>().HasQueryFilter(cc => cc.GcRecord == 0);
     }
 
     /// <summary>
-    /// Configures the database context options, registering custom interceptors and logging.
+    /// Configures options for the context, such as injecting interceptors.
     /// </summary>
-    /// <param name="optionsBuilder">A builder used to create or modify options for this context.</param>
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        // Register the auditing interceptor to populate BaseAuditableEntity fields automatically
-        optionsBuilder.AddInterceptors(_auditableEntitySaveChangesInterceptor);
-
-        // Enable sensitive data logging for detailed error tracking 
-        // NOTE: Ensure this is driven by environment variables so it is disabled in Production.
+        // Inject the Auditing and Multi-tenant interceptor into the EF Core pipeline
+        optionsBuilder.AddInterceptors(_auditableInterceptor);
+        
+        // Enable sensitive data logging to aid in debugging complex LINQ queries (Disable in Production)
         optionsBuilder.EnableSensitiveDataLogging();
-
+        
         base.OnConfiguring(optionsBuilder);
-    }
-
-    /// <summary>
-    /// Saves all changes made in this context to the database asynchronously.
-    /// </summary>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
-    /// <returns>A task that represents the asynchronous save operation.</returns>
-    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        // The actual audit logic is handled by the registered AuditableEntitySaveChangesInterceptor.
-        return await base.SaveChangesAsync(cancellationToken);
     }
 }

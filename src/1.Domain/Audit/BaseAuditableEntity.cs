@@ -10,7 +10,7 @@ namespace JOIN.Domain.Audit;
 /// Essential for monitoring who performed actions and when, 
 /// supporting security audits and data integrity checks.
 /// </summary>
-public abstract class BaseAuditableEntity : BaseEntity
+public abstract class BaseAuditableEntity : BaseEntity, IAuditableEntity
 {
     /// <summary>
     /// Gets or sets the UTC date and time when the entity was created.

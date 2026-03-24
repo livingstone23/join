@@ -1,3 +1,4 @@
+using JOIN.Domain.Audit;
 using Microsoft.AspNetCore.Identity;
 
 
@@ -10,7 +11,7 @@ namespace JOIN.Domain.Security;
 /// Custom Identity Role for the application.
 /// Allows adding specific auditing or business properties to roles.
 /// </summary>
-public class ApplicationRole : IdentityRole<Guid>
+public class ApplicationRole : IdentityRole<Guid>, IAuditableEntity
 {
     
     /// <summary>
@@ -23,6 +24,17 @@ public class ApplicationRole : IdentityRole<Guid>
     /// </summary>
     public bool IsSystemDefault { get; set; } = false;
 
+
+
+    // --- Audit Properties (from Interface) ---
+    public DateTime Created { get; set; } = DateTime.UtcNow;
+    public string? CreatedBy { get; set; }
+    public DateTime? LastModified { get; set; }
+    public string? LastModifiedBy { get; set; }
+    public int GcRecord { get; set; } = 0;
+
+
+    
     // --- Navigation Properties ---
     public virtual ICollection<UserRoleCompany> UserRoleCompanies { get; set; } = new List<UserRoleCompany>();
     

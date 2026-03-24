@@ -1,0 +1,267 @@
+
+///Para acivar el Mac en agente 
+
+Windows/Linux: Ctrl + Shift + I (para chat rápido) o Ctrl + Shift + Alt + L (para el panel lateral).
+
+macOS: Cmd + Shift + I o Cmd + Shift + Alt + L.
+
+
+# Permite con el comentario de código, el uso de la función de autocompletado de código en el editor, lo que facilita la escritura de código y mejora la productividad del desarrollador. Además, al proporcionar información adicional sobre el código, como su propósito o cómo se utiliza, los comentarios pueden ayudar a otros desarrolladores a comprender mejor el código 
+y a colaborar de manera más efectiva en proyectos de desarrollo de software.
+
+
+//Cambiar el modelo del autocompletado en copilot
+> change completion model 
+
+
+//Lineamientos para un promtpt efectivo:
+--Be Specific: Proporciona detalles claros sobre lo que necesitas. Cuanta más información, mejor.
+--Add usefull context: Si es relevante, incluye información adicional que pueda ayudar a entender mejor tu solicitud.
+--Add examples: Si es posible, proporciona ejemplos de lo que estás buscando. Esto puede ayudar a guiar la respuesta y asegurar que sea más precisa.
+--Ask for step-by-step: Si tu solicitud es compleja, pide una respuesta paso a
+
+
+//Para brindar un buen contexto puedes referenciar
+--ARchivo específico: "En el archivo ClassTest.cs, ¿cómo puedo implementar una función que calcule la suma de dos números?"
+--Función específica: "En la función CalculateSum, ¿cómo puedo optimizar el rendimiento
+--Variable específica: "En la variable totalCount, ¿cómo puedo asegurarme de que se actualice correctamente cada vez que se agregue un nuevo elemento a la lista?"
+--Url específica: "En la URL https://example.com/api/data, ¿cómo puedo manejar los errores de red de manera efectiva?"
+--Carpetas específicas: "En la carpeta Services, ¿cómo puedo organizar mis archivos para mejorar la mantenibilidad del proyecto?"
+
+
+--Considerar investigar un poco mas sobre Exploring Background & Cloud Agents.
+
+
+//Prompts files. en >copilot prompt
+//pueden funcionar atravez de multimples proyectos y los puedes organizar por carpetas.
+--.github/prompts
+--User Data
+--tienes la ruta de -Configure prompts files
+                    -New prompt file
+                    -Edit prompt file
+                    -Delete prompt file
+
+ //En el fichero tendras las siguientes secciones:, se pueden utilizar variables para que la estructura 
+ //sea reutilizable, por ejemplo {file} para referenciar un archivo específico, o {function} para referenciar una función específica. Esto permite que el mismo prompt se pueda utilizar en diferentes contextos simplemente cambiando el valor de las variables.
+ //para mas detalle ir a la ruta de documentacion oficial en la seccion de prompts files, donde se explica como configurar y utilizar los archivos de prompts de manera efectiva.
+ //https://code.visualstudio.com/docs/copilot/customization/prompt-files
+ /*
+ --
+name: Analyze Code
+description: Analyze the code and provide insights on potential issues, improvements, or optimizations.
+agent: ask (tambien puedo entre los agentes creados de manera personalizada)
+ --
+Aqui se agregan las instrucciones para el agente, por ejemplo:
+ 
+ "Analyze the {file} code and provide insights on potential issues, improvements, or optimizations. Focus on code readability, performance, and maintainability. Provide specific recommendations for refactoring or enhancing the code structure."
+ --
+*/
+
+//para hacer utilizacion para el ejemplo definido
+//En el chat del agente escribir /{nombre del prompt file} y luego  {file: ClassTest.cs} que seria el archivo de contexto.
+//Y utilizo el modo que defini en el ejemplo fue "ask" y presionamos enter.
+
+//Utilizacion de Builts Comands
+//En la misma barra del chat del agente /build y luego el comando que queremos utilizar, por ejemplo:
+--/build explain {file: ClassTest.cs} para que el agente explique el código del
+
+
+
+//Utilizacion de archivo de instrucciones para el agente
+Localmente tendras una carpeta  .github/prompts donde puedes crear archivos de instrucciones para el agente, 
+Donde crear el archivo: En Configur chat (tornillo)/Instructions and rules/new instructions (definimos si lo guardamos local o lo colocamos en multimples proyectos )
+por ejemplo un archivo llamado 
+"c_sharp_best_practices.md" con el siguiente contenido:
+/*
+--
+apply to: '**/*.py'
+--
+Prefix all my functions with W¡"func"
+
+
+*/
+
+//luego para el llamado. en el chat del agente escribimos:
+Update # {file: ClassTest.cs} with the instructions from c_sharp_best_practices.md
+
+//Uso de archivos AGENTS.MD para crear agentes personalizados
+--En la carpeta .github/prompts puedes crear un archivo llamado agents.md donde puedes definir agentes personalizados con comportamientos específicos. Por ejemplo, puedes crear un agente llamado "Code Optimizer" con el siguiente contenido:
+//Ejemplo de contenido para agents.md:
+/*
+    Ensure we follow pep8 rules.
+
+
+*/
+Importante el nivel de donde se coloca el archivo del agente para que pueda ser utilizado en los proyectos, 
+por ejemplo, si lo colocamos a nivel de la carpeta .github/prompts, el agente estará disponible para todos 
+los proyectos que tengan acceso a esa carpeta. Sin embargo, si lo colocamos a nivel de un proyecto específico, 
+el agente solo estará disponible para ese proyecto. Es importante considerar esto al organizar 
+tus archivos de agentes personalizados para asegurarte de que estén disponibles donde los necesites.
+
+
+Otro punto a considerar son los skills para los agentes personalizados, 
+que son habilidades específicas que puedes asignar a tus agentes para que realicen tareas específicas. 
+Por ejemplo, puedes asignar un skill de "Code Optimization" a tu agente "Code Optimizer" para que se especialice en optimizar código. 
+Esto permite que tus agentes sean más eficientes y efectivos en sus tareas asignadas, ya que pueden enfocarse en áreas específicas de conocimiento 
+o habilidades.
+
+
+
+
+SKILL.md
+---
+name: Performance Review
+description: Thoroughly evaluate the performance of Python code. Check for common mistakes and ensure the code
+follow well-know best practices. 
+
+---
+
+... instrucciones para el skill de performance reviews
+Debera de darse un grupo de instrucciones precisas para que el agente pueda realizar una revisión de rendimiento efectiva, por ejemplo:
+/*
+## Performance Review guidelines
+
+### Code Efficiency Review
+
+1.** Time complexity review**
+    -- Identify loops, nested iterations, and recursive calls
+    -- Look for patterns that may lead to inefficient algorithms, such as O(n^2) or worse.
+    -- Check for unnecessary computations or redundant code that could be optimized.
+
+2.** Memory usage review**
+    --Spot memory leaks from unclosed resources (files, connections).
+    --Identify excesive object creation in loops
+    --Review large data structure usage and unnecessary copies.
+
+3.** Algorithmic Optimization**
+    --Suggest more efficient algorithms or data structures where applicable.
+    --Recomend built-in functions over manual implementations
+    --Identify opportunities for caching or memorization to improve performance.
+
+### Common Performance Anti-Patterns
+- **String Concatenation**: Use `str.join()` instead of `+=` in loops
+- **List Comprehensions**: Prefer over traditional loop when appropiate
+- **Generator Expressions**: Use for memory-efficient over large datasets
+- **Dictionary Lookups**: Use dictionaries for O(1) lookups instead of lists for O(n)
+- **Set Operations**: Use sets for membership testing instead of lists
+- **Inefficient Loops**: Avoid nested loops when possible, and consider using built-in functions or libraries for optimized performance.
+
+### Profile Recommendations
+1.** Timing Analysis**
+    --Use profiling tools to identify bottlenecks in the code.
+    --Focus on optimizing the sections of code that consume the most time.
+2.** Memory Profiling**
+    --Use memory profiling tools to identify areas of high memory usage.
+    --Focus on optimizing memory usage in those areas, such as by reducing object creation or using
+    more efficient data structures.
+
+*/
+
+
+Para hacer uso de la skill en la ventana del agete llamas
+improve the performance of {file: ClassTest.cs} using the Performance Review skill.
+
+
+
+TOOLS & MCP
+Puedes instalar un tool para que el agente pueda realizar tareas específicas, por ejemplo, puedes instalar un tool de 
+"Code Formatter" para que el agente pueda formatear tu código automáticamente según las reglas de estilo que prefieras.
+y con @mcp en la busqueda de componentes puedo buscar herramientas específicas para mejorar la funcionalidad de mis agentes personalizados
+
+Identifica cuales deberias utilizar, entre mas tengas cargados mas pueden consumir tus tokes y crearte una experiencia de uso mas lenta, 
+por lo que es importante seleccionar cuidadosamente las herramientas que realmente necesitas para tus agentes personalizados 
+y evitar cargar herramientas innecesarias que puedan afectar el rendimiento de tus agentes y la experiencia general de uso.
+
+Importante si la tengo descargada, la puedo marcar y desmarcar para utilizar, ahi la prudencia de seleccionar las herramientas que realmente necesito 
+para mis agentes personalizados es clave para mantener un buen rendimiento y una experiencia de uso fluida.
+
+
+
+
+//
+
+
+
+.github
+    agentes
+    instructions
+    skills
+        performance-reviews
+            SKILL.md
+
+
+--NOTAS A REALIZAR PARA EL USO DE LOS PROMPT FILES Y BUILT IN COMMANDS
+--** Debere crear un archivo de instrucciones cuando lo aplique para programar en c sharp y 
+-- tener un comportamiento especifico para ese lenguaje, por ejemplo, si quiero que el agente me ayude a optimizar el código en c sharp, puedo crear un archivo de instrucciones llamado "optimize_csharp.md" con las siguientes instrucciones:
+"Optimize the C# code in the {file} file by identifying potential performance bottlenecks, improving code readability, and suggesting best practices for C# development. Focus on optimizing loops, reducing memory usage, and enhancing the overall structure of the code. Provide specific recommendations for refactoring or enhancing the code to improve its efficiency and maintainability."
+
+
+//
+
+
+CURSOR
+MODULO 4 ADVANCE
+//VID 01
+
+
+//Usando Rules y AGENTS.MD
+CURSOR Rules
+    Se pueden crear reglas para todo los proyectos
+    y para proyectos individuales.
+
+    .cursor/rules
+
+Alternativo a las regles esta el uso del fichero:
+    AGENTS.MD puede estar a nivel de raiz del proyecto
+    cursor lo cargara por defecto.
+
+//Usando AI Use tools
+    Brindarle contexto qeu busque en la web
+
+//Utilizando MCP 
+    Hay una lista de direcciones de mcp 
+    revisar https://cursor.com/docs/mcp
+            https://cursor.com/marketplace
+
+si agregar el MCP solo tienes que hacerle referencia a el en la 
+conversacion al agente.
+
+
+//.cursorignore
+.env
+Se puede agregar archivo que no quieres
+que cursor pueda revisar.
+otro podria ser .venv
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

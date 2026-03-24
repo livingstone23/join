@@ -15,15 +15,12 @@ namespace JOIN.Domain.Admin;
 /// Represents a functional department within a Company.
 /// Status is managed through the EntityStatus catalog for dynamic workflow support.
 /// </summary>
-public class Area : BaseAuditableEntity
+public class Area : BaseTenantEntity
 {
     
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Foreign key to the owner Company (Tenant).
-    /// </summary>
-    public Guid CompanyId { get; set; }
+
 
     /// <summary>
     /// Foreign key to the dynamic EntityStatus catalog.
@@ -32,7 +29,8 @@ public class Area : BaseAuditableEntity
 
     // --- Navigation Properties ---
 
-    public virtual Company Company { get; set; } = null!;
+
+
     public virtual EntityStatus Status { get; set; } = null!;
     public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
 

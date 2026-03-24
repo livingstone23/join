@@ -14,10 +14,31 @@ namespace JOIN.Domain.Security;
 /// </summary>
 public class ApplicationUser : IdentityUser<Guid>, IAuditableEntity
 {
+
+
+    /// <summary>
+    /// The user's first name.
+    /// </summary>
+    public string FirstName { get; set; } = string.Empty;
+
+
+    /// <summary>
+    /// The user's last name.
+    /// </summary>
+    public string LastName { get; set; } = string.Empty;
+
+
+    /// <summary>
+    /// Identifier for the avatar (e.g., if stored in a cloud bucket or media table).
+    /// </summary>
+    public Guid? AvatarId { get; set; }
+
+
     /// <summary>
     /// URL to the user's profile image.
     /// </summary>
     public string? AvatarUrl { get; set; }
+
 
     /// <summary>
     /// Soft delete and login access control.

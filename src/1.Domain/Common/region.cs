@@ -5,7 +5,6 @@ using JOIN.Domain.Audit;
 
 
 
-
 namespace JOIN.Domain.Common;
 
 

@@ -22,5 +22,8 @@ public class IdentificationType : BaseAuditableEntity
 
     /// <summary> Regex pattern to validate the identification number if necessary. </summary>
     public string? ValidationPattern { get; set; }
+
+    /// <summary> Indicates if this document type is currently active and can be used for new customers. </summary>
+    public bool IsActive { get; set; } = true;
     
 }

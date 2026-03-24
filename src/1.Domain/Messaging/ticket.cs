@@ -16,7 +16,7 @@ namespace JOIN.Domain.Messaging;
 /// <summary>
 /// Represents a service request with advanced tracking, SLAs, and multi-channel support.
 /// </summary>
-public class Ticket : BaseAuditableEntity
+public class Ticket : BaseTenantEntity
 {
     /// <summary> Human-readable identifier (e.g., 2006_001). </summary>
     public string Code { get; set; } = string.Empty;
@@ -34,7 +34,7 @@ public class Ticket : BaseAuditableEntity
     public Guid TicketComplexityId { get; set; }
 
     // --- Context & Hierarchy ---
-    public Guid CompanyId { get; set; } // Requerido
+
     public Guid? CustomerId { get; set; }
     public Guid? ProjectId { get; set; } // Opcional
     public Guid? AreaId { get; set; }    // Opcional
@@ -44,10 +44,11 @@ public class Ticket : BaseAuditableEntity
     public Guid? PrecedentTicketId { get; set; }
 
     /// <summary>
-    /// Guide to indicate if user that are not created, or user can watch the ticket
+    /// Indicates whether this ticket is visible to external users (e.g., customers) 
+    /// through a self-service portal or external tracking system.
     /// </summary>
-    /// <value></value>   
     public bool IsVisibleToExternals { get; set; } = false;
+    
     
     // --- Ownership ---
     public Guid CreatedByUserId { get; set; } // Usuario creó
@@ -55,7 +56,6 @@ public class Ticket : BaseAuditableEntity
 
 
     // --- Navigation ---
-    public virtual Company Company { get; set; } = null!;
     public virtual Customer? Customer { get; set; }
     public virtual Project? Project { get; set; }
     public virtual Area? Area { get; set; }
@@ -70,5 +70,10 @@ public class Ticket : BaseAuditableEntity
     
     public virtual Ticket? PrecedentTicket { get; set; }
     public virtual ICollection<TicketNotification> Notifications { get; set; } = new List<TicketNotification>();
+
+
+    /// <summary> Collection of follow-up tickets spawned from this specific ticket. </summary>
+    public virtual ICollection<Ticket> ChildTickets { get; set; } = new List<Ticket>();
+
 
 }

@@ -51,4 +51,5 @@ public class TicketNotification : BaseAuditableEntity
     // --- Navigation Properties ---
     public virtual Ticket? Ticket { get; set; }
     public virtual CommunicationChannel Channel { get; set; } = null!;
+    
 }

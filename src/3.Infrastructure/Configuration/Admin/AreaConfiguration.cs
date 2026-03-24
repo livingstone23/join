@@ -5,7 +5,11 @@ using JOIN.Domain.Admin;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
+
+
 namespace JOIN.Infrastructure.Configuration.Admin;
+
+
 
 /// <summary>
 /// Configures the database mapping for the <see cref="Area"/> entity.

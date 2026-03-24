@@ -13,7 +13,10 @@ namespace JOIN.Services.WebApi.Services;
 /// </summary>
 public class CurrentUserService : ICurrentUserService
 {
+    
+    
     private readonly IHttpContextAccessor _httpContextAccessor;
+
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CurrentUserService"/> class.
@@ -24,13 +27,34 @@ public class CurrentUserService : ICurrentUserService
         _httpContextAccessor = httpContextAccessor;
     }
 
+
     /// <summary>
     /// Extracts the UserId from the 'NameIdentifier' claim inside the JWT.
     /// </summary>
     public string? UserId => _httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
 
+
     /// <summary>
     /// Validates if the current user identity is marked as authenticated by the ASP.NET Core pipeline.
     /// </summary>
     public bool IsAuthenticated => _httpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated ?? false;
+
+    
+    /// <summary>
+    /// Extracts the CompanyId (Tenant) from the JWT claims. 
+    /// This is the cornerstone for data isolation in JOIN.
+    /// </summary>
+    public Guid CompanyId
+    {
+        get
+        {
+            var companyClaim = _httpContextAccessor.HttpContext?.User?.FindFirstValue("CompanyId");
+            if (Guid.TryParse(companyClaim, out var companyId))
+            {
+                return companyId;
+            }
+            return Guid.Empty;
+        }
+    }
+
 }
