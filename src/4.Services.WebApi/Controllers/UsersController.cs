@@ -1,7 +1,7 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
 using JOIN.Domain.Security;
-using JOIN.Infrastructure.Contexts;
+using JOIN.Persistence.Contexts;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;

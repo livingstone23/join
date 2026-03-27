@@ -2,8 +2,8 @@ using JOIN.Application;
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Domain.Security;
-using JOIN.Infrastructure.Configuration;
-using JOIN.Infrastructure.Contexts;
+using JOIN.Persistence.Configuration;
+using JOIN.Persistence.Contexts;
 using JOIN.Services.WebApi.Middlewares;
 using JOIN.Services.WebApi.Services;
 using Microsoft.AspNetCore.Identity;
@@ -32,14 +32,13 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
-builder.Services.AddSingleton<ICurrentUserService, CurrentUserService>();
-builder.Services.AddTransient<ICurrentUserService, CurrentUserService>();
+
 
 // Application Layer (MediatR, FluentValidation Pipeline)
 builder.Services.AddApplicationServices();
 
 // Infrastructure Layer (EF Core, Dapper Context, Repositories, UnitOfWork)
-builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddPersistenceServices(builder.Configuration);
 
 // ============================================================================
 // 3. ADD IDENTITY & SECURITY SERVICES
@@ -72,7 +71,7 @@ using (var scope = app.Services.CreateScope())
         await context.Database.MigrateAsync();
         logger.LogInformation("Database migrations applied successfully.");
 
-        var seeder = services.GetRequiredService<JOIN.Infrastructure.Persistence.DatabaseSeeder>();
+        var seeder = services.GetRequiredService<JOIN.Persistence.DatabaseSeeder>();
         await seeder.SeedAsync(); // Seed the database with initial data (roles, default users, etc.)
 
     }

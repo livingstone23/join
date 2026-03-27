@@ -12,6 +12,9 @@
   <Folder Name="/src/3.Infrastructure/">
     <Project Path="src/3.Infrastructure/JOIN.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/3.Persistence/">
+    <Project Path="src/3.Persistence/JOIN.Persistence.csproj" />
+  </Folder>
   <Folder Name="/src/4.Services.WebApi/">
     <Project Path="src/4.Services.WebApi/JOIN.Services.WebApi.csproj" />
   </Folder>

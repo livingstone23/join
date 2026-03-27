@@ -17,5 +17,6 @@
   <ItemGroup>
     <ProjectReference Include="..\2.Application\JOIN.Application.csproj" />
     <ProjectReference Include="..\3.Infrastructure\JOIN.Infrastructure.csproj" />
+    <ProjectReference Include="..\3.Persistence\JOIN.Persistence.csproj" />
   </ItemGroup>
 </Project>

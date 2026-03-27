@@ -15,7 +15,7 @@ namespace JOIN.Domain.Support;
 /// Records every outbound notification sent to users or customers.
 /// Supports both Ticket-specific alerts and Generic System alerts.
 /// </summary>
-public class TicketNotification : BaseAuditableEntity
+public class TicketNotification : BaseTenantEntity
 {
     /// <summary>
     /// Foreign key to the associated Ticket. 
