@@ -75,6 +75,7 @@ public class DatabaseSeeder
             await SeedStreetTypesAsync();
             await SeedCommunicationChannelsAsync();
             await SeedSystemModulesAsync();
+            await SeedCompanyModulesAsync();
 
             // 5. Identidad de acceso (SuperAdmin)
             await SeedSuperAdminAsync();
@@ -866,6 +867,81 @@ public class DatabaseSeeder
         }
 
         _logger.LogInformation("System modules catalog seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
+    }
+
+    private async Task SeedCompanyModulesAsync()
+    {
+        var companyIds = await _context.Companies
+            .IgnoreQueryFilters()
+            .Where(c => c.IsActive)
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        if (companyIds.Count == 0)
+        {
+            _logger.LogWarning("Company modules seed skipped. No active companies were found.");
+            return;
+        }
+
+        var moduleIds = await _context.SystemModules
+            .IgnoreQueryFilters()
+            .Where(m => m.IsActive)
+            .Select(m => m.Id)
+            .ToListAsync();
+
+        if (moduleIds.Count == 0)
+        {
+            _logger.LogWarning("Company modules seed skipped. No active system modules were found.");
+            return;
+        }
+
+        var existingPairs = await _context.CompanyModules
+            .IgnoreQueryFilters()
+            .Where(cm => companyIds.Contains(cm.CompanyId) && moduleIds.Contains(cm.ModuleId))
+            .Select(cm => new { cm.CompanyId, cm.ModuleId })
+            .ToListAsync();
+
+        var existingSet = existingPairs
+            .Select(x => (x.CompanyId, x.ModuleId))
+            .ToHashSet();
+
+        var now = DateTime.UtcNow;
+        var inserted = 0;
+
+        foreach (var companyId in companyIds)
+        {
+            foreach (var moduleId in moduleIds)
+            {
+                if (existingSet.Contains((companyId, moduleId)))
+                {
+                    continue;
+                }
+
+                _context.CompanyModules.Add(new CompanyModule
+                {
+                    CompanyId = companyId,
+                    ModuleId = moduleId,
+                    IsActive = true,
+                    Created = now,
+                    CreatedBy = "System_Seeder",
+                    GcRecord = 0
+                });
+
+                inserted++;
+            }
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        var totalExpected = companyIds.Count * moduleIds.Count;
+        _logger.LogInformation(
+            "Company modules seed finished. Inserted: {Inserted}, Existing: {Existing}, TotalExpected: {TotalExpected}",
+            inserted,
+            totalExpected - inserted,
+            totalExpected);
     }
 
     private static List<CountrySeed> GetCountrySeeds() =>
