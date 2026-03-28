@@ -30,8 +30,8 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
         
         var response = new Response<CustomerDto>();
 
-        // 1. Fetch data using Dapper (blazing fast, no tracking)
-        var customer = await _unitOfWork.Customers.GetAsync(request.CustomerId);
+        // 1. Fetch data including identification type for enriched response payload.
+        var customer = await _unitOfWork.Customers.GetByIdWithIdentificationTypeAsync(request.CustomerId);
 
         if (customer == null)
         {
@@ -42,7 +42,10 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
 
         // 2. Map Entity to DTO using Mapperly (Source Generators, zero reflection)
         var mapper = new CustomerMapper();
-        response.Data = mapper.ToDto(customer);
+        response.Data = mapper.ToDto(customer) with
+        {
+            IdentificationTypeIdName = customer.IdentificationType?.Name
+        };
         response.IsSuccess = true;
         response.Message = "Customer retrieved successfully.";
 

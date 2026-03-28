@@ -51,6 +51,18 @@ public class CustomersRepository : GenericRepository<Customer>, ICustomersReposi
     }
 
     /// <summary>
+    /// Retrieves a single customer by ID including IdentificationType using EF Core.
+    /// </summary>
+    public async Task<Customer?> GetByIdWithIdentificationTypeAsync(Guid id)
+    {
+        return await _context.Set<Customer>()
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Include(c => c.IdentificationType)
+            .FirstOrDefaultAsync(c => c.Id == id && c.GcRecord == 0);
+    }
+
+    /// <summary>
     /// Retrieves all active customers using Dapper to reduce memory overhead.
     /// </summary>
     public override async Task<IEnumerable<Customer>> GetAllAsync()
