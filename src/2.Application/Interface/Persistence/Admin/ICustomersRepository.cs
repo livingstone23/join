@@ -15,8 +15,9 @@ namespace JOIN.Application.Interface.Persistence.Admin;
 /// </summary>
 public interface ICustomersRepository : IGenericRepository<Customer>
 {
-
-    // Note: Add specific query contracts here in the future.
-    // Example: Task<Customer?> GetByVatNumberAsync(string vatNumber);
+    /// <summary>
+    /// Retrieves a customer by ID including the linked IdentificationType navigation.
+    /// </summary>
+    Task<Customer?> GetByIdWithIdentificationTypeAsync(Guid id);
 
 }

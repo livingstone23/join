@@ -37,9 +37,35 @@ public record CustomerDto
     public string FirstName { get; init; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the middle name of the customer.
+    /// </summary>
+    public string? MiddleName { get; init; }
+
+    /// <summary>
     /// Gets or sets the first surname of the customer[cite: 921].
     /// </summary>
     public string LastName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the second surname of the customer.
+    /// </summary>
+    public string? SecondLastName { get; init; }
+
+    /// <summary>
+    /// Gets or sets the business or trade name.
+    /// Mandatory for Legal persons.
+    /// </summary>
+    public string? CommercialName { get; init; }
+
+    /// <summary>
+    /// Gets or sets the foreign key for the identification document type.
+    /// </summary>
+    public Guid IdentificationTypeId { get; init; }
+
+    /// <summary>
+    /// Gets or sets the name of the identification type linked to <see cref="IdentificationTypeId"/>.
+    /// </summary>
+    public string? IdentificationTypeIdName { get; init; }
 
     /// <summary>
     /// Gets or sets the unique identification number (ID Card, Tax ID)[cite: 926].
