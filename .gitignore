@@ -155,3 +155,10 @@ PublishScripts/
 *.azurePubxml
 *.pubxml
 *.publishproj
+
+
+# Copilot local instructions
+/.github/copilot-instructions.md
+
+# Excluir todo lo de Copilot en .github
+/.github/copilot/**
