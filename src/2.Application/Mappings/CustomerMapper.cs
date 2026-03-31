@@ -41,6 +41,15 @@ public partial class CustomerMapper
 
 
     /// <summary>
+    /// Maps a CustomerContact domain entity to a CustomerContactDto.
+    /// </summary>
+    /// <param name="contact">The source CustomerContact entity.</param>
+    /// <returns>The mapped CustomerContactDto.</returns>
+    [MapperIgnoreSource(nameof(CustomerContact.CustomerId))]
+    public partial CustomerContactDto ToContactDto(CustomerContact contact);
+
+
+    /// <summary>
     /// Maps a CustomerDto back to a Customer domain entity.
     /// Ignores the Id property on the target to prevent accidental overwrites during creation.
     /// </summary>
@@ -49,6 +58,7 @@ public partial class CustomerMapper
     [MapperIgnoreTarget(nameof(Customer.Id))]
     [MapperIgnoreSource(nameof(CustomerDto.IdentificationTypeName))]
     [MapperIgnoreSource(nameof(CustomerDto.Addresses))]
+    [MapperIgnoreSource(nameof(CustomerDto.Contacts))]
     public partial Customer ToEntity(CustomerDto customerDto);
 
     

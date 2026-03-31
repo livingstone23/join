@@ -69,6 +69,7 @@ public class CustomersRepository : GenericRepository<Customer>, ICustomersReposi
                 .ThenInclude(a => a.Province)
             .Include(c => c.Addresses)
                 .ThenInclude(a => a.Municipality)
+            .Include(c => c.Contacts)
             .FirstOrDefaultAsync(c => c.Id == id && c.GcRecord == 0);
     }
 
