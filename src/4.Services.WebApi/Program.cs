@@ -9,6 +9,7 @@ using JOIN.Services.WebApi.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore; // <-- New using for modern API UI
+using JOIN.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +37,9 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 // Application Layer (MediatR, FluentValidation Pipeline)
 builder.Services.AddApplicationServices();
+
+// Infrastructure Layer (Dapper Connection Factory, Integrations)
+builder.Services.AddInfrastructure(builder.Configuration);
 
 // Infrastructure Layer (EF Core, Dapper Context, Repositories, UnitOfWork)
 builder.Services.AddPersistenceServices(builder.Configuration);
