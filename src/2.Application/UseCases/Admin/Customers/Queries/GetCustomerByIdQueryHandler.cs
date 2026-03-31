@@ -42,9 +42,12 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
 
         // 2. Map Entity to DTO using Mapperly (Source Generators, zero reflection)
         var mapper = new CustomerMapper();
-        response.Data = mapper.ToDto(customer) with
+        var customerDto = mapper.ToDto(customer);
+
+        response.Data = customerDto with
         {
-            IdentificationTypeIdName = customer.IdentificationType?.Name
+            IdentificationTypeName = customer.IdentificationType?.Name,
+            Addresses = customerDto.Addresses is { Count: > 0 } ? customerDto.Addresses : null
         };
         response.IsSuccess = true;
         response.Message = "Customer retrieved successfully.";
