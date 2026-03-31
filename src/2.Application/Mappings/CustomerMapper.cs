@@ -1,5 +1,6 @@
 using JOIN.Application.DTO.Admin;
 using JOIN.Domain.Admin;
+using JOIN.Domain.Common;
 using Riok.Mapperly.Abstractions;
 
 
@@ -26,12 +27,28 @@ public partial class CustomerMapper
 
 
     /// <summary>
+    /// Maps a CustomerAddress domain entity to a CustomerAddressDto.
+    /// </summary>
+    /// <param name="address">The source CustomerAddress entity.</param>
+    /// <returns>The mapped CustomerAddressDto.</returns>
+    [MapProperty($"{nameof(CustomerAddress.StreetType)}.{nameof(StreetType.Name)}", nameof(CustomerAddressDto.StreetTypeName))]
+    [MapProperty($"{nameof(CustomerAddress.Country)}.{nameof(Country.Name)}", nameof(CustomerAddressDto.CountryName))]
+    [MapProperty($"{nameof(CustomerAddress.Region)}.{nameof(Region.Name)}", nameof(CustomerAddressDto.RegionName))]
+    [MapProperty($"{nameof(CustomerAddress.Province)}.{nameof(Province.Name)}", nameof(CustomerAddressDto.ProvinceName))]
+    [MapProperty($"{nameof(CustomerAddress.Municipality)}.{nameof(Municipality.Name)}", nameof(CustomerAddressDto.MunicipalityName))]
+    [MapperIgnoreSource(nameof(CustomerAddress.CustomerId))]
+    public partial CustomerAddressDto ToAddressDto(CustomerAddress address);
+
+
+    /// <summary>
     /// Maps a CustomerDto back to a Customer domain entity.
     /// Ignores the Id property on the target to prevent accidental overwrites during creation.
     /// </summary>
     /// <param name="customerDto">The source CustomerDto.</param>
     /// <returns>The mapped Customer entity.</returns>
     [MapperIgnoreTarget(nameof(Customer.Id))]
+    [MapperIgnoreSource(nameof(CustomerDto.IdentificationTypeName))]
+    [MapperIgnoreSource(nameof(CustomerDto.Addresses))]
     public partial Customer ToEntity(CustomerDto customerDto);
 
     

@@ -59,6 +59,16 @@ public class CustomersRepository : GenericRepository<Customer>, ICustomersReposi
             .AsNoTracking()
             .IgnoreQueryFilters()
             .Include(c => c.IdentificationType)
+            .Include(c => c.Addresses)
+                .ThenInclude(a => a.StreetType)
+            .Include(c => c.Addresses)
+                .ThenInclude(a => a.Country)
+            .Include(c => c.Addresses)
+                .ThenInclude(a => a.Region)
+            .Include(c => c.Addresses)
+                .ThenInclude(a => a.Province)
+            .Include(c => c.Addresses)
+                .ThenInclude(a => a.Municipality)
             .FirstOrDefaultAsync(c => c.Id == id && c.GcRecord == 0);
     }
 

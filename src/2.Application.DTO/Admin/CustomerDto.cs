@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 
 
@@ -10,9 +11,8 @@ namespace JOIN.Application.DTO.Admin;
 /// Data Transfer Object (DTO) representing a customer.
 /// Uses 'record' to guarantee immutability, thread safety, and value-based equality.
 /// </summary>
-public record CustomerDto 
+public record CustomerDto
 {
-
     /// <summary>
     /// Global unique identifier for the customer.
     /// </summary>
@@ -65,11 +65,17 @@ public record CustomerDto
     /// <summary>
     /// Gets or sets the name of the identification type linked to <see cref="IdentificationTypeId"/>.
     /// </summary>
-    public string? IdentificationTypeIdName { get; init; }
+    public string? IdentificationTypeName { get; init; }
 
     /// <summary>
     /// Gets or sets the unique identification number (ID Card, Tax ID)[cite: 926].
     /// </summary>
     public string IdentificationNumber { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the addresses linked to this customer.
+    /// Returns null when the customer has no address records.
+    /// </summary>
+    public IReadOnlyCollection<CustomerAddressDto>? Addresses { get; init; }
 
 }
