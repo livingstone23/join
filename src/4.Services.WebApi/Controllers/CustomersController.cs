@@ -21,13 +21,16 @@ namespace JOIN.Services.WebApi.Controllers;
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
 public class CustomersController : ControllerBase
-{
+{   
+
+    
     private readonly IMediator _mediator;
 
     public CustomersController(IMediator mediator)
     {
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
     }
+
 
     /// <summary>
     /// Retrieves a specific customer by their unique identifier.
@@ -49,6 +52,7 @@ public class CustomersController : ControllerBase
 
         return Ok(response);
     }
+    
 
     /// <summary>
     /// Registers a new customer in the system.

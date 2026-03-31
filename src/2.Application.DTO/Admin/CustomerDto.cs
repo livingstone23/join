@@ -78,4 +78,10 @@ public record CustomerDto
     /// </summary>
     public IReadOnlyCollection<CustomerAddressDto>? Addresses { get; init; }
 
+    /// <summary>
+    /// Gets or sets the contact methods linked to this customer.
+    /// Returns null when the customer has no contact records.
+    /// </summary>
+    public IReadOnlyCollection<CustomerContactDto>? Contacts { get; init; }
+
 }

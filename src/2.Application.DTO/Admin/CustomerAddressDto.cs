@@ -82,4 +82,9 @@ public record CustomerAddressDto
     /// Indicates whether this is the default address for the customer.
     /// </summary>
     public bool IsDefault { get; init; }
+
+    /// <summary>
+    /// Address creation timestamp formatted as yyyy-MM-dd HH:mm.
+    /// </summary>
+    public string CreatedAt { get; init; } = string.Empty;
 }
