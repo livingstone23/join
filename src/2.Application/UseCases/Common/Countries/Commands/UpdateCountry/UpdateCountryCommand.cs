@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Common;
 using MediatR;
@@ -12,6 +13,7 @@ public record UpdateCountryCommand : IRequest<Response<CountryDto>>
     /// <summary>
     /// Gets the country identifier to update.
     /// </summary>
+    [JsonIgnore]
     public Guid Id { get; init; }
 
     /// <summary>
