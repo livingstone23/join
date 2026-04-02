@@ -1,86 +1,80 @@
-# Blueprint: MediatR Query (Dapper & Multi-Tenancy)
-Este blueprint define el estándar obligatorio para todas las operaciones de Lectura (Queries) en JOIN CRM. Se utiliza Dapper para garantizar una respuesta en milisegundos y evitar la sobrecarga del Change Tracker de Entity Framework, cumpliendo con el pilar de CQRS Optimizado.
+# Blueprint: MediatR Query (Dapper & Performance)
+
+Este blueprint define el estándar obligatorio para todas las operaciones de Lectura (Queries) en JOIN CRM, asegurando un rendimiento extremo y compatibilidad multi-motor (SQL Server/PostgreSQL).
 
 ## 1. Definición del DTO (Capa: JOIN.Application.DTO)
-Los DTOs deben ser records inmutables. Ubicación: src/2.Application.DTO/{Modulo}/.
-
+Los DTOs deben ser `record` inmutables.
 ```csharp
 namespace JOIN.Application.DTO.Admin;
 
-/// <summary>
-/// Data transfer object for Customer details
-/// </summary>
-public record CustomerDto(Guid Id, string Name, string Email, string TaxId);
-```
-
-## 2. Definición de la Query (Capa: JOIN.Application)
-La Query es un record que transporta los parámetros y hereda de IRequest<Response<T>>. Ubicación: src/2.Application/UseCases/{Modulo}/Queries/.
-
- ```csharp
-using JOIN.Application.Common.Models;
-using JOIN.Application.DTO.Admin;
-using MediatR;
-
-namespace JOIN.Application.UseCases.Admin.Queries;
-
-public record GetCustomerByIdQuery(Guid Id) : IRequest<Response<CustomerDto>>;
-```
-
-## 3. Implementación del Handler (Capa: JOIN.Application)
-El Handler ejecuta el SQL crudo. Regla de Oro: Está prohibido usar DbContext o IUnitOfWork en esta clase para operaciones de lectura.
-
-Ubicación: src/2.Application/UseCases/{Modulo}/Queries/
-
-```csharp
-using Dapper;
-using JOIN.Application.Common.Interfaces;
-using JOIN.Application.Common.Models;
-using JOIN.Application.DTO.Admin;
-using MediatR;
-
-namespace JOIN.Application.UseCases.Admin.Queries;
-
-// Uso obligatorio de Primary Constructors para inyección
-public class GetCustomerByIdHandler(
-    ISqlConnectionFactory connectionFactory, 
+public record CustomerDto {
+    public Guid Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string IdentificationTypeName { get; init; } = string.Empty;
+    public List<CustomerAddressDto>? Addresses { get; init; }
+}
+2. Implementación del Handler (Capa: JOIN.Application)
+Reglas de Oro
+Inyección: Usar ISqlConnectionFactory para obtener la conexión.
+Multi-Tenancy: Filtrar siempre por @TenantId.
+Single Roundtrip: Si hay colecciones relacionadas, usar QueryMultipleAsync.
+Agnosticismo: Usar CONCAT() para strings y formatear fechas en C#.
+Ejemplo de Handler Complejo
+C#
+public class GetCustomerByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
     ICurrentUserService currentUserService) 
     : IRequestHandler<GetCustomerByIdQuery, Response<CustomerDto>>
 {
     public async Task<Response<CustomerDto>> Handle(GetCustomerByIdQuery request, CancellationToken ct)
     {
-        // 1. Obtener conexión desde la fábrica (Agnóstica a SQL Server/PostgreSQL)
         using var connection = connectionFactory.CreateConnection();
 
-        // 2. SQL Raw con "REGLA DE ORO": Filtrar siempre por CompanyId (Multi-Tenancy)
-        // Se utiliza la sintaxis de triple comilla """ para legibilidad.
+        // SQL using standard JOINS and multiple SELECTs
         const string sql = """
-            SELECT Id, Name, Email, TaxId 
-            FROM Admin.Customers 
-            WHERE Id = @Id AND CompanyId = @TenantId
+            -- Query 1: Main Entity + Catalogs
+            SELECT c.Id, CONCAT(c.FirstName, ' ', c.LastName) AS Name, it.Name AS IdentificationTypeName
+            FROM Admin.Customers c
+            LEFT JOIN Admin.IdentificationTypes it ON c.IdentificationTypeId = it.Id
+            WHERE c.Id = @Id AND c.CompanyId = @TenantId AND c.GcRecord = 0;
+
+            -- Query 2: Related Collection
+            SELECT a.Id, a.AddressLine1, co.Name AS CountryName, a.Created
+            FROM Admin.CustomerAddresses a
+            LEFT JOIN Common.Countries co ON a.CountryId = co.Id
+            WHERE a.CustomerId = @Id AND a.CompanyId = @TenantId AND a.GcRecord = 0;
             """;
 
-        // 3. Ejecución directa con Dapper (Mapeo automático al DTO)
-        var result = await connection.QueryFirstOrDefaultAsync<CustomerDto>(sql, new 
+        using var multi = await connection.QueryMultipleAsync(sql, new 
         { 
-            Id = request.Id, 
+            Id = request.CustomerId, 
             TenantId = currentUserService.CompanyId 
         });
 
-        // 4. Retorno estandarizado usando el modelo Response
-        return result is not null 
-            ? Response<CustomerDto>.Success(result)
-            : Response<CustomerDto>.Error("Customer not found");
+        var customer = await multi.ReadFirstOrDefaultAsync<CustomerDto>();
+        if (customer == null) return Response<CustomerDto>.Error("Not found");
+
+        var addressesRaw = await multi.ReadAsync<dynamic>();
+        
+        // Final mapping with C# formatting
+        return Response<CustomerDto>.Success(customer with {
+            Addresses = addressesRaw.Select(a => new CustomerAddressDto {
+                Id = a.Id,
+                FullAddress = a.AddressLine1,
+                CountryName = a.CountryName,
+                CreatedAt = a.Created != null ? ((DateTime)a.Created).ToString("yyyy-MM-dd") : ""
+            }).ToList()
+        });
     }
 }
-```
+3. Checklist de Revisión
+[ ] ¿Usa ISqlConnectionFactory?
+[ ] ¿Filtra por CompanyId y GcRecord?
+[ ] ¿Usa CONCAT en lugar de + o ||?
+[ ] ¿El SQL es una const string con triple comilla?
+[ ] ¿Se formatea la fecha en el Select de C# y no en el SQL?
 
-## 4. Reglas Críticas de Cumplimiento (Checklist)
-Multi-Tenancy Manual: Toda consulta a entidades que hereden de BaseTenantEntity DEBE incluir el filtro CompanyId = @TenantId de forma manual en el SQL.
-Agnosticismo de DB: Prohibido usar funciones específicas de un motor (ej: NOLOCK de SQL Server o ILIKE de Postgres). El SQL debe ser compatible con ambos.
-Gestión de Memoria: Siempre usar using var connection para asegurar que la conexión se libere inmediatamente.
-Mapeo Directo: Dapper debe mapear directamente al DTO. No instanciar entidades de dominio dentro de una Query.
-Namespaces: Respetar la estructura de carpetas UseCases/{Modulo}/Queries/.
-Raw Strings: Definir el SQL como una const string dentro del Handler para mantener el caso de uso autocontenido.
+
 
 
 
