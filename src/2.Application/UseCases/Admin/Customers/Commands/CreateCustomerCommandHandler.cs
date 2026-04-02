@@ -7,6 +7,7 @@ using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Mappings;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
+using JOIN.Domain.Enums;
 using MediatR;
 
 
@@ -22,9 +23,11 @@ namespace JOIN.Application.UseCases.Admin.Customers.Commands;
 /// <param name="currentUserService">Current user context used to enforce tenant isolation.</param>
 public class CreateCustomerCommandHandler(
     IUnitOfWork unitOfWork,
+    ICustomerMapper customerMapper,
     ICurrentUserService currentUserService) : IRequestHandler<CreateCustomerCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly ICustomerMapper _customerMapper = customerMapper;
 
     /// <summary>
     /// Creates a customer after validating tenant context and foreign key references.
@@ -35,7 +38,6 @@ public class CreateCustomerCommandHandler(
     public async Task<Response<Guid>> Handle(CreateCustomerCommand request, CancellationToken cancellationToken)
     {
         var response = new Response<Guid>();
-        var mapper = new CustomerMapper();
 
         if (currentUserService.CompanyId == Guid.Empty)
         {
@@ -56,7 +58,7 @@ public class CreateCustomerCommandHandler(
         }
 
         var identificationTypeRepository = _unitOfWork.GetRepository<IdentificationType>();
-        var identificationType = await identificationTypeRepository.GetAsync(request.CustomerDto.IdentificationTypeId);
+        var identificationType = await identificationTypeRepository.GetAsync(request.IdentificationTypeId);
         if (identificationType is null)
         {
             response.IsSuccess = false;
@@ -65,9 +67,96 @@ public class CreateCustomerCommandHandler(
             return response;
         }
 
+        if (request.Addresses is { Count: > 0 })
+        {
+            var streetTypeRepository = _unitOfWork.GetRepository<StreetType>();
+            var countryRepository = _unitOfWork.GetRepository<Country>();
+            var regionRepository = _unitOfWork.GetRepository<Region>();
+            var provinceRepository = _unitOfWork.GetRepository<Province>();
+            var municipalityRepository = _unitOfWork.GetRepository<Municipality>();
+            var referenceErrors = new List<string>();
+
+            var streetTypeIds = request.Addresses.Select(a => a.StreetTypeId).Distinct();
+            foreach (var streetTypeId in streetTypeIds)
+            {
+                if (await streetTypeRepository.GetAsync(streetTypeId) is null)
+                {
+                    referenceErrors.Add($"Invalid StreetTypeId in addresses section: {streetTypeId}.");
+                }
+            }
+
+            var countryIds = request.Addresses.Select(a => a.CountryId).Distinct();
+            foreach (var countryId in countryIds)
+            {
+                if (await countryRepository.GetAsync(countryId) is null)
+                {
+                    referenceErrors.Add($"Invalid CountryId in addresses section: {countryId}.");
+                }
+            }
+
+            var provinceIds = request.Addresses.Select(a => a.ProvinceId).Distinct();
+            foreach (var provinceId in provinceIds)
+            {
+                if (await provinceRepository.GetAsync(provinceId) is null)
+                {
+                    referenceErrors.Add($"Invalid ProvinceId in addresses section: {provinceId}.");
+                }
+            }
+
+            var municipalityIds = request.Addresses.Select(a => a.MunicipalityId).Distinct();
+            foreach (var municipalityId in municipalityIds)
+            {
+                if (await municipalityRepository.GetAsync(municipalityId) is null)
+                {
+                    referenceErrors.Add($"Invalid MunicipalityId in addresses section: {municipalityId}.");
+                }
+            }
+
+            var regionIds = request.Addresses
+                .Select(a => a.RegionId)
+                .Where(r => r.HasValue)
+                .Select(r => r!.Value)
+                .Distinct();
+
+            foreach (var regionId in regionIds)
+            {
+                if (regionId == Guid.Empty || await regionRepository.GetAsync(regionId) is null)
+                {
+                    referenceErrors.Add($"Invalid RegionId in addresses section: {regionId}.");
+                }
+            }
+
+            if (referenceErrors.Count != 0)
+            {
+                response.IsSuccess = false;
+                response.Message = "One or more address references are invalid.";
+                response.Errors = referenceErrors;
+                return response;
+            }
+        }
+
+        if (request.Contacts is { Count: > 0 })
+        {
+            var invalidContactTypes = request.Contacts
+                .Select(c => c.ContactType)
+                .Where(ct => !Enum.TryParse<ContactType>(ct, true, out _))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (invalidContactTypes.Count != 0)
+            {
+                response.IsSuccess = false;
+                response.Message = "One or more contact types are invalid.";
+                response.Errors = invalidContactTypes
+                    .Select(ct => $"Invalid ContactType in contacts section: {ct}.")
+                    .ToList();
+                return response;
+            }
+        }
+
         var customerAlreadyExists = await _unitOfWork.Customers.ExistsByCompanyAndIdentificationAsync(
             currentUserService.CompanyId,
-            request.CustomerDto.IdentificationNumber);
+            request.IdentificationNumber);
 
         if (customerAlreadyExists)
         {
@@ -76,11 +165,23 @@ public class CreateCustomerCommandHandler(
                 ["A customer with the same identification number already exists for this company."]);
         }
 
-        // 1. Map DTO to Entity (Mapperly ignores the Id automatically to let DB/Constructor handle it)
-        var customerEntity = mapper.ToEntity(request.CustomerDto);
+        // 1. Map command payload to aggregate root with nested collections.
+        var customerEntity = _customerMapper.ToEntity(request);
         customerEntity.CompanyId = currentUserService.CompanyId;
 
-        // 2. Insert into Context (EF Core Change Tracker picks this up)
+        foreach (var address in customerEntity.Addresses)
+        {
+            address.CompanyId = currentUserService.CompanyId;
+            address.CustomerId = customerEntity.Id;
+        }
+
+        foreach (var contact in customerEntity.Contacts)
+        {
+            contact.CompanyId = currentUserService.CompanyId;
+            contact.CustomerId = customerEntity.Id;
+        }
+
+        // 2. Insert the aggregate so EF Core persists Customer + child collections atomically.
         await _unitOfWork.Customers.InsertAsync(customerEntity);
 
         // 3. Commit Transaction (This triggers the AuditableEntitySaveChangesInterceptor)

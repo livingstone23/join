@@ -3,6 +3,7 @@
 
 using System.Reflection;
 using FluentValidation;
+using JOIN.Application.Mappings;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -35,6 +36,9 @@ public static class ConfigureServices
 
         // Register FluentValidation and automatically discover all Validators
         services.AddValidatorsFromAssembly(assembly);
+
+        // Register Mapperly mappers
+        services.AddScoped<ICustomerMapper, CustomerMapper>();
 
         return services;
     
