@@ -1,16 +1,17 @@
 # Blueprint: Riok.Mapperly Mapper (High-Performance Mapping)
 
-Este blueprint define el estándar para la creación de mappers en JOIN CRM. Es obligatorio el uso de **Riok.Mapperly** (Source Generators) para garantizar el mejor rendimiento y evitar el overhead de reflexión en tiempo de ejecución.
+This blueprint defines the standard for creating mappers within JOIN CRM. The use of Riok.Mapperly (Source Generators) is mandatory to ensure peak performance and eliminate runtime reflection overhead.
 
-## 1. Definición del Mapper (Capa: JOIN.Application)
+## 1. Mapper Definition (Layer: JOIN.Application)
 
-### Reglas de Oro
-1. **Definición**: Los mappers deben ser `partial interface` y estar decorados con el atributo `[Mapper]`.
-2. **Nombramiento**: Seguir el patrón `I{Entity}Mapper` (ej: `ICustomerMapper`).
-3. **Ubicación**: Deben residir en el namespace de la entidad o del caso de uso correspondiente dentro de `JOIN.Application`.
-4. **Ignorar Propiedades**: Usar `[MapperIgnoreSource]` o `[MapperIgnoreTarget]` para campos auditables o IDs generados por la BD.
+### Golden Rules
+Definition: Mappers must be a partial interface and decorated with the [Mapper] attribute.
+Naming: Follow the I{Entity}Mapper pattern (e.g., ICustomerMapper).
+Location: They must reside in the entity's namespace or the corresponding use case namespace within JOIN.Application.
+Ignore Properties: Use [MapperIgnoreSource] or [MapperIgnoreTarget] for audit fields or database-generated IDs.
 
-### Ejemplo de Mapper Estándar
+### Standard Mapper Example
+
 ```csharp
 using Riok.Mapperly.Abstractions;
 using JOIN.Domain.Admin;
@@ -40,25 +41,25 @@ public partial interface ICustomerMapper
 }
 ´´
 
-2. Uso en el Handler
-El mapper debe inyectarse vía Primary Constructor en el Handler del Command.
+2. Usage in the Handler
+The mapper must be injected via a Primary Constructor in the Command Handler.
 
-C#
+```csharp
 public class CreateCustomerHandler(IUnitOfWork unitOfWork, ICustomerMapper mapper) 
     : IRequestHandler<CreateCustomerCommand, Response<Guid>>
 {
     public async Task<Response<Guid>> Handle(...)
     {
-        // Uso del mapper generado
+        // Usage of the generated mapper
         var entity = mapper.ToEntity(request);
         // ...
     }
 }
-´´´
+´´
 
-3. Checklist de Revisión
-[ ] ¿Es una partial interface?
-[ ] ¿Tiene el atributo [Mapper]?
-[ ] ¿Ignora los campos de auditoría (Created, GcRecord) al mapear hacia la Entidad?
-[ ] ¿Los nombres de los métodos son claros (ToEntity, ToDto)?
-[ ] ¿Tiene XML Comments en inglés?
+3. Review Checklist
+[ ] Is it a partial interface?
+[ ] Does it have the [Mapper] attribute?
+[ ] Does it ignore audit fields (Created, GcRecord) when mapping toward the Entity?
+[ ] Are the method names clear (ToEntity, ToDto)?
+[ ] Does it include XML Comments in English?

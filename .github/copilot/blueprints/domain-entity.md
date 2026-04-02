@@ -1,27 +1,18 @@
 # Blueprint: Domain Entity (DDD & Multi-Tenancy)
+This blueprint defines the standard for creating domain entities within JOIN.Domain. Entities must be pure business representations and adhere to specific inheritance rules for auditing and data isolation.
 
-Este blueprint define el estándar para la creación de entidades de dominio en `JOIN.Domain`. Las entidades deben ser representaciones puras del negocio y seguir las reglas de herencia para auditoría y aislamiento de datos.
+### 1 Inheritance Options
+- BaseTenantEntity: Used for data belonging to a specific company, such as Customers, Projects, or Branches. It includes CompanyId and is automatically processed by the Tenant Filter.
+- BaseAuditableEntity: Used for global or shared data requiring traceability, such as Countries or Currencies. It includes audit fields (Created, LastModified) but does not include CompanyId.
+- BaseEntity: Used for simple master or system tables that do not require extended auditing.
 
-## 1. Opciones de Herencia
+### 2 Coding Rules
+- *Constructors: Primary Constructors are FORBIDDEN in domain entities. EF Core requires a parameterless constructor (which can be protected) for materialization and proxy creation.
+- Properties: Use public virtual for navigation properties to allow for Lazy Loading when necessary.
+- Collections: Always initialize collections in the constructor or as auto-implemented properties to avoid NullReferenceException.
 
-### BaseTenantEntity
-- **Uso**: Para datos que pertenecen a una empresa específica (ej: Clientes, Proyectos, Sedes).
-- **Efecto**: Incluye `CompanyId` y es filtrado automáticamente por el Tenant Filter.
 
-### BaseAuditableEntity
-- **Uso**: Para datos globales o compartidos que requieren trazabilidad (ej: Países, Monedas).
-- **Efecto**: Incluye campos de auditoría (`Created`, `LastModified`) pero NO `CompanyId`.
-
-### BaseEntity
-- **Uso**: Para tablas maestras muy simples o de sistema sin necesidad de auditoría extendida.
-
-## 2. Reglas de Codificación
-
-1. **Constructores**: **PROHIBIDO** usar *Primary Constructors* en entidades de dominio. EF Core requiere un constructor sin parámetros (puede ser protegido) para la materialización y creación de proxies.
-2. **Propiedades**: Usar `public virtual` para propiedades de navegación para permitir *Lazy Loading* si fuera necesario.
-3. **Colecciones**: Inicializar colecciones en el constructor o como propiedades auto-implementadas para evitar `NullReferenceException`.
-
-## 3. Ejemplo de Entidad Estándar
+## 3. Standard Entity Example
 
 ```csharp
 using JOIN.Domain.Common;
@@ -57,9 +48,9 @@ public class Customer : BaseTenantEntity
 }
 ´´
 
-4. Checklist de Revisión
-[ ] ¿Hereda de la clase base correcta (BaseTenantEntity o BaseAuditableEntity)?
-[ ] ¿Evita el uso de Primary Constructors?
-[ ] ¿Tiene comentarios XML en inglés para cada propiedad?
-[ ] ¿Las propiedades de navegación son virtual?
-[ ] ¿Las colecciones están inicializadas?
+4. Review Checklist
+[ ] Does it inherit from the correct base class (BaseTenantEntity or BaseAuditableEntity)?
+[ ] Does it avoid the use of Primary Constructors?
+[ ] Does it include English XML comments for every property?
+[ ] Are navigation properties marked as virtual
+[ ] Are all collections properly initialized?
