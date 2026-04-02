@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text;
 using Dapper;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
@@ -48,6 +49,29 @@ public class GetCustomersPagedQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
+        var parameters = new DynamicParameters();
+        parameters.Add("TenantId", currentUserService.CompanyId);
+        parameters.Add("Offset", offset);
+        parameters.Add("PageSize", sanitizedPageSize);
+
+        var whereBuilder = new StringBuilder("WHERE c.CompanyId = @TenantId AND c.GcRecord = 0");
+
+        AddLikeFilter(request.PersonType, "PersonType");
+        AddLikeFilter(request.FirstName, "FirstName");
+        AddLikeFilter(request.MiddleName, "MiddleName");
+        AddLikeFilter(request.LastName, "LastName");
+        AddLikeFilter(request.SecondLastName, "SecondLastName");
+        AddLikeFilter(request.CommercialName, "CommercialName");
+        AddLikeFilter(request.IdentificationNumber, "IdentificationNumber");
+
+        if (request.IdentificationTypeId.HasValue && request.IdentificationTypeId.Value != Guid.Empty)
+        {
+            whereBuilder.Append(" AND c.IdentificationTypeId = @IdentificationTypeId");
+            parameters.Add("IdentificationTypeId", request.IdentificationTypeId.Value);
+        }
+
+        var whereClause = whereBuilder.ToString();
+
         var sql = $"""
             SELECT
                 c.Id,
@@ -63,24 +87,19 @@ public class GetCustomersPagedQueryHandler(
                 c.IdentificationNumber
             FROM Admin.Customers c
             LEFT JOIN Admin.IdentificationTypes it ON c.IdentificationTypeId = it.Id
-            WHERE c.CompanyId = @TenantId AND c.GcRecord = 0
+            {whereClause}
             ORDER BY c.Created DESC
             {GetPaginationClause(connection)};
 
             SELECT COUNT(*)
             FROM Admin.Customers c
-            WHERE c.CompanyId = @TenantId AND c.GcRecord = 0;
+            {whereClause};
             """;
 
         using var multi = await connection.QueryMultipleAsync(
             new CommandDefinition(
                 sql,
-                new
-                {
-                    TenantId = currentUserService.CompanyId,
-                    Offset = offset,
-                    PageSize = sanitizedPageSize
-                },
+                parameters,
                 cancellationToken: cancellationToken));
 
         var items = (await multi.ReadAsync<CustomerListItemDto>()).AsList();
@@ -98,6 +117,17 @@ public class GetCustomersPagedQueryHandler(
         response.Message = "Customers retrieved successfully.";
 
         return response;
+
+        void AddLikeFilter(string? value, string columnName)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            whereBuilder.Append($" AND c.{columnName} LIKE @{columnName}");
+            parameters.Add(columnName, $"%{value.Trim()}%");
+        }
     }
 
     /// <summary>

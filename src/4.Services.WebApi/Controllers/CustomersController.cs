@@ -60,13 +60,42 @@ public class CustomersController : ControllerBase
     /// </summary>
     /// <param name="pageNumber">The requested page number. Defaults to 1.</param>
     /// <param name="pageSize">The requested page size. Maximum allowed value is 50.</param>
+    /// <param name="personType">Optional customer person type filter.</param>
+    /// <param name="firstName">Optional first name filter.</param>
+    /// <param name="middleName">Optional middle name filter.</param>
+    /// <param name="lastName">Optional last name filter.</param>
+    /// <param name="secondLastName">Optional second last name filter.</param>
+    /// <param name="commercialName">Optional commercial name filter.</param>
+    /// <param name="identificationTypeId">Optional identification type filter.</param>
+    /// <param name="identificationNumber">Optional identification number filter.</param>
     /// <returns>A standardized response containing the paginated customer list.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(Application.Common.Response<PagedResult<CustomerListItemDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+    public async Task<IActionResult> GetPaged(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? personType = null,
+        [FromQuery] string? firstName = null,
+        [FromQuery] string? middleName = null,
+        [FromQuery] string? lastName = null,
+        [FromQuery] string? secondLastName = null,
+        [FromQuery] string? commercialName = null,
+        [FromQuery] Guid? identificationTypeId = null,
+        [FromQuery] string? identificationNumber = null)
     {
-        var query = new GetCustomersPagedQuery(pageNumber, pageSize);
+        var query = new GetCustomersPagedQuery(
+            pageNumber,
+            pageSize,
+            personType,
+            firstName,
+            middleName,
+            lastName,
+            secondLastName,
+            commercialName,
+            identificationTypeId,
+            identificationNumber);
+
         var response = await _mediator.Send(query);
 
         if (!response.IsSuccess)
