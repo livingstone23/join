@@ -61,6 +61,17 @@ public partial class CustomerMapper
     [MapperIgnoreSource(nameof(CustomerDto.Contacts))]
     public partial Customer ToEntity(CustomerDto customerDto);
 
+
+    /// <summary>
+    /// Maps a CreateCustomerDto to a Customer domain entity.
+    /// Tenant ownership (CompanyId) is resolved from the authenticated context in the handler.
+    /// </summary>
+    /// <param name="customerDto">The source create DTO.</param>
+    /// <returns>The mapped Customer entity.</returns>
+    [MapperIgnoreTarget(nameof(Customer.Id))]
+    [MapperIgnoreTarget(nameof(Customer.CompanyId))]
+    public partial Customer ToEntity(CreateCustomerDto customerDto);
+
     
     /// <summary>
     /// Projects an IQueryable of Customer entities to an IQueryable of CustomerDtos.

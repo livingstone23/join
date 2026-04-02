@@ -25,4 +25,20 @@ public class Response<T>
     /// <summary> Collection of validation errors, if any. </summary>
     public IEnumerable<string>? Errors { get; set; }
 
+    /// <summary>
+    /// Creates an error response with a standardized payload.
+    /// </summary>
+    /// <param name="message">The error message or error code.</param>
+    /// <param name="errors">Optional detailed validation or domain errors.</param>
+    /// <returns>An unsuccessful response instance.</returns>
+    public static Response<T> Error(string message, IEnumerable<string>? errors = null)
+    {
+        return new Response<T>
+        {
+            IsSuccess = false,
+            Message = message,
+            Errors = errors
+        };
+    }
+
 }

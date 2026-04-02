@@ -86,12 +86,18 @@ public class CustomersController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(Application.Common.Response<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Application.Common.Response<Guid>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateCustomerCommand command)
     {
         var response = await _mediator.Send(command);
 
         if (!response.IsSuccess)
         {
+            if (response.Message == "CUSTOMER_ALREADY_EXISTS")
+            {
+                return Conflict(response);
+            }
+
             return BadRequest(response);
         }
 

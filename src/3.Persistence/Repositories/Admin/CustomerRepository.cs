@@ -74,6 +74,35 @@ public class CustomersRepository : GenericRepository<Customer>, ICustomersReposi
     }
 
     /// <summary>
+    /// Determines whether an active customer exists for a given company and identification number.
+    /// </summary>
+    /// <param name="companyId">The tenant company identifier.</param>
+    /// <param name="identificationNumber">The identification number to validate.</param>
+    /// <returns><c>true</c> when a matching active customer exists; otherwise, <c>false</c>.</returns>
+    public async Task<bool> ExistsByCompanyAndIdentificationAsync(Guid companyId, string identificationNumber)
+    {
+        using var connection = _dapperContext.CreateConnection();
+        const string query = """
+            SELECT CASE
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM Admin.Customers
+                    WHERE CompanyId = @CompanyId
+                      AND IdentificationNumber = @IdentificationNumber
+                      AND GcRecord = 0
+                ) THEN CAST(1 AS bit)
+                ELSE CAST(0 AS bit)
+            END
+            """;
+
+        return await connection.ExecuteScalarAsync<bool>(query, new
+        {
+            CompanyId = companyId,
+            IdentificationNumber = identificationNumber
+        });
+    }
+
+    /// <summary>
     /// Retrieves all active customers using Dapper to reduce memory overhead.
     /// </summary>
     public override async Task<IEnumerable<Customer>> GetAllAsync()

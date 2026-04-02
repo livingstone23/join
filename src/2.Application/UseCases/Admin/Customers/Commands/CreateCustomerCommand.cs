@@ -16,7 +16,7 @@ namespace JOIN.Application.UseCases.Admin.Customers.Commands;
 /// Carries the DTO containing the required information.
 /// </summary>
 /// <param name="CustomerDto">The customer data transfer object.</param>
-public record CreateCustomerCommand(CustomerDto CustomerDto) : IRequest<Response<Guid>>;
+public record CreateCustomerCommand(CreateCustomerDto CustomerDto) : IRequest<Response<Guid>>;
 
 
 

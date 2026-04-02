@@ -4,7 +4,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
-  
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3">
@@ -13,7 +12,6 @@
     </PackageReference>
     <PackageReference Include="Scalar.AspNetCore" Version="2.12.54" />
   </ItemGroup>
-  
   <ItemGroup>
     <ProjectReference Include="..\2.Application\JOIN.Application.csproj" />
     <ProjectReference Include="..\3.Infrastructure\JOIN.Infrastructure.csproj" />
