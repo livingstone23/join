@@ -20,4 +20,11 @@ public interface IUnitOfWork : IDisposable
     // --- 3. Atomic Transaction ---
     Task<int> SaveAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Persists all tracked changes in a single atomic transaction.
+    /// </summary>
+    /// <param name="cancellationToken">Token to observe while waiting for the task to complete.</param>
+    /// <returns>The number of state entries written to the database.</returns>
+    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
 }

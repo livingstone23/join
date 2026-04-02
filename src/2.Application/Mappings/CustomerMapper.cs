@@ -123,6 +123,115 @@ public partial class CustomerMapper : ICustomerMapper
     [MapperIgnoreTarget(nameof(CustomerContact.Customer))]
     public partial CustomerContact ToContactEntity(CreateCustomerCommand.CreateCustomerContactDto contactDto);
 
+
+    /// <summary>
+    /// Maps an update-address payload to a CustomerAddress entity.
+    /// </summary>
+    /// <param name="addressDto">The source update-address payload.</param>
+    /// <returns>The mapped CustomerAddress entity.</returns>
+    [MapperIgnoreTarget(nameof(CustomerAddress.Id))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.CustomerId))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.CompanyId))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Created))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.CreatedBy))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.LastModified))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.LastModifiedBy))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.GcRecord))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Company))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Customer))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Country))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Region))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Province))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Municipality))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.StreetType))]
+    [MapperIgnoreSource(nameof(UpdateCustomerCommand.UpdateCustomerAddressDto.Id))]
+    public partial CustomerAddress ToAddressEntity(UpdateCustomerCommand.UpdateCustomerAddressDto addressDto);
+
+
+    /// <summary>
+    /// Maps an update-contact payload to a CustomerContact entity.
+    /// </summary>
+    /// <param name="contactDto">The source update-contact payload.</param>
+    /// <returns>The mapped CustomerContact entity.</returns>
+    [MapperIgnoreTarget(nameof(CustomerContact.Id))]
+    [MapperIgnoreTarget(nameof(CustomerContact.CustomerId))]
+    [MapperIgnoreTarget(nameof(CustomerContact.CompanyId))]
+    [MapperIgnoreTarget(nameof(CustomerContact.Created))]
+    [MapperIgnoreTarget(nameof(CustomerContact.CreatedBy))]
+    [MapperIgnoreTarget(nameof(CustomerContact.LastModified))]
+    [MapperIgnoreTarget(nameof(CustomerContact.LastModifiedBy))]
+    [MapperIgnoreTarget(nameof(CustomerContact.GcRecord))]
+    [MapperIgnoreTarget(nameof(CustomerContact.Company))]
+    [MapperIgnoreTarget(nameof(CustomerContact.Customer))]
+    [MapperIgnoreSource(nameof(UpdateCustomerCommand.UpdateCustomerContactDto.Id))]
+    public partial CustomerContact ToContactEntity(UpdateCustomerCommand.UpdateCustomerContactDto contactDto);
+
+
+    /// <summary>
+    /// Applies scalar updates from command to an existing customer entity.
+    /// </summary>
+    /// <param name="command">Source command data.</param>
+    /// <param name="customer">Target tracked customer entity.</param>
+    [MapperIgnoreTarget(nameof(Customer.Id))]
+    [MapperIgnoreTarget(nameof(Customer.CompanyId))]
+    [MapperIgnoreTarget(nameof(Customer.Created))]
+    [MapperIgnoreTarget(nameof(Customer.CreatedBy))]
+    [MapperIgnoreTarget(nameof(Customer.LastModified))]
+    [MapperIgnoreTarget(nameof(Customer.LastModifiedBy))]
+    [MapperIgnoreTarget(nameof(Customer.GcRecord))]
+    [MapperIgnoreTarget(nameof(Customer.Company))]
+    [MapperIgnoreTarget(nameof(Customer.IdentificationType))]
+    [MapperIgnoreTarget(nameof(Customer.Addresses))]
+    [MapperIgnoreTarget(nameof(Customer.Contacts))]
+    [MapperIgnoreTarget(nameof(Customer.Tickets))]
+    [MapperIgnoreSource(nameof(UpdateCustomerCommand.Id))]
+    [MapperIgnoreSource(nameof(UpdateCustomerCommand.Addresses))]
+    [MapperIgnoreSource(nameof(UpdateCustomerCommand.Contacts))]
+    public partial void ApplyUpdate(UpdateCustomerCommand command, Customer customer);
+
+
+    /// <summary>
+    /// Applies updates from payload to an existing customer address entity.
+    /// </summary>
+    /// <param name="source">Source update payload.</param>
+    /// <param name="target">Target tracked address entity.</param>
+    [MapperIgnoreTarget(nameof(CustomerAddress.Id))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.CustomerId))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.CompanyId))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Created))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.CreatedBy))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.LastModified))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.LastModifiedBy))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.GcRecord))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Company))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Customer))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Country))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Region))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Province))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.Municipality))]
+    [MapperIgnoreTarget(nameof(CustomerAddress.StreetType))]
+    [MapperIgnoreSource(nameof(UpdateCustomerCommand.UpdateCustomerAddressDto.Id))]
+    public partial void ApplyUpdate(UpdateCustomerCommand.UpdateCustomerAddressDto source, CustomerAddress target);
+
+
+    /// <summary>
+    /// Applies updates from payload to an existing customer contact entity.
+    /// </summary>
+    /// <param name="source">Source update payload.</param>
+    /// <param name="target">Target tracked contact entity.</param>
+    [MapperIgnoreTarget(nameof(CustomerContact.Id))]
+    [MapperIgnoreTarget(nameof(CustomerContact.CustomerId))]
+    [MapperIgnoreTarget(nameof(CustomerContact.CompanyId))]
+    [MapperIgnoreTarget(nameof(CustomerContact.Created))]
+    [MapperIgnoreTarget(nameof(CustomerContact.CreatedBy))]
+    [MapperIgnoreTarget(nameof(CustomerContact.LastModified))]
+    [MapperIgnoreTarget(nameof(CustomerContact.LastModifiedBy))]
+    [MapperIgnoreTarget(nameof(CustomerContact.GcRecord))]
+    [MapperIgnoreTarget(nameof(CustomerContact.Company))]
+    [MapperIgnoreTarget(nameof(CustomerContact.Customer))]
+    [MapperIgnoreSource(nameof(UpdateCustomerCommand.UpdateCustomerContactDto.Id))]
+    public partial void ApplyUpdate(UpdateCustomerCommand.UpdateCustomerContactDto source, CustomerContact target);
+
     
     /// <summary>
     /// Projects an IQueryable of Customer entities to an IQueryable of CustomerDtos.

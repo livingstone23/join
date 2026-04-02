@@ -103,6 +103,51 @@ public class CustomersRepository : GenericRepository<Customer>, ICustomersReposi
     }
 
     /// <summary>
+    /// Determines whether another active customer already uses the same identification pair.
+    /// </summary>
+    public async Task<bool> ExistsByCompanyAndIdentificationExceptIdAsync(
+        Guid companyId,
+        Guid customerId,
+        Guid identificationTypeId,
+        string identificationNumber)
+    {
+        using var connection = _dapperContext.CreateConnection();
+        const string query = """
+            SELECT CASE
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM Admin.Customers
+                    WHERE CompanyId = @CompanyId
+                      AND IdentificationTypeId = @IdentificationTypeId
+                      AND IdentificationNumber = @IdentificationNumber
+                      AND Id <> @CustomerId
+                      AND GcRecord = 0
+                ) THEN CAST(1 AS bit)
+                ELSE CAST(0 AS bit)
+            END
+            """;
+
+        return await connection.ExecuteScalarAsync<bool>(query, new
+        {
+            CompanyId = companyId,
+            CustomerId = customerId,
+            IdentificationTypeId = identificationTypeId,
+            IdentificationNumber = identificationNumber
+        });
+    }
+
+    /// <summary>
+    /// Retrieves a tracked customer aggregate with addresses and contacts for update operations.
+    /// </summary>
+    public async Task<Customer?> GetForUpdateAsync(Guid id, Guid companyId)
+    {
+        return await _context.Set<Customer>()
+            .Include(c => c.Addresses)
+            .Include(c => c.Contacts)
+            .FirstOrDefaultAsync(c => c.Id == id && c.CompanyId == companyId && c.GcRecord == 0);
+    }
+
+    /// <summary>
     /// Retrieves all active customers using Dapper to reduce memory overhead.
     /// </summary>
     public override async Task<IEnumerable<Customer>> GetAllAsync()

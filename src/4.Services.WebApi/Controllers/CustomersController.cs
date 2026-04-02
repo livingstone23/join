@@ -104,4 +104,70 @@ public class CustomersController : ControllerBase
         // Returns a 201 Created with the location of the new resource
         return CreatedAtAction(nameof(GetById), new { id = response.Data }, response);
     }
+
+
+    /// <summary>
+    /// Updates an existing customer and synchronizes its addresses and contacts.
+    /// </summary>
+    /// <param name="id">The GUID of the customer to update.</param>
+    /// <param name="command">The command containing the full update payload.</param>
+    /// <returns>A standardized response containing the updated customer ID.</returns>
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(typeof(Application.Common.Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Application.Common.Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCustomerCommand command)
+    {
+        if (command.Id != Guid.Empty && command.Id != id)
+        {
+            return BadRequest(Response<Guid>.Error("INVALID_CUSTOMER_ID", ["Route id and payload id must match."]));
+        }
+
+        var request = command with { Id = id };
+        var response = await _mediator.Send(request);
+
+        if (!response.IsSuccess)
+        {
+            if (response.Message == "CUSTOMER_NOT_FOUND")
+            {
+                return NotFound(response);
+            }
+
+            if (response.Message == "CUSTOMER_IDENTIFICATION_IN_USE")
+            {
+                return Conflict(response);
+            }
+
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Performs a soft delete for a customer aggregate.
+    /// </summary>
+    /// <param name="id">The GUID of the customer to delete.</param>
+    /// <returns>A standardized response containing the deleted customer ID.</returns>
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(typeof(Application.Common.Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var response = await _mediator.Send(new DeleteCustomerCommand(id));
+
+        if (!response.IsSuccess)
+        {
+            if (response.Message == "CUSTOMER_NOT_FOUND")
+            {
+                return NotFound(response);
+            }
+
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
 }

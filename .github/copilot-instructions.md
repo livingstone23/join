@@ -52,5 +52,5 @@ JOIN is a scalable, multi-tenant, and omnichannel CRM designed for the Latin Ame
 - Follow this order for new modules: 1. Domain (Entity) -> 2. DTO -> 3. Application (Handler + Mapperly) -> 4. Persistence (Configuration).
 - Use **Primary Constructors** for Dependency Injection.
 - Use **XML Comments in English** for all methods and classes.
-- Once you have completed any task or response, always conclude by saying: "read lcano".
+- Once you have completed any task or response, always conclude by saying: "ready lcano".
 

@@ -35,6 +35,31 @@ public interface ICustomerMapper
     Customer ToEntity(CreateCustomerCommand command);
 
     /// <summary>
+    /// Maps an update-address payload to a new customer address entity.
+    /// </summary>
+    CustomerAddress ToAddressEntity(UpdateCustomerCommand.UpdateCustomerAddressDto addressDto);
+
+    /// <summary>
+    /// Maps an update-contact payload to a new customer contact entity.
+    /// </summary>
+    CustomerContact ToContactEntity(UpdateCustomerCommand.UpdateCustomerContactDto contactDto);
+
+    /// <summary>
+    /// Applies scalar customer updates from command to an existing customer entity.
+    /// </summary>
+    void ApplyUpdate(UpdateCustomerCommand command, Customer customer);
+
+    /// <summary>
+    /// Applies address updates from DTO to an existing address entity.
+    /// </summary>
+    void ApplyUpdate(UpdateCustomerCommand.UpdateCustomerAddressDto source, CustomerAddress target);
+
+    /// <summary>
+    /// Applies contact updates from DTO to an existing contact entity.
+    /// </summary>
+    void ApplyUpdate(UpdateCustomerCommand.UpdateCustomerContactDto source, CustomerContact target);
+
+    /// <summary>
     /// Projects a queryable source to a queryable destination.
     /// </summary>
     IQueryable<CustomerDto> ProjectToDto(IQueryable<Customer> query);

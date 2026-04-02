@@ -65,7 +65,12 @@ public class UnitOfWork : IUnitOfWork
         return (IGenericRepository<TEntity>)_repositories[type]!;
     }
 
-    public async Task<int> SaveAsync(CancellationToken cancellationToken = default)
+    public Task<int> SaveAsync(CancellationToken cancellationToken = default)
+    {
+        return SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return await _dbContext.SaveChangesAsync(cancellationToken);
     }
