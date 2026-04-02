@@ -1,16 +1,15 @@
 # Blueprint: Entity Framework Configuration (Fluent API)
+This blueprint defines the standard for persistence configurations within JOIN.Persistence. It utilizes Fluent API to decouple database-specific concerns from the core domain model.
 
-Este blueprint define el estándar para las configuraciones de persistencia en `JOIN.Persistence`. Se utiliza **Fluent API** para separar las preocupaciones de la base de datos del modelo de dominio.
+## 1. Configuration Rules
 
-## 1. Reglas de Configuración
+1. **Esquemas**: It is mandatory to explicitly define the table schema (e.g., Admin, Common, Security, Support).
+2. **Naming**: Table names must be pluralized.
+3. **Primary Keys**: Always configure the primary key using .HasKey(x => x.Id).
+4. **Relationships**: Explicitly define relationships and their specific deletion behavior (OnDelete).
+5. **Multi-Tenancy**: filters are applied globally at the DbContext level; do not duplicate this logic within individual configurations.aquí.
 
-1. **Esquemas**: Es obligatorio definir el esquema de la tabla (ej: `Admin`, `Common`, `Security`, `Support`).
-2. **Nombramiento**: Las tablas deben nombrarse en plural.
-3. **Llaves Primarias**: Configurar siempre `.HasKey(x => x.Id)`.
-4. **Relaciones**: Definir explícitamente las relaciones y el comportamiento de borrado (`OnDelete`).
-5. **Multi-Tenancy**: Los filtros de `CompanyId` se aplican de forma global en el `DbContext`. No duplicar esa lógica aquí.
-
-## 2. Ejemplo de Configuración Estándar
+## 2. Standard Configuration Example
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -59,9 +58,9 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 }
 ´´´
 
-3. Checklist de Revisión
-[ ] ¿Define explícitamente el esquema (Schema)?
-[ ] ¿El nombre de la tabla está en plural?
-[ ] ¿Usa IEntityTypeConfiguration<T>?
-[ ] ¿Configura los límites de longitud (HasMaxLength) para strings?
-[ ] ¿Tiene comentarios XML en inglés?
+3. Review Checklist
+[ ] Does it explicitly define the Schema?
+[ ] Is the table name pluralized?
+[ ] Does it implement IEntityTypeConfiguration<T>?
+[ ] Are MaxLength constraints configured for all string properties?
+[ ] Does it include English XML comments for the class?

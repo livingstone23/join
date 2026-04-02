@@ -14,6 +14,11 @@ y a colaborar de manera más efectiva en proyectos de desarrollo de software.
 > change completion model 
 
 
+//Para configurar el github.copilot y el archivo de agente habilitas
+Cmd + ,   en macOs
+Ctrl + ,   en Windows/Linux 
+
+
 //Lineamientos para un promtpt efectivo:
 --Be Specific: Proporciona detalles claros sobre lo que necesitas. Cuanta más información, mejor.
 --Add usefull context: Si es relevante, incluye información adicional que pueda ayudar a entender mejor tu solicitud.

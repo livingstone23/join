@@ -1,9 +1,10 @@
 # Blueprint: MediatR Query (Dapper & Performance)
 
-Este blueprint define el estándar obligatorio para todas las operaciones de Lectura (Queries) en JOIN CRM, asegurando un rendimiento extremo y compatibilidad multi-motor (SQL Server/PostgreSQL).
+This blueprint defines the mandatory standard for all Read operations (Queries) within JOIN CRM, ensuring extreme performance and multi-engine compatibility (SQL Server/PostgreSQL).
 
-## 1. Definición del DTO (Capa: JOIN.Application.DTO)
-Los DTOs deben ser `record` inmutables.
+## 1. DTO Definition (Layer: JOIN.Application.DTO)
+DTOs must be immutable records.
+
 ```csharp
 namespace JOIN.Application.DTO.Admin;
 
@@ -13,18 +14,19 @@ public record CustomerDto {
     public string IdentificationTypeName { get; init; } = string.Empty;
     public List<CustomerAddressDto>? Addresses { get; init; }
 }
-2. Implementación del Handler (Capa: JOIN.Application)
-Reglas de Oro
-Inyección: Usar ISqlConnectionFactory para obtener la conexión.
-Multi-Tenancy: Filtrar siempre por @TenantId.
-Single Roundtrip: Si hay colecciones relacionadas, usar QueryMultipleAsync.
-Agnosticismo: Usar CONCAT() para strings y formatear fechas en C#.
-Ejemplo de Handler Complejo
-C#
-public class GetCustomerByIdQueryHandler(
-    ISqlConnectionFactory connectionFactory,
-    ICurrentUserService currentUserService) 
-    : IRequestHandler<GetCustomerByIdQuery, Response<CustomerDto>>
+´´
+
+## 2. IHandler Implementation (Layer: JOIN.Application)
+Golden Rules
+- Injection: Use ISqlConnectionFactory to obtain the connection.
+- Multi-Tenancy: Always filter by @TenantId.
+- Single Roundtrip: For related collections, use QueryMultipleAsync.
+- Agnosticism: Use CONCAT() for strings and format dates in C#.
+
+Complex Handler Example
+
+```csharp
+public class GetCustomerByIdQueryHandler(ISqlConnectionFactory connectionFactory,ICurrentUserService currentUserService) : IRequestHandler<GetCustomerByIdQuery, Response<CustomerDto>>
 {
     public async Task<Response<CustomerDto>> Handle(GetCustomerByIdQuery request, CancellationToken ct)
     {
@@ -67,12 +69,14 @@ public class GetCustomerByIdQueryHandler(
         });
     }
 }
-3. Checklist de Revisión
-[ ] ¿Usa ISqlConnectionFactory?
-[ ] ¿Filtra por CompanyId y GcRecord?
-[ ] ¿Usa CONCAT en lugar de + o ||?
-[ ] ¿El SQL es una const string con triple comilla?
-[ ] ¿Se formatea la fecha en el Select de C# y no en el SQL?
+´´
+
+## 3. Review Checklist
+[ ] Uses ISqlConnectionFactory?
+[ ] Filters by CompanyId and GcRecord?
+[ ] Uses CONCAT instead of + or ||?
+[ ] SQL is a const string with triple quotes?
+[ ] Date formatting is handled in C# Select, not in SQL?
 
 
 

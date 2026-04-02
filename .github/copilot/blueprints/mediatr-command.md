@@ -1,12 +1,13 @@
 # Blueprint: MediatR Command Handler (Riok.Mapperly version)
-Usa esta estructura para todos los Commands en JOIN.Application.
+Use this structure for all Commands within JOIN.Application.
 
-## Estructura
+## Structure
 1. **Namespace**: `JOIN.Application.UseCases.{Modulo}.Commands`
 2. **Request**: Usar `record` y heredar de `IRequest<Response<{T}>>`.
 3. **Handler**: Usar Primary Constructors para inyectar `IUnitOfWork` y el Mapper específico (ej: `ICustomerMapper`).
 4. **Respuesta**: Siempre retornar `Response<{T}>.Success(data)` o `.Error(message)`.
 
+Implementation Example
 ```csharp
 namespace JOIN.Application.UseCases.Admin.Commands;
 
@@ -27,3 +28,10 @@ public class CreateCustomerHandler(IUnitOfWork unitOfWork, ICustomerMapper mappe
         return Response<Guid>.Success(entity.Id);
     }
 }
+
+## Structure
+[ ] Is the namespace correctly structured by module?
+[ ] Does the command use a record for immutability?
+[ ] Are you injecting a specific Mapperly interface instead of a generic one?
+[ ] Does the handler use IUnitOfWork for persistence?
+[ ] Is the response wrapped in the standard Response<{T}> object?
