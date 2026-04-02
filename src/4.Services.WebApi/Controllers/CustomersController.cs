@@ -2,6 +2,7 @@
 
 
 using JOIN.Application.DTO.Admin;
+using JOIN.Application.Common;
 using JOIN.Application.UseCases.Admin.Customers.Commands;
 using JOIN.Application.UseCases.Admin.Customers.Queries;
 using MediatR;
@@ -48,6 +49,29 @@ public class CustomersController : ControllerBase
         if (!response.IsSuccess)
         {
             return NotFound(response);
+        }
+
+        return Ok(response);
+    }
+
+
+    /// <summary>
+    /// Retrieves a paginated list of customers for the current tenant.
+    /// </summary>
+    /// <param name="pageNumber">The requested page number. Defaults to 1.</param>
+    /// <param name="pageSize">The requested page size. Maximum allowed value is 50.</param>
+    /// <returns>A standardized response containing the paginated customer list.</returns>
+    [HttpGet]
+    [ProducesResponseType(typeof(Application.Common.Response<PagedResult<CustomerListItemDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+    {
+        var query = new GetCustomersPagedQuery(pageNumber, pageSize);
+        var response = await _mediator.Send(query);
+
+        if (!response.IsSuccess)
+        {
+            return BadRequest(response);
         }
 
         return Ok(response);
