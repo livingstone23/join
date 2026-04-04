@@ -1,3 +1,4 @@
+using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using Microsoft.AspNetCore.Identity;
 
@@ -37,5 +38,12 @@ public class ApplicationRole : IdentityRole<Guid>, IAuditableEntity
     
     // --- Navigation Properties ---
     public virtual ICollection<UserRoleCompany> UserRoleCompanies { get; set; } = new List<UserRoleCompany>();
+
+
+    /// <summary>
+    /// Collection of granular permissions assigned to this role across different system options.
+    /// Scoped by company due to RoleSystemOption being a BaseTenantEntity.
+    /// </summary>
+    public virtual ICollection<RoleSystemOption> RoleSystemOptions { get; set; } = new List<RoleSystemOption>();
     
 }

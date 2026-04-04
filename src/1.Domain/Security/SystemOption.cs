@@ -1,8 +1,9 @@
+using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 
 
 
-namespace JOIN.Domain.Admin;
+namespace JOIN.Domain.Security;
 
 
 
@@ -43,6 +44,12 @@ public class SystemOption : BaseAuditableEntity
     // --- Default Supported Actions ---
     // These indicate if the screen *supports* these actions by default.
     
+
+    /// <summary>
+    /// The name of the frontend controller or component associated with this option, used for permission checks and UI rendering.
+    /// </summary> 
+    public string? ControllerName { get; set; } = string.Empty;
+
     public bool CanRead { get; set; } = true;
     public bool CanCreate { get; set; } = true;
     public bool CanUpdate { get; set; } = true;

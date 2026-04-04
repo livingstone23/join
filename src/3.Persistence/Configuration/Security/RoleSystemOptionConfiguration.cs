@@ -1,11 +1,15 @@
 // Copyright (c) 2026-2027 JOIN Inc. All rights reserved.
 // See LICENSE in the project root for license information.
 
-using JOIN.Domain.Admin;
+using JOIN.Domain.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace JOIN.Persistence.Configuration.Admin;
+
+
+namespace JOIN.Persistence.Configuration.Security;
+
+
 
 /// <summary>
 /// Configures the database mapping for the <see cref="RoleSystemOption"/> entity.
@@ -20,7 +24,7 @@ public class RoleSystemOptionConfiguration : IEntityTypeConfiguration<RoleSystem
     public void Configure(EntityTypeBuilder<RoleSystemOption> builder)
     {
         // Map to table "RoleSystemOptions" in schema "Admin"
-        builder.ToTable("RoleSystemOptions", "Admin");
+        builder.ToTable("RoleSystemOptions", "Security");
 
         // --- Primary Key ---
         // Define a composite primary key. This ensures a role can only have one
@@ -54,5 +58,12 @@ public class RoleSystemOptionConfiguration : IEntityTypeConfiguration<RoleSystem
 
         // Apply a soft-delete filter.
         builder.HasQueryFilter(rso => rso.GcRecord == 0);
+
+
+        builder.HasOne(x => x.Company)
+            .WithMany(c => c.RoleSystemOptions)
+            .HasForeignKey(x => x.CompanyId)
+            .OnDelete(DeleteBehavior.Cascade);
+            
     }
 }

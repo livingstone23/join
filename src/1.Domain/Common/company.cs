@@ -87,5 +87,12 @@ public class Company : BaseAuditableEntity
     /// </summary>
     public virtual ICollection<UserCompany> UserCompanies { get; set; } = new List<UserCompany>();
     
+
+    /// <summary>
+    /// Collection of granular role-based permissions configured for this specific company.
+    /// </summary>
+    public virtual ICollection<RoleSystemOption> RoleSystemOptions { get; set; } = new List<RoleSystemOption>();
+    
+    
 }
 

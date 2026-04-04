@@ -1,4 +1,5 @@
 using JOIN.Domain.Audit;
+using JOIN.Domain.Security;
 
 
 
@@ -36,4 +37,6 @@ public class SystemModule : BaseAuditableEntity
     // --- Navigation Properties ---
     public virtual ICollection<CompanyModule> CompanyModules { get; set; } = new List<CompanyModule>();
     public virtual ICollection<SystemOption> SystemOptions { get; set; } = new List<SystemOption>();
+
+    
 }

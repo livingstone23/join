@@ -39,6 +39,17 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         // Combines both conditions into a single filter. 
         // Ensures that queries will NEVER return soft-deleted (GcRecord > 0) OR inactive users.
         builder.HasQueryFilter(u => u.GcRecord == 0 && u.IsActive);
+
+        // Security & SSO properties
+        builder.Property(u => u.ExternalProvider).HasMaxLength(50);
+        builder.Property(u => u.ExternalProviderId).HasMaxLength(255);
+        builder.Property(u => u.MfaSecretKey).HasMaxLength(100);
+
+        // Identity relationships
+        builder.HasMany(u => u.UserRoleCompanies)
+            .WithOne(urc => urc.User)
+            .HasForeignKey(urc => urc.UserId)
+            .IsRequired();
     }
     
 }

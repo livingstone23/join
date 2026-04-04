@@ -68,5 +68,10 @@ public class CompanyConfiguration : IEntityTypeConfiguration<Company>
         
         // Apply a soft-delete filter.
         builder.HasQueryFilter(c => c.GcRecord == 0);
-    }
+
+        // Inside Company mapping
+        builder.HasMany(c => c.RoleSystemOptions)
+            .WithOne(rso => rso.Company)
+            .HasForeignKey(rso => rso.CompanyId);
+            }
 }

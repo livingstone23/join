@@ -42,13 +42,15 @@ public class UserCompanyConfiguration : IEntityTypeConfiguration<UserCompany>
         builder.HasOne(uc => uc.User)
             .WithMany(u => u.UserCompanies)
             .HasForeignKey(uc => uc.UserId)
-            .OnDelete(DeleteBehavior.Cascade); // If the user is hard-deleted, remove their company access.
+            .HasPrincipalKey(u => u.Id) // <-- Fuerza el enlace explícito a la PK del Usuario
+            .OnDelete(DeleteBehavior.Cascade);
 
         // Relationship with Company (Tenant)
         builder.HasOne(uc => uc.Company)
-            .WithMany(c => c.UserCompanies) // Assuming you added this collection to Company
+            .WithMany(c => c.UserCompanies)
             .HasForeignKey(uc => uc.CompanyId)
-            .OnDelete(DeleteBehavior.Restrict); // Prevent deleting a company if users are still attached.
+            .HasPrincipalKey(c => c.Id) // <-- LA SOLUCIÓN AL WARNING: Fuerza el enlace a la PK de la Empresa
+            .OnDelete(DeleteBehavior.Restrict);
 
         // 5. Global Query Filters
         // Automatically excludes soft-deleted access records from queries.

@@ -8,6 +8,7 @@ using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
 using JOIN.Domain.Support;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,9 +42,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<EntityStatus> EntityStatuses => Set<EntityStatus>();
     public DbSet<IdentificationType> IdentificationTypes => Set<IdentificationType>();
     public DbSet<Project> Projects => Set<Project>();
-    public DbSet<RoleSystemOption> RoleSystemOptions => Set<RoleSystemOption>();
-    public DbSet<SystemModule> SystemModules => Set<SystemModule>();
-    public DbSet<SystemOption> SystemOptions => Set<SystemOption>();
+    
 
 
     // --- 3. COMMON MODULE ---
@@ -56,12 +55,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<StreetType> StreetTypes => Set<StreetType>();
  
 
+
     // --- 4. MESSAGING MODULE ---
     public DbSet<Ticket> Tickets => Set<Ticket>();
     public DbSet<TicketComplexity> TicketComplexities => Set<TicketComplexity>();
     public DbSet<TicketStatus> TicketStatuses => Set<TicketStatus>();
     public DbSet<TimeUnit> TimeUnits => Set<TimeUnit>();
     public DbSet<UserCommunicationChannel> UserCommunicationChannels => Set<UserCommunicationChannel>();
+
 
 
     // --- 5. SECURITY MODULE ---
@@ -71,6 +72,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<UserConnectionLog> UserConnectionLogs => Set<UserConnectionLog>();
     public DbSet<UserCustomer> UserCustomers => Set<UserCustomer>();
     public DbSet<UserRoleCompany> UserRoleCompanies => Set<UserRoleCompany>();
+    public DbSet<SystemOption> SystemOptions => Set<SystemOption>();
+    public DbSet<RoleSystemOption> RoleSystemOptions => Set<RoleSystemOption>();
+    public DbSet<SystemModule> SystemModules => Set<SystemModule>();
+
     
     
     /// --- 6. SUPPORT
@@ -103,6 +108,16 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
         // 5. SQL SERVER FIX: Prevent multiple cascade paths for Security relationships
         ConfigureSecurityRelationships(builder);
+
+        // 6. Map explicity the tables identity tables to the "Security" schema to keep them organized and avoid confusion with application tables.
+        builder.Entity<ApplicationUser>(e => e.ToTable("Users", "Security"));
+        builder.Entity<ApplicationRole>(e => e.ToTable("Roles", "Security"));
+        builder.Entity<IdentityUserRole<Guid>>(e => e.ToTable("UserRoles", "Security"));
+        builder.Entity<IdentityUserClaim<Guid>>(e => e.ToTable("UserClaims", "Security"));
+        builder.Entity<IdentityUserLogin<Guid>>(e => e.ToTable("UserLogins", "Security"));
+        builder.Entity<IdentityRoleClaim<Guid>>(e => e.ToTable("RoleClaims", "Security"));
+        builder.Entity<IdentityUserToken<Guid>>(e => e.ToTable("UserTokens", "Security"));
+        
     }
 
     /// <summary>
@@ -146,9 +161,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     
     // System Configuration
     builder.Entity<SystemModule>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<SystemOption>().HasQueryFilter(e => e.GcRecord == 0);
     builder.Entity<CompanyModule>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<RoleSystemOption>().HasQueryFilter(e => e.GcRecord == 0);
+    
 
 
     // --- 3. SECURITY & INTERSECTION ENTITIES (SOFT DELETE) ---
@@ -158,6 +172,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     builder.Entity<UserCustomer>().HasQueryFilter(e => e.GcRecord == 0);
     builder.Entity<UserRoleCompany>().HasQueryFilter(e => e.GcRecord == 0);
     builder.Entity<UserCommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0);
+    builder.Entity<RoleSystemOption>().HasQueryFilter(e => e.GcRecord == 0);
+    builder.Entity<SystemOption>().HasQueryFilter(e => e.GcRecord == 0);
+    
     
     // Note: UserConnectionLog typically doesn't need Soft Delete as it's an audit trail,
     // but if it inherits from BaseAuditableEntity, add it here:
@@ -193,18 +210,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
     private void ConfigureSecurityRelationships(ModelBuilder builder)
     {
-        // Prevent delete cycles between Users and Companies
-        builder.Entity<UserCompany>()
-            .HasOne(uc => uc.User)
-            .WithMany()
-            .HasForeignKey(uc => uc.UserId)
-            .OnDelete(DeleteBehavior.Restrict);
 
-        builder.Entity<UserCompany>()
-            .HasOne(uc => uc.Company)
-            .WithMany()
-            .HasForeignKey(uc => uc.CompanyId)
-            .OnDelete(DeleteBehavior.Restrict);
 
         // Prevent delete cycles between Users and Customers
         builder.Entity<UserCustomer>()

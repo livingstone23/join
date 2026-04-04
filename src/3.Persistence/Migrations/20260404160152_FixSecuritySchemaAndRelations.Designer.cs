@@ -4,6 +4,7 @@ using JOIN.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace JOIN.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260404160152_FixSecuritySchemaAndRelations")]
+    partial class FixSecuritySchemaAndRelations
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1336,10 +1339,6 @@ namespace JOIN.Persistence.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
 
-                    b.Property<string>("ControllerName")
-                        .HasMaxLength(250)
-                        .HasColumnType("nvarchar(250)");
-
                     b.Property<DateTime>("Created")
                         .HasColumnType("datetime2");
 
@@ -1391,7 +1390,13 @@ namespace JOIN.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ApplicationUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CompanyId1")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("Created")
@@ -1417,7 +1422,11 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ApplicationUserId");
+
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("CompanyId1");
 
                     b.HasIndex("UserId", "CompanyId")
                         .IsUnique();
@@ -1623,7 +1632,7 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("RoleClaims", "Security");
+                    b.ToTable("AspNetRoleClaims", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
@@ -1647,7 +1656,7 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserClaims", "Security");
+                    b.ToTable("AspNetUserClaims", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
@@ -1668,7 +1677,7 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserLogins", "Security");
+                    b.ToTable("AspNetUserLogins", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
@@ -1683,7 +1692,7 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("UserRoles", "Security");
+                    b.ToTable("AspNetUserRoles", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
@@ -1702,7 +1711,7 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasKey("UserId", "LoginProvider", "Name");
 
-                    b.ToTable("UserTokens", "Security");
+                    b.ToTable("AspNetUserTokens", (string)null);
                 });
 
             modelBuilder.Entity("JOIN.Domain.Admin.Area", b =>
@@ -2057,7 +2066,7 @@ namespace JOIN.Persistence.Migrations
                     b.HasOne("JOIN.Domain.Admin.SystemModule", "Module")
                         .WithMany("SystemOptions")
                         .HasForeignKey("ModuleId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("JOIN.Domain.Security.SystemOption", "Parent")
@@ -2072,16 +2081,24 @@ namespace JOIN.Persistence.Migrations
 
             modelBuilder.Entity("JOIN.Domain.Security.UserCompany", b =>
                 {
-                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", null)
                         .WithMany("UserCompanies")
+                        .HasForeignKey("ApplicationUserId");
+
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "User")
+                    b.HasOne("JOIN.Domain.Common.Company", null)
                         .WithMany("UserCompanies")
+                        .HasForeignKey("CompanyId1");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "User")
+                        .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Company");
