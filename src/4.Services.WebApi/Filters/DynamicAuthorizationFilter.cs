@@ -41,10 +41,10 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
         string controllerName = descriptor.ControllerName; 
         string httpMethod = context.HttpContext.Request.Method; 
 
-        // 3. Extract user identity, ROLE, and tenant context from the JWT Claims.
+        // 3. Extract user identity, ROLES, and tenant context from the JWT Claims.
         var user = context.HttpContext.User;
         var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        var role = user.FindFirst(ClaimTypes.Role)?.Value; // Extraemos el Rol
+        var roles = user.FindAll(ClaimTypes.Role).Select(claim => claim.Value).ToArray();
         var companyId = user.FindFirst("CompanyId")?.Value;
 
         // Block access if the UserId is completely missing (Invalid Token).
@@ -56,7 +56,7 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
 
         // --- SUPERADMIN BYPASS ---
         // If the user is SuperAdmin, grant full access immediately and ignore CompanyId.
-        if (string.Equals(role, SuperAdminRoleName, StringComparison.OrdinalIgnoreCase))
+        if (roles.Any(role => string.Equals(role, SuperAdminRoleName, StringComparison.OrdinalIgnoreCase)))
         {
             return; // Successful authorization, stop filter execution.
         }

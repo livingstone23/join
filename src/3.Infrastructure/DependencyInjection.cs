@@ -1,5 +1,7 @@
 using JOIN.Application.Interface;
 using JOIN.Infrastructure.Persistence;
+using JOIN.Infrastructure.Security;
+using JOIN.Infrastructure.Security.Jwt;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,6 +27,10 @@ public static class DependencyInjection
 
         // Register the Dapper connection factory as a Singleton
         services.AddSingleton<ISqlConnectionFactory, SqlConnectionFactory>();
+
+        // Register JWT generation services.
+        services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+        services.AddScoped<IPermissionService, PermissionService>();
 
         return services;
     }

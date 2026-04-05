@@ -71,6 +71,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<UserCompany> UserCompanies => Set<UserCompany>();
     public DbSet<UserConnectionLog> UserConnectionLogs => Set<UserConnectionLog>();
     public DbSet<UserCustomer> UserCustomers => Set<UserCustomer>();
+    public DbSet<UserRefreshToken> UserRefreshTokens => Set<UserRefreshToken>();
     public DbSet<UserRoleCompany> UserRoleCompanies => Set<UserRoleCompany>();
     public DbSet<SystemOption> SystemOptions => Set<SystemOption>();
     public DbSet<RoleSystemOption> RoleSystemOptions => Set<RoleSystemOption>();
@@ -170,6 +171,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     
     builder.Entity<UserCompany>().HasQueryFilter(e => e.GcRecord == 0);
     builder.Entity<UserCustomer>().HasQueryFilter(e => e.GcRecord == 0);
+    builder.Entity<UserRefreshToken>().HasQueryFilter(e => e.GcRecord == 0);
     builder.Entity<UserRoleCompany>().HasQueryFilter(e => e.GcRecord == 0);
     builder.Entity<UserCommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0);
     builder.Entity<RoleSystemOption>().HasQueryFilter(e => e.GcRecord == 0);

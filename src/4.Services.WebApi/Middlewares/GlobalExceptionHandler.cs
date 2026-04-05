@@ -60,6 +60,17 @@ public class GlobalExceptionHandler : IExceptionHandler
 
             return true;
         }
+        else if (exception is UnauthorizedAccessException unauthorizedAccessException)
+        {
+            httpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            await httpContext.Response.WriteAsJsonAsync(
+                Response<object>.Error(
+                    "UNAUTHORIZED",
+                    [unauthorizedAccessException.Message]),
+                cancellationToken);
+
+            return true;
+        }
         else if (exception is DbUpdateException dbUpdateException
                  && TryGetSqlErrorNumber(dbUpdateException.InnerException, out var sqlErrorNumber)
                  && (sqlErrorNumber == 2601 || sqlErrorNumber == 2627))

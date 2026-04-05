@@ -97,5 +97,6 @@ public class ApplicationUser : IdentityUser<Guid>, IAuditableEntity
     public virtual ICollection<UserCompany> UserCompanies { get; set; } = new List<UserCompany>();
     public virtual ICollection<UserRoleCompany> UserRoleCompanies { get; set; } = new List<UserRoleCompany>();
     public virtual ICollection<UserCommunicationChannel> Channels { get; set; } = new List<UserCommunicationChannel>();
+    public virtual ICollection<UserRefreshToken> RefreshTokens { get; set; } = new List<UserRefreshToken>();
     
 }
