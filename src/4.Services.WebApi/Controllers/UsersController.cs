@@ -4,9 +4,12 @@ using JOIN.Application.UseCases.Security.Auth.Login;
 using JOIN.Application.UseCases.Security.Auth.Refresh;
 using JOIN.Application.UseCases.Security.Auth.Register;
 using JOIN.Application.UseCases.Security.Queries.GetMyCompanyUserReport;
+using JOIN.Application.UseCases.Security.Queries.GetSidebarMenu;
 using JOIN.Application.UseCases.Security.Queries.GetSystemWideUserReport;
+using JOIN.Application.UseCases.Security.UserCompanies.Commands.SetDefaultCompany;
 using JOIN.Domain.Security;
 using JOIN.Persistence.Contexts;
+using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -91,6 +94,7 @@ public class UsersController : ControllerBase
         return Ok(response);
     }
 
+
     /// <summary>
     /// Logs the current user out of the active session.
     /// </summary>
@@ -108,6 +112,7 @@ public class UsersController : ControllerBase
             Message = "Logout completed successfully."
         });
     }
+
 
     /// <summary>
     /// Returns the user management and activity report across all companies.
@@ -131,8 +136,12 @@ public class UsersController : ControllerBase
         return Ok(response);
     }
 
+
     /// <summary>
-    /// Returns the user management and activity report scoped to the caller's active company.
+    /// Returns the user management and activity report for the authenticated user's active company context,
+    /// resolving the tenant first from <c>Security.UserCompanies</c> (default company), then from
+    /// <c>Security.UserRoleCompanies</c> when needed, and finally applying the effective <c>CompanyId</c>
+    /// to scope the report data.
     /// </summary>
     [HttpGet("reports/my-company")]
     [ProducesResponseType(typeof(Response<IReadOnlyCollection<UserManagementReportDto>>), StatusCodes.Status200OK)]
@@ -148,6 +157,22 @@ public class UsersController : ControllerBase
             new GetMyCompanyUserReportQuery(fromDate, toDate, roleNames),
             cancellationToken);
 
+        return Ok(response);
+    }
+
+
+    /// <summary>
+    /// Returns the hierarchical sidebar menu for the authenticated user in the active company context.
+    /// This endpoint skips the controller-based dynamic permission filter because it is the source used to build that permission-driven navigation.
+    /// </summary>
+    [Authorize]
+    [SkipDynamicAuthorization]
+    [HttpGet("sidebar")]
+    [ProducesResponseType(typeof(Response<IReadOnlyCollection<MenuOptionResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetSidebarMenu(CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new GetSidebarMenuQuery(), cancellationToken);
         return Ok(response);
     }
 
@@ -193,6 +218,69 @@ public class UsersController : ControllerBase
             IsSuccess = true,
             Message = "Users with roles retrieved successfully."
         });
+    }
+
+
+    /// <summary>
+    /// Returns the companies linked to the user and indicates which one is currently marked as default.
+    /// </summary>
+    [HttpGet("{userId:guid}/companies")]
+    [ProducesResponseType(typeof(Response<IEnumerable<UserCompanyDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<IEnumerable<UserCompanyDto>>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetUserCompanies(Guid userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return NotFound(new Response<IEnumerable<UserCompanyDto>>
+            {
+                IsSuccess = false,
+                Message = "User not found."
+            });
+        }
+
+        var companies = await _dbContext.UserCompanies
+            .AsNoTracking()
+            .Where(link => link.UserId == userId && link.GcRecord == 0)
+            .Join(
+                _dbContext.Companies.AsNoTracking().Where(company => company.GcRecord == 0),
+                link => link.CompanyId,
+                company => company.Id,
+                (link, company) => new UserCompanyDto
+                {
+                    CompanyId = company.Id,
+                    CompanyName = company.Name,
+                    TaxId = company.TaxId,
+                    IsDefault = link.IsDefault
+                })
+            .OrderByDescending(item => item.IsDefault)
+            .ThenBy(item => item.CompanyName)
+            .ToListAsync();
+
+        return Ok(new Response<IEnumerable<UserCompanyDto>>
+        {
+            Data = companies,
+            IsSuccess = true,
+            Message = "User companies retrieved successfully."
+        });
+    }
+
+    /// <summary>
+    /// Sets the default company for a user and clears any previous default assignment.
+    /// </summary>
+    [HttpPut("{userId:guid}/default-company/{companyId:guid}")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SetDefaultCompany(Guid userId, Guid companyId, CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(new SetDefaultCompanyCommand(userId, companyId), cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            return BadRequest(response);
+        }
+
+        return Ok(response);
     }
 
     /// <summary>
@@ -291,4 +379,5 @@ public class UsersController : ControllerBase
             Message = "User roles updated successfully."
         });
     }
+
 }

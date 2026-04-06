@@ -30,9 +30,13 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
 
     public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
-        // 1. Bypass authorization for endpoints decorated with [AllowAnonymous] (e.g., Login).
-        if (context.ActionDescriptor.EndpointMetadata.Any(em => em.GetType() == typeof(AllowAnonymousAttribute)))
+        // 1. Bypass dynamic authorization for endpoints explicitly marked to skip it
+        // or for [AllowAnonymous] endpoints such as login/refresh.
+        if (context.ActionDescriptor.EndpointMetadata.Any(em =>
+                em is AllowAnonymousAttribute || em is SkipDynamicAuthorizationAttribute))
+        {
             return;
+        }
 
         // 2. Ensure the request is mapped to a Controller action.
         if (context.ActionDescriptor is not ControllerActionDescriptor descriptor) return;

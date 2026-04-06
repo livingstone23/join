@@ -4,6 +4,7 @@ using JOIN.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace JOIN.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260406181249_RemoveShadowPropertyApplicationRoleId")]
+    partial class RemoveShadowPropertyApplicationRoleId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1413,11 +1416,6 @@ namespace JOIN.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
-
-                    b.HasIndex("UserId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_UserCompanies_UserId_Default")
-                        .HasFilter("[IsDefault] = 1 AND [GcRecord] = 0");
 
                     b.HasIndex("UserId", "CompanyId")
                         .IsUnique();

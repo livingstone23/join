@@ -76,9 +76,12 @@ public class DatabaseSeeder
             await SeedCommunicationChannelsAsync();
             await SeedSystemModulesAsync();
             await SeedCompanyModulesAsync();
+            await SeedSystemOptionsAsync();
 
-            // 5. Identidad de acceso (SuperAdmin)
-            await SeedSuperAdminAsync();
+            // 5. Identidad de acceso y autorizacion inicial
+            await SeedDefaultUsersAsync();
+            await SeedUserAccessAsync(joinCompanyId);
+            await SeedRoleSystemOptionsAsync(joinCompanyId);
 
             // 6. Catálogos administrativos operacionales
             var activeStatusId = await SeedActiveEntityStatusAsync();
@@ -103,20 +106,46 @@ public class DatabaseSeeder
 
     private async Task SeedRolesAsync()
     {
-        string[] roles = { "SuperAdmin", "Admin", "Agent", "Customer" };
+        string[] roles = { "SuperAdmin", "Admin", "Agent", "Customer", "Manager", "Supervisor", "Coordinador", "UsuarioSimple" };
+
         foreach (var roleName in roles)
         {
-            if (!await _roleManager.RoleExistsAsync(roleName))
+            var role = await _roleManager.FindByNameAsync(roleName);
+            if (role is null)
             {
                 _logger.LogDebug("Creating role: {RoleName}", roleName);
-                await _roleManager.CreateAsync(new ApplicationRole 
-                { 
-                    Name = roleName, 
-                    NormalizedName = roleName.ToUpper(),
+                var createResult = await _roleManager.CreateAsync(new ApplicationRole
+                {
+                    Name = roleName,
+                    NormalizedName = roleName.ToUpperInvariant(),
                     Description = $"Default system role for {roleName}",
-                    IsSystemDefault = true 
+                    IsSystemDefault = true,
+                    Created = DateTime.UtcNow,
+                    CreatedBy = "System_Seeder",
+                    GcRecord = 0
                 });
+
+                EnsureIdentityResultSucceeded(createResult, $"creating role '{roleName}'");
+                continue;
             }
+
+            var hasChanges = role.Description != $"Default system role for {roleName}"
+                || !role.IsSystemDefault
+                || role.GcRecord != 0;
+
+            if (!hasChanges)
+            {
+                continue;
+            }
+
+            role.Description = $"Default system role for {roleName}";
+            role.IsSystemDefault = true;
+            role.GcRecord = 0;
+            role.LastModified = DateTime.UtcNow;
+            role.LastModifiedBy = "System_Seeder";
+
+            var updateResult = await _roleManager.UpdateAsync(role);
+            EnsureIdentityResultSucceeded(updateResult, $"updating role '{roleName}'");
         }
     }
 
@@ -193,28 +222,180 @@ public class DatabaseSeeder
         return existing.Id;
     }
 
-    private async Task SeedSuperAdminAsync()
+    private async Task SeedDefaultUsersAsync()
     {
-        var adminEmail = "admin@join.com";
-        if (await _userManager.FindByEmailAsync(adminEmail) == null)
+        foreach (var seed in GetDefaultUserSeeds())
         {
-            _logger.LogDebug("Creating default SuperAdmin user...");
-            var user = new ApplicationUser 
-            { 
-                UserName = adminEmail, 
-                Email = adminEmail, 
-                EmailConfirmed = true, 
-                IsActive = true,
+            var user = await _userManager.FindByEmailAsync(seed.Email);
+            var isNewUser = user is null;
+
+            user ??= new ApplicationUser
+            {
+                UserName = seed.Email,
+                Email = seed.Email,
                 Created = DateTime.UtcNow,
-                CreatedBy = "System_Seeder"
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
             };
 
-            var result = await _userManager.CreateAsync(user, "Join_Admin2026*");
-            if (result.Succeeded)
+            user.FirstName = seed.FirstName;
+            user.LastName = seed.LastName;
+            user.UserName = seed.Email;
+            user.Email = seed.Email;
+            user.EmailConfirmed = true;
+            user.IsActive = true;
+            user.IsSuperAdmin = seed.IsSuperAdmin;
+            user.IsSuperAdminCompany = false;
+            user.GcRecord = 0;
+
+            if (isNewUser)
             {
-                await _userManager.AddToRoleAsync(user, "SuperAdmin");
+                var createResult = await _userManager.CreateAsync(user, seed.Password);
+                EnsureIdentityResultSucceeded(createResult, $"creating user '{seed.Email}'");
+            }
+            else
+            {
+                user.LastModified = DateTime.UtcNow;
+                user.LastModifiedBy = "System_Seeder";
+
+                var updateResult = await _userManager.UpdateAsync(user);
+                EnsureIdentityResultSucceeded(updateResult, $"updating user '{seed.Email}'");
+
+                IdentityResult passwordResult;
+                if (await _userManager.HasPasswordAsync(user))
+                {
+                    var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+                    passwordResult = await _userManager.ResetPasswordAsync(user, resetToken, seed.Password);
+                }
+                else
+                {
+                    passwordResult = await _userManager.AddPasswordAsync(user, seed.Password);
+                }
+
+                EnsureIdentityResultSucceeded(passwordResult, $"setting password for '{seed.Email}'");
+            }
+
+            if (!await _userManager.IsInRoleAsync(user, seed.RoleName))
+            {
+                var addToRoleResult = await _userManager.AddToRoleAsync(user, seed.RoleName);
+                EnsureIdentityResultSucceeded(addToRoleResult, $"assigning role '{seed.RoleName}' to '{seed.Email}'");
             }
         }
+    }
+
+    private async Task SeedUserAccessAsync(Guid joinCompanyId)
+    {
+        var seeds = GetDefaultUserSeeds();
+        var emails = seeds.Select(x => x.Email).ToList();
+        var roleNames = seeds.Select(x => x.RoleName).Distinct().ToList();
+
+        var users = await _context.ApplicationUsers
+            .IgnoreQueryFilters()
+            .Where(u => u.Email != null && emails.Contains(u.Email))
+            .ToListAsync();
+
+        var roles = await _context.ApplicationRoles
+            .IgnoreQueryFilters()
+            .Where(r => r.Name != null && roleNames.Contains(r.Name))
+            .ToListAsync();
+
+        var usersByEmail = users.ToDictionary(u => u.Email!, StringComparer.OrdinalIgnoreCase);
+        var roleIdsByName = roles.ToDictionary(r => r.Name!, r => r.Id, StringComparer.OrdinalIgnoreCase);
+        var userIds = users.Select(u => u.Id).ToList();
+
+        var existingUserCompanies = await _context.UserCompanies
+            .IgnoreQueryFilters()
+            .Where(uc => uc.CompanyId == joinCompanyId && userIds.Contains(uc.UserId))
+            .ToListAsync();
+
+        var existingUserRoleCompanies = await _context.UserRoleCompanies
+            .IgnoreQueryFilters()
+            .Where(urc => urc.CompanyId == joinCompanyId && userIds.Contains(urc.UserId))
+            .ToListAsync();
+
+        var userCompanyByUserId = existingUserCompanies.ToDictionary(x => x.UserId, x => x);
+        var userRoleSet = existingUserRoleCompanies
+            .Select(x => (x.UserId, x.RoleId, x.CompanyId))
+            .ToHashSet();
+
+        var now = DateTime.UtcNow;
+        var companyLinksInserted = 0;
+        var roleLinksInserted = 0;
+
+        foreach (var seed in seeds)
+        {
+            if (!usersByEmail.TryGetValue(seed.Email, out var user))
+            {
+                _logger.LogWarning("Seeded user {Email} was not found while linking company access.", seed.Email);
+                continue;
+            }
+
+            if (!userCompanyByUserId.TryGetValue(user.Id, out var userCompany))
+            {
+                _context.UserCompanies.Add(new UserCompany
+                {
+                    UserId = user.Id,
+                    CompanyId = joinCompanyId,
+                    IsDefault = true,
+                    Created = now,
+                    CreatedBy = "System_Seeder",
+                    GcRecord = 0
+                });
+
+                companyLinksInserted++;
+            }
+            else if (!userCompany.IsDefault || userCompany.GcRecord != 0)
+            {
+                userCompany.IsDefault = true;
+                userCompany.GcRecord = 0;
+                userCompany.LastModified = now;
+                userCompany.LastModifiedBy = "System_Seeder";
+            }
+
+            if (!roleIdsByName.TryGetValue(seed.RoleName, out var roleId))
+            {
+                _logger.LogWarning("Seeded role {RoleName} was not found while linking company access.", seed.RoleName);
+                continue;
+            }
+
+            if (userRoleSet.Contains((user.Id, roleId, joinCompanyId)))
+            {
+                continue;
+            }
+
+            _context.UserRoleCompanies.Add(new UserRoleCompany
+            {
+                UserId = user.Id,
+                RoleId = roleId,
+                CompanyId = joinCompanyId,
+                Created = now,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            });
+
+            roleLinksInserted++;
+        }
+
+        if (companyLinksInserted > 0 || roleLinksInserted > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        _logger.LogInformation(
+            "User access seed finished. UserCompanies inserted: {UserCompaniesInserted}, UserRoleCompanies inserted: {UserRoleCompaniesInserted}",
+            companyLinksInserted,
+            roleLinksInserted);
+    }
+
+    private static void EnsureIdentityResultSucceeded(IdentityResult result, string action)
+    {
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        var errors = string.Join("; ", result.Errors.Select(error => $"{error.Code}: {error.Description}"));
+        throw new InvalidOperationException($"Identity seeding failed while {action}. Details: {errors}");
     }
 
     private async Task<Guid> SeedActiveEntityStatusAsync()
@@ -944,6 +1125,202 @@ public class DatabaseSeeder
             totalExpected);
     }
 
+    private async Task SeedSystemOptionsAsync()
+    {
+        var adminModule = await _context.SystemModules
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(m => m.Name == "Administracion");
+
+        if (adminModule is null)
+        {
+            _logger.LogWarning("System options seed skipped. The 'Administracion' module was not found.");
+            return;
+        }
+
+        var seeds = GetAdministrativeSystemOptionSeeds();
+        var optionNames = seeds.Select(x => x.Name).ToList();
+        var existingOptions = await _context.SystemOptions
+            .IgnoreQueryFilters()
+            .Where(o => o.ModuleId == adminModule.Id && optionNames.Contains(o.Name))
+            .ToListAsync();
+
+        var optionsByName = existingOptions.ToDictionary(o => o.Name, StringComparer.OrdinalIgnoreCase);
+        var now = DateTime.UtcNow;
+        var inserted = 0;
+        var updated = 0;
+
+        foreach (var seed in seeds.OrderBy(x => x.ParentName is null ? 0 : 1))
+        {
+            Guid? parentId = null;
+            if (!string.IsNullOrWhiteSpace(seed.ParentName) && optionsByName.TryGetValue(seed.ParentName, out var parentOption))
+            {
+                parentId = parentOption.Id;
+            }
+
+            if (!optionsByName.TryGetValue(seed.Name, out var option))
+            {
+                option = new SystemOption
+                {
+                    ModuleId = adminModule.Id,
+                    Name = seed.Name,
+                    Route = seed.Route,
+                    Icon = seed.Icon,
+                    ParentId = parentId,
+                    ControllerName = seed.ControllerName,
+                    CanRead = seed.CanRead,
+                    CanCreate = seed.CanCreate,
+                    CanUpdate = seed.CanUpdate,
+                    CanDelete = seed.CanDelete,
+                    Created = now,
+                    CreatedBy = "System_Seeder",
+                    GcRecord = 0
+                };
+
+                _context.SystemOptions.Add(option);
+                optionsByName[seed.Name] = option;
+                inserted++;
+                continue;
+            }
+
+            var hasChanges = option.Route != seed.Route
+                || option.Icon != seed.Icon
+                || option.ParentId != parentId
+                || option.ControllerName != seed.ControllerName
+                || option.CanRead != seed.CanRead
+                || option.CanCreate != seed.CanCreate
+                || option.CanUpdate != seed.CanUpdate
+                || option.CanDelete != seed.CanDelete
+                || option.GcRecord != 0;
+
+            if (!hasChanges)
+            {
+                continue;
+            }
+
+            option.Route = seed.Route;
+            option.Icon = seed.Icon;
+            option.ParentId = parentId;
+            option.ControllerName = seed.ControllerName;
+            option.CanRead = seed.CanRead;
+            option.CanCreate = seed.CanCreate;
+            option.CanUpdate = seed.CanUpdate;
+            option.CanDelete = seed.CanDelete;
+            option.GcRecord = 0;
+            option.LastModified = now;
+            option.LastModifiedBy = "System_Seeder";
+            updated++;
+        }
+
+        if (inserted > 0 || updated > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        _logger.LogInformation(
+            "System options seed finished. Inserted: {Inserted}, Updated: {Updated}, Existing: {Existing}",
+            inserted,
+            updated,
+            seeds.Count - inserted - updated);
+    }
+
+    private async Task SeedRoleSystemOptionsAsync(Guid joinCompanyId)
+    {
+        var seeds = GetRoleSystemOptionSeeds();
+        var roleNames = seeds.Select(x => x.RoleName).Distinct().ToList();
+        var optionNames = seeds.Select(x => x.SystemOptionName).Distinct().ToList();
+
+        var roles = await _context.ApplicationRoles
+            .IgnoreQueryFilters()
+            .Where(r => r.Name != null && roleNames.Contains(r.Name))
+            .ToListAsync();
+
+        var systemOptions = await _context.SystemOptions
+            .IgnoreQueryFilters()
+            .Where(o => optionNames.Contains(o.Name))
+            .ToListAsync();
+
+        var rolesByName = roles.ToDictionary(r => r.Name!, StringComparer.OrdinalIgnoreCase);
+        var optionsByName = systemOptions.ToDictionary(o => o.Name, StringComparer.OrdinalIgnoreCase);
+
+        var existingPermissions = await _context.RoleSystemOptions
+            .IgnoreQueryFilters()
+            .Where(rso => rso.CompanyId == joinCompanyId)
+            .ToListAsync();
+
+        var permissionByKey = existingPermissions.ToDictionary(x => (x.RoleId, x.SystemOptionId));
+        var now = DateTime.UtcNow;
+        var inserted = 0;
+        var updated = 0;
+
+        foreach (var seed in seeds)
+        {
+            if (!rolesByName.TryGetValue(seed.RoleName, out var role))
+            {
+                _logger.LogWarning("Role permission seed skipped because role {RoleName} was not found.", seed.RoleName);
+                continue;
+            }
+
+            if (!optionsByName.TryGetValue(seed.SystemOptionName, out var option))
+            {
+                _logger.LogWarning("Role permission seed skipped because system option {SystemOptionName} was not found.", seed.SystemOptionName);
+                continue;
+            }
+
+            if (!permissionByKey.TryGetValue((role.Id, option.Id), out var permission))
+            {
+                _context.RoleSystemOptions.Add(new RoleSystemOption
+                {
+                    RoleId = role.Id,
+                    SystemOptionId = option.Id,
+                    CompanyId = joinCompanyId,
+                    CanRead = seed.CanRead,
+                    CanCreate = seed.CanCreate,
+                    CanUpdate = seed.CanUpdate,
+                    CanDelete = seed.CanDelete,
+                    Created = now,
+                    CreatedBy = "System_Seeder",
+                    GcRecord = 0
+                });
+
+                inserted++;
+                continue;
+            }
+
+            var hasChanges = permission.CompanyId != joinCompanyId
+                || permission.CanRead != seed.CanRead
+                || permission.CanCreate != seed.CanCreate
+                || permission.CanUpdate != seed.CanUpdate
+                || permission.CanDelete != seed.CanDelete
+                || permission.GcRecord != 0;
+
+            if (!hasChanges)
+            {
+                continue;
+            }
+
+            permission.CompanyId = joinCompanyId;
+            permission.CanRead = seed.CanRead;
+            permission.CanCreate = seed.CanCreate;
+            permission.CanUpdate = seed.CanUpdate;
+            permission.CanDelete = seed.CanDelete;
+            permission.GcRecord = 0;
+            permission.LastModified = now;
+            permission.LastModifiedBy = "System_Seeder";
+            updated++;
+        }
+
+        if (inserted > 0 || updated > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        _logger.LogInformation(
+            "Role system options seed finished. Inserted: {Inserted}, Updated: {Updated}, Existing: {Existing}",
+            inserted,
+            updated,
+            seeds.Count - inserted - updated);
+    }
+
     private static List<CountrySeed> GetCountrySeeds() =>
     [
         new("Honduras", "HN"),
@@ -1148,6 +1525,40 @@ public class DatabaseSeeder
         new("Callejon", "Cjon.")
     ];
 
+    private static List<DefaultUserSeed> GetDefaultUserSeeds() =>
+    [
+        new("livingstone", "bravo", "lcano@join.com", "ABCabc123*", "SuperAdmin", true),
+        new("Manager", "Test", "manager@join.com", "ABCabc123*", "Manager", false),
+        new("Supervisor", "Test", "supervisor@join.com", "ABCabc123*", "Supervisor", false),
+        new("SimpleUser", "Test", "simpleuser@join.com", "ABCabc123*", "UsuarioSimple", false)
+    ];
+
+    private static List<SystemOptionSeed> GetAdministrativeSystemOptionSeeds() =>
+    [
+        new("Administracion", "/administracion", "icon_admin", null, null, false, false, false, false),
+        new("Paises", "/administracion/countries", "icon_country", "Administracion", "Countries", true, true, true, true),
+        new("CommunicationChannels", "/administracion/communication-channels", "icon_channel", "Administracion", "CommunicationChannels", true, true, true, true),
+        new("Compañias", "/administracion/companies", "icon_company", "Administracion", "Companies", true, true, true, true)
+    ];
+
+    private static List<RoleSystemOptionSeed> GetRoleSystemOptionSeeds() =>
+    [
+        new("Manager", "Administracion", false, false, false, false),
+        new("Manager", "Paises", true, true, true, true),
+        new("Manager", "CommunicationChannels", true, true, true, true),
+        new("Manager", "Compañias", true, true, true, true),
+
+        new("Supervisor", "Administracion", false, false, false, false),
+        new("Supervisor", "Paises", true, true, true, false),
+        new("Supervisor", "CommunicationChannels", true, true, true, false),
+        new("Supervisor", "Compañias", true, true, true, false),
+
+        new("UsuarioSimple", "Administracion", false, false, false, false),
+        new("UsuarioSimple", "Paises", true, true, false, false),
+        new("UsuarioSimple", "CommunicationChannels", true, true, false, false),
+        new("UsuarioSimple", "Compañias", true, true, false, false)
+    ];
+
     private sealed record CountrySeed(string Name, string IsoCode);
     private sealed record ProvinceSeed(string CountryIsoCode, string Name, string Code);
     private sealed record MunicipalitySeed(string CountryIsoCode, string ProvinceCode, string Name, string? Code = null);
@@ -1158,6 +1569,30 @@ public class DatabaseSeeder
         string IdentificationNumber,
         string? LastName = null,
         string? CommercialName = null);
+    private sealed record DefaultUserSeed(
+        string FirstName,
+        string LastName,
+        string Email,
+        string Password,
+        string RoleName,
+        bool IsSuperAdmin);
+    private sealed record SystemOptionSeed(
+        string Name,
+        string Route,
+        string? Icon,
+        string? ParentName,
+        string? ControllerName,
+        bool CanRead,
+        bool CanCreate,
+        bool CanUpdate,
+        bool CanDelete);
+    private sealed record RoleSystemOptionSeed(
+        string RoleName,
+        string SystemOptionName,
+        bool CanRead,
+        bool CanCreate,
+        bool CanUpdate,
+        bool CanDelete);
 }
 
 

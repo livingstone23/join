@@ -41,29 +41,27 @@ public class RoleSystemOptionConfiguration : IEntityTypeConfiguration<RoleSystem
         // --- Relationships ---
 
         // Relationship with ApplicationRole
-        // Each permission entry belongs to one role.
+        // 1. Relación con ApplicationRole (La que corregimos)
         builder.HasOne(rso => rso.Role)
-            .WithMany() // A role can have many permission entries.
+            .WithMany(r => r.RoleSystemOptions) 
             .HasForeignKey(rso => rso.RoleId)
-            .OnDelete(DeleteBehavior.Cascade); // If a role is deleted, its permissions are also deleted.
+            .OnDelete(DeleteBehavior.Cascade);
 
-        // Relationship with SystemOption
-        // Each permission entry applies to one system option.
+        // 2. Relación con SystemOption (¡Asegúrate de no olvidarla!)
         builder.HasOne(rso => rso.SystemOption)
-            .WithMany(so => so.RoleOptions) // A system option can have permissions for many roles.
+            .WithMany(so => so.RoleOptions) 
             .HasForeignKey(rso => rso.SystemOptionId)
-            .OnDelete(DeleteBehavior.Cascade); // If a system option is deleted, its permissions are deleted.
+            .OnDelete(DeleteBehavior.Cascade);
 
-        // --- Query Filters ---
-
-        // Apply a soft-delete filter.
-        builder.HasQueryFilter(rso => rso.GcRecord == 0);
-
-
+        // 3. Relación con Company (Multi-tenancy)
         builder.HasOne(x => x.Company)
             .WithMany(c => c.RoleSystemOptions)
             .HasForeignKey(x => x.CompanyId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // --- Query Filters ---
+        // Filtro global para Soft Delete
+        builder.HasQueryFilter(rso => rso.GcRecord == 0);
             
     }
 }
