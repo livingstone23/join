@@ -5,11 +5,12 @@ using MediatR;
 namespace JOIN.Application.UseCases.Security.Queries.GetMyCompanyUserReport;
 
 /// <summary>
-/// Requests the user management and activity report restricted to the caller's company.
+/// Represents the query used to obtain the user-management and activity report restricted to the authenticated caller's effective company context.
+/// This request is intended for tenant-scoped administrative reporting where data must remain isolated to the current company.
 /// </summary>
-/// <param name="FromDate">Optional inclusive start date for the activity window.</param>
-/// <param name="ToDate">Optional inclusive end date for the activity window.</param>
-/// <param name="RoleNames">Optional inclusive role-name filter scoped through <c>UserRoleCompanies</c>.</param>
+/// <param name="FromDate">Optional inclusive start date for the reporting window.</param>
+/// <param name="ToDate">Optional inclusive end date for the reporting window.</param>
+/// <param name="RoleNames">Optional role-name filter applied to the report through tenant-scoped user-role assignments.</param>
 public record GetMyCompanyUserReportQuery(
     DateTime? FromDate = null,
     DateTime? ToDate = null,

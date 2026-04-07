@@ -1553,10 +1553,11 @@ public class DatabaseSeeder
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Compañias", true, true, true, false),
 
+        // `UsuarioSimple` must not receive sidebar options unless a company explicitly grants readable access.
         new("UsuarioSimple", "Administracion", false, false, false, false),
-        new("UsuarioSimple", "Paises", true, true, false, false),
-        new("UsuarioSimple", "CommunicationChannels", true, true, false, false),
-        new("UsuarioSimple", "Compañias", true, true, false, false)
+        new("UsuarioSimple", "Paises", false, false, false, false),
+        new("UsuarioSimple", "CommunicationChannels", false, false, false, false),
+        new("UsuarioSimple", "Compañias", false, false, false, false)
     ];
 
     private sealed record CountrySeed(string Name, string IsoCode);

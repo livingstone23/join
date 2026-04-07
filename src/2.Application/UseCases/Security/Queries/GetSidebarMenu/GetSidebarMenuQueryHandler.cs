@@ -9,6 +9,7 @@ namespace JOIN.Application.UseCases.Security.Queries.GetSidebarMenu;
 
 /// <summary>
 /// Handles the retrieval of the sidebar menu for the current authenticated user.
+/// Any option assigned through the user's company-scoped roles is returned, even when the permission flags are inconsistently configured.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create engine-agnostic read connections.</param>
 /// <param name="currentUserService">Current user context used to resolve the active tenant.</param>
@@ -53,7 +54,6 @@ public sealed class GetSidebarMenuQueryHandler(
             so.CanCreate,
             so.CanUpdate,
             so.CanDelete
-        HAVING MAX(CAST(rso.CanRead AS INT)) = 1
         ORDER BY so.Name;
         """;
 
@@ -102,6 +102,11 @@ public sealed class GetSidebarMenuQueryHandler(
                 new CommandDefinition(DirectPermissionsSql, parameters, cancellationToken: cancellationToken)))
                 .AsList();
 
+            if (rows.Count == 0)
+            {
+                return Array.Empty<MenuOptionResponse>();
+            }
+
             var allOptions = (await connection.QueryAsync<SystemOptionHierarchyRow>(
                 new CommandDefinition(AllSystemOptionsSql, cancellationToken: cancellationToken)))
                 .AsList();
@@ -133,6 +138,7 @@ public sealed class GetSidebarMenuQueryHandler(
                 Icon = row.Icon,
                 ControllerName = row.ControllerName,
                 ParentId = row.ParentId,
+                CanRead = row.CanRead == 1,
                 CanCreate = row.CanCreate == 1,
                 CanUpdate = row.CanUpdate == 1,
                 CanDelete = row.CanDelete == 1,
@@ -178,6 +184,7 @@ public sealed class GetSidebarMenuQueryHandler(
                 Icon = parentRow.Icon,
                 ControllerName = parentRow.ControllerName,
                 ParentId = parentRow.ParentId,
+                CanRead = false,
                 CanCreate = false,
                 CanUpdate = false,
                 CanDelete = false,

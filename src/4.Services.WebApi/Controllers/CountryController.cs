@@ -8,26 +8,30 @@ using Microsoft.AspNetCore.Mvc;
 namespace JOIN.Services.WebApi.Controllers;
 
 /// <summary>
-/// API controller for managing country catalog entities.
+/// Exposes REST endpoints for managing the country catalog.
+/// The controller only coordinates transport-level concerns while the Application layer handles validation and persistence rules.
 /// </summary>
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
 public class CountryController(IMediator mediator) : ControllerBase
 {
-    private readonly IMediator _mediator = mediator;
+    private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
 
     /// <summary>
-    /// Retrieves a country by id.
+    /// Retrieves a single country catalog record by its unique identifier.
+    /// This endpoint is typically consumed by edit forms and detail screens that need the current persisted values for a specific country.
     /// </summary>
-    /// <param name="id">The country identifier.</param>
-    /// <returns>A standardized response with the requested country.</returns>
+    /// <param name="id">The unique identifier of the country to retrieve.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the read query is running.</param>
+    /// <returns>A standardized response containing the requested country when it exists.</returns>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(Response<CountryDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id)
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetCountryByIdQuery(id));
+        var response = await _mediator.Send(new GetCountryByIdQuery(id), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -38,21 +42,25 @@ public class CountryController(IMediator mediator) : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves a paginated list of countries with optional search by name.
+    /// Retrieves a paginated list of countries with optional text filtering.
+    /// This endpoint is intended for maintenance grids that require server-side pagination and name-based search capabilities.
     /// </summary>
-    /// <param name="pageNumber">The requested page number.</param>
-    /// <param name="pageSize">The requested page size.</param>
-    /// <param name="searchTerm">Optional search term to filter by name.</param>
-    /// <returns>A standardized paginated response.</returns>
+    /// <param name="pageNumber">The 1-based page number to retrieve.</param>
+    /// <param name="pageSize">The maximum number of country rows to return for the requested page.</param>
+    /// <param name="searchTerm">Optional text used to filter the list by country name.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the paged query executes.</param>
+    /// <returns>A standardized paged response containing the matching countries.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(Response<PagedResult<CountryListItemDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetPaged(
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10,
-        [FromQuery] string? searchTerm = null)
+        [FromQuery] string? searchTerm = null,
+        CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetCountriesPagedQuery(pageNumber, pageSize, searchTerm));
+        var response = await _mediator.Send(new GetCountriesPagedQuery(pageNumber, pageSize, searchTerm), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -63,17 +71,20 @@ public class CountryController(IMediator mediator) : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new country catalog item.
+    /// Creates a new country catalog entry.
+    /// The request is validated in the Application layer and duplicate ISO codes are reported as conflicts to keep the catalog consistent.
     /// </summary>
-    /// <param name="command">The creation payload.</param>
-    /// <returns>A standardized response with the created country.</returns>
+    /// <param name="command">The creation payload containing the country data to persist.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the create command is being processed.</param>
+    /// <returns>A `201 Created` response containing the newly created country resource.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(Response<CountryDto>), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Create([FromBody] CreateCountryCommand command)
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Create([FromBody] CreateCountryCommand command, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(command);
+        var response = await _mediator.Send(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -89,17 +100,20 @@ public class CountryController(IMediator mediator) : ControllerBase
     }
 
     /// <summary>
-    /// Updates an existing country catalog item.
+    /// Updates an existing country catalog entry while preserving the route identifier as the authoritative resource key.
+    /// Validation, not-found handling, and uniqueness checks are delegated to the corresponding Application command handler.
     /// </summary>
-    /// <param name="id">The country identifier to update.</param>
-    /// <param name="command">The update payload.</param>
-    /// <returns>A standardized response with the updated country.</returns>
+    /// <param name="id">The unique identifier of the country to update.</param>
+    /// <param name="command">The update payload containing the new country values.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the update command executes.</param>
+    /// <returns>A standardized response containing the updated country.</returns>
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(Response<CountryDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCountryCommand command)
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCountryCommand command, CancellationToken cancellationToken = default)
     {
         if (command.Id != Guid.Empty && command.Id != id)
         {
@@ -107,7 +121,7 @@ public class CountryController(IMediator mediator) : ControllerBase
         }
 
         var request = command with { Id = id };
-        var response = await _mediator.Send(request);
+        var response = await _mediator.Send(request, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -128,17 +142,20 @@ public class CountryController(IMediator mediator) : ControllerBase
     }
 
     /// <summary>
-    /// Performs a soft delete for a country catalog item.
+    /// Performs a soft delete over a country catalog entry.
+    /// The endpoint keeps the response contract explicit and reports not-found or validation failures when the delete command cannot be completed.
     /// </summary>
-    /// <param name="id">The country identifier to delete.</param>
-    /// <returns>A standardized response containing the deleted id.</returns>
+    /// <param name="id">The unique identifier of the country to delete.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the delete command is running.</param>
+    /// <returns>A standardized response containing the identifier of the deleted country.</returns>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Delete(Guid id)
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new DeleteCountryCommand(id));
+        var response = await _mediator.Send(new DeleteCountryCommand(id), cancellationToken);
 
         if (!response.IsSuccess)
         {

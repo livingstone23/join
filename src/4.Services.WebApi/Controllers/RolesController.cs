@@ -7,32 +7,32 @@ using Microsoft.EntityFrameworkCore;
 namespace JOIN.Services.WebApi.Controllers;
 
 /// <summary>
-/// API endpoints for role catalog queries.
+/// Exposes read-only endpoints for the role catalog used by the security and administration modules.
+/// The controller returns the available Identity role names so clients can populate assignment and permission-management screens.
 /// </summary>
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
-public class RolesController : ControllerBase
+public class RolesController(RoleManager<ApplicationRole> roleManager) : ControllerBase
 {
-    private readonly RoleManager<ApplicationRole> _roleManager;
-
-    public RolesController(RoleManager<ApplicationRole> roleManager)
-    {
-        _roleManager = roleManager ?? throw new ArgumentNullException(nameof(roleManager));
-    }
+    private readonly RoleManager<ApplicationRole> _roleManager = roleManager ?? throw new ArgumentNullException(nameof(roleManager));
 
     /// <summary>
-    /// Returns available role names sorted alphabetically.
+    /// Returns the active role names registered in the Identity store, sorted alphabetically for predictable UI rendering.
+    /// This endpoint is typically used to populate role selectors when assigning or replacing user permissions.
     /// </summary>
+    /// <param name="cancellationToken">Token used to cancel the request while the role list is being materialized.</param>
+    /// <returns>A standardized response containing the role names available to the application.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(Response<IEnumerable<string>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAll()
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetAll(CancellationToken cancellationToken = default)
     {
         var roles = await _roleManager.Roles
             .OrderBy(role => role.Name)
             .Select(role => role.Name ?? string.Empty)
             .Where(roleName => roleName != string.Empty)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         return Ok(new Response<IEnumerable<string>>
         {
