@@ -1,10 +1,15 @@
 using JOIN.Application.Common;
 using JOIN.Domain.Security;
+using JOIN.Services.WebApi.Filters;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace JOIN.Services.WebApi.Controllers;
+
+
+namespace JOIN.Services.WebApi.Controllers.Security;
+
+
 
 /// <summary>
 /// Exposes read-only endpoints for the role catalog used by the security and administration modules.
@@ -13,6 +18,7 @@ namespace JOIN.Services.WebApi.Controllers;
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
+[PermissionResource("Roles")]
 public class RolesController(RoleManager<ApplicationRole> roleManager) : ControllerBase
 {
     private readonly RoleManager<ApplicationRole> _roleManager = roleManager ?? throw new ArgumentNullException(nameof(roleManager));

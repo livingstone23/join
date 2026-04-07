@@ -20,7 +20,8 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
 {
     private readonly IPermissionService _permissionService;
 
-    // Constante para evitar "magic strings" y errores tipográficos
+    // Constant role name for SuperAdmin users who bypass all permission checks. 
+    // This is a simple string comparison, so it should be kept in sync with the actual role name used in the system.
     private const string SuperAdminRoleName = "SuperAdmin"; 
 
     public DynamicAuthorizationFilter(IPermissionService permissionService)
@@ -40,10 +41,10 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
 
         // 2. Ensure the request is mapped to a Controller action.
         if (context.ActionDescriptor is not ControllerActionDescriptor descriptor) return;
-        
-        // Extract the target controller and the HTTP method (GET, POST, PUT, DELETE).
-        string controllerName = descriptor.ControllerName; 
-        string httpMethod = context.HttpContext.Request.Method; 
+
+        // Resolve the explicit permission resource first and fall back to the controller name.
+        var permissionResource = ResolvePermissionResourceName(descriptor);
+        string httpMethod = context.HttpContext.Request.Method;
 
         // 3. Extract user identity, ROLES, and tenant context from the JWT Claims.
         var user = context.HttpContext.User;
@@ -74,12 +75,39 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
         }
 
         // 4. Validate permissions against the cache or database via the Application layer service.
-        bool hasAccess = await _permissionService.HasPermissionAsync(userId, companyId, controllerName, httpMethod);
+        bool hasAccess = await _permissionService.HasPermissionAsync(userId, companyId, permissionResource, httpMethod);
 
         // If the user lacks the required permission, return a 403 Forbidden response.
         if (!hasAccess)
         {
-            context.Result = new ForbidResult(); 
+            context.Result = new ForbidResult();
         }
+    }
+
+    /// <summary>
+    /// Resolves the permission resource name declared for the current action or controller.
+    /// </summary>
+    /// <param name="descriptor">The MVC action descriptor for the current request.</param>
+    /// <returns>The explicit permission resource name when declared; otherwise the controller name.</returns>
+    private static string ResolvePermissionResourceName(ControllerActionDescriptor descriptor)
+    {
+        var actionResource = descriptor.MethodInfo
+            .GetCustomAttributes(inherit: true)
+            .OfType<PermissionResourceAttribute>()
+            .FirstOrDefault()?.ResourceName;
+
+        if (!string.IsNullOrWhiteSpace(actionResource))
+        {
+            return actionResource;
+        }
+
+        var controllerResource = descriptor.ControllerTypeInfo
+            .GetCustomAttributes(inherit: true)
+            .OfType<PermissionResourceAttribute>()
+            .FirstOrDefault()?.ResourceName;
+
+        return string.IsNullOrWhiteSpace(controllerResource)
+            ? descriptor.ControllerName
+            : controllerResource;
     }
 }

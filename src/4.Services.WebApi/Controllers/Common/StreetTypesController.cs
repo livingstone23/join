@@ -2,10 +2,15 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Common;
 using JOIN.Application.UseCases.Common.StreetTypes.Commands;
 using JOIN.Application.UseCases.Common.StreetTypes.Queries;
+using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
-namespace JOIN.Services.WebApi.Controllers;
+
+
+namespace JOIN.Services.WebApi.Controllers.Common;
+
+
 
 /// <summary>
 /// Exposes REST endpoints for managing the street type catalog.
@@ -14,6 +19,7 @@ namespace JOIN.Services.WebApi.Controllers;
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
+[PermissionResource("StreetTypes")]
 public class StreetTypesController(IMediator mediator) : ControllerBase
 {
     private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));

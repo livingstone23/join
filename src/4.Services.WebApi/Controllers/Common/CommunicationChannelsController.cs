@@ -2,10 +2,15 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Common;
 using JOIN.Application.UseCases.Common.CommunicationChannels.Commands;
 using JOIN.Application.UseCases.Common.CommunicationChannels.Queries;
+using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
-namespace JOIN.Services.WebApi.Controllers;
+
+
+namespace JOIN.Services.WebApi.Controllers.Common;
+
+
 
 /// <summary>
 /// Exposes REST endpoints for managing the communication channel catalog.
@@ -14,6 +19,7 @@ namespace JOIN.Services.WebApi.Controllers;
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
+[PermissionResource("CommunicationChannels")]
 public class CommunicationChannelsController(IMediator mediator) : ControllerBase
 {
     private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));

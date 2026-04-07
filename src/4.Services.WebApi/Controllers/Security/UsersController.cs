@@ -20,7 +20,7 @@ using Microsoft.AspNetCore.Mvc;
 
 
 
-namespace JOIN.Services.WebApi.Controllers;
+namespace JOIN.Services.WebApi.Controllers.Security;
 
 
 
@@ -31,6 +31,7 @@ namespace JOIN.Services.WebApi.Controllers;
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
+[PermissionResource("Users")]
 public class UsersController(IMediator mediator) : ControllerBase
 {
 
@@ -196,22 +197,25 @@ public class UsersController(IMediator mediator) : ControllerBase
         return Ok(response);
     }
 
+
+
     /// <summary>
-    /// Invalidates the cached sidebar entry associated with a specific user and company scope.
-    /// The next call to the sidebar endpoint for the same identifiers will reload the data from the database and repopulate the cache with fresh values.
+    /// Clears one or more cached entries associated with a specific user and company scope.
+    /// The request can target the <c>sidebar</c> cache, the <c>permission</c> cache, or <c>all</c> cache entries for the provided identifiers.
     /// </summary>
-    /// <param name="command">The payload containing the user and company identifiers whose sidebar cache should be cleared.</param>
-    /// <param name="cancellationToken">Token used to cancel the invalidation request while the command is being processed.</param>
-    /// <returns>A standardized response indicating that the sidebar cache entry was removed successfully.</returns>
+    /// <param name="command">The payload containing the user, company, and cache target that should be cleared.</param>
+    /// <param name="cancellationToken">Token used to cancel the clean-cache request while the command is being processed.</param>
+    /// <returns>A standardized response indicating that the requested cache entries were removed successfully.</returns>
     [Authorize(Roles = "SuperAdmin")]
     [SkipDynamicAuthorization]
+    [HttpPost("cleancache")]
     [HttpPost("sidebar/cache/invalidate")]
     [ProducesResponseType(typeof(Response<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> InvalidateSidebarCache(
-        [FromBody] InvalidateSidebarCacheCommand command,
+    public async Task<IActionResult> CleanCache(
+        [FromBody] CleanCacheCommand command,
         CancellationToken cancellationToken = default)
     {
         var response = await _mediator.Send(command, cancellationToken);

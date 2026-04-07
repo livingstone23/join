@@ -2,30 +2,58 @@ using JOIN.Application.Common;
 using MediatR;
 using Microsoft.Extensions.Caching.Memory;
 
+
+
 namespace JOIN.Application.UseCases.Security.Users.Commands.InvalidateSidebarCache;
 
+
+
 /// <summary>
-/// Handles the invalidation of the cached sidebar menu for a specific user and company scope.
+/// Handles the removal of cached sidebar and permission entries for a specific user and company scope.
 /// </summary>
-/// <param name="memoryCache">In-memory cache used to store previously resolved sidebar results.</param>
-public sealed class InvalidateSidebarCacheCommandHandler(IMemoryCache memoryCache)
-    : IRequestHandler<InvalidateSidebarCacheCommand, Response<bool>>
+/// <param name="memoryCache">In-memory cache used to store previously resolved sidebar and permission results.</param>
+public sealed class CleanCacheCommandHandler(IMemoryCache memoryCache)
+    : IRequestHandler<CleanCacheCommand, Response<bool>>
 {
     /// <summary>
-    /// Removes the cached sidebar entry so the next request is forced to reload the menu from the database.
+    /// Removes the requested cache entry or entries so subsequent requests are rebuilt from the database.
     /// </summary>
-    /// <param name="request">The invalidation payload.</param>
+    /// <param name="request">The clean-cache payload.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
-    /// <returns>A standardized response indicating whether the invalidation request completed successfully.</returns>
-    public Task<Response<bool>> Handle(InvalidateSidebarCacheCommand request, CancellationToken cancellationToken)
+    /// <returns>A standardized response indicating whether the requested cache entries were removed successfully.</returns>
+    public Task<Response<bool>> Handle(CleanCacheCommand request, CancellationToken cancellationToken)
     {
-        var cacheKey = $"sidebar:{request.CompanyId}:{request.UserId}";
-        memoryCache.Remove(cacheKey);
+        var targetKey = request.TargetKey.Trim().ToLowerInvariant();
+
+        switch (targetKey)
+        {
+            case "sidebar":
+                memoryCache.Remove($"sidebar:{request.CompanyId}:{request.UserId}");
+                break;
+
+            case "permission":
+            case "permissions":
+                memoryCache.Remove($"permissions:{request.CompanyId}:{request.UserId}");
+                break;
+
+            case "all":
+                memoryCache.Remove($"sidebar:{request.CompanyId}:{request.UserId}");
+                memoryCache.Remove($"permissions:{request.CompanyId}:{request.UserId}");
+                break;
+
+            default:
+                return Task.FromResult(new Response<bool>
+                {
+                    IsSuccess = false,
+                    Message = "INVALID_CACHE_KEY",
+                    Errors = ["CacheKey must be one of: 'sidebar', 'permission', or 'all'."]
+                });
+        }
 
         return Task.FromResult(new Response<bool>
         {
             IsSuccess = true,
-            Message = "Sidebar cache invalidated successfully.",
+            Message = $"Cache '{targetKey}' cleaned successfully.",
             Data = true
         });
     }

@@ -3,10 +3,15 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
 using JOIN.Application.UseCases.Admin.Customers.Commands;
 using JOIN.Application.UseCases.Admin.Customers.Queries;
+using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
-namespace JOIN.Services.WebApi.Controllers;
+
+
+namespace JOIN.Services.WebApi.Controllers.Admin;
+
+
 
 /// <summary>
 /// Exposes REST endpoints for managing customer aggregates.
@@ -15,6 +20,7 @@ namespace JOIN.Services.WebApi.Controllers;
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
+[PermissionResource("Customers")]
 public class CustomersController(IMediator mediator) : ControllerBase
 {
     private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
