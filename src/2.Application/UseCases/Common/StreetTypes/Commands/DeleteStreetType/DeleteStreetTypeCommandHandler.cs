@@ -27,7 +27,7 @@ public class DeleteStreetTypeCommandHandler(IUnitOfWork unitOfWork)
             return Response<Guid>.Error("STREETTYPE_NOT_FOUND", ["Street type not found."]);
         }
 
-        entity.GcRecord = 1;
+        entity.MarkAsDeleted();
 
         await repository.UpdateAsync(entity);
         var result = await _unitOfWork.SaveChangesAsync(cancellationToken);

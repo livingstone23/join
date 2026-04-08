@@ -194,11 +194,13 @@ public class UpdateCustomerCommandHandler(
             .Select(a => a.Id!.Value)
             .ToHashSet();
 
+        var deletedAtUtc = DateTime.UtcNow;
+
         foreach (var existingAddress in customerEntity.Addresses.Where(a => a.GcRecord == 0))
         {
             if (!incomingAddressIds.Contains(existingAddress.Id))
             {
-                existingAddress.GcRecord = 1;
+                existingAddress.MarkAsDeleted(deletedAtUtc);
             }
         }
 
@@ -247,11 +249,13 @@ public class UpdateCustomerCommandHandler(
             .Select(c => c.Id!.Value)
             .ToHashSet();
 
+        var deletedAtUtc = DateTime.UtcNow;
+
         foreach (var existingContact in customerEntity.Contacts.Where(c => c.GcRecord == 0))
         {
             if (!incomingContactIds.Contains(existingContact.Id))
             {
-                existingContact.GcRecord = 1;
+                existingContact.MarkAsDeleted(deletedAtUtc);
             }
         }
 

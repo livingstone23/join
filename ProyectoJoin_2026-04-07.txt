@@ -91,6 +91,9 @@ ESTRUCTURA DE ARQUITECTURA (CLEAN ARCH)
 ./src/4.Services.WebApi/bin\Debug/net10.0
 ./src/4.Services.WebApi/Properties
 ./src/4.Services.WebApi/Controllers
+./src/4.Services.WebApi/Controllers/Security
+./src/4.Services.WebApi/Controllers/Admin
+./src/4.Services.WebApi/Controllers/Common
 ./src/4.Services.WebApi/Services
 ./src/3.Infrastructure
 ./src/3.Infrastructure/obj
@@ -369,7 +372,7 @@ public class SystemOption : BaseAuditableEntity
 }
 
 
->>> ARCHIVO: ./src/1.Domain/Security/UserCompany.cs
+>>> ARCHIVO: ./src/1.Domain/Security/usercompany.cs
 ------------------------------------------
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
@@ -514,7 +517,7 @@ public class UserRoleCompany : BaseAuditableEntity
 }
 
 
->>> ARCHIVO: ./src/1.Domain/Security/ApplicationRole.cs
+>>> ARCHIVO: ./src/1.Domain/Security/applicationrole.cs
 ------------------------------------------
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
@@ -624,7 +627,7 @@ public class UserConnectionLog : BaseEntity // Hereda solo de BaseEntity para te
 }
 
 
->>> ARCHIVO: ./src/1.Domain/Security/ApplicationUser.cs
+>>> ARCHIVO: ./src/1.Domain/Security/applicationuser.cs
 ------------------------------------------
 using JOIN.Domain.Audit;
 using JOIN.Domain.Messaging;
@@ -1350,7 +1353,7 @@ public class Municipality : BaseAuditableEntity
 
 }
 
->>> ARCHIVO: ./src/1.Domain/Common/Company.cs
+>>> ARCHIVO: ./src/1.Domain/Common/company.cs
 ------------------------------------------
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
@@ -5789,13 +5792,40 @@ using MediatR;
 namespace JOIN.Application.UseCases.Security.Users.Commands.InvalidateSidebarCache;
 
 /// <summary>
-/// Represents the command used to invalidate the cached sidebar menu for a specific user and company context.
-/// The next sidebar request for the same scope will be rebuilt from the database and stored in cache again.
+/// Represents the payload used to clear one or more cached entries for a specific user and company scope.
+/// The target cache can be provided through either <c>cacheKey</c> or <c>cleanCache</c> in the HTTP request body.
 /// </summary>
-/// <param name="UserId">The unique identifier of the user whose sidebar cache should be invalidated.</param>
-/// <param name="CompanyId">The unique identifier of the company scope associated with the cached sidebar.</param>
-public sealed record InvalidateSidebarCacheCommand(Guid UserId, Guid CompanyId)
-    : IRequest<Response<bool>>;
+public sealed record CleanCacheCommand : IRequest<Response<bool>>
+{
+    /// <summary>
+    /// Gets the unique identifier of the user whose cache entries should be removed.
+    /// </summary>
+    public Guid UserId { get; init; }
+
+    /// <summary>
+    /// Gets the unique identifier of the company scope associated with the cached entries.
+    /// </summary>
+    public Guid CompanyId { get; init; }
+
+    /// <summary>
+    /// Gets the requested cache target when the client sends the preferred <c>cacheKey</c> property.
+    /// Accepted values are <c>sidebar</c>, <c>permission</c>, and <c>all</c>.
+    /// </summary>
+    public string? CacheKey { get; init; }
+
+    /// <summary>
+    /// Gets the requested cache target when the client sends the legacy or alternative <c>cleanCache</c> property.
+    /// Accepted values are <c>sidebar</c>, <c>permission</c>, and <c>all</c>.
+    /// </summary>
+    public string? CleanCache { get; init; }
+
+    /// <summary>
+    /// Gets the normalized target cache key to be processed by the handler.
+    /// </summary>
+    public string TargetKey => string.IsNullOrWhiteSpace(CacheKey)
+        ? (CleanCache ?? string.Empty)
+        : CacheKey;
+}
 
 
 >>> ARCHIVO: ./src/2.Application/UseCases/Security/Users/Commands/InvalidateSidebarCache/InvalidateSidebarCacheCommandHandler.cs
@@ -5804,30 +5834,58 @@ using JOIN.Application.Common;
 using MediatR;
 using Microsoft.Extensions.Caching.Memory;
 
+
+
 namespace JOIN.Application.UseCases.Security.Users.Commands.InvalidateSidebarCache;
 
+
+
 /// <summary>
-/// Handles the invalidation of the cached sidebar menu for a specific user and company scope.
+/// Handles the removal of cached sidebar and permission entries for a specific user and company scope.
 /// </summary>
-/// <param name="memoryCache">In-memory cache used to store previously resolved sidebar results.</param>
-public sealed class InvalidateSidebarCacheCommandHandler(IMemoryCache memoryCache)
-    : IRequestHandler<InvalidateSidebarCacheCommand, Response<bool>>
+/// <param name="memoryCache">In-memory cache used to store previously resolved sidebar and permission results.</param>
+public sealed class CleanCacheCommandHandler(IMemoryCache memoryCache)
+    : IRequestHandler<CleanCacheCommand, Response<bool>>
 {
     /// <summary>
-    /// Removes the cached sidebar entry so the next request is forced to reload the menu from the database.
+    /// Removes the requested cache entry or entries so subsequent requests are rebuilt from the database.
     /// </summary>
-    /// <param name="request">The invalidation payload.</param>
+    /// <param name="request">The clean-cache payload.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
-    /// <returns>A standardized response indicating whether the invalidation request completed successfully.</returns>
-    public Task<Response<bool>> Handle(InvalidateSidebarCacheCommand request, CancellationToken cancellationToken)
+    /// <returns>A standardized response indicating whether the requested cache entries were removed successfully.</returns>
+    public Task<Response<bool>> Handle(CleanCacheCommand request, CancellationToken cancellationToken)
     {
-        var cacheKey = $"sidebar:{request.CompanyId}:{request.UserId}";
-        memoryCache.Remove(cacheKey);
+        var targetKey = request.TargetKey.Trim().ToLowerInvariant();
+
+        switch (targetKey)
+        {
+            case "sidebar":
+                memoryCache.Remove($"sidebar:{request.CompanyId}:{request.UserId}");
+                break;
+
+            case "permission":
+            case "permissions":
+                memoryCache.Remove($"permissions:{request.CompanyId}:{request.UserId}");
+                break;
+
+            case "all":
+                memoryCache.Remove($"sidebar:{request.CompanyId}:{request.UserId}");
+                memoryCache.Remove($"permissions:{request.CompanyId}:{request.UserId}");
+                break;
+
+            default:
+                return Task.FromResult(new Response<bool>
+                {
+                    IsSuccess = false,
+                    Message = "INVALID_CACHE_KEY",
+                    Errors = ["CacheKey must be one of: 'sidebar', 'permission', or 'all'."]
+                });
+        }
 
         return Task.FromResult(new Response<bool>
         {
             IsSuccess = true,
-            Message = "Sidebar cache invalidated successfully.",
+            Message = $"Cache '{targetKey}' cleaned successfully.",
             Data = true
         });
     }
@@ -5841,11 +5899,11 @@ using FluentValidation;
 namespace JOIN.Application.UseCases.Security.Users.Commands.InvalidateSidebarCache;
 
 /// <summary>
-/// Validates the payload used to invalidate a cached sidebar menu.
+/// Validates the payload used to clear cached sidebar and permission entries.
 /// </summary>
-public sealed class InvalidateSidebarCacheCommandValidator : AbstractValidator<InvalidateSidebarCacheCommand>
+public sealed class CleanCacheCommandValidator : AbstractValidator<CleanCacheCommand>
 {
-    public InvalidateSidebarCacheCommandValidator()
+    public CleanCacheCommandValidator()
     {
         RuleFor(x => x.UserId)
             .NotEmpty()
@@ -5854,7 +5912,16 @@ public sealed class InvalidateSidebarCacheCommandValidator : AbstractValidator<I
         RuleFor(x => x.CompanyId)
             .NotEmpty()
             .WithMessage("CompanyId is required.");
+
+        RuleFor(x => x.TargetKey)
+            .NotEmpty()
+            .WithMessage("CacheKey is required. Use 'sidebar', 'permission', or 'all'.")
+            .Must(BeSupportedCacheKey)
+            .WithMessage("CacheKey must be one of: 'sidebar', 'permission', or 'all'.");
     }
+
+    private static bool BeSupportedCacheKey(string cacheKey)
+        => cacheKey.Trim().ToLowerInvariant() is "sidebar" or "permission" or "permissions" or "all";
 }
 
 
@@ -36057,6 +36124,24 @@ public class UnitOfWork : IUnitOfWork
 }
 
 
+>>> ARCHIVO: ./src/4.Services.WebApi/Filters/PermissionResourceAttribute.cs
+------------------------------------------
+
+
+
+namespace JOIN.Services.WebApi.Filters;
+
+
+
+/// <summary>
+/// Declares the explicit permission resource name associated with a controller or action.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
+public sealed class PermissionResourceAttribute(string resourceName) : Attribute
+{
+    public string ResourceName { get; } = resourceName;
+}
+
 >>> ARCHIVO: ./src/4.Services.WebApi/Filters/SkipDynamicAuthorizationAttribute.cs
 ------------------------------------------
 using System;
@@ -36097,7 +36182,8 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
 {
     private readonly IPermissionService _permissionService;
 
-    // Constante para evitar "magic strings" y errores tipográficos
+    // Constant role name for SuperAdmin users who bypass all permission checks. 
+    // This is a simple string comparison, so it should be kept in sync with the actual role name used in the system.
     private const string SuperAdminRoleName = "SuperAdmin"; 
 
     public DynamicAuthorizationFilter(IPermissionService permissionService)
@@ -36117,10 +36203,10 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
 
         // 2. Ensure the request is mapped to a Controller action.
         if (context.ActionDescriptor is not ControllerActionDescriptor descriptor) return;
-        
-        // Extract the target controller and the HTTP method (GET, POST, PUT, DELETE).
-        string controllerName = descriptor.ControllerName; 
-        string httpMethod = context.HttpContext.Request.Method; 
+
+        // Resolve the explicit permission resource first and fall back to the controller name.
+        var permissionResource = ResolvePermissionResourceName(descriptor);
+        string httpMethod = context.HttpContext.Request.Method;
 
         // 3. Extract user identity, ROLES, and tenant context from the JWT Claims.
         var user = context.HttpContext.User;
@@ -36151,13 +36237,40 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
         }
 
         // 4. Validate permissions against the cache or database via the Application layer service.
-        bool hasAccess = await _permissionService.HasPermissionAsync(userId, companyId, controllerName, httpMethod);
+        bool hasAccess = await _permissionService.HasPermissionAsync(userId, companyId, permissionResource, httpMethod);
 
         // If the user lacks the required permission, return a 403 Forbidden response.
         if (!hasAccess)
         {
-            context.Result = new ForbidResult(); 
+            context.Result = new ForbidResult();
         }
+    }
+
+    /// <summary>
+    /// Resolves the permission resource name declared for the current action or controller.
+    /// </summary>
+    /// <param name="descriptor">The MVC action descriptor for the current request.</param>
+    /// <returns>The explicit permission resource name when declared; otherwise the controller name.</returns>
+    private static string ResolvePermissionResourceName(ControllerActionDescriptor descriptor)
+    {
+        var actionResource = descriptor.MethodInfo
+            .GetCustomAttributes(inherit: true)
+            .OfType<PermissionResourceAttribute>()
+            .FirstOrDefault()?.ResourceName;
+
+        if (!string.IsNullOrWhiteSpace(actionResource))
+        {
+            return actionResource;
+        }
+
+        var controllerResource = descriptor.ControllerTypeInfo
+            .GetCustomAttributes(inherit: true)
+            .OfType<PermissionResourceAttribute>()
+            .FirstOrDefault()?.ResourceName;
+
+        return string.IsNullOrWhiteSpace(controllerResource)
+            ? descriptor.ControllerName
+            : controllerResource;
     }
 }
 
@@ -36662,43 +36775,310 @@ public class GlobalExceptionHandler : IExceptionHandler
 }
 
 
->>> ARCHIVO: ./src/4.Services.WebApi/Controllers/StreetTypesController.cs
+>>> ARCHIVO: ./src/4.Services.WebApi/Controllers/Security/RolesController.cs
 ------------------------------------------
 using JOIN.Application.Common;
-using JOIN.Application.DTO.Common;
-using JOIN.Application.UseCases.Common.StreetTypes.Commands;
-using JOIN.Application.UseCases.Common.StreetTypes.Queries;
-using MediatR;
+using JOIN.Domain.Security;
+using JOIN.Services.WebApi.Filters;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
-namespace JOIN.Services.WebApi.Controllers;
+
+
+namespace JOIN.Services.WebApi.Controllers.Security;
+
+
 
 /// <summary>
-/// Exposes REST endpoints for managing the street type catalog.
-/// The controller handles routing and response translation while the Application layer enforces the business rules.
+/// Exposes read-only endpoints for the role catalog used by the security and administration modules.
+/// The controller returns the available Identity role names so clients can populate assignment and permission-management screens.
 /// </summary>
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
-public class StreetTypesController(IMediator mediator) : ControllerBase
+[PermissionResource("Roles")]
+public class RolesController(RoleManager<ApplicationRole> roleManager) : ControllerBase
 {
-    private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+    private readonly RoleManager<ApplicationRole> _roleManager = roleManager ?? throw new ArgumentNullException(nameof(roleManager));
 
     /// <summary>
-    /// Retrieves a street type catalog entry by its unique identifier.
-    /// This endpoint is commonly used by maintenance forms that need the current persisted state before an edit operation.
+    /// Returns the active role names registered in the Identity store, sorted alphabetically for predictable UI rendering.
+    /// This endpoint is typically used to populate role selectors when assigning or replacing user permissions.
     /// </summary>
-    /// <param name="id">The unique identifier of the street type to retrieve.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the read query is being processed.</param>
-    /// <returns>A standardized response containing the requested street type when it exists.</returns>
-    [HttpGet("{id:guid}")]
-    [ProducesResponseType(typeof(Response<StreetTypeDto>), StatusCodes.Status200OK)]
+    /// <param name="cancellationToken">Token used to cancel the request while the role list is being materialized.</param>
+    /// <returns>A standardized response containing the role names available to the application.</returns>
+    [HttpGet]
+    [ProducesResponseType(typeof(Response<IEnumerable<string>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetAll(CancellationToken cancellationToken = default)
+    {
+        var roles = await _roleManager.Roles
+            .OrderBy(role => role.Name)
+            .Select(role => role.Name ?? string.Empty)
+            .Where(roleName => roleName != string.Empty)
+            .ToListAsync(cancellationToken);
+
+        return Ok(new Response<IEnumerable<string>>
+        {
+            Data = roles,
+            IsSuccess = true,
+            Message = "Roles retrieved successfully."
+        });
+    }
+}
+
+
+>>> ARCHIVO: ./src/4.Services.WebApi/Controllers/Security/UsersController.cs
+------------------------------------------
+using JOIN.Application.Common;
+using JOIN.Application.DTO.Security;
+using JOIN.Application.UseCases.Security.Auth.Login;
+using JOIN.Application.UseCases.Security.Auth.Refresh;
+using JOIN.Application.UseCases.Security.Auth.Register;
+using JOIN.Application.UseCases.Security.Queries.GetMyCompanyUserReport;
+using JOIN.Application.UseCases.Security.Queries.GetSidebarMenu;
+using JOIN.Application.UseCases.Security.Queries.GetSystemWideUserReport;
+using JOIN.Application.UseCases.Security.UserCompanies.Commands.SetDefaultCompany;
+using JOIN.Application.UseCases.Security.UserCompanies.Queries.GetUserCompanies;
+using JOIN.Application.UseCases.Security.Users.Commands.InvalidateSidebarCache;
+using JOIN.Application.UseCases.Security.Users.Commands.ReplaceUserRoles;
+using JOIN.Application.UseCases.Security.Users.Queries.GetUsersWithRoles;
+using JOIN.Services.WebApi.Filters;
+using MediatR;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+
+
+
+namespace JOIN.Services.WebApi.Controllers.Security;
+
+
+
+/// <summary>
+/// Exposes authentication, user-administration, reporting, and user-to-company assignment endpoints for the security module.
+/// The controller keeps a thin HTTP-facing role and delegates business logic and data access to the Application layer through MediatR.
+/// </summary>
+[ApiController]
+[Route("api/v1/[controller]")]
+[Produces("application/json")]
+[PermissionResource("Users")]
+public class UsersController(IMediator mediator) : ControllerBase
+{
+
+
+
+    private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+
+
+
+    /// <summary>
+    /// Authenticates a user and returns the complete JWT session payload, including the effective company context, role list, access token, refresh token, and expiration metadata.
+    /// This endpoint is the entry point for establishing an authenticated session in the security module.
+    /// </summary>
+    /// <param name="command">The login payload containing the user credentials and optional target company context.</param>
+    /// <param name="cancellationToken">Token used to cancel the authentication request while the login command is being processed.</param>
+    /// <returns>The authenticated session payload when the credentials are valid.</returns>
+    [AllowAnonymous]
+    [HttpPost("login")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Login([FromBody] LoginCommand command, CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(command, cancellationToken);
+        return Ok(response);
+    }
+
+
+
+    /// <summary>
+    /// Registers a new active user account without initial company assignments.
+    /// The actual validation and persistence rules are executed in the Application layer through the registration command handler.
+    /// </summary>
+    /// <param name="command">The registration payload containing the new user data.</param>
+    /// <param name="cancellationToken">Token used to cancel the registration request while the command is being handled.</param>
+    /// <returns>A standardized response containing the identifier of the newly created user.</returns>
+    [AllowAnonymous]
+    [HttpPost("register")]
+    [ProducesResponseType(typeof(Response<RegisterResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Register([FromBody] RegisterCommand command, CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(command, cancellationToken);
+        return Ok(response);
+    }
+
+
+
+    /// <summary>
+    /// Rotates a valid refresh token and returns a renewed authenticated session payload.
+    /// This endpoint is intended to extend a user session without forcing the user to re-enter credentials.
+    /// </summary>
+    /// <param name="command">The refresh-token payload used to request a renewed session.</param>
+    /// <param name="cancellationToken">Token used to cancel the refresh request while the command is being processed.</param>
+    /// <returns>The renewed authenticated session payload when the refresh token is valid.</returns>
+    [AllowAnonymous]
+    [HttpPost("refresh")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand command, CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(command, cancellationToken);
+        return Ok(response);
+    }
+
+
+
+    /// <summary>
+    /// Terminates the current authenticated session in the server-side authentication pipeline.
+    /// This endpoint is used to explicitly close the active sign-in context associated with the caller.
+    /// </summary>
+    /// <returns>A standardized success response indicating that the logout operation completed successfully.</returns>
+    [HttpPost("logout")]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Logout()
+    {
+        await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
+
+        return Ok(new Response<object>
+        {
+            IsSuccess = true,
+            Message = "Logout completed successfully."
+        });
+    }
+
+
+
+    /// <summary>
+    /// Returns the user management and activity report across all companies in the system.
+    /// Access is restricted to `SuperAdmin` users because the response spans multiple tenants and may include cross-company activity information.
+    /// </summary>
+    /// <param name="fromDate">Optional lower UTC date boundary used to limit the report window.</param>
+    /// <param name="toDate">Optional upper UTC date boundary used to limit the report window.</param>
+    /// <param name="targetCompanyId">Optional explicit company filter applied inside the system-wide report.</param>
+    /// <param name="roleNames">Optional list of role names used to restrict the users included in the report.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the report query executes.</param>
+    /// <returns>A standardized response containing the requested system-wide user management report rows.</returns>
+    [HttpGet("reports/system")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<IReadOnlyCollection<UserManagementReportDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetSystemWideReport(
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null,
+        [FromQuery] Guid? targetCompanyId = null,
+        [FromQuery] string[]? roleNames = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(
+            new GetSystemWideUserReportQuery(fromDate, toDate, targetCompanyId, roleNames),
+            cancellationToken);
+
+        return Ok(response);
+    }
+
+
+
+    /// <summary>
+    /// Returns the user management and activity report restricted to the authenticated user's active company context.
+    /// The effective tenant is resolved first from <c>Security.UserCompanies</c> using the default company, then from <c>Security.UserRoleCompanies</c> when necessary, and finally applied to scope the report data safely.
+    /// </summary>
+    /// <param name="fromDate">Optional lower UTC date boundary used to filter the report window.</param>
+    /// <param name="toDate">Optional upper UTC date boundary used to filter the report window.</param>
+    /// <param name="roleNames">Optional list of role names used to narrow the report result set.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the company-scoped report query runs.</param>
+    /// <returns>A standardized response containing the company-scoped user management report rows.</returns>
+    [HttpGet("reports/my-company")]
+    [ProducesResponseType(typeof(Response<IReadOnlyCollection<UserManagementReportDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetMyCompanyReport(
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null,
+        [FromQuery] string[]? roleNames = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(
+            new GetMyCompanyUserReportQuery(fromDate, toDate, roleNames),
+            cancellationToken);
+
+        return Ok(response);
+    }
+
+
+
+    /// <summary>
+    /// Returns the hierarchical sidebar menu resolved for the authenticated user in the active company context.
+    /// This endpoint intentionally skips the controller-based dynamic permission filter because it is the source used to build the permission-driven navigation tree itself.
+    /// </summary>
+    /// <param name="cancellationToken">Token used to cancel the request while the sidebar query is being processed.</param>
+    /// <returns>A standardized response containing the hierarchical menu tree visible to the authenticated user.</returns>
+    [Authorize]
+    [SkipDynamicAuthorization]
+    [HttpGet("sidebar")]
+    [ProducesResponseType(typeof(Response<IReadOnlyCollection<MenuOptionResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetSidebarMenu(CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new GetSidebarMenuQuery(), cancellationToken);
+        return Ok(response);
+    }
+
+
+
+    /// <summary>
+    /// Clears one or more cached entries associated with a specific user and company scope.
+    /// The request can target the <c>sidebar</c> cache, the <c>permission</c> cache, or <c>all</c> cache entries for the provided identifiers.
+    /// </summary>
+    /// <param name="command">The payload containing the user, company, and cache target that should be cleared.</param>
+    /// <param name="cancellationToken">Token used to cancel the clean-cache request while the command is being processed.</param>
+    /// <returns>A standardized response indicating that the requested cache entries were removed successfully.</returns>
+    [Authorize(Roles = "SuperAdmin")]
+    [SkipDynamicAuthorization]
+    [HttpPost("cleancache")]
+    [HttpPost("sidebar/cache/invalidate")]
+    [ProducesResponseType(typeof(Response<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> CleanCache(
+        [FromBody] CleanCacheCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(command, cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
+
+
+    /// <summary>
+    /// Returns every active company linked to the specified user and indicates which assignment is currently marked as the default operational context.
+    /// This endpoint is used to drive user-context switching screens and related security administration workflows.
+    /// </summary>
+    /// <param name="userId">The unique identifier of the user whose company assignments should be listed.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the company-assignment query executes.</param>
+    /// <returns>A standardized response containing the linked companies for the requested user.</returns>
+    [HttpGet("{userId:guid}/companies")]
+    [ProducesResponseType(typeof(Response<IEnumerable<UserCompanyDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetUserCompanies(Guid userId, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetStreetTypeByIdQuery(id), cancellationToken);
-        if (!response.IsSuccess)
+        var response = await _mediator.Send(new GetUserCompaniesQuery(userId), cancellationToken);
+
+        if (!response.IsSuccess && string.Equals(response.Message, "User not found.", StringComparison.Ordinal))
         {
             return NotFound(response);
         }
@@ -36706,193 +37086,76 @@ public class StreetTypesController(IMediator mediator) : ControllerBase
         return Ok(response);
     }
 
-    /// <summary>
-    /// Returns a paginated list of street types with optional text filtering.
-    /// This endpoint is designed for lookup grids and administrative screens that require server-side paging.
-    /// </summary>
-    /// <param name="pageNumber">The 1-based page number to retrieve.</param>
-    /// <param name="pageSize">The maximum number of records to return for the requested page.</param>
-    /// <param name="searchTerm">Optional text used to filter the street type catalog.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the paged query executes.</param>
-    /// <returns>A standardized paged response containing the matching street type rows.</returns>
-    [HttpGet]
-    [ProducesResponseType(typeof(Response<PagedResult<StreetTypeListItemDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetPaged(
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string? searchTerm = null,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(new GetStreetTypesPagedQuery(pageNumber, pageSize, searchTerm), cancellationToken);
-        if (!response.IsSuccess)
-        {
-            return BadRequest(response);
-        }
 
-        return Ok(response);
-    }
 
     /// <summary>
-    /// Creates a new street type catalog entry.
-    /// The Application layer validates uniqueness for both the name and abbreviation before persisting the new record.
+    /// Sets the default company for a user and clears any previous default assignment in the same operation.
+    /// This endpoint is intended for multi-company users that need to change the company context used by subsequent application workflows.
     /// </summary>
-    /// <param name="command">The creation payload containing the street type data.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the create command is being handled.</param>
-    /// <returns>A `201 Created` response containing the newly created street type resource.</returns>
-    [HttpPost]
-    [ProducesResponseType(typeof(Response<StreetTypeDto>), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Create([FromBody] CreateStreetTypeCommand command, CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(command, cancellationToken);
-        if (!response.IsSuccess)
-        {
-            if (response.Message == "STREETTYPE_NAME_IN_USE" || response.Message == "STREETTYPE_ABBREVIATION_IN_USE")
-            {
-                return Conflict(response);
-            }
-
-            return BadRequest(response);
-        }
-
-        return CreatedAtAction(nameof(GetById), new { id = response.Data!.Id }, response);
-    }
-
-    /// <summary>
-    /// Updates an existing street type identified by the route id.
-    /// Validation, not-found handling, and uniqueness checks are delegated to the corresponding Application command handler.
-    /// </summary>
-    /// <param name="id">The unique identifier of the street type to update.</param>
-    /// <param name="command">The update payload containing the new street type state.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the update command is executing.</param>
-    /// <returns>A standardized response containing the updated street type.</returns>
-    [HttpPut("{id:guid}")]
-    [ProducesResponseType(typeof(Response<StreetTypeDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateStreetTypeCommand command, CancellationToken cancellationToken = default)
-    {
-        var request = command with { Id = id };
-        var response = await _mediator.Send(request, cancellationToken);
-
-        if (!response.IsSuccess)
-        {
-            if (response.Message == "STREETTYPE_NOT_FOUND")
-            {
-                return NotFound(response);
-            }
-
-            if (response.Message == "STREETTYPE_NAME_IN_USE" || response.Message == "STREETTYPE_ABBREVIATION_IN_USE")
-            {
-                return Conflict(response);
-            }
-
-            return BadRequest(response);
-        }
-
-        return Ok(response);
-    }
-
-    /// <summary>
-    /// Performs a soft delete over a street type catalog record.
-    /// The endpoint reports not-found and validation outcomes using the same standardized response contract as the rest of the API.
-    /// </summary>
-    /// <param name="id">The unique identifier of the street type to delete.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the delete command runs.</param>
-    /// <returns>A standardized response containing the identifier of the deleted street type.</returns>
-    [HttpDelete("{id:guid}")]
+    /// <param name="userId">The unique identifier of the user whose default company should be changed.</param>
+    /// <param name="companyId">The unique identifier of the company that must become the new default context.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the update command is being executed.</param>
+    /// <returns>A standardized response containing the company identifier that is now marked as default.</returns>
+    [HttpPut("{userId:guid}/default-company/{companyId:guid}")]
     [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> SetDefaultCompany(Guid userId, Guid companyId, CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(new DeleteStreetTypeCommand(id), cancellationToken);
+        var response = await _mediator.Send(new SetDefaultCompanyCommand(userId, companyId), cancellationToken);
+
         if (!response.IsSuccess)
         {
-            if (response.Message == "STREETTYPE_NOT_FOUND")
-            {
-                return NotFound(response);
-            }
-
             return BadRequest(response);
         }
 
         return Ok(response);
     }
-}
 
 
->>> ARCHIVO: ./src/4.Services.WebApi/Controllers/CommunicationChannelsController.cs
-------------------------------------------
-using JOIN.Application.Common;
-using JOIN.Application.DTO.Common;
-using JOIN.Application.UseCases.Common.CommunicationChannels.Commands;
-using JOIN.Application.UseCases.Common.CommunicationChannels.Queries;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
-
-namespace JOIN.Services.WebApi.Controllers;
-
-/// <summary>
-/// Exposes REST endpoints for managing the communication channel catalog.
-/// The controller remains a thin transport layer and delegates all command/query execution to MediatR handlers.
-/// </summary>
-[ApiController]
-[Route("api/v1/[controller]")]
-[Produces("application/json")]
-public class CommunicationChannelsController(IMediator mediator) : ControllerBase
-{
-    private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
 
     /// <summary>
-    /// Retrieves a single communication channel by its unique identifier.
-    /// This endpoint is useful for maintenance screens that need the complete persisted channel definition before editing.
+    /// Returns the active users registered in the system together with all roles currently assigned to each one.
+    /// This endpoint is especially useful for user-administration screens that need a consolidated role view before applying changes.
     /// </summary>
-    /// <param name="id">The unique identifier of the communication channel to retrieve.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the query is executing.</param>
-    /// <returns>A standardized response containing the requested communication channel.</returns>
-    [HttpGet("{id:guid}")]
-    [ProducesResponseType(typeof(Response<CommunicationChannelDto>), StatusCodes.Status200OK)]
+    /// <param name="cancellationToken">Token used to cancel the request while the user-role query is being processed.</param>
+    /// <returns>A standardized response containing the user list and their assigned roles.</returns>
+    [HttpGet]
+    [ProducesResponseType(typeof(Response<IEnumerable<UserWithRolesDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetUsersWithRoles(CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new GetUsersWithRolesQuery(), cancellationToken);
+        return Ok(response);
+    }
+
+
+
+    /// <summary>
+    /// Replaces the full role set assigned to a specific user.
+    /// The endpoint receives the desired final role list, delegates the replacement logic to the Application layer, and returns `404`, `400`, or `200` depending on the execution outcome.
+    /// </summary>
+    /// <param name="userId">The unique identifier of the user whose roles should be replaced.</param>
+    /// <param name="request">The payload containing the final list of roles that must remain assigned to the user.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the role-replacement command is being handled.</param>
+    /// <returns>A standardized response containing the updated user and role assignment projection.</returns>
+    [HttpPut("{userId:guid}/roles")]
+    [ProducesResponseType(typeof(Response<UserWithRolesDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> ReplaceUserRoles(
+        Guid userId,
+        [FromBody] UpdateUserRolesDto request,
+        CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetCommunicationChannelByIdQuery(id), cancellationToken);
-        if (!response.IsSuccess)
+        var response = await _mediator.Send(new ReplaceUserRolesCommand(userId, request.Roles), cancellationToken);
+
+        if (!response.IsSuccess && string.Equals(response.Message, "User not found.", StringComparison.Ordinal))
         {
             return NotFound(response);
         }
 
-        return Ok(response);
-    }
-
-    /// <summary>
-    /// Returns a paginated list of communication channels with optional filtering.
-    /// This endpoint supports catalog grids and administrative lookups that require server-side paging and search.
-    /// </summary>
-    /// <param name="pageNumber">The 1-based page number to retrieve.</param>
-    /// <param name="pageSize">The maximum amount of rows to return on the requested page.</param>
-    /// <param name="searchTerm">Optional text used to filter the channel list.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the paged query executes.</param>
-    /// <returns>A standardized paged response containing the matching communication channels.</returns>
-    [HttpGet]
-    [ProducesResponseType(typeof(Response<PagedResult<CommunicationChannelListItemDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetPaged(
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string? searchTerm = null,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(new GetCommunicationChannelsPagedQuery(pageNumber, pageSize, searchTerm), cancellationToken);
         if (!response.IsSuccess)
         {
             return BadRequest(response);
@@ -36901,112 +37164,25 @@ public class CommunicationChannelsController(IMediator mediator) : ControllerBas
         return Ok(response);
     }
 
-    /// <summary>
-    /// Creates a new communication channel catalog entry.
-    /// Duplicate channel names are rejected with a conflict response to preserve catalog consistency.
-    /// </summary>
-    /// <param name="command">The creation payload containing the communication channel data.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the create command is being processed.</param>
-    /// <returns>A `201 Created` response containing the newly persisted communication channel.</returns>
-    [HttpPost]
-    [ProducesResponseType(typeof(Response<CommunicationChannelDto>), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Create([FromBody] CreateCommunicationChannelCommand command, CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(command, cancellationToken);
-        if (!response.IsSuccess)
-        {
-            if (response.Message == "COMMUNICATIONCHANNEL_NAME_IN_USE")
-            {
-                return Conflict(response);
-            }
-
-            return BadRequest(response);
-        }
-
-        return CreatedAtAction(nameof(GetById), new { id = response.Data!.Id }, response);
-    }
-
-    /// <summary>
-    /// Updates an existing communication channel identified by the route id.
-    /// The endpoint returns not-found, validation, or conflict responses depending on the result produced by the Application layer.
-    /// </summary>
-    /// <param name="id">The unique identifier of the communication channel to update.</param>
-    /// <param name="command">The update payload containing the new communication channel values.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the update command is running.</param>
-    /// <returns>A standardized response containing the updated communication channel.</returns>
-    [HttpPut("{id:guid}")]
-    [ProducesResponseType(typeof(Response<CommunicationChannelDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCommunicationChannelCommand command, CancellationToken cancellationToken = default)
-    {
-        var request = command with { Id = id };
-        var response = await _mediator.Send(request, cancellationToken);
-
-        if (!response.IsSuccess)
-        {
-            if (response.Message == "COMMUNICATIONCHANNEL_NOT_FOUND")
-            {
-                return NotFound(response);
-            }
-
-            if (response.Message == "COMMUNICATIONCHANNEL_NAME_IN_USE")
-            {
-                return Conflict(response);
-            }
-
-            return BadRequest(response);
-        }
-
-        return Ok(response);
-    }
-
-    /// <summary>
-    /// Performs a soft delete over a communication channel catalog entry.
-    /// The delete command preserves the standardized response contract and reports whether the target record was missing or invalid for deletion.
-    /// </summary>
-    /// <param name="id">The unique identifier of the communication channel to delete.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the delete command executes.</param>
-    /// <returns>A standardized response containing the deleted communication channel identifier.</returns>
-    [HttpDelete("{id:guid}")]
-    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(new DeleteCommunicationChannelCommand(id), cancellationToken);
-        if (!response.IsSuccess)
-        {
-            if (response.Message == "COMMUNICATIONCHANNEL_NOT_FOUND")
-            {
-                return NotFound(response);
-            }
-
-            return BadRequest(response);
-        }
-
-        return Ok(response);
-    }
 }
 
 
->>> ARCHIVO: ./src/4.Services.WebApi/Controllers/CustomersController.cs
+>>> ARCHIVO: ./src/4.Services.WebApi/Controllers/Admin/CustomersController.cs
 ------------------------------------------
 
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
 using JOIN.Application.UseCases.Admin.Customers.Commands;
 using JOIN.Application.UseCases.Admin.Customers.Queries;
+using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
-namespace JOIN.Services.WebApi.Controllers;
+
+
+namespace JOIN.Services.WebApi.Controllers.Admin;
+
+
 
 /// <summary>
 /// Exposes REST endpoints for managing customer aggregates.
@@ -37015,6 +37191,7 @@ namespace JOIN.Services.WebApi.Controllers;
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
+[PermissionResource("Customers")]
 public class CustomersController(IMediator mediator) : ControllerBase
 {
     private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
@@ -37199,64 +37376,367 @@ public class CustomersController(IMediator mediator) : ControllerBase
 }
 
 
->>> ARCHIVO: ./src/4.Services.WebApi/Controllers/RolesController.cs
+>>> ARCHIVO: ./src/4.Services.WebApi/Controllers/Common/StreetTypesController.cs
 ------------------------------------------
 using JOIN.Application.Common;
-using JOIN.Domain.Security;
-using Microsoft.AspNetCore.Identity;
+using JOIN.Application.DTO.Common;
+using JOIN.Application.UseCases.Common.StreetTypes.Commands;
+using JOIN.Application.UseCases.Common.StreetTypes.Queries;
+using JOIN.Services.WebApi.Filters;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
-namespace JOIN.Services.WebApi.Controllers;
+
+
+namespace JOIN.Services.WebApi.Controllers.Common;
+
+
 
 /// <summary>
-/// Exposes read-only endpoints for the role catalog used by the security and administration modules.
-/// The controller returns the available Identity role names so clients can populate assignment and permission-management screens.
+/// Exposes REST endpoints for managing the street type catalog.
+/// The controller handles routing and response translation while the Application layer enforces the business rules.
 /// </summary>
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
-public class RolesController(RoleManager<ApplicationRole> roleManager) : ControllerBase
+[PermissionResource("StreetTypes")]
+public class StreetTypesController(IMediator mediator) : ControllerBase
 {
-    private readonly RoleManager<ApplicationRole> _roleManager = roleManager ?? throw new ArgumentNullException(nameof(roleManager));
+    private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
 
     /// <summary>
-    /// Returns the active role names registered in the Identity store, sorted alphabetically for predictable UI rendering.
-    /// This endpoint is typically used to populate role selectors when assigning or replacing user permissions.
+    /// Retrieves a street type catalog entry by its unique identifier.
+    /// This endpoint is commonly used by maintenance forms that need the current persisted state before an edit operation.
     /// </summary>
-    /// <param name="cancellationToken">Token used to cancel the request while the role list is being materialized.</param>
-    /// <returns>A standardized response containing the role names available to the application.</returns>
-    [HttpGet]
-    [ProducesResponseType(typeof(Response<IEnumerable<string>>), StatusCodes.Status200OK)]
+    /// <param name="id">The unique identifier of the street type to retrieve.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the read query is being processed.</param>
+    /// <returns>A standardized response containing the requested street type when it exists.</returns>
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(Response<StreetTypeDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken = default)
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var roles = await _roleManager.Roles
-            .OrderBy(role => role.Name)
-            .Select(role => role.Name ?? string.Empty)
-            .Where(roleName => roleName != string.Empty)
-            .ToListAsync(cancellationToken);
-
-        return Ok(new Response<IEnumerable<string>>
+        var response = await _mediator.Send(new GetStreetTypeByIdQuery(id), cancellationToken);
+        if (!response.IsSuccess)
         {
-            Data = roles,
-            IsSuccess = true,
-            Message = "Roles retrieved successfully."
-        });
+            return NotFound(response);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Returns a paginated list of street types with optional text filtering.
+    /// This endpoint is designed for lookup grids and administrative screens that require server-side paging.
+    /// </summary>
+    /// <param name="pageNumber">The 1-based page number to retrieve.</param>
+    /// <param name="pageSize">The maximum number of records to return for the requested page.</param>
+    /// <param name="searchTerm">Optional text used to filter the street type catalog.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the paged query executes.</param>
+    /// <returns>A standardized paged response containing the matching street type rows.</returns>
+    [HttpGet]
+    [ProducesResponseType(typeof(Response<PagedResult<StreetTypeListItemDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetPaged(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? searchTerm = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new GetStreetTypesPagedQuery(pageNumber, pageSize, searchTerm), cancellationToken);
+        if (!response.IsSuccess)
+        {
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Creates a new street type catalog entry.
+    /// The Application layer validates uniqueness for both the name and abbreviation before persisting the new record.
+    /// </summary>
+    /// <param name="command">The creation payload containing the street type data.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the create command is being handled.</param>
+    /// <returns>A `201 Created` response containing the newly created street type resource.</returns>
+    [HttpPost]
+    [ProducesResponseType(typeof(Response<StreetTypeDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Create([FromBody] CreateStreetTypeCommand command, CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(command, cancellationToken);
+        if (!response.IsSuccess)
+        {
+            if (response.Message == "STREETTYPE_NAME_IN_USE" || response.Message == "STREETTYPE_ABBREVIATION_IN_USE")
+            {
+                return Conflict(response);
+            }
+
+            return BadRequest(response);
+        }
+
+        return CreatedAtAction(nameof(GetById), new { id = response.Data!.Id }, response);
+    }
+
+    /// <summary>
+    /// Updates an existing street type identified by the route id.
+    /// Validation, not-found handling, and uniqueness checks are delegated to the corresponding Application command handler.
+    /// </summary>
+    /// <param name="id">The unique identifier of the street type to update.</param>
+    /// <param name="command">The update payload containing the new street type state.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the update command is executing.</param>
+    /// <returns>A standardized response containing the updated street type.</returns>
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(typeof(Response<StreetTypeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateStreetTypeCommand command, CancellationToken cancellationToken = default)
+    {
+        var request = command with { Id = id };
+        var response = await _mediator.Send(request, cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            if (response.Message == "STREETTYPE_NOT_FOUND")
+            {
+                return NotFound(response);
+            }
+
+            if (response.Message == "STREETTYPE_NAME_IN_USE" || response.Message == "STREETTYPE_ABBREVIATION_IN_USE")
+            {
+                return Conflict(response);
+            }
+
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Performs a soft delete over a street type catalog record.
+    /// The endpoint reports not-found and validation outcomes using the same standardized response contract as the rest of the API.
+    /// </summary>
+    /// <param name="id">The unique identifier of the street type to delete.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the delete command runs.</param>
+    /// <returns>A standardized response containing the identifier of the deleted street type.</returns>
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new DeleteStreetTypeCommand(id), cancellationToken);
+        if (!response.IsSuccess)
+        {
+            if (response.Message == "STREETTYPE_NOT_FOUND")
+            {
+                return NotFound(response);
+            }
+
+            return BadRequest(response);
+        }
+
+        return Ok(response);
     }
 }
 
 
->>> ARCHIVO: ./src/4.Services.WebApi/Controllers/CompaniesController.cs
+>>> ARCHIVO: ./src/4.Services.WebApi/Controllers/Common/CommunicationChannelsController.cs
+------------------------------------------
+using JOIN.Application.Common;
+using JOIN.Application.DTO.Common;
+using JOIN.Application.UseCases.Common.CommunicationChannels.Commands;
+using JOIN.Application.UseCases.Common.CommunicationChannels.Queries;
+using JOIN.Services.WebApi.Filters;
+using MediatR;
+using Microsoft.AspNetCore.Mvc;
+
+
+
+namespace JOIN.Services.WebApi.Controllers.Common;
+
+
+
+/// <summary>
+/// Exposes REST endpoints for managing the communication channel catalog.
+/// The controller remains a thin transport layer and delegates all command/query execution to MediatR handlers.
+/// </summary>
+[ApiController]
+[Route("api/v1/[controller]")]
+[Produces("application/json")]
+[PermissionResource("CommunicationChannels")]
+public class CommunicationChannelsController(IMediator mediator) : ControllerBase
+{
+    private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+
+    /// <summary>
+    /// Retrieves a single communication channel by its unique identifier.
+    /// This endpoint is useful for maintenance screens that need the complete persisted channel definition before editing.
+    /// </summary>
+    /// <param name="id">The unique identifier of the communication channel to retrieve.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the query is executing.</param>
+    /// <returns>A standardized response containing the requested communication channel.</returns>
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(Response<CommunicationChannelDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new GetCommunicationChannelByIdQuery(id), cancellationToken);
+        if (!response.IsSuccess)
+        {
+            return NotFound(response);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Returns a paginated list of communication channels with optional filtering.
+    /// This endpoint supports catalog grids and administrative lookups that require server-side paging and search.
+    /// </summary>
+    /// <param name="pageNumber">The 1-based page number to retrieve.</param>
+    /// <param name="pageSize">The maximum amount of rows to return on the requested page.</param>
+    /// <param name="searchTerm">Optional text used to filter the channel list.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the paged query executes.</param>
+    /// <returns>A standardized paged response containing the matching communication channels.</returns>
+    [HttpGet]
+    [ProducesResponseType(typeof(Response<PagedResult<CommunicationChannelListItemDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetPaged(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? searchTerm = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new GetCommunicationChannelsPagedQuery(pageNumber, pageSize, searchTerm), cancellationToken);
+        if (!response.IsSuccess)
+        {
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Creates a new communication channel catalog entry.
+    /// Duplicate channel names are rejected with a conflict response to preserve catalog consistency.
+    /// </summary>
+    /// <param name="command">The creation payload containing the communication channel data.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the create command is being processed.</param>
+    /// <returns>A `201 Created` response containing the newly persisted communication channel.</returns>
+    [HttpPost]
+    [ProducesResponseType(typeof(Response<CommunicationChannelDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Create([FromBody] CreateCommunicationChannelCommand command, CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(command, cancellationToken);
+        if (!response.IsSuccess)
+        {
+            if (response.Message == "COMMUNICATIONCHANNEL_NAME_IN_USE")
+            {
+                return Conflict(response);
+            }
+
+            return BadRequest(response);
+        }
+
+        return CreatedAtAction(nameof(GetById), new { id = response.Data!.Id }, response);
+    }
+
+    /// <summary>
+    /// Updates an existing communication channel identified by the route id.
+    /// The endpoint returns not-found, validation, or conflict responses depending on the result produced by the Application layer.
+    /// </summary>
+    /// <param name="id">The unique identifier of the communication channel to update.</param>
+    /// <param name="command">The update payload containing the new communication channel values.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the update command is running.</param>
+    /// <returns>A standardized response containing the updated communication channel.</returns>
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(typeof(Response<CommunicationChannelDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCommunicationChannelCommand command, CancellationToken cancellationToken = default)
+    {
+        var request = command with { Id = id };
+        var response = await _mediator.Send(request, cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            if (response.Message == "COMMUNICATIONCHANNEL_NOT_FOUND")
+            {
+                return NotFound(response);
+            }
+
+            if (response.Message == "COMMUNICATIONCHANNEL_NAME_IN_USE")
+            {
+                return Conflict(response);
+            }
+
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Performs a soft delete over a communication channel catalog entry.
+    /// The delete command preserves the standardized response contract and reports whether the target record was missing or invalid for deletion.
+    /// </summary>
+    /// <param name="id">The unique identifier of the communication channel to delete.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the delete command executes.</param>
+    /// <returns>A standardized response containing the deleted communication channel identifier.</returns>
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new DeleteCommunicationChannelCommand(id), cancellationToken);
+        if (!response.IsSuccess)
+        {
+            if (response.Message == "COMMUNICATIONCHANNEL_NOT_FOUND")
+            {
+                return NotFound(response);
+            }
+
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+}
+
+
+>>> ARCHIVO: ./src/4.Services.WebApi/Controllers/Common/CompaniesController.cs
 ------------------------------------------
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Common;
 using JOIN.Application.UseCases.Common.Companies.Commands;
 using JOIN.Application.UseCases.Common.Companies.Queries;
+using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
-namespace JOIN.Services.WebApi.Controllers;
+
+
+namespace JOIN.Services.WebApi.Controllers.Common;
+
+
 
 /// <summary>
 /// Exposes REST endpoints for managing the company catalog.
@@ -37265,6 +37745,7 @@ namespace JOIN.Services.WebApi.Controllers;
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
+[PermissionResource("Companies")]
 public class CompaniesController(IMediator mediator) : ControllerBase
 {
     private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
@@ -37414,16 +37895,21 @@ public class CompaniesController(IMediator mediator) : ControllerBase
 }
 
 
->>> ARCHIVO: ./src/4.Services.WebApi/Controllers/CountryController.cs
+>>> ARCHIVO: ./src/4.Services.WebApi/Controllers/Common/CountryController.cs
 ------------------------------------------
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Common;
 using JOIN.Application.UseCases.Common.Countries.Commands;
 using JOIN.Application.UseCases.Common.Countries.Queries;
+using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
-namespace JOIN.Services.WebApi.Controllers;
+
+
+namespace JOIN.Services.WebApi.Controllers.Common;
+
+
 
 /// <summary>
 /// Exposes REST endpoints for managing the country catalog.
@@ -37432,6 +37918,7 @@ namespace JOIN.Services.WebApi.Controllers;
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
+[PermissionResource("Countries")]
 public class CountryController(IMediator mediator) : ControllerBase
 {
     private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
@@ -37587,340 +38074,6 @@ public class CountryController(IMediator mediator) : ControllerBase
 
         return Ok(response);
     }
-}
-
-
->>> ARCHIVO: ./src/4.Services.WebApi/Controllers/UsersController.cs
-------------------------------------------
-using JOIN.Application.Common;
-using JOIN.Application.DTO.Security;
-using JOIN.Application.UseCases.Security.Auth.Login;
-using JOIN.Application.UseCases.Security.Auth.Refresh;
-using JOIN.Application.UseCases.Security.Auth.Register;
-using JOIN.Application.UseCases.Security.Queries.GetMyCompanyUserReport;
-using JOIN.Application.UseCases.Security.Queries.GetSidebarMenu;
-using JOIN.Application.UseCases.Security.Queries.GetSystemWideUserReport;
-using JOIN.Application.UseCases.Security.UserCompanies.Commands.SetDefaultCompany;
-using JOIN.Application.UseCases.Security.UserCompanies.Queries.GetUserCompanies;
-using JOIN.Application.UseCases.Security.Users.Commands.InvalidateSidebarCache;
-using JOIN.Application.UseCases.Security.Users.Commands.ReplaceUserRoles;
-using JOIN.Application.UseCases.Security.Users.Queries.GetUsersWithRoles;
-using JOIN.Services.WebApi.Filters;
-using MediatR;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-
-
-
-namespace JOIN.Services.WebApi.Controllers;
-
-
-
-/// <summary>
-/// Exposes authentication, user-administration, reporting, and user-to-company assignment endpoints for the security module.
-/// The controller keeps a thin HTTP-facing role and delegates business logic and data access to the Application layer through MediatR.
-/// </summary>
-[ApiController]
-[Route("api/v1/[controller]")]
-[Produces("application/json")]
-public class UsersController(IMediator mediator) : ControllerBase
-{
-
-
-
-    private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
-
-
-
-    /// <summary>
-    /// Authenticates a user and returns the complete JWT session payload, including the effective company context, role list, access token, refresh token, and expiration metadata.
-    /// This endpoint is the entry point for establishing an authenticated session in the security module.
-    /// </summary>
-    /// <param name="command">The login payload containing the user credentials and optional target company context.</param>
-    /// <param name="cancellationToken">Token used to cancel the authentication request while the login command is being processed.</param>
-    /// <returns>The authenticated session payload when the credentials are valid.</returns>
-    [AllowAnonymous]
-    [HttpPost("login")]
-    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> Login([FromBody] LoginCommand command, CancellationToken cancellationToken)
-    {
-        var response = await _mediator.Send(command, cancellationToken);
-        return Ok(response);
-    }
-
-
-
-    /// <summary>
-    /// Registers a new active user account without initial company assignments.
-    /// The actual validation and persistence rules are executed in the Application layer through the registration command handler.
-    /// </summary>
-    /// <param name="command">The registration payload containing the new user data.</param>
-    /// <param name="cancellationToken">Token used to cancel the registration request while the command is being handled.</param>
-    /// <returns>A standardized response containing the identifier of the newly created user.</returns>
-    [AllowAnonymous]
-    [HttpPost("register")]
-    [ProducesResponseType(typeof(Response<RegisterResponseDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Register([FromBody] RegisterCommand command, CancellationToken cancellationToken)
-    {
-        var response = await _mediator.Send(command, cancellationToken);
-        return Ok(response);
-    }
-
-
-
-    /// <summary>
-    /// Rotates a valid refresh token and returns a renewed authenticated session payload.
-    /// This endpoint is intended to extend a user session without forcing the user to re-enter credentials.
-    /// </summary>
-    /// <param name="command">The refresh-token payload used to request a renewed session.</param>
-    /// <param name="cancellationToken">Token used to cancel the refresh request while the command is being processed.</param>
-    /// <returns>The renewed authenticated session payload when the refresh token is valid.</returns>
-    [AllowAnonymous]
-    [HttpPost("refresh")]
-    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand command, CancellationToken cancellationToken)
-    {
-        var response = await _mediator.Send(command, cancellationToken);
-        return Ok(response);
-    }
-
-
-
-    /// <summary>
-    /// Terminates the current authenticated session in the server-side authentication pipeline.
-    /// This endpoint is used to explicitly close the active sign-in context associated with the caller.
-    /// </summary>
-    /// <returns>A standardized success response indicating that the logout operation completed successfully.</returns>
-    [HttpPost("logout")]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> Logout()
-    {
-        await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
-
-        return Ok(new Response<object>
-        {
-            IsSuccess = true,
-            Message = "Logout completed successfully."
-        });
-    }
-
-
-
-    /// <summary>
-    /// Returns the user management and activity report across all companies in the system.
-    /// Access is restricted to `SuperAdmin` users because the response spans multiple tenants and may include cross-company activity information.
-    /// </summary>
-    /// <param name="fromDate">Optional lower UTC date boundary used to limit the report window.</param>
-    /// <param name="toDate">Optional upper UTC date boundary used to limit the report window.</param>
-    /// <param name="targetCompanyId">Optional explicit company filter applied inside the system-wide report.</param>
-    /// <param name="roleNames">Optional list of role names used to restrict the users included in the report.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the report query executes.</param>
-    /// <returns>A standardized response containing the requested system-wide user management report rows.</returns>
-    [HttpGet("reports/system")]
-    [Authorize(Roles = "SuperAdmin")]
-    [ProducesResponseType(typeof(Response<IReadOnlyCollection<UserManagementReportDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetSystemWideReport(
-        [FromQuery] DateTime? fromDate = null,
-        [FromQuery] DateTime? toDate = null,
-        [FromQuery] Guid? targetCompanyId = null,
-        [FromQuery] string[]? roleNames = null,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(
-            new GetSystemWideUserReportQuery(fromDate, toDate, targetCompanyId, roleNames),
-            cancellationToken);
-
-        return Ok(response);
-    }
-
-
-
-    /// <summary>
-    /// Returns the user management and activity report restricted to the authenticated user's active company context.
-    /// The effective tenant is resolved first from <c>Security.UserCompanies</c> using the default company, then from <c>Security.UserRoleCompanies</c> when necessary, and finally applied to scope the report data safely.
-    /// </summary>
-    /// <param name="fromDate">Optional lower UTC date boundary used to filter the report window.</param>
-    /// <param name="toDate">Optional upper UTC date boundary used to filter the report window.</param>
-    /// <param name="roleNames">Optional list of role names used to narrow the report result set.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the company-scoped report query runs.</param>
-    /// <returns>A standardized response containing the company-scoped user management report rows.</returns>
-    [HttpGet("reports/my-company")]
-    [ProducesResponseType(typeof(Response<IReadOnlyCollection<UserManagementReportDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetMyCompanyReport(
-        [FromQuery] DateTime? fromDate = null,
-        [FromQuery] DateTime? toDate = null,
-        [FromQuery] string[]? roleNames = null,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(
-            new GetMyCompanyUserReportQuery(fromDate, toDate, roleNames),
-            cancellationToken);
-
-        return Ok(response);
-    }
-
-
-
-    /// <summary>
-    /// Returns the hierarchical sidebar menu resolved for the authenticated user in the active company context.
-    /// This endpoint intentionally skips the controller-based dynamic permission filter because it is the source used to build the permission-driven navigation tree itself.
-    /// </summary>
-    /// <param name="cancellationToken">Token used to cancel the request while the sidebar query is being processed.</param>
-    /// <returns>A standardized response containing the hierarchical menu tree visible to the authenticated user.</returns>
-    [Authorize]
-    [SkipDynamicAuthorization]
-    [HttpGet("sidebar")]
-    [ProducesResponseType(typeof(Response<IReadOnlyCollection<MenuOptionResponse>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetSidebarMenu(CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(new GetSidebarMenuQuery(), cancellationToken);
-        return Ok(response);
-    }
-
-    /// <summary>
-    /// Invalidates the cached sidebar entry associated with a specific user and company scope.
-    /// The next call to the sidebar endpoint for the same identifiers will reload the data from the database and repopulate the cache with fresh values.
-    /// </summary>
-    /// <param name="command">The payload containing the user and company identifiers whose sidebar cache should be cleared.</param>
-    /// <param name="cancellationToken">Token used to cancel the invalidation request while the command is being processed.</param>
-    /// <returns>A standardized response indicating that the sidebar cache entry was removed successfully.</returns>
-    [Authorize(Roles = "SuperAdmin")]
-    [SkipDynamicAuthorization]
-    [HttpPost("sidebar/cache/invalidate")]
-    [ProducesResponseType(typeof(Response<bool>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> InvalidateSidebarCache(
-        [FromBody] InvalidateSidebarCacheCommand command,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(command, cancellationToken);
-
-        if (!response.IsSuccess)
-        {
-            return BadRequest(response);
-        }
-
-        return Ok(response);
-    }
-
-
-
-    /// <summary>
-    /// Returns every active company linked to the specified user and indicates which assignment is currently marked as the default operational context.
-    /// This endpoint is used to drive user-context switching screens and related security administration workflows.
-    /// </summary>
-    /// <param name="userId">The unique identifier of the user whose company assignments should be listed.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the company-assignment query executes.</param>
-    /// <returns>A standardized response containing the linked companies for the requested user.</returns>
-    [HttpGet("{userId:guid}/companies")]
-    [ProducesResponseType(typeof(Response<IEnumerable<UserCompanyDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetUserCompanies(Guid userId, CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(new GetUserCompaniesQuery(userId), cancellationToken);
-
-        if (!response.IsSuccess && string.Equals(response.Message, "User not found.", StringComparison.Ordinal))
-        {
-            return NotFound(response);
-        }
-
-        return Ok(response);
-    }
-
-
-
-    /// <summary>
-    /// Sets the default company for a user and clears any previous default assignment in the same operation.
-    /// This endpoint is intended for multi-company users that need to change the company context used by subsequent application workflows.
-    /// </summary>
-    /// <param name="userId">The unique identifier of the user whose default company should be changed.</param>
-    /// <param name="companyId">The unique identifier of the company that must become the new default context.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the update command is being executed.</param>
-    /// <returns>A standardized response containing the company identifier that is now marked as default.</returns>
-    [HttpPut("{userId:guid}/default-company/{companyId:guid}")]
-    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> SetDefaultCompany(Guid userId, Guid companyId, CancellationToken cancellationToken)
-    {
-        var response = await _mediator.Send(new SetDefaultCompanyCommand(userId, companyId), cancellationToken);
-
-        if (!response.IsSuccess)
-        {
-            return BadRequest(response);
-        }
-
-        return Ok(response);
-    }
-
-
-
-    /// <summary>
-    /// Returns the active users registered in the system together with all roles currently assigned to each one.
-    /// This endpoint is especially useful for user-administration screens that need a consolidated role view before applying changes.
-    /// </summary>
-    /// <param name="cancellationToken">Token used to cancel the request while the user-role query is being processed.</param>
-    /// <returns>A standardized response containing the user list and their assigned roles.</returns>
-    [HttpGet]
-    [ProducesResponseType(typeof(Response<IEnumerable<UserWithRolesDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetUsersWithRoles(CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(new GetUsersWithRolesQuery(), cancellationToken);
-        return Ok(response);
-    }
-
-
-
-    /// <summary>
-    /// Replaces the full role set assigned to a specific user.
-    /// The endpoint receives the desired final role list, delegates the replacement logic to the Application layer, and returns `404`, `400`, or `200` depending on the execution outcome.
-    /// </summary>
-    /// <param name="userId">The unique identifier of the user whose roles should be replaced.</param>
-    /// <param name="request">The payload containing the final list of roles that must remain assigned to the user.</param>
-    /// <param name="cancellationToken">Token used to cancel the request while the role-replacement command is being handled.</param>
-    /// <returns>A standardized response containing the updated user and role assignment projection.</returns>
-    [HttpPut("{userId:guid}/roles")]
-    [ProducesResponseType(typeof(Response<UserWithRolesDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> ReplaceUserRoles(
-        Guid userId,
-        [FromBody] UpdateUserRolesDto request,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(new ReplaceUserRolesCommand(userId, request.Roles), cancellationToken);
-
-        if (!response.IsSuccess && string.Equals(response.Message, "User not found.", StringComparison.Ordinal))
-        {
-            return NotFound(response);
-        }
-
-        if (!response.IsSuccess)
-        {
-            return BadRequest(response);
-        }
-
-        return Ok(response);
-    }
-
 }
 
 

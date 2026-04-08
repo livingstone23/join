@@ -1537,6 +1537,7 @@ public class DatabaseSeeder
     [
         new("Administracion", "/administracion", "icon_admin", null, null, false, false, false, false),
         new("Paises", "/administracion/countries", "icon_country", "Administracion", "Countries", true, true, true, true),
+        new("Areas", "/administracion/areas", "icon_area", "Administracion", "Areas", true, true, true, true),
         new("CommunicationChannels", "/administracion/communication-channels", "icon_channel", "Administracion", "CommunicationChannels", true, true, true, true),
         new("Compañias", "/administracion/companies", "icon_company", "Administracion", "Companies", true, true, true, true)
     ];
@@ -1545,17 +1546,20 @@ public class DatabaseSeeder
     [
         new("Manager", "Administracion", false, false, false, false),
         new("Manager", "Paises", true, true, true, true),
+        new("Manager", "Areas", true, true, true, true),
         new("Manager", "CommunicationChannels", true, true, true, true),
         new("Manager", "Compañias", true, true, true, true),
 
         new("Supervisor", "Administracion", false, false, false, false),
         new("Supervisor", "Paises", true, true, true, false),
+        new("Supervisor", "Areas", true, true, true, false),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Compañias", true, true, true, false),
 
-        // `UsuarioSimple` must not receive sidebar options unless a company explicitly grants readable access.
+        // `UsuarioSimple` receives read-only access to the `Areas` option while the remaining administrative entries stay restricted by default.
         new("UsuarioSimple", "Administracion", false, false, false, false),
         new("UsuarioSimple", "Paises", false, false, false, false),
+        new("UsuarioSimple", "Areas", true, false, false, false),
         new("UsuarioSimple", "CommunicationChannels", false, false, false, false),
         new("UsuarioSimple", "Compañias", false, false, false, false)
     ];

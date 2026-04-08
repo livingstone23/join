@@ -30,7 +30,7 @@ public class DeleteCountryCommandHandler(IUnitOfWork unitOfWork)
             return Response<Guid>.Error("COUNTRY_NOT_FOUND", ["Country not found."]);
         }
 
-        countryEntity.GcRecord = 1;
+        countryEntity.MarkAsDeleted();
 
         await countryRepository.UpdateAsync(countryEntity);
         var result = await _unitOfWork.SaveChangesAsync(cancellationToken);

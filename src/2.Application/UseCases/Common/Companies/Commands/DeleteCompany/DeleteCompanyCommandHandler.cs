@@ -27,7 +27,7 @@ public class DeleteCompanyCommandHandler(IUnitOfWork unitOfWork)
             return Response<Guid>.Error("COMPANY_NOT_FOUND", ["Company not found."]);
         }
 
-        entity.GcRecord = 1;
+        entity.MarkAsDeleted();
 
         await repository.UpdateAsync(entity);
         var result = await _unitOfWork.SaveChangesAsync(cancellationToken);

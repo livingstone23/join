@@ -56,7 +56,7 @@ public class AuditableEntitySaveChangesInterceptor : SaveChangesInterceptor
             {
                 entry.Entity.Created = utcNow;
                 entry.Entity.CreatedBy = currentUserId;
-                entry.Entity.GcRecord = 0; // Ensure it's active
+                entry.Entity.GcRecord = BaseAuditableEntity.ActiveGcRecord; // Ensure it's active
             }
 
             if (entry.State == EntityState.Added || entry.State == EntityState.Modified || entry.HasChangedOwnedEntities())
@@ -69,7 +69,7 @@ public class AuditableEntitySaveChangesInterceptor : SaveChangesInterceptor
             if (entry.State == EntityState.Deleted)
             {
                 entry.State = EntityState.Modified; // Cancel physical delete
-                entry.Entity.GcRecord = 1;          // Mark as deleted
+                entry.Entity.MarkAsDeleted(utcNow); // Mark as deleted using yyyyMMdd
                 entry.Entity.LastModified = utcNow;
                 entry.Entity.LastModifiedBy = currentUserId;
             }

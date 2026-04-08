@@ -1,4 +1,3 @@
-using System.Globalization;
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
@@ -51,20 +50,18 @@ public class DeleteCustomerCommandHandler(
                 ["Customer not found for the current company."]);
         }
 
-        var deletedStamp = int.Parse(
-            DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture),
-            CultureInfo.InvariantCulture);
+        var deletedAtUtc = DateTime.UtcNow;
 
-        customerEntity.GcRecord = deletedStamp;
+        customerEntity.MarkAsDeleted(deletedAtUtc);
 
         foreach (var address in customerEntity.Addresses.Where(a => a.GcRecord == 0))
         {
-            address.GcRecord = deletedStamp;
+            address.MarkAsDeleted(deletedAtUtc);
         }
 
         foreach (var contact in customerEntity.Contacts.Where(c => c.GcRecord == 0))
         {
-            contact.GcRecord = deletedStamp;
+            contact.MarkAsDeleted(deletedAtUtc);
         }
 
         await _unitOfWork.Customers.UpdateAsync(customerEntity);
