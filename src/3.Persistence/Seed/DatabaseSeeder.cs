@@ -1573,7 +1573,9 @@ public class DatabaseSeeder
     [
         new("Administracion", "/administracion", "icon_admin", null, null, false, false, false, false),
         new("Paises", "/administracion/countries", "icon_country", "Administracion", "Countries", true, true, true, true),
+        new("IdentificationTypes", "/administracion/identification-types", "icon_identification_type", "Administracion", "IdentificationTypes", true, true, true, true),
         new("Areas", "/administracion/areas", "icon_area", "Administracion", "Areas", true, true, true, true),
+        new("Projects", "/administracion/projects", "icon_project", "Administracion", "Projects", true, true, true, true),
         new("EntityStatuses", "/administracion/entity-statuses", "icon_entity_status", "Administracion", "EntityStatuses", true, true, true, true),
         new("CompanyModules", "/administracion/company-modules", "icon_company_module", "Administracion", "CompanyModules", true, true, true, true),
         new("CommunicationChannels", "/administracion/communication-channels", "icon_channel", "Administracion", "CommunicationChannels", true, true, true, true),
@@ -1584,7 +1586,9 @@ public class DatabaseSeeder
     [
         new("Manager", "Administracion", false, false, false, false),
         new("Manager", "Paises", true, true, true, true),
+        new("Manager", "IdentificationTypes", true, true, true, true),
         new("Manager", "Areas", true, true, true, true),
+        new("Manager", "Projects", true, true, true, true),
         new("Manager", "EntityStatuses", true, true, true, true),
         new("Manager", "CompanyModules", true, true, true, true),
         new("Manager", "CommunicationChannels", true, true, true, true),
@@ -1592,7 +1596,9 @@ public class DatabaseSeeder
 
         new("Supervisor", "Administracion", false, false, false, false),
         new("Supervisor", "Paises", true, true, true, false),
+        new("Supervisor", "IdentificationTypes", true, true, true, false),
         new("Supervisor", "Areas", true, true, true, false),
+        new("Supervisor", "Projects", true, true, true, false),
         new("Supervisor", "EntityStatuses", true, true, true, false),
         new("Supervisor", "CompanyModules", true, true, true, false),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
@@ -1601,7 +1607,9 @@ public class DatabaseSeeder
         // `UsuarioSimple` receives read-only access to selected administrative options while the remaining entries stay restricted by default.
         new("UsuarioSimple", "Administracion", false, false, false, false),
         new("UsuarioSimple", "Paises", false, false, false, false),
+        new("UsuarioSimple", "IdentificationTypes", true, false, false, false),
         new("UsuarioSimple", "Areas", true, false, false, false),
+        new("UsuarioSimple", "Projects", true, false, false, false),
         new("UsuarioSimple", "EntityStatuses", true, false, false, false),
         new("UsuarioSimple", "CompanyModules", true, false, false, false),
         new("UsuarioSimple", "CommunicationChannels", false, false, false, false),
