@@ -8,7 +8,7 @@ namespace JOIN.Domain.Admin;
 
 /// <summary>
 /// Catalog that defines the possible operational states for administrative entities.
-/// Examples: Active, Paused, Closed, Concluded.
+/// Examples: Active, Pausada, Bloqueado, PendienteIniciar.
 /// </summary>
 public class EntityStatus : BaseAuditableEntity
 {
@@ -24,9 +24,14 @@ public class EntityStatus : BaseAuditableEntity
 
     /// <summary>
     /// Internal code to facilitate logic without depending on the Guid Oid.
-    /// Example: 1 for Active, 2 for Paused.
+    /// Example: 1 for Active, 2 for Pausada.
     /// </summary>
     public int Code { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the status allows the entity to continue operating.
+    /// </summary>
+    public bool IsOperative { get; set; } = true;
 
     // --- Navigation Properties ---
     

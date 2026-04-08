@@ -36,6 +36,7 @@ public class EntityStatusConfiguration : IEntityTypeConfiguration<EntityStatus>
         builder.Property(es => es.Name).IsRequired().HasMaxLength(50);
         builder.Property(es => es.Description).HasMaxLength(200);
         builder.Property(es => es.Code).IsRequired();
+        builder.Property(es => es.IsOperative).IsRequired().HasDefaultValue(true);
 
         // --- Relationships ---
         

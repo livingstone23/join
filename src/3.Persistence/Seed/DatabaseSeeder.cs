@@ -400,28 +400,64 @@ public class DatabaseSeeder
 
     private async Task<Guid> SeedActiveEntityStatusAsync()
     {
-        var existing = await _context.EntityStatuses
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(s => s.Code == 1);
+        var now = DateTime.UtcNow;
 
-        if (existing != null)
+        var seeds = new[]
         {
-            return existing.Id;
-        }
-
-        var status = new EntityStatus
-        {
-            Name = "Active",
-            Description = "Default active status for operational entities",
-            Code = 1,
-            Created = DateTime.UtcNow,
-            CreatedBy = "System_Seeder",
-            GcRecord = 0
+            new { Code = 1, Name = "Active", Description = "Default active status for operational entities", IsOperative = true },
+            new { Code = 2, Name = "Pausada", Description = "Status used when the entity is temporarily paused.", IsOperative = false },
+            new { Code = 3, Name = "Bloqueado", Description = "Status used when the entity is blocked and cannot operate.", IsOperative = false },
+            new { Code = 4, Name = "PendienteIniciar", Description = "Status used when the entity is pending start.", IsOperative = false }
         };
 
-        _context.EntityStatuses.Add(status);
-        await _context.SaveChangesAsync();
-        return status.Id;
+        var existingStatuses = await _context.EntityStatuses
+            .IgnoreQueryFilters()
+            .ToListAsync();
+
+        var hasChanges = false;
+
+        foreach (var seed in seeds)
+        {
+            var existing = existingStatuses.FirstOrDefault(s => s.Code == seed.Code);
+            if (existing != null)
+            {
+                if (!string.Equals(existing.Name, seed.Name, StringComparison.Ordinal)
+                    || !string.Equals(existing.Description, seed.Description, StringComparison.Ordinal)
+                    || existing.IsOperative != seed.IsOperative
+                    || existing.GcRecord != 0)
+                {
+                    existing.Name = seed.Name;
+                    existing.Description = seed.Description;
+                    existing.IsOperative = seed.IsOperative;
+                    existing.GcRecord = 0;
+                    hasChanges = true;
+                }
+
+                continue;
+            }
+
+            var status = new EntityStatus
+            {
+                Name = seed.Name,
+                Description = seed.Description,
+                Code = seed.Code,
+                IsOperative = seed.IsOperative,
+                Created = now,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            };
+
+            _context.EntityStatuses.Add(status);
+            existingStatuses.Add(status);
+            hasChanges = true;
+        }
+
+        if (hasChanges)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        return existingStatuses.First(s => s.Code == 1).Id;
     }
 
     private async Task SeedAreasByCompanyAsync(Guid joinCompanyId, Guid privateCompanyId, Guid entityStatusId)
@@ -1538,6 +1574,8 @@ public class DatabaseSeeder
         new("Administracion", "/administracion", "icon_admin", null, null, false, false, false, false),
         new("Paises", "/administracion/countries", "icon_country", "Administracion", "Countries", true, true, true, true),
         new("Areas", "/administracion/areas", "icon_area", "Administracion", "Areas", true, true, true, true),
+        new("EntityStatuses", "/administracion/entity-statuses", "icon_entity_status", "Administracion", "EntityStatuses", true, true, true, true),
+        new("CompanyModules", "/administracion/company-modules", "icon_company_module", "Administracion", "CompanyModules", true, true, true, true),
         new("CommunicationChannels", "/administracion/communication-channels", "icon_channel", "Administracion", "CommunicationChannels", true, true, true, true),
         new("Compañias", "/administracion/companies", "icon_company", "Administracion", "Companies", true, true, true, true)
     ];
@@ -1547,19 +1585,25 @@ public class DatabaseSeeder
         new("Manager", "Administracion", false, false, false, false),
         new("Manager", "Paises", true, true, true, true),
         new("Manager", "Areas", true, true, true, true),
+        new("Manager", "EntityStatuses", true, true, true, true),
+        new("Manager", "CompanyModules", true, true, true, true),
         new("Manager", "CommunicationChannels", true, true, true, true),
         new("Manager", "Compañias", true, true, true, true),
 
         new("Supervisor", "Administracion", false, false, false, false),
         new("Supervisor", "Paises", true, true, true, false),
         new("Supervisor", "Areas", true, true, true, false),
+        new("Supervisor", "EntityStatuses", true, true, true, false),
+        new("Supervisor", "CompanyModules", true, true, true, false),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Compañias", true, true, true, false),
 
-        // `UsuarioSimple` receives read-only access to the `Areas` option while the remaining administrative entries stay restricted by default.
+        // `UsuarioSimple` receives read-only access to selected administrative options while the remaining entries stay restricted by default.
         new("UsuarioSimple", "Administracion", false, false, false, false),
         new("UsuarioSimple", "Paises", false, false, false, false),
         new("UsuarioSimple", "Areas", true, false, false, false),
+        new("UsuarioSimple", "EntityStatuses", true, false, false, false),
+        new("UsuarioSimple", "CompanyModules", true, false, false, false),
         new("UsuarioSimple", "CommunicationChannels", false, false, false, false),
         new("UsuarioSimple", "Compañias", false, false, false, false)
     ];

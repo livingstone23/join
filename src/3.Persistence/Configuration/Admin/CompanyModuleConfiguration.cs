@@ -48,9 +48,9 @@ public class CompanyModuleConfiguration : IEntityTypeConfiguration<CompanyModule
         // Required relationship with SystemModule
         // A CompanyModule links to one SystemModule.
         builder.HasOne(cm => cm.Module)
-            .WithMany() // A module can be linked to many companies.
+            .WithMany(sm => sm.CompanyModules) // <--- Agregamos la lista de navegación inversa
             .HasForeignKey(cm => cm.ModuleId)
-            .OnDelete(DeleteBehavior.Restrict); // Prevent deleting a module if it's linked to companies.
+            .OnDelete(DeleteBehavior.Restrict);// Prevent deleting a module if it's linked to companies.
 
         // --- Query Filters ---
 
