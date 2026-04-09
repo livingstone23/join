@@ -1573,6 +1573,7 @@ public class DatabaseSeeder
     [
         new("Administracion", "/administracion", "icon_admin", null, null, false, false, false, false),
         new("Paises", "/administracion/countries", "icon_country", "Administracion", "Countries", true, true, true, true),
+        new("Regions", "/administracion/regions", "icon_region", "Administracion", "Regions", true, true, true, true),
         new("Provinces", "/administracion/provinces", "icon_province", "Administracion", "Provinces", true, true, true, true),
         new("Municipalities", "/administracion/municipalities", "icon_municipality", "Administracion", "Municipalities", true, true, true, true),
         new("IdentificationTypes", "/administracion/identification-types", "icon_identification_type", "Administracion", "IdentificationTypes", true, true, true, true),
@@ -1591,6 +1592,7 @@ public class DatabaseSeeder
 
         new("Manager", "Administracion", false, false, false, false),
         new("Manager", "Paises", true, true, true, true),
+        new("Manager", "Regions", true, true, true, true),
         new("Manager", "Provinces", true, true, true, true),
         new("Manager", "Municipalities", true, true, true, true),
         new("Manager", "IdentificationTypes", true, true, true, true),
@@ -1603,6 +1605,7 @@ public class DatabaseSeeder
 
         new("Supervisor", "Administracion", false, false, false, false),
         new("Supervisor", "Paises", true, true, true, false),
+        new("Supervisor", "Regions", true, true, true, false),
         new("Supervisor", "Provinces", true, true, true, false),
         new("Supervisor", "Municipalities", true, true, true, false),
         new("Supervisor", "IdentificationTypes", true, true, true, false),
@@ -1616,6 +1619,7 @@ public class DatabaseSeeder
         // `UsuarioSimple` receives read-only access to selected administrative options while the remaining entries stay restricted by default.
         new("UsuarioSimple", "Administracion", false, false, false, false),
         new("UsuarioSimple", "Paises", false, false, false, false),
+        new("UsuarioSimple", "Regions", false, false, false, false),
         new("UsuarioSimple", "Provinces", false, false, false, false),
         new("UsuarioSimple", "Municipalities", false, false, false, false),
         new("UsuarioSimple", "IdentificationTypes", true, false, false, false),
