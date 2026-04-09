@@ -37,17 +37,18 @@ public class TicketStatusConfiguration : IEntityTypeConfiguration<TicketStatus>
             .IsRequired()
             .HasMaxLength(50);
 
-
-        // Configures the 'Description' property: it is required and has a maximum length of 200 characters.
+        // Configures the 'Code' property as a required numeric identifier.
         builder.Property(p => p.Code)
-            .IsRequired(false)
-            .HasMaxLength(50);
+            .IsRequired();
 
-
-        // Configures the 'Description' property: it is required and has a maximum length of 200 characters.
+        // Configures the 'Description' property: it is optional and has a maximum length of 200 characters.
         builder.Property(p => p.Description)
             .IsRequired(false)
             .HasMaxLength(200);
+
+        // Configures the 'IsActive' property as required.
+        builder.Property(p => p.IsActive)
+            .IsRequired();
 
         // Apply a soft-delete filter to automatically exclude records marked as deleted.
         builder.HasQueryFilter(a => a.GcRecord == 0);
