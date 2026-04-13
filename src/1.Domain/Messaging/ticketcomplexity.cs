@@ -10,33 +10,48 @@ namespace JOIN.Domain.Messaging;
 
 
 /// <summary>
-/// Catalog for ticket effort or impact levels (e.g., Low, Medium, High, Critical).
-/// Incorporates SLA (Service Level Agreement) metrics to automatically calculate deadlines.
+/// Catalog for ticket complexity levels used across the messaging module.
 /// </summary>
 public class TicketComplexity : BaseAuditableEntity
 {
-    
-    public string Name { get; set; } = string.Empty;
-    
-    public string? Description { get; set; }
-    
     /// <summary>
-    /// Numeric weight of the complexity (e.g., 1 for Low, 4 for Critical).
+    /// Gets or sets the display name of the ticket complexity.
     /// </summary>
-    public string? Code { get; set; }
+    public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// The numeric value representing the allocated time to resolve this ticket.
+    /// Gets or sets the optional description of the ticket complexity.
+    /// </summary>
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Gets or sets the numeric catalog code associated with the ticket complexity.
+    /// </summary>
+    public int Code { get; set; }
+
+    /// <summary>
+    /// Gets or sets the amount of configured time units required to resolve a ticket with this complexity.
     /// </summary>
     public int ResolutionTimeUnits { get; set; }
 
     /// <summary>
-    /// Foreign key to the TimeUnit catalog (e.g., Hours, Days) used alongside ResolutionTimeUnits.
+    /// Gets or sets the time unit associated with the configured resolution time.
     /// </summary>
     public Guid TimeUnitId { get; set; }
 
-    // --- Navigation Properties ---
+    /// <summary>
+    /// Gets or sets whether the ticket complexity is active.
+    /// </summary>
+    public bool IsActive { get; set; } = true;
+
+    /// <summary>
+    /// Navigation to the associated time unit.
+    /// </summary>
     public virtual TimeUnit TimeUnit { get; set; } = null!;
+
+    /// <summary>
+    /// Navigation to the tickets associated with this complexity.
+    /// </summary>
     public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
 
 }

@@ -1587,6 +1587,7 @@ public class DatabaseSeeder
         
         new("Tickets", "/tickets", "icon_ticket", null, null, false, false, false, false),
         new("TimeUnits", "/administracion/time-units", "icon_time_unit", "Administracion", "TimeUnits", true, true, true, true),
+        new("TicketComplexities", "/administracion/ticket-complexities", "icon_ticket_complexity", "Administracion", "TicketComplexities", true, true, true, true),
         new("TicketStatuses", "/administracion/ticket-statuses", "icon_ticket_status", "Administracion", "TicketStatuses", true, true, true, true)
 
     ];
@@ -1595,9 +1596,11 @@ public class DatabaseSeeder
     [
         new("SuperAdmin", "SystemModules", true, true, true, true),
         new("SuperAdmin", "TimeUnits", true, true, true, true),
+        new("SuperAdmin", "TicketComplexities", true, true, true, true),
         new("SuperAdmin", "TicketStatuses", true, true, true, true),
         new("Admin", "Administracion", false, false, false, false),
         new("Admin", "TimeUnits", true, true, true, true),
+        new("Admin", "TicketComplexities", true, true, true, true),
         new("Admin", "TicketStatuses", true, true, true, true),
 
         new("Manager", "Administracion", false, false, false, false),
@@ -1613,6 +1616,7 @@ public class DatabaseSeeder
         new("Manager", "CommunicationChannels", true, true, true, true),
         new("Manager", "Compañias", true, true, true, true),
         new("Manager", "TimeUnits", true, true, true, true),
+        new("Manager", "TicketComplexities", true, true, true, true),
         new("Manager", "TicketStatuses", true, true, true, true),
 
         new("Supervisor", "Administracion", false, false, false, false),
@@ -1628,6 +1632,7 @@ public class DatabaseSeeder
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Compañias", true, true, true, false),
         new("Supervisor", "TimeUnits", true, true, true, false),
+        new("Supervisor", "TicketComplexities", true, true, true, false),
         new("Supervisor", "TicketStatuses", true, true, true, false),
 
         // `UsuarioSimple` receives read-only access to selected administrative options while the remaining entries stay restricted by default.
@@ -1644,6 +1649,7 @@ public class DatabaseSeeder
         new("UsuarioSimple", "CommunicationChannels", false, false, false, false),
         new("UsuarioSimple", "Compañias", false, false, false, false),
         new("UsuarioSimple", "TimeUnits", false, false, false, false),
+        new("UsuarioSimple", "TicketComplexities", true, false, false, false),
         new("UsuarioSimple", "TicketStatuses", true, false, false, false)
     ];
 

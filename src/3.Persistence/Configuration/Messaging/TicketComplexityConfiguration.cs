@@ -15,26 +15,38 @@ namespace JOIN.Persistence.Configuration.Messaging;
 
 /// <summary>
 /// Configures the database mapping for the <see cref="TicketComplexity"/> entity.
-/// This setup defines the table structure, constraints, and relationships
-/// for the ticket complexity data, which includes SLA metrics.
+/// This setup defines the table structure and constraints for the global ticket complexity catalog.
 /// </summary>
 public class TicketComplexityConfiguration : IEntityTypeConfiguration<TicketComplexity>
 {
+    /// <summary>
+    /// Configures the <see cref="TicketComplexity"/> entity.
+    /// </summary>
+    /// <param name="builder">The builder to be used for configuring the entity.</param>
     public void Configure(EntityTypeBuilder<TicketComplexity> builder)
     {
         builder.ToTable("TicketComplexities", "Messaging");
         builder.HasKey(p => p.Id);
 
-        builder.Property(p => p.Name).IsRequired().HasMaxLength(50);
-        builder.Property(p => p.Description).HasMaxLength(200);
-        builder.Property(p => p.Code).IsRequired();
-        builder.Property(p => p.ResolutionTimeUnits).IsRequired();
-            
-        // --- Relationships ---
+        builder.Property(p => p.Name)
+            .IsRequired()
+            .HasMaxLength(50);
 
-        // Defines a one-to-many relationship with TimeUnit.
+        builder.Property(p => p.Description)
+            .IsRequired(false)
+            .HasMaxLength(200);
+
+        builder.Property(p => p.Code)
+            .IsRequired();
+
+        builder.Property(p => p.ResolutionTimeUnits)
+            .IsRequired();
+
+        builder.Property(p => p.IsActive)
+            .IsRequired();
+
         builder.HasOne(p => p.TimeUnit)
-            .WithMany(t => t.TicketComplexities) // CORREGIDO: Evita shadow property TimeUnitId1
+            .WithMany(t => t.TicketComplexities)
             .HasForeignKey(p => p.TimeUnitId)
             .OnDelete(DeleteBehavior.Restrict);
 
