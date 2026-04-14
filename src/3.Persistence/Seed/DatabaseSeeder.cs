@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using JOIN.Domain.Common;
 using JOIN.Domain.Enums;
+using JOIN.Domain.Messaging;
 using System.Linq;
 
 
@@ -74,6 +75,9 @@ public class DatabaseSeeder
             await SeedMunicipalitiesAsync();
             await SeedStreetTypesAsync();
             await SeedCommunicationChannelsAsync();
+            var defaultTimeUnitId = await SeedTimeUnitsAsync();
+            await SeedTicketStatusesAsync();
+            await SeedTicketComplexitiesAsync(defaultTimeUnitId);
             await SeedSystemModulesAsync();
             await SeedCompanyModulesAsync();
             await SeedSystemOptionsAsync();
@@ -92,6 +96,7 @@ public class DatabaseSeeder
             await SeedJoinCustomersAsync(joinCompanyId, idTypeId);
             await SeedPrivateCustomersAsync(privateCompanyId, idTypeId);
             await SeedJoinCustomerAddressesAndContactsAsync(joinCompanyId);
+            await SeedJoinTicketsAsync(joinCompanyId);
 
             // Guardado final para asegurar consistencia
             await _context.SaveChangesAsync();
@@ -1050,6 +1055,325 @@ public class DatabaseSeeder
         _logger.LogInformation("Communication channels catalog seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
     }
 
+    private async Task<Guid> SeedTimeUnitsAsync()
+    {
+        var now = DateTime.UtcNow;
+        var seeds = new[]
+        {
+            new { Name = "Hours", Code = 1, IsActive = true },
+            new { Name = "Days", Code = 2, IsActive = true }
+        };
+
+        var existing = await _context.TimeUnits
+            .IgnoreQueryFilters()
+            .ToListAsync();
+
+        var hasChanges = false;
+
+        foreach (var seed in seeds)
+        {
+            var entity = existing.FirstOrDefault(x => x.Code == seed.Code);
+            if (entity is null)
+            {
+                _context.TimeUnits.Add(new TimeUnit
+                {
+                    Name = seed.Name,
+                    Code = seed.Code,
+                    IsActive = seed.IsActive,
+                    Created = now,
+                    CreatedBy = "System_Seeder",
+                    GcRecord = 0
+                });
+
+                hasChanges = true;
+                continue;
+            }
+
+            if (!string.Equals(entity.Name, seed.Name, StringComparison.Ordinal)
+                || entity.IsActive != seed.IsActive
+                || entity.GcRecord != 0)
+            {
+                entity.Name = seed.Name;
+                entity.IsActive = seed.IsActive;
+                entity.GcRecord = 0;
+                entity.LastModified = now;
+                entity.LastModifiedBy = "System_Seeder";
+                hasChanges = true;
+            }
+        }
+
+        if (hasChanges)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        var defaultTimeUnit = await _context.TimeUnits
+            .IgnoreQueryFilters()
+            .OrderBy(t => t.Code)
+            .FirstAsync();
+
+        return defaultTimeUnit.Id;
+    }
+
+    private async Task SeedTicketStatusesAsync()
+    {
+        var now = DateTime.UtcNow;
+        var seeds = new[]
+        {
+            new { Code = 1, Name = "Open", Description = "Ticket is open and pending triage.", IsActive = true },
+            new { Code = 2, Name = "InProgress", Description = "Ticket is currently being worked on.", IsActive = true },
+            new { Code = 3, Name = "Resolved", Description = "Ticket was resolved and is waiting for closure.", IsActive = true },
+            new { Code = 4, Name = "Closed", Description = "Ticket is closed.", IsActive = true }
+        };
+
+        var existing = await _context.TicketStatuses
+            .IgnoreQueryFilters()
+            .ToListAsync();
+
+        var hasChanges = false;
+
+        foreach (var seed in seeds)
+        {
+            var entity = existing.FirstOrDefault(x => x.Code == seed.Code);
+            if (entity is null)
+            {
+                _context.TicketStatuses.Add(new TicketStatus
+                {
+                    Name = seed.Name,
+                    Description = seed.Description,
+                    Code = seed.Code,
+                    IsActive = seed.IsActive,
+                    Created = now,
+                    CreatedBy = "System_Seeder",
+                    GcRecord = 0
+                });
+
+                hasChanges = true;
+                continue;
+            }
+
+            if (!string.Equals(entity.Name, seed.Name, StringComparison.Ordinal)
+                || !string.Equals(entity.Description, seed.Description, StringComparison.Ordinal)
+                || entity.IsActive != seed.IsActive
+                || entity.GcRecord != 0)
+            {
+                entity.Name = seed.Name;
+                entity.Description = seed.Description;
+                entity.IsActive = seed.IsActive;
+                entity.GcRecord = 0;
+                entity.LastModified = now;
+                entity.LastModifiedBy = "System_Seeder";
+                hasChanges = true;
+            }
+        }
+
+        if (hasChanges)
+        {
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    private async Task SeedTicketComplexitiesAsync(Guid defaultTimeUnitId)
+    {
+        var now = DateTime.UtcNow;
+        var seeds = new[]
+        {
+            new { Code = 1, Name = "Low", Description = "Low complexity ticket.", ResolutionTimeUnits = 8, IsActive = true },
+            new { Code = 2, Name = "Medium", Description = "Medium complexity ticket.", ResolutionTimeUnits = 16, IsActive = true },
+            new { Code = 3, Name = "High", Description = "High complexity ticket.", ResolutionTimeUnits = 24, IsActive = true }
+        };
+
+        var existing = await _context.TicketComplexities
+            .IgnoreQueryFilters()
+            .ToListAsync();
+
+        var hasChanges = false;
+
+        foreach (var seed in seeds)
+        {
+            var entity = existing.FirstOrDefault(x => x.Code == seed.Code);
+            if (entity is null)
+            {
+                _context.TicketComplexities.Add(new TicketComplexity
+                {
+                    Name = seed.Name,
+                    Description = seed.Description,
+                    Code = seed.Code,
+                    ResolutionTimeUnits = seed.ResolutionTimeUnits,
+                    TimeUnitId = defaultTimeUnitId,
+                    IsActive = seed.IsActive,
+                    Created = now,
+                    CreatedBy = "System_Seeder",
+                    GcRecord = 0
+                });
+
+                hasChanges = true;
+                continue;
+            }
+
+            if (!string.Equals(entity.Name, seed.Name, StringComparison.Ordinal)
+                || !string.Equals(entity.Description, seed.Description, StringComparison.Ordinal)
+                || entity.ResolutionTimeUnits != seed.ResolutionTimeUnits
+                || entity.TimeUnitId != defaultTimeUnitId
+                || entity.IsActive != seed.IsActive
+                || entity.GcRecord != 0)
+            {
+                entity.Name = seed.Name;
+                entity.Description = seed.Description;
+                entity.ResolutionTimeUnits = seed.ResolutionTimeUnits;
+                entity.TimeUnitId = defaultTimeUnitId;
+                entity.IsActive = seed.IsActive;
+                entity.GcRecord = 0;
+                entity.LastModified = now;
+                entity.LastModifiedBy = "System_Seeder";
+                hasChanges = true;
+            }
+        }
+
+        if (hasChanges)
+        {
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    private async Task SeedJoinTicketsAsync(Guid joinCompanyId)
+    {
+        var managerUser = await _context.ApplicationUsers
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Email == "manager@join.com");
+
+        var simpleUser = await _context.ApplicationUsers
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Email == "simpleuser@join.com");
+
+        if (managerUser is null || simpleUser is null)
+        {
+            _logger.LogWarning("Ticket seed skipped because default users manager@join.com and/or simpleuser@join.com were not found.");
+            return;
+        }
+
+        var statusByCode = (await _context.TicketStatuses
+            .IgnoreQueryFilters()
+            .Where(x => x.GcRecord == 0)
+            .OrderByDescending(x => x.LastModified ?? x.Created)
+            .ToListAsync())
+            .GroupBy(x => x.Code)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+
+        var complexityByCode = (await _context.TicketComplexities
+            .IgnoreQueryFilters()
+            .Where(x => x.GcRecord == 0)
+            .OrderByDescending(x => x.LastModified ?? x.Created)
+            .ToListAsync())
+            .GroupBy(x => x.Code)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+
+        var defaultTimeUnit = await _context.TimeUnits
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.GcRecord == 0);
+
+        var channel = await _context.CommunicationChannels
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.GcRecord == 0 && x.Code == "WHATSAPP")
+            ?? await _context.CommunicationChannels
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.GcRecord == 0);
+
+        var customers = await _context.Customers
+            .IgnoreQueryFilters()
+            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .OrderBy(x => x.Created)
+            .Take(3)
+            .ToListAsync();
+
+        var projects = await _context.Projects
+            .IgnoreQueryFilters()
+            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .OrderBy(x => x.Created)
+            .Take(3)
+            .ToListAsync();
+
+        var areas = await _context.Areas
+            .IgnoreQueryFilters()
+            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .OrderBy(x => x.Created)
+            .Take(3)
+            .ToListAsync();
+
+        if (!statusByCode.TryGetValue(1, out var openStatusId)
+            || !statusByCode.TryGetValue(2, out var inProgressStatusId)
+            || !statusByCode.TryGetValue(3, out var resolvedStatusId)
+            || !complexityByCode.TryGetValue(1, out var lowComplexityId)
+            || !complexityByCode.TryGetValue(2, out var mediumComplexityId)
+            || !complexityByCode.TryGetValue(3, out var highComplexityId)
+            || defaultTimeUnit is null
+            || channel is null)
+        {
+            _logger.LogWarning("Ticket seed skipped because required ticket catalogs were not available.");
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        var seeds = new List<TicketSeed>
+        {
+            new("2026_0001", "Portal login intermittent failure", "Users report intermittent login failures in customer portal.", managerUser.Id, openStatusId, highComplexityId, 16m, 2m, true, customers.ElementAtOrDefault(0)?.Id, projects.ElementAtOrDefault(0)?.Id, areas.ElementAtOrDefault(0)?.Id),
+            new("2026_0002", "Invoice PDF formatting issue", "Generated invoice PDF truncates long customer names.", managerUser.Id, inProgressStatusId, mediumComplexityId, 8m, 3m, false, customers.ElementAtOrDefault(1)?.Id, projects.ElementAtOrDefault(1)?.Id, areas.ElementAtOrDefault(1)?.Id),
+            new("2026_0003", "Email notifications delayed", "Outbound email notifications are delayed more than 10 minutes.", managerUser.Id, openStatusId, mediumComplexityId, 12m, 1m, false, customers.ElementAtOrDefault(2)?.Id, projects.ElementAtOrDefault(2)?.Id, areas.ElementAtOrDefault(2)?.Id),
+            new("2026_0004", "Customer merge validation", "Validation message should explain duplicate tax id behavior.", simpleUser.Id, resolvedStatusId, lowComplexityId, 4m, 4m, false, customers.ElementAtOrDefault(0)?.Id, projects.ElementAtOrDefault(0)?.Id, areas.ElementAtOrDefault(1)?.Id),
+            new("2026_0005", "Dashboard KPI discrepancy", "KPI cards display different totals than exports.", simpleUser.Id, inProgressStatusId, highComplexityId, 20m, 6m, false, customers.ElementAtOrDefault(1)?.Id, projects.ElementAtOrDefault(1)?.Id, areas.ElementAtOrDefault(2)?.Id),
+            new("2026_0006", "WhatsApp template selection", "Support agents need default template suggestion by ticket type.", simpleUser.Id, openStatusId, lowComplexityId, 6m, 0m, true, customers.ElementAtOrDefault(2)?.Id, projects.ElementAtOrDefault(2)?.Id, areas.ElementAtOrDefault(0)?.Id),
+            new("2026_0007", "Audit report export timeout", "Large audit report export times out after 90 seconds.", simpleUser.Id, openStatusId, highComplexityId, 24m, 5m, false, customers.ElementAtOrDefault(0)?.Id, projects.ElementAtOrDefault(0)?.Id, areas.ElementAtOrDefault(2)?.Id)
+        };
+
+        var existingCodes = await _context.Tickets
+            .IgnoreQueryFilters()
+            .Where(t => t.CompanyId == joinCompanyId)
+            .Select(t => t.Code)
+            .ToListAsync();
+
+        var inserted = 0;
+
+        foreach (var seed in seeds)
+        {
+            if (existingCodes.Contains(seed.Code, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            _context.Tickets.Add(new Ticket
+            {
+                CompanyId = joinCompanyId,
+                Code = seed.Code,
+                Name = seed.Name,
+                Description = seed.Description,
+                EstimatedTime = seed.EstimatedTime,
+                ConsumedTime = seed.ConsumedTime,
+                TimeUnitId = defaultTimeUnit.Id,
+                TicketStatusId = seed.TicketStatusId,
+                TicketComplexityId = seed.TicketComplexityId,
+                CustomerId = seed.CustomerId,
+                ProjectId = seed.ProjectId,
+                AreaId = seed.AreaId,
+                ChannelId = channel.Id,
+                IsVisibleToExternals = seed.IsVisibleToExternals,
+                CreatedByUserId = seed.AssignedToUserId,
+                AssignedToUserId = seed.AssignedToUserId,
+                Created = now,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            });
+
+            inserted++;
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        _logger.LogInformation("JOIN tickets seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
+    }
+
     private async Task SeedSystemModulesAsync()
     {
         var now = DateTime.UtcNow;
@@ -1687,6 +2011,20 @@ public class DatabaseSeeder
         bool CanCreate,
         bool CanUpdate,
         bool CanDelete);
+
+    private sealed record TicketSeed(
+        string Code,
+        string Name,
+        string Description,
+        Guid AssignedToUserId,
+        Guid TicketStatusId,
+        Guid TicketComplexityId,
+        decimal EstimatedTime,
+        decimal ConsumedTime,
+        bool IsVisibleToExternals,
+        Guid? CustomerId,
+        Guid? ProjectId,
+        Guid? AreaId);
 }
 
 

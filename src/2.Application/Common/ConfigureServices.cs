@@ -39,6 +39,7 @@ public static class ConfigureServices
 
         // Register Mapperly mappers
         services.AddScoped<ICustomerMapper, CustomerMapper>();
+        services.AddScoped<ITicketMapper, TicketMapper>();
 
         return services;
     

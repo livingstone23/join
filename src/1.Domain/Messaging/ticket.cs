@@ -71,6 +71,9 @@ public class Ticket : BaseTenantEntity
     public virtual Ticket? PrecedentTicket { get; set; }
     public virtual ICollection<TicketNotification> Notifications { get; set; } = new List<TicketNotification>();
 
+    public virtual ICollection<TicketLog> TicketLogs { get; set; } = new List<TicketLog>();
+
+
 
     /// <summary> Collection of follow-up tickets spawned from this specific ticket. </summary>
     public virtual ICollection<Ticket> ChildTickets { get; set; } = new List<Ticket>();

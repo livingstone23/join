@@ -12,7 +12,11 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
+
+
 namespace JOIN.Persistence.Contexts;
+
+
 
 /// <summary>
 /// Core database context for the JOIN CRM.
@@ -21,6 +25,7 @@ namespace JOIN.Persistence.Contexts;
 /// </summary>
 public class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>
 {
+    
     private readonly AuditableEntitySaveChangesInterceptor _auditableInterceptor;
     private readonly ICurrentUserService _currentUserService;
 
@@ -81,6 +86,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     
     /// --- 6. SUPPORT
     public DbSet<TicketNotification> TicketNotifications => Set<TicketNotification>();
+    public DbSet<TicketLog> TicketLogs => Set<TicketLog>();
 
 
 
@@ -110,7 +116,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         // 5. SQL SERVER FIX: Prevent multiple cascade paths for Security relationships
         ConfigureSecurityRelationships(builder);
 
-        // 6. Map explicity the tables identity tables to the "Security" schema to keep them organized and avoid confusion with application tables.
+        // 6. SQL SERVER FIX: Prevent multiple cascade paths for Support relationships
+        ConfigureSupportRelationships(builder);
+
+        // 7. Map explicity the tables identity tables to the "Security" schema to keep them organized and avoid confusion with application tables.
         builder.Entity<ApplicationUser>(e => e.ToTable("Users", "Security"));
         builder.Entity<ApplicationRole>(e => e.ToTable("Roles", "Security"));
         builder.Entity<IdentityUserRole<Guid>>(e => e.ToTable("UserRoles", "Security"));
@@ -125,63 +134,64 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     /// Applies global filters to all relevant entities.
     /// </summary>
     private void ConfigureGlobalQueryFilters(ModelBuilder builder)
-{
-    // --- 1. TENANT-SPECIFIC & SOFT DELETE ENTITIES ---
-    // These entities MUST belong to the current Company and NOT be deleted.
-    
-    // Administrative / Customers
-    builder.Entity<Customer>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
-    builder.Entity<CustomerAddress>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
-    builder.Entity<CustomerContact>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
-    builder.Entity<Project>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
-    builder.Entity<Area>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
-    
-    // Messaging / Tickets
-    builder.Entity<Ticket>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
-    builder.Entity<TicketNotification>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+    {
+        // --- 1. TENANT-SPECIFIC & SOFT DELETE ENTITIES ---
+        // These entities MUST belong to the current Company and NOT be deleted.
+        
+        // Administrative / Customers
+        builder.Entity<Customer>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CustomerAddress>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CustomerContact>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<Project>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<Area>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        
+        // Messaging / Tickets
+        builder.Entity<Ticket>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<TicketNotification>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<TicketLog>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        
+
+        // --- 2. SHARED CATALOGS (SOFT DELETE ONLY) ---
+        // These are global or system-wide catalogs where we only care if they are deleted.
+
+        // Common Module
+        builder.Entity<Company>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<Country>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<Region>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<Province>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<Municipality>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<StreetType>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<CommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0);
+        
+        // Admin / Support Catalogs
+        builder.Entity<EntityStatus>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<IdentificationType>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<TicketStatus>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<TicketComplexity>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<TimeUnit>().HasQueryFilter(e => e.GcRecord == 0);
+        
+        // System Configuration
+        builder.Entity<SystemModule>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<CompanyModule>().HasQueryFilter(e => e.GcRecord == 0);
+        
 
 
-    // --- 2. SHARED CATALOGS (SOFT DELETE ONLY) ---
-    // These are global or system-wide catalogs where we only care if they are deleted.
-
-    // Common Module
-    builder.Entity<Company>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<Country>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<Region>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<Province>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<Municipality>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<StreetType>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<CommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0);
-    
-    // Admin / Support Catalogs
-    builder.Entity<EntityStatus>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<IdentificationType>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<TicketStatus>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<TicketComplexity>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<TimeUnit>().HasQueryFilter(e => e.GcRecord == 0);
-    
-    // System Configuration
-    builder.Entity<SystemModule>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<CompanyModule>().HasQueryFilter(e => e.GcRecord == 0);
-    
-
-
-    // --- 3. SECURITY & INTERSECTION ENTITIES (SOFT DELETE) ---
-    // These link users to tenants or customers and should respect the delete flag.
-    
-    builder.Entity<UserCompany>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<UserCustomer>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<UserRefreshToken>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<UserRoleCompany>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<UserCommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<RoleSystemOption>().HasQueryFilter(e => e.GcRecord == 0);
-    builder.Entity<SystemOption>().HasQueryFilter(e => e.GcRecord == 0);
-    
-    
-    // Note: UserConnectionLog typically doesn't need Soft Delete as it's an audit trail,
-    // but if it inherits from BaseAuditableEntity, add it here:
-    // builder.Entity<UserConnectionLog>().HasQueryFilter(e => e.GcRecord == 0);
-}
+        // --- 3. SECURITY & INTERSECTION ENTITIES (SOFT DELETE) ---
+        // These link users to tenants or customers and should respect the delete flag.
+        
+        builder.Entity<UserCompany>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<UserCustomer>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<UserRefreshToken>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<UserRoleCompany>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<UserCommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<RoleSystemOption>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<SystemOption>().HasQueryFilter(e => e.GcRecord == 0);
+        
+        
+        // Note: UserConnectionLog typically doesn't need Soft Delete as it's an audit trail,
+        // but if it inherits from BaseAuditableEntity, add it here:
+        // builder.Entity<UserConnectionLog>().HasQueryFilter(e => e.GcRecord == 0);
+    }
 
     /// <summary>
     /// Manages complex relationships for the Ticket entity to avoid SQL Server circular reference errors.
@@ -210,6 +220,51 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             .OnDelete(DeleteBehavior.Restrict);
     }
 
+
+    private void ConfigureSupportRelationships(ModelBuilder builder)
+    {
+
+        // Fix for ticketLog multiple paths to ApplicationUser
+        builder.Entity<TicketLog>()
+            .HasOne(tl => tl.UserRegistered)
+            .WithMany()
+            .HasForeignKey(tl => tl.UserRegisterLogId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<TicketLog>()
+            .HasOne(tl => tl.NewAssignedToUser)
+            .WithMany()
+            .HasForeignKey(tl => tl.NewAssignedToUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Fix for ticketLog multiple paths to TicketStatus
+        builder.Entity<TicketLog>()
+            .HasOne(tl => tl.Status)
+            .WithMany()
+            .HasForeignKey(tl => tl.TicketStatusId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<TicketLog>()
+            .HasOne(tl => tl.PreviousStatus)
+            .WithMany()
+            .HasForeignKey(tl => tl.PreviousStatusId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Prevent cycles with TimeUnit (Crucial for work-log reporting)
+        builder.Entity<TicketLog>()
+            .HasOne(tl => tl.TimeUnit)
+            .WithMany()
+            .HasForeignKey(tl => tl.TimeUnitId)
+            .OnDelete(DeleteBehavior.Restrict);
+            
+        // Optimization: Composite Index for Multi-tenant Audit performance
+        builder.Entity<TicketLog>()
+            .HasIndex(tl => new { tl.CompanyId, tl.TicketId, tl.GcRecord })
+            .HasDatabaseName("IX_TicketLog_Tenant_Ticket_Active");
+
+    }
+
+
     private void ConfigureSecurityRelationships(ModelBuilder builder)
     {
 
@@ -221,6 +276,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             .HasForeignKey(uc => uc.CustomerId)
             .OnDelete(DeleteBehavior.Restrict);
     }
+
 
     /// <summary>
     /// Configures the DbContext behavior, including interceptors and logging.
