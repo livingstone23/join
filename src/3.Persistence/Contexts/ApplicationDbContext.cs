@@ -87,8 +87,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     /// --- 6. SUPPORT
     public DbSet<TicketNotification> TicketNotifications => Set<TicketNotification>();
     public DbSet<TicketLog> TicketLogs => Set<TicketLog>();
-
-
+    public DbSet<TicketCompanyDefault> TicketCompanyDefaults => Set<TicketCompanyDefault>();
 
 
 
@@ -149,7 +148,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<Ticket>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<TicketNotification>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<TicketLog>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
-        
+        builder.Entity<TicketCompanyDefault>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+
 
         // --- 2. SHARED CATALOGS (SOFT DELETE ONLY) ---
         // These are global or system-wide catalogs where we only care if they are deleted.

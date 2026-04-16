@@ -4,6 +4,7 @@ using JOIN.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace JOIN.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260416165403_SyncPendingTicketModel")]
+    partial class SyncPendingTicketModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -838,9 +841,6 @@ namespace JOIN.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
-                    b.Property<decimal?>("EffortPoints")
-                        .HasColumnType("decimal(5,1)");
-
                     b.Property<decimal>("EstimatedTime")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -905,79 +905,6 @@ namespace JOIN.Persistence.Migrations
                     b.HasIndex("TimeUnitId");
 
                     b.ToTable("Tickets", "Messaging");
-                });
-
-            modelBuilder.Entity("JOIN.Domain.Messaging.TicketCompanyDefault", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("AreaDefaultId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("ChannelDefaultId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("CodeSequenceLength")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("GcRecord")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("LastModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid?>("ProjectDefaultId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("StartCode")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<Guid?>("TicketComplexityDefaultId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("TicketStatusDefaultId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("TimeUnitDefaultId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("UsePersonalizedCode")
-                        .HasColumnType("bit");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AreaDefaultId");
-
-                    b.HasIndex("ChannelDefaultId");
-
-                    b.HasIndex("CompanyId")
-                        .IsUnique();
-
-                    b.HasIndex("ProjectDefaultId");
-
-                    b.HasIndex("TicketComplexityDefaultId");
-
-                    b.HasIndex("TicketStatusDefaultId");
-
-                    b.HasIndex("TimeUnitDefaultId");
-
-                    b.ToTable("TicketCompanyDefaults", "Messaging");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Messaging.TicketComplexity", b =>
@@ -2187,59 +2114,6 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Status");
 
                     b.Navigation("TimeUnit");
-                });
-
-            modelBuilder.Entity("JOIN.Domain.Messaging.TicketCompanyDefault", b =>
-                {
-                    b.HasOne("JOIN.Domain.Admin.Area", "AreaDefault")
-                        .WithMany()
-                        .HasForeignKey("AreaDefaultId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("JOIN.Domain.Common.CommunicationChannel", "ChannelDefault")
-                        .WithMany()
-                        .HasForeignKey("ChannelDefaultId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("JOIN.Domain.Common.Company", "Company")
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("JOIN.Domain.Admin.Project", "ProjectDefault")
-                        .WithMany()
-                        .HasForeignKey("ProjectDefaultId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("JOIN.Domain.Messaging.TicketComplexity", "TicketComplexityDefault")
-                        .WithMany()
-                        .HasForeignKey("TicketComplexityDefaultId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("JOIN.Domain.Messaging.TicketStatus", "TicketStatusDefault")
-                        .WithMany()
-                        .HasForeignKey("TicketStatusDefaultId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("JOIN.Domain.Messaging.TimeUnit", "TimeUnitDefault")
-                        .WithMany()
-                        .HasForeignKey("TimeUnitDefaultId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("AreaDefault");
-
-                    b.Navigation("ChannelDefault");
-
-                    b.Navigation("Company");
-
-                    b.Navigation("ProjectDefault");
-
-                    b.Navigation("TicketComplexityDefault");
-
-                    b.Navigation("TicketStatusDefault");
-
-                    b.Navigation("TimeUnitDefault");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Messaging.TicketComplexity", b =>

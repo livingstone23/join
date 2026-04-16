@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\2.Application\JOIN.Application.csproj" />
+    <ProjectReference Include="..\..\src\4.Services.WebApi\JOIN.Services.WebApi.csproj" />
   </ItemGroup>
 
 </Project>

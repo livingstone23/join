@@ -9,6 +9,10 @@ namespace JOIN.Domain.Support;
 
 
 
+/// <summary>
+/// This Entity represents the audit log for a ticket, 
+/// capturing all significant events and changes related to the ticket's lifecycle.
+/// </summary> 
 public class TicketLog: BaseTenantEntity
 {
     

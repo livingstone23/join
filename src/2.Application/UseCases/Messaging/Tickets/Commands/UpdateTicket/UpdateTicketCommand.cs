@@ -37,6 +37,11 @@ public record UpdateTicketCommand : IRequest<Response<TicketDto>>
     public decimal ConsumedTime { get; init; }
 
     /// <summary>
+    /// Gets or sets the optional effort points.
+    /// </summary>
+    public decimal? EffortPoints { get; init; }
+
+    /// <summary>
     /// Gets or sets whether the ticket is visible to external users.
     /// </summary>
     public bool IsVisibleToExternals { get; init; }

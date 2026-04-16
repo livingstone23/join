@@ -91,6 +91,7 @@ public class DatabaseSeeder
             var activeStatusId = await SeedActiveEntityStatusAsync();
             await SeedAreasByCompanyAsync(joinCompanyId, privateCompanyId, activeStatusId);
             await SeedProjectsByCompanyAsync(joinCompanyId, privateCompanyId, activeStatusId);
+            await SeedTicketCompanyDefaultsAsync(joinCompanyId, defaultTimeUnitId);
 
             // 7. Entidades operacionales (Clientes)
             await SeedJoinCustomersAsync(joinCompanyId, idTypeId);
@@ -1236,6 +1237,103 @@ public class DatabaseSeeder
         }
     }
 
+    private async Task SeedTicketCompanyDefaultsAsync(Guid joinCompanyId, Guid defaultTimeUnitId)
+    {
+        var openStatusId = await _context.TicketStatuses
+            .IgnoreQueryFilters()
+            .Where(x => x.GcRecord == 0 && x.Code == 1)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync();
+
+        var mediumComplexityId = await _context.TicketComplexities
+            .IgnoreQueryFilters()
+            .Where(x => x.GcRecord == 0 && x.Code == 2)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync();
+
+        var defaultAreaId = await _context.Areas
+            .IgnoreQueryFilters()
+            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .OrderBy(x => x.Created)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync();
+
+        var defaultProjectId = await _context.Projects
+            .IgnoreQueryFilters()
+            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .OrderBy(x => x.Created)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync();
+
+        var defaultChannelId = await _context.CommunicationChannels
+            .IgnoreQueryFilters()
+            .Where(x => x.GcRecord == 0 && x.Code == "WHATSAPP")
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync()
+            ?? await _context.CommunicationChannels
+                .IgnoreQueryFilters()
+                .Where(x => x.GcRecord == 0)
+                .OrderBy(x => x.Created)
+                .Select(x => (Guid?)x.Id)
+                .FirstOrDefaultAsync();
+
+        if (!openStatusId.HasValue
+            || !mediumComplexityId.HasValue
+            || !defaultAreaId.HasValue
+            || !defaultProjectId.HasValue
+            || !defaultChannelId.HasValue)
+        {
+            _logger.LogWarning("Ticket company default seed skipped because one or more required references were not available for JOIN.");
+            return;
+        }
+
+        var existing = await _context.TicketCompanyDefaults
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.CompanyId == joinCompanyId);
+
+        var now = DateTime.UtcNow;
+
+        if (existing is null)
+        {
+            _context.TicketCompanyDefaults.Add(new TicketCompanyDefault
+            {
+                CompanyId = joinCompanyId,
+                StartCode = "TICK",
+                CodeSequenceLength = 6,
+                UsePersonalizedCode = true,
+                TicketStatusDefaultId = openStatusId.Value,
+                TicketComplexityDefaultId = mediumComplexityId.Value,
+                TimeUnitDefaultId = defaultTimeUnitId,
+                AreaDefaultId = defaultAreaId.Value,
+                ProjectDefaultId = defaultProjectId.Value,
+                ChannelDefaultId = defaultChannelId.Value,
+                Created = now,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            });
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("JOIN ticket company defaults seed finished. Inserted: 1, Updated: 0");
+            return;
+        }
+
+        existing.StartCode = "TICK";
+        existing.CodeSequenceLength = 6;
+        existing.UsePersonalizedCode = true;
+        existing.TicketStatusDefaultId = openStatusId.Value;
+        existing.TicketComplexityDefaultId = mediumComplexityId.Value;
+        existing.TimeUnitDefaultId = defaultTimeUnitId;
+        existing.AreaDefaultId = defaultAreaId.Value;
+        existing.ProjectDefaultId = defaultProjectId.Value;
+        existing.ChannelDefaultId = defaultChannelId.Value;
+        existing.GcRecord = 0;
+        existing.LastModified = now;
+        existing.LastModifiedBy = "System_Seeder";
+
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("JOIN ticket company defaults seed finished. Inserted: 0, Updated: 1");
+    }
+
     private async Task SeedJoinTicketsAsync(Guid joinCompanyId)
     {
         var managerUser = await _context.ApplicationUsers
@@ -1314,15 +1412,16 @@ public class DatabaseSeeder
         }
 
         var now = DateTime.UtcNow;
+        var codePrefix = $"TICK-{now:yyyyMM}-";
         var seeds = new List<TicketSeed>
         {
-            new("2026_0001", "Portal login intermittent failure", "Users report intermittent login failures in customer portal.", managerUser.Id, openStatusId, highComplexityId, 16m, 2m, true, customers.ElementAtOrDefault(0)?.Id, projects.ElementAtOrDefault(0)?.Id, areas.ElementAtOrDefault(0)?.Id),
-            new("2026_0002", "Invoice PDF formatting issue", "Generated invoice PDF truncates long customer names.", managerUser.Id, inProgressStatusId, mediumComplexityId, 8m, 3m, false, customers.ElementAtOrDefault(1)?.Id, projects.ElementAtOrDefault(1)?.Id, areas.ElementAtOrDefault(1)?.Id),
-            new("2026_0003", "Email notifications delayed", "Outbound email notifications are delayed more than 10 minutes.", managerUser.Id, openStatusId, mediumComplexityId, 12m, 1m, false, customers.ElementAtOrDefault(2)?.Id, projects.ElementAtOrDefault(2)?.Id, areas.ElementAtOrDefault(2)?.Id),
-            new("2026_0004", "Customer merge validation", "Validation message should explain duplicate tax id behavior.", simpleUser.Id, resolvedStatusId, lowComplexityId, 4m, 4m, false, customers.ElementAtOrDefault(0)?.Id, projects.ElementAtOrDefault(0)?.Id, areas.ElementAtOrDefault(1)?.Id),
-            new("2026_0005", "Dashboard KPI discrepancy", "KPI cards display different totals than exports.", simpleUser.Id, inProgressStatusId, highComplexityId, 20m, 6m, false, customers.ElementAtOrDefault(1)?.Id, projects.ElementAtOrDefault(1)?.Id, areas.ElementAtOrDefault(2)?.Id),
-            new("2026_0006", "WhatsApp template selection", "Support agents need default template suggestion by ticket type.", simpleUser.Id, openStatusId, lowComplexityId, 6m, 0m, true, customers.ElementAtOrDefault(2)?.Id, projects.ElementAtOrDefault(2)?.Id, areas.ElementAtOrDefault(0)?.Id),
-            new("2026_0007", "Audit report export timeout", "Large audit report export times out after 90 seconds.", simpleUser.Id, openStatusId, highComplexityId, 24m, 5m, false, customers.ElementAtOrDefault(0)?.Id, projects.ElementAtOrDefault(0)?.Id, areas.ElementAtOrDefault(2)?.Id)
+            new($"{codePrefix}0001", "Portal login intermittent failure", "Users report intermittent login failures in customer portal.", managerUser.Id, openStatusId, highComplexityId, 16m, 2m, true, customers.ElementAtOrDefault(0)?.Id, projects.ElementAtOrDefault(0)?.Id, areas.ElementAtOrDefault(0)?.Id),
+            new($"{codePrefix}0002", "Invoice PDF formatting issue", "Generated invoice PDF truncates long customer names.", managerUser.Id, inProgressStatusId, mediumComplexityId, 8m, 3m, false, customers.ElementAtOrDefault(1)?.Id, projects.ElementAtOrDefault(1)?.Id, areas.ElementAtOrDefault(1)?.Id),
+            new($"{codePrefix}0003", "Email notifications delayed", "Outbound email notifications are delayed more than 10 minutes.", managerUser.Id, openStatusId, mediumComplexityId, 12m, 1m, false, customers.ElementAtOrDefault(2)?.Id, projects.ElementAtOrDefault(2)?.Id, areas.ElementAtOrDefault(2)?.Id),
+            new($"{codePrefix}0004", "Customer merge validation", "Validation message should explain duplicate tax id behavior.", simpleUser.Id, resolvedStatusId, lowComplexityId, 4m, 4m, false, customers.ElementAtOrDefault(0)?.Id, projects.ElementAtOrDefault(0)?.Id, areas.ElementAtOrDefault(1)?.Id),
+            new($"{codePrefix}0005", "Dashboard KPI discrepancy", "KPI cards display different totals than exports.", simpleUser.Id, inProgressStatusId, highComplexityId, 20m, 6m, false, customers.ElementAtOrDefault(1)?.Id, projects.ElementAtOrDefault(1)?.Id, areas.ElementAtOrDefault(2)?.Id),
+            new($"{codePrefix}0006", "WhatsApp template selection", "Support agents need default template suggestion by ticket type.", simpleUser.Id, openStatusId, lowComplexityId, 6m, 0m, true, customers.ElementAtOrDefault(2)?.Id, projects.ElementAtOrDefault(2)?.Id, areas.ElementAtOrDefault(0)?.Id),
+            new($"{codePrefix}0007", "Audit report export timeout", "Large audit report export times out after 90 seconds.", simpleUser.Id, openStatusId, highComplexityId, 24m, 5m, false, customers.ElementAtOrDefault(0)?.Id, projects.ElementAtOrDefault(0)?.Id, areas.ElementAtOrDefault(2)?.Id)
         };
 
         var existingCodes = await _context.Tickets
@@ -1340,10 +1439,9 @@ public class DatabaseSeeder
                 continue;
             }
 
-            _context.Tickets.Add(new Ticket
+            var ticket = new Ticket
             {
                 CompanyId = joinCompanyId,
-                Code = seed.Code,
                 Name = seed.Name,
                 Description = seed.Description,
                 EstimatedTime = seed.EstimatedTime,
@@ -1361,7 +1459,26 @@ public class DatabaseSeeder
                 Created = now,
                 CreatedBy = "System_Seeder",
                 GcRecord = 0
-            });
+            };
+
+            if (!int.TryParse(seed.Code.Split('-').Last(), out var seedSequence))
+            {
+                _logger.LogWarning("Ticket seed entry skipped because the sequence could not be extracted from code {Code}.", seed.Code);
+                continue;
+            }
+
+            ticket.SetStandardCode(now.Year, now.Month, seedSequence);
+
+            var seedCreationSummary = string.IsNullOrWhiteSpace(channel.Name)
+                ? "Ticket creado"
+                : $"Ticket creado desde {channel.Name}";
+
+            ticket.AddLog(
+                ticket.CreatedByUserId,
+                LogType.Creation,
+                seedCreationSummary);
+
+            _context.Tickets.Add(ticket);
 
             inserted++;
         }
@@ -1371,7 +1488,47 @@ public class DatabaseSeeder
             await _context.SaveChangesAsync();
         }
 
-        _logger.LogInformation("JOIN tickets seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
+        var seedCodes = seeds.Select(x => x.Code).ToList();
+        var seededTickets = await _context.Tickets
+            .IgnoreQueryFilters()
+            .Where(t => t.CompanyId == joinCompanyId && t.GcRecord == 0 && seedCodes.Contains(t.Code))
+            .ToListAsync();
+
+        var ticketsWithLogs = await _context.TicketLogs
+            .IgnoreQueryFilters()
+            .Where(tl => tl.CompanyId == joinCompanyId && tl.GcRecord == 0)
+            .Select(tl => tl.TicketId)
+            .Distinct()
+            .ToListAsync();
+
+        var ticketIdsWithLogs = ticketsWithLogs.ToHashSet();
+        var logsAdded = 0;
+
+        foreach (var ticket in seededTickets)
+        {
+            if (ticketIdsWithLogs.Contains(ticket.Id))
+            {
+                continue;
+            }
+
+            var seedCreationSummary = string.IsNullOrWhiteSpace(channel.Name)
+                ? "Ticket creado"
+                : $"Ticket creado desde {channel.Name}";
+
+            ticket.AddLog(
+                ticket.CreatedByUserId,
+                LogType.Creation,
+                seedCreationSummary);
+
+            logsAdded++;
+        }
+
+        if (logsAdded > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        _logger.LogInformation("JOIN tickets seed finished. Inserted: {Inserted}, Existing: {Existing}, LogsAdded: {LogsAdded}", inserted, seeds.Count - inserted, logsAdded);
     }
 
     private async Task SeedSystemModulesAsync()
@@ -1909,10 +2066,11 @@ public class DatabaseSeeder
         new("CompanyModules", "/administracion/company-modules", "icon_company_module", "Administracion", "CompanyModules", true, true, true, true),
         new("CommunicationChannels", "/administracion/communication-channels", "icon_channel", "Administracion", "CommunicationChannels", true, true, true, true),
         
-        new("Tickets", "/tickets", "icon_ticket", null, null, false, false, false, false),
-        new("TimeUnits", "/administracion/time-units", "icon_time_unit", "Administracion", "TimeUnits", true, true, true, true),
-        new("TicketComplexities", "/administracion/ticket-complexities", "icon_ticket_complexity", "Administracion", "TicketComplexities", true, true, true, true),
-        new("TicketStatuses", "/administracion/ticket-statuses", "icon_ticket_status", "Administracion", "TicketStatuses", true, true, true, true)
+        new("ManejoTickets", "/ManejoTickets", "icon_ManageTicket", null, null, false, false, false, false),
+        new("Tickets", "/ManejoTickets/tickets", "icon_ticket", "ManejoTickets", "Tickets", false, false, false, false),
+        new("TimeUnits", "/ManejoTickets/time-units", "icon_time_unit", "ManejoTickets", "TimeUnits", true, true, true, true),
+        new("TicketComplexities", "/ManejoTickets/ticket-complexities", "icon_ticket_complexity", "ManejoTickets", "TicketComplexities", true, true, true, true),
+        new("TicketStatuses", "//ManejoTickets/ticket-statuses", "icon_ticket_status", "ManejoTickets", "TicketStatuses", true, true, true, true)
 
     ];
 
@@ -1939,6 +2097,8 @@ public class DatabaseSeeder
         new("Manager", "CompanyModules", true, true, true, true),
         new("Manager", "CommunicationChannels", true, true, true, true),
         new("Manager", "Compañias", true, true, true, true),
+        new("Manager", "ManejoTickets", true, true, true, true),
+        new("Manager", "Tickets", true, true, true, true),
         new("Manager", "TimeUnits", true, true, true, true),
         new("Manager", "TicketComplexities", true, true, true, true),
         new("Manager", "TicketStatuses", true, true, true, true),
@@ -1955,6 +2115,8 @@ public class DatabaseSeeder
         new("Supervisor", "CompanyModules", true, true, true, false),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Compañias", true, true, true, false),
+        new("Supervisor", "ManejoTickets", true, true, true, true),
+        new("Supervisor", "Tickets", true, true, true, true),
         new("Supervisor", "TimeUnits", true, true, true, false),
         new("Supervisor", "TicketComplexities", true, true, true, false),
         new("Supervisor", "TicketStatuses", true, true, true, false),
@@ -1972,9 +2134,12 @@ public class DatabaseSeeder
         new("UsuarioSimple", "CompanyModules", true, false, false, false),
         new("UsuarioSimple", "CommunicationChannels", false, false, false, false),
         new("UsuarioSimple", "Compañias", false, false, false, false),
+        new("UsuarioSimple", "ManejoTickets", true, true, true, true),
+        new("UsuarioSimple", "Tickets", true, true, true, true),
         new("UsuarioSimple", "TimeUnits", false, false, false, false),
         new("UsuarioSimple", "TicketComplexities", true, false, false, false),
         new("UsuarioSimple", "TicketStatuses", true, false, false, false)
+        
     ];
 
     private sealed record CountrySeed(string Name, string IsoCode);

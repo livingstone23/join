@@ -5,6 +5,7 @@ using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Mappings;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
+using JOIN.Domain.Enums;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
 using MediatR;
@@ -31,6 +32,11 @@ public sealed class UpdateTicketCommandHandler(
         if (currentUserService.CompanyId == Guid.Empty)
         {
             return Response<TicketDto>.Error("COMPANY_REQUIRED", ["The X-Company-Id header is required."]);
+        }
+
+        if (!Guid.TryParse(currentUserService.UserId, out var currentUserId))
+        {
+            return Response<TicketDto>.Error("USER_REQUIRED", ["The authenticated user identifier is required."]);
         }
 
         var companyRepository = _unitOfWork.GetRepository<Company>();
@@ -124,7 +130,31 @@ public sealed class UpdateTicketCommandHandler(
             }
         }
 
+        var previousStatusId = entity.TicketStatusId;
+        var previousAssignedToUserId = entity.AssignedToUserId;
+        var statusChanged = previousStatusId != request.TicketStatusId;
+        var assignmentChanged = previousAssignedToUserId != request.AssignedToUserId;
+
         _ticketMapper.ApplyUpdate(request, entity);
+        entity.EffortPoints = request.EffortPoints;
+
+        if (statusChanged)
+        {
+            entity.AddLog(
+                currentUserId,
+                LogType.StatusChange,
+                "Estado actualizado",
+                previousStatusId: previousStatusId);
+        }
+
+        if (assignmentChanged)
+        {
+            entity.AddLog(
+                currentUserId,
+                LogType.Reassignment,
+                "Ticket reasignado",
+                newAssignedToUserId: entity.AssignedToUserId);
+        }
 
         await ticketRepository.UpdateAsync(entity);
         var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -160,6 +190,7 @@ public sealed class UpdateTicketCommandHandler(
                 Description = entity.Description,
                 EstimatedTime = entity.EstimatedTime,
                 ConsumedTime = entity.ConsumedTime,
+                EffortPoints = entity.EffortPoints,
                 IsVisibleToExternals = entity.IsVisibleToExternals,
                 TicketStatusId = entity.TicketStatusId,
                 TicketStatusName = status?.Name ?? string.Empty,

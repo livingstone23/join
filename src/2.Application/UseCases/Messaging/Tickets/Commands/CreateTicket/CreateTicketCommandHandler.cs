@@ -5,6 +5,7 @@ using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Mappings;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
+using JOIN.Domain.Enums;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
 using MediatR;
@@ -53,6 +54,7 @@ public sealed class CreateTicketCommandHandler(
         var projectRepository = _unitOfWork.GetRepository<Project>();
         var areaRepository = _unitOfWork.GetRepository<Area>();
         var userRepository = _unitOfWork.GetRepository<ApplicationUser>();
+        var ticketCompanyDefaultRepository = _unitOfWork.GetRepository<TicketCompanyDefault>();
 
         if (await statusRepository.GetAsync(request.TicketStatusId) is null)
         {
@@ -69,7 +71,8 @@ public sealed class CreateTicketCommandHandler(
             return Response<TicketDto>.Error("INVALID_TIME_UNIT", ["The provided time unit does not exist or is inactive."]);
         }
 
-        if (await channelRepository.GetAsync(request.ChannelId) is null)
+        var channel = await channelRepository.GetAsync(request.ChannelId);
+        if (channel is null)
         {
             return Response<TicketDto>.Error("INVALID_CHANNEL", ["The provided communication channel does not exist or is inactive."]);
         }
@@ -119,22 +122,48 @@ public sealed class CreateTicketCommandHandler(
         }
 
         var existingTickets = await ticketRepository.GetAllAsync();
-        var code = GenerateTicketCode(existingTickets, currentUserService.CompanyId);
+        var ticketCompanyDefaults = await ticketCompanyDefaultRepository.GetAllAsync();
+        var ticketCompanyDefault = ticketCompanyDefaults.FirstOrDefault(x => x.CompanyId == currentUserService.CompanyId && x.GcRecord == 0);
+        var now = DateTime.UtcNow;
+        var monthlySequence = existingTickets.Count(ticket =>
+                ticket.GcRecord == 0
+                && ticket.CompanyId == currentUserService.CompanyId
+                && ticket.Created.Year == now.Year
+                && ticket.Created.Month == now.Month)
+            + 1;
+
+        var entity = _ticketMapper.ToEntity(request);
+        entity.CompanyId = currentUserService.CompanyId;
+        entity.CreatedByUserId = currentUserId;
+        entity.EffortPoints = request.EffortPoints;
+
+        if (ticketCompanyDefault is not null && ticketCompanyDefault.UsePersonalizedCode)
+        {
+            entity.SetPersonalizedCode(ticketCompanyDefault.StartCode, monthlySequence, ticketCompanyDefault.CodeSequenceLength);
+        }
+        else
+        {
+            entity.SetStandardCode(now.Year, now.Month, monthlySequence);
+        }
 
         var duplicatedCode = existingTickets.Any(ticket =>
             ticket.GcRecord == 0
             && ticket.CompanyId == currentUserService.CompanyId
-            && string.Equals(ticket.Code, code, StringComparison.OrdinalIgnoreCase));
+            && string.Equals(ticket.Code, entity.Code, StringComparison.OrdinalIgnoreCase));
 
         if (duplicatedCode)
         {
             return Response<TicketDto>.Error("TICKET_CODE_IN_USE", ["Generated ticket code is already in use. Try again."]);
         }
 
-        var entity = _ticketMapper.ToEntity(request);
-        entity.CompanyId = currentUserService.CompanyId;
-        entity.CreatedByUserId = currentUserId;
-        entity.Code = code;
+        var creationSummary = string.IsNullOrWhiteSpace(channel.Name)
+            ? "Ticket creado"
+            : $"Ticket creado desde {channel.Name}";
+
+        entity.AddLog(
+            currentUserId,
+            LogType.Creation,
+            creationSummary);
 
         await ticketRepository.InsertAsync(entity);
         var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -151,7 +180,6 @@ public sealed class CreateTicketCommandHandler(
         var status = await statusRepository.GetAsync(entity.TicketStatusId);
         var complexity = await complexityRepository.GetAsync(entity.TicketComplexityId);
         var timeUnit = await timeUnitRepository.GetAsync(entity.TimeUnitId);
-        var channel = await channelRepository.GetAsync(entity.ChannelId);
         var customer = entity.CustomerId.HasValue ? await customerRepository.GetAsync(entity.CustomerId.Value) : null;
         var project = entity.ProjectId.HasValue ? await projectRepository.GetAsync(entity.ProjectId.Value) : null;
         var area = entity.AreaId.HasValue ? await areaRepository.GetAsync(entity.AreaId.Value) : null;
@@ -170,6 +198,7 @@ public sealed class CreateTicketCommandHandler(
                 Description = entity.Description,
                 EstimatedTime = entity.EstimatedTime,
                 ConsumedTime = entity.ConsumedTime,
+                EffortPoints = entity.EffortPoints,
                 IsVisibleToExternals = entity.IsVisibleToExternals,
                 TicketStatusId = entity.TicketStatusId,
                 TicketStatusName = status?.Name ?? string.Empty,
@@ -194,28 +223,6 @@ public sealed class CreateTicketCommandHandler(
                 CreatedAt = entity.Created
             }
         };
-    }
-
-    private static string GenerateTicketCode(IEnumerable<Ticket> tickets, Guid companyId)
-    {
-        var year = DateTime.UtcNow.Year;
-        var prefix = $"{year}_";
-
-        var maxSequence = tickets
-            .Where(ticket => ticket.GcRecord == 0 && ticket.CompanyId == companyId)
-            .Select(ticket => ticket.Code)
-            .Where(code => code.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            .Select(code =>
-            {
-                var parts = code.Split('_');
-                return parts.Length == 2 && int.TryParse(parts[1], out var sequence)
-                    ? sequence
-                    : 0;
-            })
-            .DefaultIfEmpty(0)
-            .Max();
-
-        return $"{year}_{(maxSequence + 1):D4}";
     }
 
     private static string? ResolveCustomerName(Customer? customer)

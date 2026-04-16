@@ -23,6 +23,11 @@ public sealed class CreateTicketCommandValidator : AbstractValidator<CreateTicke
         RuleFor(x => x.ConsumedTime)
             .GreaterThanOrEqualTo(0).WithMessage("Consumed time must be greater than or equal to zero.");
 
+        RuleFor(x => x.EffortPoints)
+            .GreaterThanOrEqualTo(0)
+            .When(x => x.EffortPoints.HasValue)
+            .WithMessage("El puntaje de esfuerzo no puede ser negativo.");
+
         RuleFor(x => x.TicketStatusId)
             .NotEqual(Guid.Empty).WithMessage("Ticket status is required.");
 

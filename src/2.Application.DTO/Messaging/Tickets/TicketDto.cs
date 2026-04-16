@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace JOIN.Application.DTO.Messaging;
 
@@ -41,6 +42,11 @@ public record TicketDto
     /// Gets the consumed time value.
     /// </summary>
     public decimal ConsumedTime { get; init; }
+
+    /// <summary>
+    /// Gets the optional effort points value.
+    /// </summary>
+    public decimal? EffortPoints { get; init; }
 
     /// <summary>
     /// Gets whether the ticket is visible to external users.
@@ -151,4 +157,9 @@ public record TicketDto
     /// Gets the UTC creation timestamp.
     /// </summary>
     public DateTime CreatedAt { get; init; }
+
+    /// <summary>
+    /// Gets the ticket audit history entries ordered by recency.
+    /// </summary>
+    public IEnumerable<TicketLogDto> Logs { get; set; } = new List<TicketLogDto>();
 }

@@ -4,6 +4,7 @@
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
+using JOIN.Domain.Enums;
 using JOIN.Domain.Security;
 using JOIN.Domain.Support;
 
@@ -18,8 +19,11 @@ namespace JOIN.Domain.Messaging;
 /// </summary>
 public class Ticket : BaseTenantEntity
 {
-    /// <summary> Human-readable identifier (e.g., 2006_001). </summary>
-    public string Code { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Human-readable ticket identifier managed exclusively by the domain.
+    /// </summary>
+    public string Code { get; private set; } = string.Empty;
 
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
@@ -28,6 +32,7 @@ public class Ticket : BaseTenantEntity
     public Guid TimeUnitId { get; set; }
     public decimal EstimatedTime { get; set; } // Tiempo proyectado
     public decimal ConsumedTime { get; set; }  // Tiempo consumido
+    public decimal? EffortPoints { get; set; } // Puntos de esfuerzo opcionales
 
     // --- Status & Complexity (Tables) ---
     public Guid TicketStatusId { get; set; }
@@ -78,5 +83,100 @@ public class Ticket : BaseTenantEntity
     /// <summary> Collection of follow-up tickets spawned from this specific ticket. </summary>
     public virtual ICollection<Ticket> ChildTickets { get; set; } = new List<Ticket>();
 
+    /// <summary>
+    /// Assigns the standard system-generated code using the format TICK-YYYYMM-XXXX.
+    /// </summary>
+    /// <param name="year">The UTC year used for the ticket prefix.</param>
+    /// <param name="month">The UTC month used for the ticket prefix.</param>
+    /// <param name="sequence">The monthly ticket sequence number.</param>
+    public void SetStandardCode(int year, int month, int sequence)
+    {
+        if (year is < 1 or > 9999)
+        {
+            throw new ArgumentOutOfRangeException(nameof(year), "Year must be between 1 and 9999.");
+        }
 
+        if (month is < 1 or > 12)
+        {
+            throw new ArgumentOutOfRangeException(nameof(month), "Month must be between 1 and 12.");
+        }
+
+        if (sequence <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(sequence), "Sequence must be greater than zero.");
+        }
+
+        Code = $"TICK-{year:D4}{month:D2}-{sequence:D4}";
+    }
+
+    /// <summary>
+    /// Assigns a personalized code using the configured start code and padded numeric sequence.
+    /// </summary>
+    /// <param name="startCode">The configured ticket prefix for the tenant.</param>
+    /// <param name="sequence">The ticket sequence number to format.</param>
+    /// <param name="length">The total length of the numeric sequence padding.</param>
+    public void SetPersonalizedCode(string startCode, int sequence, int length)
+    {
+        if (string.IsNullOrWhiteSpace(startCode))
+        {
+            throw new ArgumentException("Start code is required.", nameof(startCode));
+        }
+
+        if (sequence <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(sequence), "Sequence must be greater than zero.");
+        }
+
+        if (length <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(length), "Length must be greater than zero.");
+        }
+
+        var normalizedStartCode = startCode.Trim().ToUpperInvariant();
+        Code = $"{normalizedStartCode}-{sequence.ToString($"D{length}")}";
+    }
+
+    /// <summary>
+    /// Appends a new audit log entry to the current ticket aggregate.
+    /// </summary>
+    /// <param name="userId">The identifier of the user responsible for the action.</param>
+    /// <param name="logType">The type of audit event to register.</param>
+    /// <param name="summary">The human-readable summary of the action.</param>
+    /// <param name="previousStatusId">The previous workflow status when the log represents a status transition.</param>
+    /// <param name="newAssignedToUserId">The new assignee when the log represents a reassignment.</param>
+    public void AddLog(
+        Guid userId,
+        LogType logType,
+        string summary,
+        Guid? previousStatusId = null,
+        Guid? newAssignedToUserId = null)
+    {
+        if (userId == Guid.Empty)
+        {
+            throw new ArgumentException("User identifier is required.", nameof(userId));
+        }
+
+        if (string.IsNullOrWhiteSpace(summary))
+        {
+            throw new ArgumentException("Log summary is required.", nameof(summary));
+        }
+
+        TicketLogs.Add(new TicketLog
+        {
+            TicketId = Id,
+            CompanyId = CompanyId,
+            LogType = logType,
+            Summary = summary.Trim(),
+            UserRegisterLogId = userId,
+            PreviousStatusId = previousStatusId,
+            TicketStatusId = TicketStatusId,
+            TimeUnitId = TimeUnitId == Guid.Empty ? null : TimeUnitId,
+            ConsumedTime = ConsumedTime,
+            IsOnlyForCreatedAndAssigned = false,
+            NewAssignedToUserId = newAssignedToUserId,
+            Created = DateTime.UtcNow,
+            CreatedBy = userId.ToString(),
+            GcRecord = BaseAuditableEntity.ActiveGcRecord
+        });
+    }
 }

@@ -37,6 +37,7 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 
         builder.Property(t => t.EstimatedTime).HasPrecision(18, 2);
         builder.Property(t => t.ConsumedTime).HasPrecision(18, 2);
+        builder.Property(t => t.EffortPoints).HasColumnType("decimal(5,1)").IsRequired(false);
         
         // --- Relationships ---
 

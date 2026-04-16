@@ -78,18 +78,47 @@ public sealed class GetTicketByIdQueryHandler(
             WHERE t.Id = @Id
               AND t.CompanyId = @TenantId
               AND t.GcRecord = 0;
+
+            SELECT
+                tl.Id,
+                CASE tl.LogType
+                    WHEN 0 THEN 'Creation'
+                    WHEN 1 THEN 'StatusChange'
+                    WHEN 2 THEN 'InternalNote'
+                    WHEN 3 THEN 'ExternalNote'
+                    WHEN 4 THEN 'Reassignment'
+                    ELSE CONCAT('Unknown(', tl.LogType, ')')
+                END AS LogType,
+                tl.Summary,
+                tl.Created AS CreatedAt,
+                CONCAT(usr.FirstName, ' ', usr.LastName) AS UserRegisteredName,
+                ps.Name AS PreviousStatusName,
+                ns.Name AS NewStatusName,
+                tl.ConsumedTime
+            FROM Support.TicketLogs tl
+            LEFT JOIN Security.Users usr ON tl.UserRegisterLogId = usr.Id
+            LEFT JOIN Messaging.TicketStatuses ps ON tl.PreviousStatusId = ps.Id
+            LEFT JOIN Messaging.TicketStatuses ns ON tl.TicketStatusId = ns.Id
+            WHERE tl.TicketId = @Id
+              AND tl.CompanyId = @TenantId
+              AND tl.GcRecord = 0
+            ORDER BY tl.Created DESC;
             """;
 
-        var ticket = await connection.QuerySingleOrDefaultAsync<TicketDto>(
+        using var multi = await connection.QueryMultipleAsync(
             new CommandDefinition(
                 sql,
                 new { request.Id, TenantId = currentUserService.CompanyId },
                 cancellationToken: cancellationToken));
 
+        var ticket = await multi.ReadFirstOrDefaultAsync<TicketDto>();
+
         if (ticket is null)
         {
             return Response<TicketDto>.Error("TICKET_NOT_FOUND", ["Ticket not found for the current company."]);
         }
+
+        ticket.Logs = (await multi.ReadAsync<TicketLogDto>()).AsList();
 
         return new Response<TicketDto>
         {
