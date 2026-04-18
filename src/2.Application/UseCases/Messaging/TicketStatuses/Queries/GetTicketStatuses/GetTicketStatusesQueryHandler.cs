@@ -16,16 +16,23 @@ namespace JOIN.Application.UseCases.Messaging.TicketStatuses.Queries;
 /// <param name="paginationOptions">Configurable pagination defaults for the ticket status listing endpoint.</param>
 public sealed class GetTicketStatusesQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetTicketStatusesQuery, Response<PagedResult<TicketStatusDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
+    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     /// <summary>
     /// Retrieves a paginated list of ticket statuses with optional filters by name and active status.
     /// </summary>
     public async Task<Response<PagedResult<TicketStatusDto>>> Handle(GetTicketStatusesQuery request, CancellationToken cancellationToken)
     {
+        if (_currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<PagedResult<TicketStatusDto>>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
         var defaultPageNumber = _paginationSettings.DefaultPageNumber < 1 ? 1 : _paginationSettings.DefaultPageNumber;
         var defaultPageSize = _paginationSettings.DefaultPageSize < 1 ? 10 : _paginationSettings.DefaultPageSize;
         var maxPageSize = _paginationSettings.MaxPageSize < defaultPageSize ? defaultPageSize : _paginationSettings.MaxPageSize;
@@ -40,10 +47,11 @@ public sealed class GetTicketStatusesQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
+        parameters.Add("TenantId", _currentUserService.CompanyId);
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE ts.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE ts.CompanyId = @TenantId AND ts.GcRecord = 0");
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
@@ -62,12 +70,18 @@ public sealed class GetTicketStatusesQueryHandler(
         var sql = $"""
             SELECT
                 ts.Id,
+                ts.CompanyId,
+                c.Name AS CompanyName,
                 ts.Name,
                 ts.Description,
                 ts.Code,
                 ts.IsActive,
+                ts.IsInitial,
+                ts.IsPaused,
+                ts.IsFinal,
                 ts.Created AS CreatedAt
             FROM Messaging.TicketStatuses ts
+            INNER JOIN Common.Companies c ON c.Id = ts.CompanyId
             {whereClause}
             ORDER BY ts.Created DESC, ts.Name ASC
             {GetPaginationClause(connection)};

@@ -1,5 +1,6 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Domain.Messaging;
 using MediatR;
@@ -10,16 +11,22 @@ namespace JOIN.Application.UseCases.Messaging.TicketComplexities.Commands;
 /// Handles ticket complexity creation commands.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
-public sealed class CreateTicketComplexityCommandHandler(IUnitOfWork unitOfWork)
+public sealed class CreateTicketComplexityCommandHandler(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
     : IRequestHandler<CreateTicketComplexityCommand, Response<TicketComplexityDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     /// <summary>
     /// Creates a ticket complexity catalog item.
     /// </summary>
     public async Task<Response<TicketComplexityDto>> Handle(CreateTicketComplexityCommand request, CancellationToken cancellationToken)
     {
+        if (_currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<TicketComplexityDto>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
         var ticketComplexityRepository = _unitOfWork.GetRepository<TicketComplexity>();
         var timeUnitRepository = _unitOfWork.GetRepository<TimeUnit>();
 
@@ -55,6 +62,7 @@ public sealed class CreateTicketComplexityCommandHandler(IUnitOfWork unitOfWork)
 
         var entity = new TicketComplexity
         {
+            CompanyId = _currentUserService.CompanyId,
             Name = normalizedName,
             Description = normalizedDescription,
             Code = request.Code,

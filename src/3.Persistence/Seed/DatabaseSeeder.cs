@@ -1,3 +1,4 @@
+using JOIN.Application.Interface;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Security;
 using JOIN.Persistence.Contexts;
@@ -34,7 +35,7 @@ namespace JOIN.Persistence;
 /// handles automatic generation within its protected constructor.
 /// </para>
 /// </remarks>
-public class DatabaseSeeder
+public class DatabaseSeeder : ICompanyCatalogSeeder
 {
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
@@ -51,6 +52,14 @@ public class DatabaseSeeder
         _userManager = userManager;
         _roleManager = roleManager;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Seeds the default tenant-aware messaging catalogs for a specific company.
+    /// </summary>
+    public async Task SeedDefaultCatalogsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        await SeedMessagingCatalogsForCompanyAsync(companyId, cancellationToken);
     }
 
     public async Task SeedAsync()
@@ -75,9 +84,8 @@ public class DatabaseSeeder
             await SeedMunicipalitiesAsync();
             await SeedStreetTypesAsync();
             await SeedCommunicationChannelsAsync();
-            var defaultTimeUnitId = await SeedTimeUnitsAsync();
-            await SeedTicketStatusesAsync();
-            await SeedTicketComplexitiesAsync(defaultTimeUnitId);
+            var defaultTimeUnitId = await SeedMessagingCatalogsForCompanyAsync(joinCompanyId);
+            await SeedMessagingCatalogsForCompanyAsync(privateCompanyId);
             await SeedSystemModulesAsync();
             await SeedCompanyModulesAsync();
             await SeedSystemOptionsAsync();
@@ -1056,7 +1064,16 @@ public class DatabaseSeeder
         _logger.LogInformation("Communication channels catalog seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
     }
 
-    private async Task<Guid> SeedTimeUnitsAsync()
+    private async Task<Guid> SeedMessagingCatalogsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        var defaultTimeUnitId = await SeedTimeUnitsForCompanyAsync(companyId);
+        await SeedTicketStatusesForCompanyAsync(companyId);
+        await SeedTicketComplexitiesForCompanyAsync(companyId, defaultTimeUnitId);
+        await _context.SaveChangesAsync(cancellationToken);
+        return defaultTimeUnitId;
+    }
+
+    private async Task<Guid> SeedTimeUnitsForCompanyAsync(Guid companyId)
     {
         var now = DateTime.UtcNow;
         var seeds = new[]
@@ -1067,105 +1084,100 @@ public class DatabaseSeeder
 
         var existing = await _context.TimeUnits
             .IgnoreQueryFilters()
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0)
             .ToListAsync();
 
-        var hasChanges = false;
+        var inserted = 0;
 
         foreach (var seed in seeds)
         {
-            var entity = existing.FirstOrDefault(x => x.Code == seed.Code);
-            if (entity is null)
-            {
-                _context.TimeUnits.Add(new TimeUnit
-                {
-                    Name = seed.Name,
-                    Code = seed.Code,
-                    IsActive = seed.IsActive,
-                    Created = now,
-                    CreatedBy = "System_Seeder",
-                    GcRecord = 0
-                });
+            var alreadyExists = existing.Any(x =>
+                x.Code == seed.Code
+                || string.Equals(x.Name, seed.Name, StringComparison.OrdinalIgnoreCase));
 
-                hasChanges = true;
+            if (alreadyExists)
+            {
                 continue;
             }
 
-            if (!string.Equals(entity.Name, seed.Name, StringComparison.Ordinal)
-                || entity.IsActive != seed.IsActive
-                || entity.GcRecord != 0)
+            _context.TimeUnits.Add(new TimeUnit
             {
-                entity.Name = seed.Name;
-                entity.IsActive = seed.IsActive;
-                entity.GcRecord = 0;
-                entity.LastModified = now;
-                entity.LastModifiedBy = "System_Seeder";
-                hasChanges = true;
-            }
+                CompanyId = companyId,
+                Name = seed.Name,
+                Code = seed.Code,
+                IsActive = seed.IsActive,
+                Created = now,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            });
+
+            inserted++;
         }
 
-        if (hasChanges)
+        if (inserted > 0)
         {
             await _context.SaveChangesAsync();
         }
 
         var defaultTimeUnit = await _context.TimeUnits
             .IgnoreQueryFilters()
+            .Where(t => t.CompanyId == companyId && t.GcRecord == 0)
             .OrderBy(t => t.Code)
             .FirstAsync();
 
         return defaultTimeUnit.Id;
     }
 
-    private async Task SeedTicketStatusesAsync()
+    /// <summary>
+    /// Ensures the base ticket statuses exist for the specified company without modifying any previously created records.
+    /// </summary>
+    /// <param name="companyId">Identifier of the company that will own the default statuses.</param>
+    public async Task SeedTicketStatusesForCompanyAsync(Guid companyId)
     {
         var now = DateTime.UtcNow;
         var seeds = new[]
         {
-            new { Code = 1, Name = "Open", Description = "Ticket is open and pending triage.", IsActive = true },
-            new { Code = 2, Name = "InProgress", Description = "Ticket is currently being worked on.", IsActive = true },
-            new { Code = 3, Name = "Resolved", Description = "Ticket was resolved and is waiting for closure.", IsActive = true },
-            new { Code = 4, Name = "Closed", Description = "Ticket is closed.", IsActive = true }
+            new { Code = 1, Name = "Inicial", Description = "Initial status for newly created tickets.", IsInitial = true, IsPaused = false, IsFinal = false },
+            new { Code = 2, Name = "Paused", Description = "Paused status for tickets temporarily on hold.", IsInitial = false, IsPaused = true, IsFinal = false },
+            new { Code = 3, Name = "Final", Description = "Final status for tickets that completed their lifecycle.", IsInitial = false, IsPaused = false, IsFinal = true }
         };
 
         var existing = await _context.TicketStatuses
             .IgnoreQueryFilters()
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0)
             .ToListAsync();
 
         var hasChanges = false;
 
         foreach (var seed in seeds)
         {
-            var entity = existing.FirstOrDefault(x => x.Code == seed.Code);
-            if (entity is null)
-            {
-                _context.TicketStatuses.Add(new TicketStatus
-                {
-                    Name = seed.Name,
-                    Description = seed.Description,
-                    Code = seed.Code,
-                    IsActive = seed.IsActive,
-                    Created = now,
-                    CreatedBy = "System_Seeder",
-                    GcRecord = 0
-                });
+            var alreadyExists = existing.Any(x =>
+                string.Equals(x.Name, seed.Name, StringComparison.OrdinalIgnoreCase)
+                || (seed.IsInitial && x.IsInitial)
+                || (seed.IsPaused && x.IsPaused)
+                || (seed.IsFinal && x.IsFinal));
 
-                hasChanges = true;
+            if (alreadyExists)
+            {
                 continue;
             }
 
-            if (!string.Equals(entity.Name, seed.Name, StringComparison.Ordinal)
-                || !string.Equals(entity.Description, seed.Description, StringComparison.Ordinal)
-                || entity.IsActive != seed.IsActive
-                || entity.GcRecord != 0)
+            _context.TicketStatuses.Add(new TicketStatus
             {
-                entity.Name = seed.Name;
-                entity.Description = seed.Description;
-                entity.IsActive = seed.IsActive;
-                entity.GcRecord = 0;
-                entity.LastModified = now;
-                entity.LastModifiedBy = "System_Seeder";
-                hasChanges = true;
-            }
+                CompanyId = companyId,
+                Name = seed.Name,
+                Description = seed.Description,
+                Code = seed.Code,
+                IsActive = true,
+                IsInitial = seed.IsInitial,
+                IsPaused = seed.IsPaused,
+                IsFinal = seed.IsFinal,
+                Created = now,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            });
+
+            hasChanges = true;
         }
 
         if (hasChanges)
@@ -1174,7 +1186,7 @@ public class DatabaseSeeder
         }
     }
 
-    private async Task SeedTicketComplexitiesAsync(Guid defaultTimeUnitId)
+    private async Task SeedTicketComplexitiesForCompanyAsync(Guid companyId, Guid defaultTimeUnitId)
     {
         var now = DateTime.UtcNow;
         var seeds = new[]
@@ -1186,52 +1198,40 @@ public class DatabaseSeeder
 
         var existing = await _context.TicketComplexities
             .IgnoreQueryFilters()
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0)
             .ToListAsync();
 
-        var hasChanges = false;
+        var inserted = 0;
 
         foreach (var seed in seeds)
         {
-            var entity = existing.FirstOrDefault(x => x.Code == seed.Code);
-            if (entity is null)
-            {
-                _context.TicketComplexities.Add(new TicketComplexity
-                {
-                    Name = seed.Name,
-                    Description = seed.Description,
-                    Code = seed.Code,
-                    ResolutionTimeUnits = seed.ResolutionTimeUnits,
-                    TimeUnitId = defaultTimeUnitId,
-                    IsActive = seed.IsActive,
-                    Created = now,
-                    CreatedBy = "System_Seeder",
-                    GcRecord = 0
-                });
+            var alreadyExists = existing.Any(x =>
+                x.Code == seed.Code
+                || string.Equals(x.Name, seed.Name, StringComparison.OrdinalIgnoreCase));
 
-                hasChanges = true;
+            if (alreadyExists)
+            {
                 continue;
             }
 
-            if (!string.Equals(entity.Name, seed.Name, StringComparison.Ordinal)
-                || !string.Equals(entity.Description, seed.Description, StringComparison.Ordinal)
-                || entity.ResolutionTimeUnits != seed.ResolutionTimeUnits
-                || entity.TimeUnitId != defaultTimeUnitId
-                || entity.IsActive != seed.IsActive
-                || entity.GcRecord != 0)
+            _context.TicketComplexities.Add(new TicketComplexity
             {
-                entity.Name = seed.Name;
-                entity.Description = seed.Description;
-                entity.ResolutionTimeUnits = seed.ResolutionTimeUnits;
-                entity.TimeUnitId = defaultTimeUnitId;
-                entity.IsActive = seed.IsActive;
-                entity.GcRecord = 0;
-                entity.LastModified = now;
-                entity.LastModifiedBy = "System_Seeder";
-                hasChanges = true;
-            }
+                CompanyId = companyId,
+                Name = seed.Name,
+                Description = seed.Description,
+                Code = seed.Code,
+                ResolutionTimeUnits = seed.ResolutionTimeUnits,
+                TimeUnitId = defaultTimeUnitId,
+                IsActive = seed.IsActive,
+                Created = now,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            });
+
+            inserted++;
         }
 
-        if (hasChanges)
+        if (inserted > 0)
         {
             await _context.SaveChangesAsync();
         }
@@ -1241,7 +1241,7 @@ public class DatabaseSeeder
     {
         var openStatusId = await _context.TicketStatuses
             .IgnoreQueryFilters()
-            .Where(x => x.GcRecord == 0 && x.Code == 1)
+            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0 && x.IsInitial)
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync();
 
@@ -1352,7 +1352,7 @@ public class DatabaseSeeder
 
         var statusByCode = (await _context.TicketStatuses
             .IgnoreQueryFilters()
-            .Where(x => x.GcRecord == 0)
+            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
             .OrderByDescending(x => x.LastModified ?? x.Created)
             .ToListAsync())
             .GroupBy(x => x.Code)
@@ -2070,7 +2070,8 @@ public class DatabaseSeeder
         new("Tickets", "/ManejoTickets/tickets", "icon_ticket", "ManejoTickets", "Tickets", false, false, false, false),
         new("TimeUnits", "/ManejoTickets/time-units", "icon_time_unit", "ManejoTickets", "TimeUnits", true, true, true, true),
         new("TicketComplexities", "/ManejoTickets/ticket-complexities", "icon_ticket_complexity", "ManejoTickets", "TicketComplexities", true, true, true, true),
-        new("TicketStatuses", "//ManejoTickets/ticket-statuses", "icon_ticket_status", "ManejoTickets", "TicketStatuses", true, true, true, true)
+        new("TicketStatuses", "//ManejoTickets/ticket-statuses", "icon_ticket_status", "ManejoTickets", "TicketStatuses", true, true, true, true),
+        new("TicketCompanyDefaults", "/ManejoTickets/ticket-company-defaults", "icon_ticket_defaults", "ManejoTickets", "TicketCompanyDefaults", true, true, true, true)
 
     ];
 
@@ -2080,10 +2081,12 @@ public class DatabaseSeeder
         new("SuperAdmin", "TimeUnits", true, true, true, true),
         new("SuperAdmin", "TicketComplexities", true, true, true, true),
         new("SuperAdmin", "TicketStatuses", true, true, true, true),
+        new("SuperAdmin", "TicketCompanyDefaults", true, true, true, true),
         new("Admin", "Administracion", false, false, false, false),
         new("Admin", "TimeUnits", true, true, true, true),
         new("Admin", "TicketComplexities", true, true, true, true),
         new("Admin", "TicketStatuses", true, true, true, true),
+        new("Admin", "TicketCompanyDefaults", true, true, true, true),
 
         new("Manager", "Administracion", false, false, false, false),
         new("Manager", "Paises", true, true, true, true),
@@ -2102,6 +2105,7 @@ public class DatabaseSeeder
         new("Manager", "TimeUnits", true, true, true, true),
         new("Manager", "TicketComplexities", true, true, true, true),
         new("Manager", "TicketStatuses", true, true, true, true),
+        new("Manager", "TicketCompanyDefaults", true, true, true, true),
 
         new("Supervisor", "Administracion", false, false, false, false),
         new("Supervisor", "Paises", true, true, true, false),
@@ -2139,7 +2143,7 @@ public class DatabaseSeeder
         new("UsuarioSimple", "TimeUnits", false, false, false, false),
         new("UsuarioSimple", "TicketComplexities", true, false, false, false),
         new("UsuarioSimple", "TicketStatuses", true, false, false, false)
-        
+
     ];
 
     private sealed record CountrySeed(string Name, string IsoCode);

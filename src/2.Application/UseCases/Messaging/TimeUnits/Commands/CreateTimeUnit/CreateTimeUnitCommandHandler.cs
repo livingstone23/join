@@ -1,5 +1,6 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Domain.Messaging;
 using MediatR;
@@ -10,16 +11,22 @@ namespace JOIN.Application.UseCases.Messaging.TimeUnits.Commands;
 /// Handles time unit creation commands.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
-public sealed class CreateTimeUnitCommandHandler(IUnitOfWork unitOfWork)
+public sealed class CreateTimeUnitCommandHandler(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
     : IRequestHandler<CreateTimeUnitCommand, Response<TimeUnitDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     /// <summary>
     /// Creates a time unit catalog item.
     /// </summary>
     public async Task<Response<TimeUnitDto>> Handle(CreateTimeUnitCommand request, CancellationToken cancellationToken)
     {
+        if (_currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<TimeUnitDto>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
         var timeUnitRepository = _unitOfWork.GetRepository<TimeUnit>();
 
         var normalizedName = request.Name.Trim();
@@ -45,6 +52,7 @@ public sealed class CreateTimeUnitCommandHandler(IUnitOfWork unitOfWork)
 
         var entity = new TimeUnit
         {
+            CompanyId = _currentUserService.CompanyId,
             Name = normalizedName,
             Code = request.Code,
             IsActive = request.IsActive

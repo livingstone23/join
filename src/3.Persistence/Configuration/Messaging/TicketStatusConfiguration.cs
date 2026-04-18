@@ -32,6 +32,10 @@ public class TicketStatusConfiguration : IEntityTypeConfiguration<TicketStatus>
         // Sets the primary key for the entity.
         builder.HasKey(p => p.Id);
 
+        // Configures the CompanyId property as a required tenant discriminator.
+        builder.Property(p => p.CompanyId)
+            .IsRequired();
+
         // Configures the 'Name' property: it is required and has a maximum length of 50 characters.
         builder.Property(p => p.Name)
             .IsRequired()
@@ -49,6 +53,32 @@ public class TicketStatusConfiguration : IEntityTypeConfiguration<TicketStatus>
         // Configures the 'IsActive' property as required.
         builder.Property(p => p.IsActive)
             .IsRequired();
+
+        // Configures the workflow control flags as required.
+        builder.Property(p => p.IsInitial)
+            .IsRequired();
+
+        builder.Property(p => p.IsPaused)
+            .IsRequired();
+
+        builder.Property(p => p.IsFinal)
+            .IsRequired();
+
+        // Filtered unique indexes to guarantee only one logical initial/paused/final status per company.
+        builder.HasIndex(p => new { p.CompanyId, p.IsInitial })
+            .HasDatabaseName("UX_TicketStatuses_Company_Initial")
+            .IsUnique()
+            .HasFilter("[IsInitial] = 1 AND [GcRecord] = 0");
+
+        builder.HasIndex(p => new { p.CompanyId, p.IsPaused })
+            .HasDatabaseName("UX_TicketStatuses_Company_Paused")
+            .IsUnique()
+            .HasFilter("[IsPaused] = 1 AND [GcRecord] = 0");
+
+        builder.HasIndex(p => new { p.CompanyId, p.IsFinal })
+            .HasDatabaseName("UX_TicketStatuses_Company_Final")
+            .IsUnique()
+            .HasFilter("[IsFinal] = 1 AND [GcRecord] = 0");
 
         // Apply a soft-delete filter to automatically exclude records marked as deleted.
         builder.HasQueryFilter(a => a.GcRecord == 0);

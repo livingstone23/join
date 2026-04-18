@@ -28,6 +28,9 @@ public class TicketComplexityConfiguration : IEntityTypeConfiguration<TicketComp
         builder.ToTable("TicketComplexities", "Messaging");
         builder.HasKey(p => p.Id);
 
+        builder.Property(p => p.CompanyId)
+            .IsRequired();
+
         builder.Property(p => p.Name)
             .IsRequired()
             .HasMaxLength(50);
@@ -45,10 +48,20 @@ public class TicketComplexityConfiguration : IEntityTypeConfiguration<TicketComp
         builder.Property(p => p.IsActive)
             .IsRequired();
 
+        builder.HasOne(p => p.Company)
+            .WithMany()
+            .HasForeignKey(p => p.CompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(p => p.TimeUnit)
             .WithMany(t => t.TicketComplexities)
             .HasForeignKey(p => p.TimeUnitId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(p => new { p.CompanyId, p.Name })
+            .HasDatabaseName("UX_TicketComplexities_Company_Name")
+            .IsUnique()
+            .HasFilter("[GcRecord] = 0");
 
         builder.HasQueryFilter(a => a.GcRecord == 0);
     }

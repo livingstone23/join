@@ -10,14 +10,20 @@ namespace JOIN.Application.UseCases.Messaging.TicketComplexities.Queries;
 /// Handles ticket complexity detail queries using Dapper for high-performance reads.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
-public sealed class GetTicketComplexityByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+public sealed class GetTicketComplexityByIdQueryHandler(ISqlConnectionFactory connectionFactory, ICurrentUserService currentUserService)
     : IRequestHandler<GetTicketComplexityByIdQuery, Response<TicketComplexityDto>>
 {
+    private readonly ICurrentUserService _currentUserService = currentUserService;
     /// <summary>
     /// Retrieves a ticket complexity catalog item by its unique identifier.
     /// </summary>
     public async Task<Response<TicketComplexityDto>> Handle(GetTicketComplexityByIdQuery request, CancellationToken cancellationToken)
     {
+        if (_currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<TicketComplexityDto>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
         using var connection = connectionFactory.CreateConnection();
 
         const string sql = """
@@ -32,11 +38,12 @@ public sealed class GetTicketComplexityByIdQueryHandler(ISqlConnectionFactory co
                 tc.Created AS CreatedAt
             FROM Messaging.TicketComplexities tc
             WHERE tc.Id = @Id
+              AND tc.CompanyId = @TenantId
               AND tc.GcRecord = 0;
             """;
 
         var ticketComplexity = await connection.QuerySingleOrDefaultAsync<TicketComplexityDto>(
-            new CommandDefinition(sql, new { request.Id }, cancellationToken: cancellationToken));
+            new CommandDefinition(sql, new { request.Id, TenantId = _currentUserService.CompanyId }, cancellationToken: cancellationToken));
 
         if (ticketComplexity is null)
         {

@@ -28,4 +28,19 @@ public record CreateTicketStatusCommand : IRequest<Response<TicketStatusDto>>
     /// Gets or sets whether the ticket status is active.
     /// </summary>
     public bool IsActive { get; init; } = true;
+
+    /// <summary>
+    /// Gets or sets whether the ticket status is the initial workflow status.
+    /// </summary>
+    public bool IsInitial { get; init; }
+
+    /// <summary>
+    /// Gets or sets whether the ticket status is the paused workflow status.
+    /// </summary>
+    public bool IsPaused { get; init; }
+
+    /// <summary>
+    /// Gets or sets whether the ticket status is the final workflow status.
+    /// </summary>
+    public bool IsFinal { get; init; }
 }

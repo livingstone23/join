@@ -477,6 +477,57 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("SystemModules", "Admin");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Admin.UserCommunicationChannel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ChannelIdentifier")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("CommunicationChannelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsPreferred")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CommunicationChannelId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("CompanyId", "UserId", "CommunicationChannelId")
+                        .IsUnique()
+                        .HasFilter("[GcRecord] = 0");
+
+                    b.ToTable("UserCommunicationChannels", "Admin");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Common.CommunicationChannel", b =>
                 {
                     b.Property<Guid>("Id")
@@ -940,6 +991,9 @@ namespace JOIN.Persistence.Migrations
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("MaxDayTicketInactivity")
+                        .HasColumnType("int");
+
                     b.Property<Guid?>("ProjectDefaultId")
                         .HasColumnType("uniqueidentifier");
 
@@ -989,6 +1043,9 @@ namespace JOIN.Persistence.Migrations
                     b.Property<int>("Code")
                         .HasColumnType("int");
 
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("Created")
                         .HasColumnType("datetime2");
 
@@ -1026,6 +1083,11 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasIndex("TimeUnitId");
 
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TicketComplexities_Company_Name")
+                        .HasFilter("[GcRecord] = 0");
+
                     b.ToTable("TicketComplexities", "Messaging");
                 });
 
@@ -1037,6 +1099,9 @@ namespace JOIN.Persistence.Migrations
 
                     b.Property<int>("Code")
                         .HasColumnType("int");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("Created")
                         .HasColumnType("datetime2");
@@ -1054,6 +1119,15 @@ namespace JOIN.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsFinal")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsInitial")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPaused")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime?>("LastModified")
                         .HasColumnType("datetime2");
 
@@ -1067,6 +1141,21 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CompanyId", "IsFinal")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TicketStatuses_Company_Final")
+                        .HasFilter("[IsFinal] = 1 AND [GcRecord] = 0");
+
+                    b.HasIndex("CompanyId", "IsInitial")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TicketStatuses_Company_Initial")
+                        .HasFilter("[IsInitial] = 1 AND [GcRecord] = 0");
+
+                    b.HasIndex("CompanyId", "IsPaused")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TicketStatuses_Company_Paused")
+                        .HasFilter("[IsPaused] = 1 AND [GcRecord] = 0");
+
                     b.ToTable("TicketStatuses", "Messaging");
                 });
 
@@ -1078,6 +1167,9 @@ namespace JOIN.Persistence.Migrations
 
                     b.Property<int>("Code")
                         .HasColumnType("int");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("Created")
                         .HasColumnType("datetime2");
@@ -1104,57 +1196,12 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TimeUnits_Company_Name")
+                        .HasFilter("[GcRecord] = 0");
+
                     b.ToTable("TimeUnits", "Messaging");
-                });
-
-            modelBuilder.Entity("JOIN.Domain.Messaging.UserCommunicationChannel", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("ApplicationUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ChannelIdentifier")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<Guid>("CommunicationChannelId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("GcRecord")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsPreferred")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("LastModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApplicationUserId");
-
-                    b.HasIndex("CommunicationChannelId");
-
-                    b.HasIndex("UserId", "CommunicationChannelId")
-                        .IsUnique();
-
-                    b.ToTable("UserCommunicationChannels", "Messaging");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Security.ApplicationRole", b =>
@@ -2063,6 +2110,33 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Status");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Admin.UserCommunicationChannel", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.CommunicationChannel", "Channel")
+                        .WithMany()
+                        .HasForeignKey("CommunicationChannelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "User")
+                        .WithMany("Channels")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Channel");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Common.Municipality", b =>
                 {
                     b.HasOne("JOIN.Domain.Common.Province", "Province")
@@ -2244,36 +2318,43 @@ namespace JOIN.Persistence.Migrations
 
             modelBuilder.Entity("JOIN.Domain.Messaging.TicketComplexity", b =>
                 {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("JOIN.Domain.Messaging.TimeUnit", "TimeUnit")
                         .WithMany("TicketComplexities")
                         .HasForeignKey("TimeUnitId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("Company");
+
                     b.Navigation("TimeUnit");
                 });
 
-            modelBuilder.Entity("JOIN.Domain.Messaging.UserCommunicationChannel", b =>
+            modelBuilder.Entity("JOIN.Domain.Messaging.TicketStatus", b =>
                 {
-                    b.HasOne("JOIN.Domain.Security.ApplicationUser", null)
-                        .WithMany("Channels")
-                        .HasForeignKey("ApplicationUserId");
-
-                    b.HasOne("JOIN.Domain.Common.CommunicationChannel", "Channel")
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
                         .WithMany()
-                        .HasForeignKey("CommunicationChannelId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
+                        .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Channel");
+                    b.Navigation("Company");
+                });
 
-                    b.Navigation("User");
+            modelBuilder.Entity("JOIN.Domain.Messaging.TimeUnit", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Company");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Security.RoleSystemOption", b =>

@@ -1,4 +1,5 @@
 using JOIN.Application.Common;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Domain.Messaging;
 using MediatR;
@@ -9,16 +10,24 @@ namespace JOIN.Application.UseCases.Messaging.TicketStatuses.Commands;
 /// Handles soft delete operations for ticket statuses.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
-public sealed class DeleteTicketStatusCommandHandler(IUnitOfWork unitOfWork)
+public sealed class DeleteTicketStatusCommandHandler(
+    IUnitOfWork unitOfWork,
+    ICurrentUserService currentUserService)
     : IRequestHandler<DeleteTicketStatusCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     /// <summary>
     /// Performs a logical delete by marking the ticket status as removed.
     /// </summary>
     public async Task<Response<Guid>> Handle(DeleteTicketStatusCommand request, CancellationToken cancellationToken)
     {
+        if (_currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<Guid>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
         var ticketStatusRepository = _unitOfWork.GetRepository<TicketStatus>();
         var ticketRepository = _unitOfWork.GetRepository<Ticket>();
 

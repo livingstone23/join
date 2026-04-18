@@ -33,6 +33,10 @@ public class TimeUnitConfiguration : IEntityTypeConfiguration<TimeUnit>
         // Sets the primary key for the entity.
         builder.HasKey(p => p.Id);
 
+        // Configures the CompanyId property as a required tenant discriminator.
+        builder.Property(p => p.CompanyId)
+            .IsRequired();
+
         // Configures the 'Name' property: it is required and has a maximum length of 50 characters.
         builder.Property(p => p.Name)
             .IsRequired()
@@ -44,11 +48,21 @@ public class TimeUnitConfiguration : IEntityTypeConfiguration<TimeUnit>
         
         // --- Relationships ---
 
+        builder.HasOne(p => p.Company)
+            .WithMany()
+            .HasForeignKey(p => p.CompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Configures the one-to-many relationship with Ticket.
         // A TimeUnit can be associated with many Tickets.
         builder.HasMany(p => p.Tickets)
             .WithOne(t => t.TimeUnit)
             .HasForeignKey(t => t.TimeUnitId);
+
+        builder.HasIndex(p => new { p.CompanyId, p.Name })
+            .HasDatabaseName("UX_TimeUnits_Company_Name")
+            .IsUnique()
+            .HasFilter("[GcRecord] = 0");
 
         // Apply a soft-delete filter to automatically exclude records marked as deleted.
         builder.HasQueryFilter(a => a.GcRecord == 0);

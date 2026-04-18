@@ -1,6 +1,8 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
 using MediatR;
 
@@ -10,17 +12,26 @@ namespace JOIN.Application.UseCases.Messaging.TicketStatuses.Commands;
 /// Handles ticket status update commands.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
-public sealed class UpdateTicketStatusCommandHandler(IUnitOfWork unitOfWork)
+public sealed class UpdateTicketStatusCommandHandler(
+    IUnitOfWork unitOfWork,
+    ICurrentUserService currentUserService)
     : IRequestHandler<UpdateTicketStatusCommand, Response<TicketStatusDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     /// <summary>
     /// Updates a ticket status catalog item.
     /// </summary>
     public async Task<Response<TicketStatusDto>> Handle(UpdateTicketStatusCommand request, CancellationToken cancellationToken)
     {
+        if (_currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<TicketStatusDto>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
         var ticketStatusRepository = _unitOfWork.GetRepository<TicketStatus>();
+        var companyRepository = _unitOfWork.GetRepository<Company>();
 
         var entity = await ticketStatusRepository.GetAsync(request.Id);
         if (entity is null)
@@ -59,6 +70,9 @@ public sealed class UpdateTicketStatusCommandHandler(IUnitOfWork unitOfWork)
         entity.Description = normalizedDescription;
         entity.Code = request.Code;
         entity.IsActive = request.IsActive;
+        entity.IsInitial = request.IsInitial;
+        entity.IsPaused = request.IsPaused;
+        entity.IsFinal = request.IsFinal;
 
         await ticketStatusRepository.UpdateAsync(entity);
         var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -68,6 +82,8 @@ public sealed class UpdateTicketStatusCommandHandler(IUnitOfWork unitOfWork)
             return Response<TicketStatusDto>.Error("UPDATE_FAILED", ["No records were affected while updating the ticket status."]);
         }
 
+        var company = await companyRepository.GetAsync(entity.CompanyId);
+
         return new Response<TicketStatusDto>
         {
             IsSuccess = true,
@@ -75,10 +91,15 @@ public sealed class UpdateTicketStatusCommandHandler(IUnitOfWork unitOfWork)
             Data = new TicketStatusDto
             {
                 Id = entity.Id,
+                CompanyId = entity.CompanyId,
+                CompanyName = company?.Name,
                 Name = entity.Name,
                 Description = entity.Description,
                 Code = entity.Code,
                 IsActive = entity.IsActive,
+                IsInitial = entity.IsInitial,
+                IsPaused = entity.IsPaused,
+                IsFinal = entity.IsFinal,
                 CreatedAt = entity.Created
             }
         };

@@ -63,6 +63,12 @@ public class TicketCompanyDefault: BaseTenantEntity
     public Guid? ChannelDefaultId { get; set; }
 
 
+    /// <summary>
+    /// Maximum number of days a ticket can remain inactive before triggering an alert or escalation.   
+    /// </summary>
+    /// <value></value>
+    public int? MaxDayTicketInactivity { get; set; } 
+
 
 
 

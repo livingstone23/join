@@ -12,7 +12,7 @@ namespace JOIN.Domain.Messaging;
 /// <summary>
 /// Catalog for ticket complexity levels used across the messaging module.
 /// </summary>
-public class TicketComplexity : BaseAuditableEntity
+public class TicketComplexity : BaseTenantEntity
 {
     /// <summary>
     /// Gets or sets the display name of the ticket complexity.

@@ -13,8 +13,10 @@ namespace JOIN.Domain.Messaging;
 /// Catalog for ticket lifecycle states (e.g., Draft, Assigned, Resolved).
 /// Allows dynamic workflow management and multi-language support.
 /// </summary>
-public class TicketStatus : BaseAuditableEntity
+public class TicketStatus : BaseTenantEntity
 {
+
+    
     /// <summary>
     /// Name of the status (e.g., "Assigned", "Resolved"). This is the primary identifier for the status and should be unique within the system.
     /// </summary>
@@ -35,5 +37,21 @@ public class TicketStatus : BaseAuditableEntity
     /// </summary>
     public bool IsActive { get; set; } = true;
 
+    /// <summary>
+    /// Indicates whether this status is the initial state for the company workflow.
+    /// </summary>
+    public bool IsInitial { get; set; } = false;
+
+    /// <summary>
+    /// Indicates whether this status represents a paused workflow state.
+    /// </summary>
+    public bool IsPaused { get; set; } = false;
+
+    /// <summary>
+    /// Indicates whether this status is the final state for the company workflow.
+    /// </summary>
+    public bool IsFinal { get; set; } = false;
+
     public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
+
 }

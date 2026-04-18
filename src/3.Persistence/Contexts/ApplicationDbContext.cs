@@ -47,6 +47,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<EntityStatus> EntityStatuses => Set<EntityStatus>();
     public DbSet<IdentificationType> IdentificationTypes => Set<IdentificationType>();
     public DbSet<Project> Projects => Set<Project>();
+    public DbSet<UserCommunicationChannel> UserCommunicationChannels => Set<UserCommunicationChannel>();
     
 
 
@@ -66,7 +67,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<TicketComplexity> TicketComplexities => Set<TicketComplexity>();
     public DbSet<TicketStatus> TicketStatuses => Set<TicketStatus>();
     public DbSet<TimeUnit> TimeUnits => Set<TimeUnit>();
-    public DbSet<UserCommunicationChannel> UserCommunicationChannels => Set<UserCommunicationChannel>();
 
 
 
@@ -143,9 +143,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<CustomerContact>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<Project>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<Area>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<UserCommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         
         // Messaging / Tickets
         builder.Entity<Ticket>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<TicketStatus>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<TicketComplexity>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<TimeUnit>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<TicketNotification>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<TicketLog>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<TicketCompanyDefault>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
@@ -166,9 +170,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         // Admin / Support Catalogs
         builder.Entity<EntityStatus>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<IdentificationType>().HasQueryFilter(e => e.GcRecord == 0);
-        builder.Entity<TicketStatus>().HasQueryFilter(e => e.GcRecord == 0);
-        builder.Entity<TicketComplexity>().HasQueryFilter(e => e.GcRecord == 0);
-        builder.Entity<TimeUnit>().HasQueryFilter(e => e.GcRecord == 0);
         
         // System Configuration
         builder.Entity<SystemModule>().HasQueryFilter(e => e.GcRecord == 0);
@@ -183,7 +184,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<UserCustomer>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<UserRefreshToken>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<UserRoleCompany>().HasQueryFilter(e => e.GcRecord == 0);
-        builder.Entity<UserCommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<RoleSystemOption>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<SystemOption>().HasQueryFilter(e => e.GcRecord == 0);
         

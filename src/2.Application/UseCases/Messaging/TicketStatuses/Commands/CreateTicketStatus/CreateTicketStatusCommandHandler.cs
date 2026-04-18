@@ -1,6 +1,8 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
 using MediatR;
 
@@ -10,17 +12,26 @@ namespace JOIN.Application.UseCases.Messaging.TicketStatuses.Commands;
 /// Handles ticket status creation commands.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
-public sealed class CreateTicketStatusCommandHandler(IUnitOfWork unitOfWork)
+public sealed class CreateTicketStatusCommandHandler(
+    IUnitOfWork unitOfWork,
+    ICurrentUserService currentUserService)
     : IRequestHandler<CreateTicketStatusCommand, Response<TicketStatusDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     /// <summary>
     /// Creates a ticket status catalog item.
     /// </summary>
     public async Task<Response<TicketStatusDto>> Handle(CreateTicketStatusCommand request, CancellationToken cancellationToken)
     {
+        if (_currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<TicketStatusDto>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
         var ticketStatusRepository = _unitOfWork.GetRepository<TicketStatus>();
+        var companyRepository = _unitOfWork.GetRepository<Company>();
 
         var normalizedName = request.Name.Trim();
         var normalizedDescription = string.IsNullOrWhiteSpace(request.Description)
@@ -49,10 +60,14 @@ public sealed class CreateTicketStatusCommandHandler(IUnitOfWork unitOfWork)
 
         var entity = new TicketStatus
         {
+            CompanyId = _currentUserService.CompanyId,
             Name = normalizedName,
             Description = normalizedDescription,
             Code = request.Code,
-            IsActive = request.IsActive
+            IsActive = request.IsActive,
+            IsInitial = request.IsInitial,
+            IsPaused = request.IsPaused,
+            IsFinal = request.IsFinal
         };
 
         await ticketStatusRepository.InsertAsync(entity);
@@ -63,6 +78,8 @@ public sealed class CreateTicketStatusCommandHandler(IUnitOfWork unitOfWork)
             return Response<TicketStatusDto>.Error("CREATE_FAILED", ["No records were affected while creating the ticket status."]);
         }
 
+        var company = await companyRepository.GetAsync(entity.CompanyId);
+
         return new Response<TicketStatusDto>
         {
             IsSuccess = true,
@@ -70,10 +87,15 @@ public sealed class CreateTicketStatusCommandHandler(IUnitOfWork unitOfWork)
             Data = new TicketStatusDto
             {
                 Id = entity.Id,
+                CompanyId = entity.CompanyId,
+                CompanyName = company?.Name,
                 Name = entity.Name,
                 Description = entity.Description,
                 Code = entity.Code,
                 IsActive = entity.IsActive,
+                IsInitial = entity.IsInitial,
+                IsPaused = entity.IsPaused,
+                IsFinal = entity.IsFinal,
                 CreatedAt = entity.Created
             }
         };

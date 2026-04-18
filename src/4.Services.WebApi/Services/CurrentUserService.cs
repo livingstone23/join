@@ -36,8 +36,8 @@ public class CurrentUserService : ICurrentUserService
 
     /// <summary>
     /// Resolves the CompanyId (Tenant) for the current request.
-    /// It first attempts to read from the 'X-Company-Id' HTTP Header (useful for development/testing),
-    /// and falls back to the 'CompanyId' claim in the JWT.
+    /// It prioritizes the 'CompanyId' claim from the authenticated JWT and only falls back
+    /// to the 'X-Company-Id' header for local development or testing scenarios.
     /// </summary>
     public Guid CompanyId
     {
@@ -46,18 +46,18 @@ public class CurrentUserService : ICurrentUserService
             var httpContext = _httpContextAccessor.HttpContext;
             if (httpContext == null) return Guid.Empty;
 
-            // 1. Try to extract from HTTP Header (Priority for Postman/Testing)
-            var headerValue = httpContext.Request.Headers["X-Company-Id"].FirstOrDefault();
-            if (!string.IsNullOrEmpty(headerValue) && Guid.TryParse(headerValue, out var headerCompanyId))
-            {
-                return headerCompanyId;
-            }
-
-            // 2. Try to extract from JWT Claims (Standard for Authenticated Users)
+            // 1. Try to extract from JWT Claims (Standard for authenticated users)
             var companyClaim = httpContext.User?.FindFirstValue("CompanyId");
             if (Guid.TryParse(companyClaim, out var claimCompanyId))
             {
                 return claimCompanyId;
+            }
+
+            // 2. Optional fallback for development/testing tools
+            var headerValue = httpContext.Request.Headers["X-Company-Id"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(headerValue) && Guid.TryParse(headerValue, out var headerCompanyId))
+            {
+                return headerCompanyId;
             }
 
             return Guid.Empty;

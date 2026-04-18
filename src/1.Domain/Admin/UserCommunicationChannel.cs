@@ -4,7 +4,7 @@ using JOIN.Domain.Security;
 
 
 
-namespace JOIN.Domain.Messaging;
+namespace JOIN.Domain.Admin;
 
 
 
@@ -12,7 +12,7 @@ namespace JOIN.Domain.Messaging;
 /// Maps a User to a specific communication channel (WhatsApp, Telegram, etc.).
 /// Crucial for routing automated alerts and notifications to the correct agent/user endpoint.
 /// </summary>
-public class UserCommunicationChannel : BaseAuditableEntity
+public class UserCommunicationChannel : BaseTenantEntity
 {
     /// <summary>
     /// Foreign key to the ApplicationUser.

@@ -13,7 +13,7 @@ namespace JOIN.Domain.Messaging;
 /// Catalog for time measurements (e.g., Hours, Days, Weeks).
 /// Standardizes how resolution time is recorded.
 /// </summary>
-public class TimeUnit : BaseAuditableEntity
+public class TimeUnit : BaseTenantEntity
 {
 
 

@@ -16,16 +16,23 @@ namespace JOIN.Application.UseCases.Messaging.TicketComplexities.Queries;
 /// <param name="paginationOptions">Configurable pagination defaults for the ticket complexity listing endpoint.</param>
 public sealed class GetTicketComplexitiesQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetTicketComplexitiesQuery, Response<PagedResult<TicketComplexityDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
+    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     /// <summary>
     /// Retrieves a paginated list of ticket complexities with optional filters by name and active status.
     /// </summary>
     public async Task<Response<PagedResult<TicketComplexityDto>>> Handle(GetTicketComplexitiesQuery request, CancellationToken cancellationToken)
     {
+        if (_currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<PagedResult<TicketComplexityDto>>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
         var defaultPageNumber = _paginationSettings.DefaultPageNumber < 1 ? 1 : _paginationSettings.DefaultPageNumber;
         var defaultPageSize = _paginationSettings.DefaultPageSize < 1 ? 10 : _paginationSettings.DefaultPageSize;
         var maxPageSize = _paginationSettings.MaxPageSize < defaultPageSize ? defaultPageSize : _paginationSettings.MaxPageSize;
@@ -40,10 +47,11 @@ public sealed class GetTicketComplexitiesQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
+        parameters.Add("TenantId", _currentUserService.CompanyId);
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE tc.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE tc.CompanyId = @TenantId AND tc.GcRecord = 0");
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {

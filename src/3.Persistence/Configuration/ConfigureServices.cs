@@ -3,6 +3,7 @@
 
 
 
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Admin;
 using JOIN.Persistence.Contexts;
@@ -61,6 +62,7 @@ public static class ConfigureServices
 
         // 6. SERVICIOS DE APOYO
         services.AddScoped<JOIN.Persistence.DatabaseSeeder>();
+        services.AddScoped<ICompanyCatalogSeeder>(sp => sp.GetRequiredService<JOIN.Persistence.DatabaseSeeder>());
 
         return services;
     }

@@ -1,5 +1,6 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Common;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Domain.Common;
 using MediatR;
@@ -10,10 +11,11 @@ namespace JOIN.Application.UseCases.Common.Companies.Commands;
 /// Handles company creation commands.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
-public class CreateCompanyCommandHandler(IUnitOfWork unitOfWork)
+public class CreateCompanyCommandHandler(IUnitOfWork unitOfWork, ICompanyCatalogSeeder companyCatalogSeeder)
     : IRequestHandler<CreateCompanyCommand, Response<CompanyDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly ICompanyCatalogSeeder _companyCatalogSeeder = companyCatalogSeeder;
 
     /// <summary>
     /// Creates a company.
@@ -47,6 +49,8 @@ public class CreateCompanyCommandHandler(IUnitOfWork unitOfWork)
         {
             return Response<CompanyDto>.Error("CREATE_FAILED", ["No records were affected while creating the company."]);
         }
+
+        await _companyCatalogSeeder.SeedDefaultCatalogsForCompanyAsync(entity.Id, cancellationToken);
 
         return new Response<CompanyDto>
         {

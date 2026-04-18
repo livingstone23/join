@@ -10,14 +10,20 @@ namespace JOIN.Application.UseCases.Messaging.TimeUnits.Queries;
 /// Handles time unit detail queries using Dapper for high-performance reads.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
-public sealed class GetTimeUnitByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+public sealed class GetTimeUnitByIdQueryHandler(ISqlConnectionFactory connectionFactory, ICurrentUserService currentUserService)
     : IRequestHandler<GetTimeUnitByIdQuery, Response<TimeUnitDto>>
 {
+    private readonly ICurrentUserService _currentUserService = currentUserService;
     /// <summary>
     /// Retrieves a time unit catalog item by its unique identifier.
     /// </summary>
     public async Task<Response<TimeUnitDto>> Handle(GetTimeUnitByIdQuery request, CancellationToken cancellationToken)
     {
+        if (_currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<TimeUnitDto>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
         using var connection = connectionFactory.CreateConnection();
 
         const string sql = """
@@ -29,11 +35,12 @@ public sealed class GetTimeUnitByIdQueryHandler(ISqlConnectionFactory connection
                 tu.Created AS CreatedAt
             FROM Messaging.TimeUnits tu
             WHERE tu.Id = @Id
+              AND tu.CompanyId = @TenantId
               AND tu.GcRecord = 0;
             """;
 
         var timeUnit = await connection.QuerySingleOrDefaultAsync<TimeUnitDto>(
-            new CommandDefinition(sql, new { request.Id }, cancellationToken: cancellationToken));
+            new CommandDefinition(sql, new { request.Id, TenantId = _currentUserService.CompanyId }, cancellationToken: cancellationToken));
 
         if (timeUnit is null)
         {

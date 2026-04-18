@@ -10,7 +10,9 @@ namespace JOIN.Application.UseCases.Messaging.TicketStatuses.Queries;
 /// Handles ticket status detail queries using Dapper for high-performance reads.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
-public sealed class GetTicketStatusByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+public sealed class GetTicketStatusByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetTicketStatusByIdQuery, Response<TicketStatusDto>>
 {
     /// <summary>
@@ -18,23 +20,35 @@ public sealed class GetTicketStatusByIdQueryHandler(ISqlConnectionFactory connec
     /// </summary>
     public async Task<Response<TicketStatusDto>> Handle(GetTicketStatusByIdQuery request, CancellationToken cancellationToken)
     {
+        if (currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<TicketStatusDto>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
         using var connection = connectionFactory.CreateConnection();
 
         const string sql = """
             SELECT
                 ts.Id,
+                ts.CompanyId,
+                c.Name AS CompanyName,
                 ts.Name,
                 ts.Description,
                 ts.Code,
                 ts.IsActive,
+                ts.IsInitial,
+                ts.IsPaused,
+                ts.IsFinal,
                 ts.Created AS CreatedAt
             FROM Messaging.TicketStatuses ts
+            INNER JOIN Common.Companies c ON c.Id = ts.CompanyId
             WHERE ts.Id = @Id
+              AND ts.CompanyId = @TenantId
               AND ts.GcRecord = 0;
             """;
 
         var ticketStatus = await connection.QuerySingleOrDefaultAsync<TicketStatusDto>(
-            new CommandDefinition(sql, new { request.Id }, cancellationToken: cancellationToken));
+            new CommandDefinition(sql, new { request.Id, TenantId = currentUserService.CompanyId }, cancellationToken: cancellationToken));
 
         if (ticketStatus is null)
         {

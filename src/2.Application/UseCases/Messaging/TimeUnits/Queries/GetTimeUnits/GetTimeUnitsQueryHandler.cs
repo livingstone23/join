@@ -16,16 +16,23 @@ namespace JOIN.Application.UseCases.Messaging.TimeUnits.Queries;
 /// <param name="paginationOptions">Configurable pagination defaults for the time unit listing endpoint.</param>
 public sealed class GetTimeUnitsQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetTimeUnitsQuery, Response<PagedResult<TimeUnitDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
+    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     /// <summary>
     /// Retrieves a paginated list of time units with optional filters by name and active status.
     /// </summary>
     public async Task<Response<PagedResult<TimeUnitDto>>> Handle(GetTimeUnitsQuery request, CancellationToken cancellationToken)
     {
+        if (_currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<PagedResult<TimeUnitDto>>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
         var defaultPageNumber = _paginationSettings.DefaultPageNumber < 1 ? 1 : _paginationSettings.DefaultPageNumber;
         var defaultPageSize = _paginationSettings.DefaultPageSize < 1 ? 10 : _paginationSettings.DefaultPageSize;
         var maxPageSize = _paginationSettings.MaxPageSize < defaultPageSize ? defaultPageSize : _paginationSettings.MaxPageSize;
@@ -40,10 +47,11 @@ public sealed class GetTimeUnitsQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
+        parameters.Add("TenantId", _currentUserService.CompanyId);
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE tu.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE tu.CompanyId = @TenantId AND tu.GcRecord = 0");
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {

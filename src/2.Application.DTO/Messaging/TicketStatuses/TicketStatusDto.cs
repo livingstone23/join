@@ -13,6 +13,16 @@ public record TicketStatusDto
     public Guid Id { get; init; }
 
     /// <summary>
+    /// Gets the company identifier that owns the ticket status.
+    /// </summary>
+    public Guid CompanyId { get; init; }
+
+    /// <summary>
+    /// Gets the company display name that owns the ticket status.
+    /// </summary>
+    public string? CompanyName { get; init; }
+
+    /// <summary>
     /// Gets the display name of the ticket status.
     /// </summary>
     public string Name { get; init; } = string.Empty;
@@ -31,6 +41,21 @@ public record TicketStatusDto
     /// Gets whether the ticket status is active.
     /// </summary>
     public bool IsActive { get; init; }
+
+    /// <summary>
+    /// Gets whether the ticket status is configured as the initial workflow status.
+    /// </summary>
+    public bool IsInitial { get; init; }
+
+    /// <summary>
+    /// Gets whether the ticket status is configured as the paused workflow status.
+    /// </summary>
+    public bool IsPaused { get; init; }
+
+    /// <summary>
+    /// Gets whether the ticket status is configured as the final workflow status.
+    /// </summary>
+    public bool IsFinal { get; init; }
 
     /// <summary>
     /// Gets the UTC creation timestamp of the record.

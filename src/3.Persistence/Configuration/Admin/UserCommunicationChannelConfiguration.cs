@@ -3,13 +3,13 @@
 
 
 
-using JOIN.Domain.Messaging;
+using JOIN.Domain.Admin;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 
 
-namespace JOIN.Persistence.Configuration.Messaging;
+namespace JOIN.Persistence.Configuration.Admin;
 
 
 
@@ -27,12 +27,15 @@ public class UserCommunicationChannelConfiguration : IEntityTypeConfiguration<Us
     public void Configure(EntityTypeBuilder<UserCommunicationChannel> builder)
     {
 
-        // Maps the entity to the "UserCommunicationChannels" table in the "Messaging" schema.
-        builder.ToTable("UserCommunicationChannels", "Messaging");
+        // Maps the entity to the "UserCommunicationChannels" table in the "Admin" schema.
+        builder.ToTable("UserCommunicationChannels", "Admin");
 
 
         // Sets the primary key for the entity.
         builder.HasKey(p => p.Id);
+
+        builder.Property(p => p.CompanyId)
+            .IsRequired();
 
         // Configures the 'ChannelIdentifier' property: it is required and has a maximum length of 100 characters.
         builder.Property(p => p.ChannelIdentifier)
@@ -41,26 +44,32 @@ public class UserCommunicationChannelConfiguration : IEntityTypeConfiguration<Us
 
         // --- Relationships ---
 
+        builder.HasOne(p => p.Company)
+            .WithMany()
+            .HasForeignKey(p => p.CompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Defines a one-to-many relationship with ApplicationUser.
         // A UserCommunicationChannel belongs to one User.
         builder.HasOne(p => p.User)
-            .WithMany()
+            .WithMany(u => u.Channels)
             .HasForeignKey(p => p.UserId)
-            .OnDelete(DeleteBehavior.Cascade); // Deleting a user also deletes their channel mappings.
+            .OnDelete(DeleteBehavior.Cascade);
 
         // Defines a one-to-many relationship with CommunicationChannel.
         // A UserCommunicationChannel belongs to one Channel.
         builder.HasOne(p => p.Channel)
             .WithMany()
             .HasForeignKey(p => p.CommunicationChannelId)
-            .OnDelete(DeleteBehavior.Restrict); // Prevents deleting a channel if it's in use by a user.
+            .OnDelete(DeleteBehavior.Restrict);
 
         // --- Indexes ---
 
-
-        // Creates a unique index on UserId and CommunicationChannelId to ensure
-        // a user can only be mapped to a specific channel once.
-        builder.HasIndex(p => new { p.UserId, p.CommunicationChannelId }).IsUnique();
+        // Creates a unique tenant-aware index to ensure a user can only be mapped
+        // to the same communication channel once within a company.
+        builder.HasIndex(p => new { p.CompanyId, p.UserId, p.CommunicationChannelId })
+            .IsUnique()
+            .HasFilter("[GcRecord] = 0");
 
 
         // Apply a soft-delete filter to automatically exclude records marked as deleted.

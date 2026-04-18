@@ -4,6 +4,7 @@ using JOIN.Application.UseCases.Messaging.TicketStatuses.Commands;
 using JOIN.Application.UseCases.Messaging.TicketStatuses.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 
@@ -13,7 +14,7 @@ namespace JOIN.Services.WebApi.Controllers.Messaging;
 
 
 /// <summary>
-/// Exposes REST endpoints for managing the global ticket status catalog.
+/// Exposes REST endpoints for managing the tenant ticket status catalog.
 /// The controller remains intentionally thin and delegates business rules to the Application layer through MediatR.
 /// </summary>
 [ApiController]
@@ -49,7 +50,50 @@ public class TicketStatusesController(ISender sender) : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves a single ticket status by its unique identifier.
+    /// Retrieves a paginated system-wide list of ticket statuses across all companies.
+    /// Access is restricted to SuperAdmin users only.
+    /// </summary>
+    [HttpGet("system-wide")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<PagedResult<TicketStatusDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetSystemWide(
+        [FromQuery] int? pageNumber = null,
+        [FromQuery] int? pageSize = null,
+        [FromQuery] string? name = null,
+        [FromQuery] bool? isActive = null,
+        [FromQuery] bool? isInitial = null,
+        [FromQuery] bool? isPaused = null,
+        [FromQuery] bool? isFinal = null,
+        [FromQuery] string? companyName = null,
+        [FromQuery] int? code = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(
+            new GetSystemWideTicketStatusesQuery(
+                pageNumber,
+                pageSize,
+                name,
+                isActive,
+                isInitial,
+                isPaused,
+                isFinal,
+                companyName,
+                code),
+            cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Retrieves a single tenant ticket status by its unique identifier.
     /// </summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(Response<TicketStatusDto>), StatusCodes.Status200OK)]
@@ -61,14 +105,19 @@ public class TicketStatusesController(ISender sender) : ControllerBase
 
         if (!response.IsSuccess)
         {
-            return NotFound(response);
+            if (response.Message == "TICKET_STATUS_NOT_FOUND")
+            {
+                return NotFound(response);
+            }
+
+            return BadRequest(response);
         }
 
         return Ok(response);
     }
 
     /// <summary>
-    /// Creates a new ticket status catalog entry.
+    /// Creates a new ticket status catalog entry for the company resolved from the authenticated token.
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(Response<TicketStatusDto>), StatusCodes.Status201Created)]
