@@ -5,6 +5,7 @@ using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
 using JOIN.Domain.Enums;
+using JOIN.Domain.Exceptions;
 using JOIN.Domain.Security;
 using JOIN.Domain.Support;
 
@@ -93,17 +94,17 @@ public class Ticket : BaseTenantEntity
     {
         if (year is < 1 or > 9999)
         {
-            throw new ArgumentOutOfRangeException(nameof(year), "Year must be between 1 and 9999.");
+            throw new DomainException("INVALID_TICKET_YEAR", "Year must be between 1 and 9999.");
         }
 
         if (month is < 1 or > 12)
         {
-            throw new ArgumentOutOfRangeException(nameof(month), "Month must be between 1 and 12.");
+            throw new DomainException("INVALID_TICKET_MONTH", "Month must be between 1 and 12.");
         }
 
         if (sequence <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(sequence), "Sequence must be greater than zero.");
+            throw new DomainException("INVALID_TICKET_SEQUENCE", "Sequence must be greater than zero.");
         }
 
         Code = $"TICK-{year:D4}{month:D2}-{sequence:D4}";
@@ -119,17 +120,17 @@ public class Ticket : BaseTenantEntity
     {
         if (string.IsNullOrWhiteSpace(startCode))
         {
-            throw new ArgumentException("Start code is required.", nameof(startCode));
+            throw new DomainException("INVALID_TICKET_PREFIX", "Start code is required.");
         }
 
         if (sequence <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(sequence), "Sequence must be greater than zero.");
+            throw new DomainException("INVALID_TICKET_SEQUENCE", "Sequence must be greater than zero.");
         }
 
         if (length <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(length), "Length must be greater than zero.");
+            throw new DomainException("INVALID_TICKET_CODE_LENGTH", "Length must be greater than zero.");
         }
 
         var normalizedStartCode = startCode.Trim().ToUpperInvariant();
@@ -153,12 +154,12 @@ public class Ticket : BaseTenantEntity
     {
         if (userId == Guid.Empty)
         {
-            throw new ArgumentException("User identifier is required.", nameof(userId));
+            throw new DomainException("INVALID_TICKET_LOG_USER", "User identifier is required.");
         }
 
         if (string.IsNullOrWhiteSpace(summary))
         {
-            throw new ArgumentException("Log summary is required.", nameof(summary));
+            throw new DomainException("INVALID_TICKET_LOG_SUMMARY", "Log summary is required.");
         }
 
         TicketLogs.Add(new TicketLog

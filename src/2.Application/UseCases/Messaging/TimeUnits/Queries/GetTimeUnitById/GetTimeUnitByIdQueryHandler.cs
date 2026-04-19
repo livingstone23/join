@@ -1,6 +1,7 @@
 using Dapper;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
+using JOIN.Application.Exceptions;
 using JOIN.Application.Interface;
 using MediatR;
 
@@ -47,7 +48,7 @@ public sealed class GetTimeUnitByIdQueryHandler(ISqlConnectionFactory connection
 
         if (timeUnit is null)
         {
-            return Response<TimeUnitDto>.Error("TIME_UNIT_NOT_FOUND", ["Time unit not found."]);
+            throw new NotFoundException("TimeUnit", request.Id, "Time unit not found.");
         }
 
         return new Response<TimeUnitDto>

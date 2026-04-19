@@ -30,9 +30,25 @@ builder.Services.AddControllers(options => options.Filters.AddService<DynamicAut
 builder.Services.AddOpenApi(); 
 builder.Services.AddEndpointsApiExplorer();
 
-// Register the Global Exception Handler (RFC 7807 Problem Details)
+// Register the global exception handler and native RFC 7807 ProblemDetails services.
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        context.ProblemDetails.Instance ??= context.HttpContext.Request.Path;
+
+        if (!context.ProblemDetails.Extensions.ContainsKey("traceId"))
+        {
+            context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+        }
+
+        if (!context.ProblemDetails.Extensions.ContainsKey("timestamp"))
+        {
+            context.ProblemDetails.Extensions["timestamp"] = DateTimeOffset.UtcNow;
+        }
+    };
+});
 
 // ============================================================================
 // 2. ADD CLEAN ARCHITECTURE LAYERS

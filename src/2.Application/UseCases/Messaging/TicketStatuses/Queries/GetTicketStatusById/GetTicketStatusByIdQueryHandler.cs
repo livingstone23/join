@@ -1,6 +1,7 @@
 using Dapper;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
+using JOIN.Application.Exceptions;
 using JOIN.Application.Interface;
 using MediatR;
 
@@ -52,7 +53,7 @@ public sealed class GetTicketStatusByIdQueryHandler(
 
         if (ticketStatus is null)
         {
-            return Response<TicketStatusDto>.Error("TICKET_STATUS_NOT_FOUND", ["Ticket status not found."]);
+            throw new NotFoundException("TicketStatus", request.Id, "Ticket status not found.");
         }
 
         return new Response<TicketStatusDto>

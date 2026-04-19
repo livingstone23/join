@@ -1,100 +1,148 @@
-
-
-
 using JOIN.Application.Common;
-using System.Linq;
+using JOIN.Application.Exceptions;
+using JOIN.Domain.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
-
 
 namespace JOIN.Services.WebApi.Middlewares;
 
-
-
 /// <summary>
-/// Global exception handler intercepting all unhandled exceptions in the HTTP pipeline.
-/// Translates domain and application exceptions into standardized Response payloads.
+/// Global exception handler that converts unhandled exceptions into RFC 7807 ProblemDetails responses.
 /// </summary>
-public class GlobalExceptionHandler : IExceptionHandler
+public sealed class GlobalExceptionHandler(
+    ILogger<GlobalExceptionHandler> logger,
+    IProblemDetailsService problemDetailsService) : IExceptionHandler
 {
-
-    private readonly ILogger<GlobalExceptionHandler> _logger;
-
     /// <summary>
-    /// Initializes a new instance of the <see cref="GlobalExceptionHandler"/> class.
-    /// </summary>
-    /// <param name="logger">Logger used to record unhandled exceptions.</param>
-    public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger)
-    {
-        _logger = logger;
-    }
-
-    /// <summary>
-    /// Attempts to handle unhandled exceptions and convert them into RFC 7807 responses.
+    /// Attempts to handle the current exception and serialize a standardized ProblemDetails payload.
     /// </summary>
     /// <param name="httpContext">Current HTTP context.</param>
     /// <param name="exception">The thrown exception.</param>
-    /// <param name="cancellationToken">Cancellation token for async operation.</param>
-    /// <returns><c>true</c> when the exception was handled.</returns>
+    /// <param name="cancellationToken">Cancellation token for async work.</param>
+    /// <returns><c>true</c> when the exception is handled.</returns>
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,
         CancellationToken cancellationToken)
     {
-        _logger.LogError(exception, "An unhandled exception occurred: {Message}", exception.Message);
+        logger.LogError(
+            exception,
+            "Unhandled exception for request {Method} {Path}. TraceId: {TraceId}",
+            httpContext.Request.Method,
+            httpContext.Request.Path,
+            httpContext.TraceIdentifier);
 
-        // Pattern matching to handle specific custom exceptions
-        if (exception is ValidationException validationException)
+        var problemDetails = CreateProblemDetails(httpContext, exception);
+        httpContext.Response.StatusCode = problemDetails.Status ?? StatusCodes.Status500InternalServerError;
+
+        return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {
-            var validationErrors = validationException.Errors
-                .SelectMany(kvp => kvp.Value.Select(error => $"{kvp.Key}: {error}"))
-                .ToArray();
+            HttpContext = httpContext,
+            ProblemDetails = problemDetails,
+            Exception = exception
+        });
+    }
 
-            httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await httpContext.Response.WriteAsJsonAsync(
-                Response<object>.Error(
-                    "VALIDATION_FAILED",
-                    validationErrors),
-                cancellationToken);
-
-            return true;
-        }
-        else if (exception is UnauthorizedAccessException unauthorizedAccessException)
+    /// <summary>
+    /// Creates a standardized <see cref="ProblemDetails"/> instance based on the exception type.
+    /// </summary>
+    /// <param name="httpContext">Current HTTP context.</param>
+    /// <param name="exception">Thrown exception.</param>
+    /// <returns>A properly populated problem details instance.</returns>
+    private static ProblemDetails CreateProblemDetails(HttpContext httpContext, Exception exception)
+    {
+        ProblemDetails problemDetails = exception switch
         {
-            httpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await httpContext.Response.WriteAsJsonAsync(
-                Response<object>.Error(
-                    "UNAUTHORIZED",
-                    [unauthorizedAccessException.Message]),
-                cancellationToken);
+            ValidationException validationException => CreateValidationProblemDetails(httpContext, validationException),
+            NotFoundException notFoundException => CreateProblemDetails(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Resource not found",
+                notFoundException.Message,
+                notFoundException.Code ?? "RESOURCE_NOT_FOUND"),
+            DomainException domainException => CreateProblemDetails(
+                httpContext,
+                StatusCodes.Status400BadRequest,
+                "Business rule violation",
+                domainException.Message,
+                domainException.Code ?? "DOMAIN_RULE_VIOLATION"),
+            UnauthorizedAccessException unauthorizedAccessException => CreateProblemDetails(
+                httpContext,
+                StatusCodes.Status401Unauthorized,
+                "Unauthorized",
+                unauthorizedAccessException.Message,
+                "UNAUTHORIZED"),
+            DbUpdateException dbUpdateException
+                when TryGetSqlErrorNumber(dbUpdateException.InnerException, out var sqlErrorNumber)
+                     && (sqlErrorNumber == 2601 || sqlErrorNumber == 2627) => CreateProblemDetails(
+                    httpContext,
+                    StatusCodes.Status409Conflict,
+                    "Conflict",
+                    $"Duplicate key violation detected (SQL {sqlErrorNumber}).",
+                    "DUPLICATE_KEY"),
+            _ => CreateProblemDetails(
+                httpContext,
+                StatusCodes.Status500InternalServerError,
+                "Internal Server Error",
+                "An unexpected error occurred. Please try again later.",
+                "INTERNAL_SERVER_ERROR")
+        };
 
-            return true;
-        }
-        else if (exception is DbUpdateException dbUpdateException
-                 && TryGetSqlErrorNumber(dbUpdateException.InnerException, out var sqlErrorNumber)
-                 && (sqlErrorNumber == 2601 || sqlErrorNumber == 2627))
+        problemDetails.Extensions["traceId"] = httpContext.TraceIdentifier;
+        problemDetails.Extensions["timestamp"] = DateTimeOffset.UtcNow;
+
+        return problemDetails;
+    }
+
+    /// <summary>
+    /// Creates a <see cref="ValidationProblemDetails"/> payload for FluentValidation errors.
+    /// </summary>
+    /// <param name="httpContext">Current HTTP context.</param>
+    /// <param name="exception">Validation exception containing grouped field errors.</param>
+    /// <returns>A validation-oriented problem details instance.</returns>
+    private static ValidationProblemDetails CreateValidationProblemDetails(HttpContext httpContext, ValidationException exception)
+    {
+        var problemDetails = new ValidationProblemDetails(exception.Errors)
         {
-            httpContext.Response.StatusCode = StatusCodes.Status409Conflict;
-            await httpContext.Response.WriteAsJsonAsync(
-                Response<object>.Error(
-                    "CUSTOMER_ALREADY_EXISTS",
-                    [$"Duplicate key violation detected (SQL {sqlErrorNumber})."]),
-                cancellationToken);
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Validation failure",
+            Detail = "One or more validation errors occurred.",
+            Type = "https://httpstatuses.com/400",
+            Instance = httpContext.Request.Path
+        };
 
-            return true;
-        }
+        problemDetails.Extensions["code"] = "VALIDATION_FAILED";
+        return problemDetails;
+    }
 
-        httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
-        await httpContext.Response.WriteAsJsonAsync(
-            Response<object>.Error(
-                "INTERNAL_SERVER_ERROR",
-                ["An unexpected fault happened. Try again later."]),
-            cancellationToken);
+    /// <summary>
+    /// Creates a generic <see cref="ProblemDetails"/> payload.
+    /// </summary>
+    /// <param name="httpContext">Current HTTP context.</param>
+    /// <param name="statusCode">HTTP status code.</param>
+    /// <param name="title">Short error title.</param>
+    /// <param name="detail">Detailed error message.</param>
+    /// <param name="code">Machine-readable application error code.</param>
+    /// <returns>A populated problem details instance.</returns>
+    private static ProblemDetails CreateProblemDetails(
+        HttpContext httpContext,
+        int statusCode,
+        string title,
+        string detail,
+        string code)
+    {
+        var problemDetails = new ProblemDetails
+        {
+            Status = statusCode,
+            Title = title,
+            Detail = detail,
+            Type = $"https://httpstatuses.com/{statusCode}",
+            Instance = httpContext.Request.Path
+        };
 
-        // Return true to signal that this exception has been handled and shouldn't propagate further.
-        return true;
-        
+        problemDetails.Extensions["code"] = code;
+        return problemDetails;
     }
 
     /// <summary>
@@ -134,5 +182,4 @@ public class GlobalExceptionHandler : IExceptionHandler
         errorNumber = sqlNumber;
         return true;
     }
-
 }
