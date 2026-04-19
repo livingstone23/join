@@ -162,3 +162,24 @@ PublishScripts/
 
 # Excluir todo lo de Copilot en .github
 /.github/copilot/**
+
+
+# ===================================================
+# 🧪 TESTING, COVERAGE & REPORTS
+# ===================================================
+# Raw coverage data files
+*.trx
+*.coverage
+*.coveragexml
+coverage.cobertura.xml
+[Tt]est[Rr]esults/
+**/[Tt]est[Rr]esults/
+
+# Generated HTML Reports (ReportGenerator)
+tests/Reports/
+coveragereport/
+**/coveragereport/
+
+# Coverage tool temporary files
+.sonarqube/
+.utp/
