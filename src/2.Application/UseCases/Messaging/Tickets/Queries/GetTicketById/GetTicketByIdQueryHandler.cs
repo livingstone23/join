@@ -21,7 +21,7 @@ public sealed class GetTicketByIdQueryHandler(
     {
         if (currentUserService.CompanyId == Guid.Empty)
         {
-            return Response<TicketDto>.Error("COMPANY_REQUIRED", ["The X-Company-Id header is required."]);
+            return Response<TicketDto>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
         using var connection = connectionFactory.CreateConnection();
@@ -30,6 +30,7 @@ public sealed class GetTicketByIdQueryHandler(
             SELECT
                 t.Id,
                 t.CompanyId,
+                co.Name AS CompanyName,
                 t.Code,
                 t.Name,
                 t.Description,
@@ -65,6 +66,7 @@ public sealed class GetTicketByIdQueryHandler(
                 pt.Code AS PrecedentTicketCode,
                 t.Created AS CreatedAt
             FROM Messaging.Tickets t
+            LEFT JOIN Common.Companies co ON t.CompanyId = co.Id
             INNER JOIN Messaging.TicketStatuses ts ON t.TicketStatusId = ts.Id
             INNER JOIN Messaging.TicketComplexities tc ON t.TicketComplexityId = tc.Id
             INNER JOIN Messaging.TimeUnits tu ON t.TimeUnitId = tu.Id

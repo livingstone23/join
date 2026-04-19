@@ -13,6 +13,16 @@ public record TicketListItemDto
     public Guid Id { get; init; }
 
     /// <summary>
+    /// Gets the tenant company identifier.
+    /// </summary>
+    public Guid CompanyId { get; init; }
+
+    /// <summary>
+    /// Gets the tenant company display name.
+    /// </summary>
+    public string? CompanyName { get; init; }
+
+    /// <summary>
     /// Gets the ticket code.
     /// </summary>
     public string Code { get; init; } = string.Empty;

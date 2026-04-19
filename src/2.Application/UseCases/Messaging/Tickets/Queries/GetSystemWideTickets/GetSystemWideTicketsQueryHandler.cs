@@ -10,28 +10,21 @@ using Microsoft.Extensions.Options;
 namespace JOIN.Application.UseCases.Messaging.Tickets.Queries;
 
 /// <summary>
-/// Handles paginated ticket queries using Dapper for high-performance reads.
+/// Handles paginated system-wide ticket queries using Dapper for high-performance reads.
 /// </summary>
-public sealed class GetTicketsQueryHandler(
+public sealed class GetSystemWideTicketsQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    ICurrentUserService currentUserService,
     IOptions<PaginationSettings> paginationOptions)
-    : IRequestHandler<GetTicketsQuery, Response<PagedResult<TicketListItemDto>>>
+    : IRequestHandler<GetSystemWideTicketsQuery, Response<PagedResult<TicketListItemDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
 
     /// <summary>
-    /// Retrieves a tenant-scoped paginated ticket list with optional filters.
+    /// Retrieves a system-wide paginated ticket list with optional filters across all companies.
+    /// Includes rows with logical deletion markers.
     /// </summary>
-    public async Task<Response<PagedResult<TicketListItemDto>>> Handle(GetTicketsQuery request, CancellationToken cancellationToken)
+    public async Task<Response<PagedResult<TicketListItemDto>>> Handle(GetSystemWideTicketsQuery request, CancellationToken cancellationToken)
     {
-        if (currentUserService.CompanyId == Guid.Empty)
-        {
-            return Response<PagedResult<TicketListItemDto>>.Error(
-                "COMPANY_REQUIRED",
-                ["The authenticated token must contain a valid CompanyId claim."]);
-        }
-
         var defaultPageNumber = _paginationSettings.DefaultPageNumber < 1 ? 1 : _paginationSettings.DefaultPageNumber;
         var defaultPageSize = _paginationSettings.DefaultPageSize < 1 ? 10 : _paginationSettings.DefaultPageSize;
         var maxPageSize = _paginationSettings.MaxPageSize < defaultPageSize ? defaultPageSize : _paginationSettings.MaxPageSize;
@@ -46,11 +39,10 @@ public sealed class GetTicketsQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("TenantId", currentUserService.CompanyId);
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE t.CompanyId = @TenantId AND t.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -106,6 +98,12 @@ public sealed class GetTicketsQueryHandler(
             parameters.Add("ToDate", request.ToDate.Value);
         }
 
+        if (!string.IsNullOrWhiteSpace(request.CompanyName))
+        {
+            whereBuilder.Append(" AND co.Name LIKE @CompanyName");
+            parameters.Add("CompanyName", $"%{request.CompanyName.Trim()}%");
+        }
+
         var whereClause = whereBuilder.ToString();
 
         var sql = $"""
@@ -138,11 +136,12 @@ public sealed class GetTicketsQueryHandler(
             LEFT JOIN Admin.Customers c ON t.CustomerId = c.Id
             LEFT JOIN Security.Users au ON t.AssignedToUserId = au.Id
             {whereClause}
-            ORDER BY t.Created DESC, t.Code DESC
+            ORDER BY co.Name ASC, t.Created DESC, t.Code DESC
             {GetPaginationClause(connection)};
 
             SELECT COUNT(*)
             FROM Messaging.Tickets t
+            LEFT JOIN Common.Companies co ON t.CompanyId = co.Id
             {whereClause};
             """;
 
@@ -155,7 +154,7 @@ public sealed class GetTicketsQueryHandler(
         return new Response<PagedResult<TicketListItemDto>>
         {
             IsSuccess = true,
-            Message = "Tickets retrieved successfully.",
+            Message = "System-wide tickets retrieved successfully.",
             Data = new PagedResult<TicketListItemDto>
             {
                 Items = items,

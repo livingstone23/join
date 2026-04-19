@@ -19,6 +19,11 @@ public record TicketDto
     public Guid CompanyId { get; init; }
 
     /// <summary>
+    /// Gets the tenant company display name.
+    /// </summary>
+    public string? CompanyName { get; init; }
+
+    /// <summary>
     /// Gets the human-readable code.
     /// </summary>
     public string Code { get; init; } = string.Empty;

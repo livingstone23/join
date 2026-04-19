@@ -4,6 +4,7 @@ using JOIN.Application.UseCases.Messaging.Tickets.Commands;
 using JOIN.Application.UseCases.Messaging.Tickets.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JOIN.Services.WebApi.Controllers.Messaging;
@@ -52,6 +53,55 @@ public class TicketsController(ISender sender) : ControllerBase
             isVisibleToExternals,
             fromDate,
             toDate);
+
+        var response = await _sender.Send(query, cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Retrieves a paginated system-wide list of tickets across all companies.
+    /// Access is restricted to SuperAdmin users only.
+    /// </summary>
+    [HttpGet("system-wide")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<PagedResult<TicketListItemDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetSystemWide(
+        [FromQuery] int? pageNumber = null,
+        [FromQuery] int? pageSize = null,
+        [FromQuery] string? search = null,
+        [FromQuery] Guid? ticketStatusId = null,
+        [FromQuery] Guid? ticketComplexityId = null,
+        [FromQuery] Guid? assignedToUserId = null,
+        [FromQuery] Guid? customerId = null,
+        [FromQuery] Guid? projectId = null,
+        [FromQuery] bool? isVisibleToExternals = null,
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null,
+        [FromQuery] string? companyName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new GetSystemWideTicketsQuery(
+            pageNumber,
+            pageSize,
+            search,
+            ticketStatusId,
+            ticketComplexityId,
+            assignedToUserId,
+            customerId,
+            projectId,
+            isVisibleToExternals,
+            fromDate,
+            toDate,
+            companyName);
 
         var response = await _sender.Send(query, cancellationToken);
 

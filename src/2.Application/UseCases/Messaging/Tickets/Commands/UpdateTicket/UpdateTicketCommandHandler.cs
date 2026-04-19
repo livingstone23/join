@@ -31,7 +31,7 @@ public sealed class UpdateTicketCommandHandler(
     {
         if (currentUserService.CompanyId == Guid.Empty)
         {
-            return Response<TicketDto>.Error("COMPANY_REQUIRED", ["The X-Company-Id header is required."]);
+            return Response<TicketDto>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
         if (!Guid.TryParse(currentUserService.UserId, out var currentUserId))
@@ -40,7 +40,8 @@ public sealed class UpdateTicketCommandHandler(
         }
 
         var companyRepository = _unitOfWork.GetRepository<Company>();
-        if (await companyRepository.GetAsync(currentUserService.CompanyId) is null)
+        var company = await companyRepository.GetAsync(currentUserService.CompanyId);
+        if (company is null)
         {
             return Response<TicketDto>.Error("INVALID_COMPANY", ["The provided company does not exist or is inactive."]);
         }
@@ -185,6 +186,7 @@ public sealed class UpdateTicketCommandHandler(
             {
                 Id = entity.Id,
                 CompanyId = entity.CompanyId,
+                CompanyName = company.Name,
                 Code = entity.Code,
                 Name = entity.Name,
                 Description = entity.Description,
