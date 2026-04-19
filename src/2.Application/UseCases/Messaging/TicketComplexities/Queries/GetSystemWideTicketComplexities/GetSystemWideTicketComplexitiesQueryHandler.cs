@@ -10,29 +10,23 @@ using Microsoft.Extensions.Options;
 namespace JOIN.Application.UseCases.Messaging.TicketComplexities.Queries;
 
 /// <summary>
-/// Handles paginated ticket complexity queries using Dapper for high-performance reads.
+/// Handles high-performance system-wide ticket complexity queries for SuperAdmin users.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
 /// <param name="paginationOptions">Configurable pagination defaults for the ticket complexity listing endpoint.</param>
-public sealed class GetTicketComplexitiesQueryHandler(
+public sealed class GetSystemWideTicketComplexitiesQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions,
-    ICurrentUserService currentUserService)
-    : IRequestHandler<GetTicketComplexitiesQuery, Response<PagedResult<TicketComplexityDto>>>
+    IOptions<PaginationSettings> paginationOptions)
+    : IRequestHandler<GetSystemWideTicketComplexitiesQuery, Response<PagedResult<TicketComplexityDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
-    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     /// <summary>
-    /// Retrieves a paginated list of ticket complexities with optional filters by name and active status.
+    /// Retrieves a paginated list of ticket complexities across all companies with optional filters.
+    /// Includes logically deleted rows.
     /// </summary>
-    public async Task<Response<PagedResult<TicketComplexityDto>>> Handle(GetTicketComplexitiesQuery request, CancellationToken cancellationToken)
+    public async Task<Response<PagedResult<TicketComplexityDto>>> Handle(GetSystemWideTicketComplexitiesQuery request, CancellationToken cancellationToken)
     {
-        if (_currentUserService.CompanyId == Guid.Empty)
-        {
-            return Response<PagedResult<TicketComplexityDto>>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
-        }
-
         var defaultPageNumber = _paginationSettings.DefaultPageNumber < 1 ? 1 : _paginationSettings.DefaultPageNumber;
         var defaultPageSize = _paginationSettings.DefaultPageSize < 1 ? 10 : _paginationSettings.DefaultPageSize;
         var maxPageSize = _paginationSettings.MaxPageSize < defaultPageSize ? defaultPageSize : _paginationSettings.MaxPageSize;
@@ -47,11 +41,10 @@ public sealed class GetTicketComplexitiesQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("TenantId", _currentUserService.CompanyId);
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE tc.CompanyId = @TenantId AND tc.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
@@ -63,6 +56,12 @@ public sealed class GetTicketComplexitiesQueryHandler(
         {
             whereBuilder.Append(" AND tc.IsActive = @IsActive");
             parameters.Add("IsActive", request.IsActive.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.CompanyName))
+        {
+            whereBuilder.Append(" AND c.Name LIKE @CompanyName");
+            parameters.Add("CompanyName", $"%{request.CompanyName.Trim()}%");
         }
 
         var whereClause = whereBuilder.ToString();
@@ -82,11 +81,12 @@ public sealed class GetTicketComplexitiesQueryHandler(
             FROM Messaging.TicketComplexities tc
             LEFT JOIN Common.Companies c ON c.Id = tc.CompanyId
             {whereClause}
-            ORDER BY tc.Created DESC, tc.Name ASC
+            ORDER BY c.Name ASC, tc.Created DESC, tc.Name ASC
             {GetPaginationClause(connection)};
 
             SELECT COUNT(*)
             FROM Messaging.TicketComplexities tc
+            LEFT JOIN Common.Companies c ON c.Id = tc.CompanyId
             {whereClause};
             """;
 
@@ -99,7 +99,7 @@ public sealed class GetTicketComplexitiesQueryHandler(
         return new Response<PagedResult<TicketComplexityDto>>
         {
             IsSuccess = true,
-            Message = "Ticket complexities retrieved successfully.",
+            Message = "System-wide ticket complexities retrieved successfully.",
             Data = new PagedResult<TicketComplexityDto>
             {
                 Items = items,

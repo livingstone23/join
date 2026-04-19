@@ -29,6 +29,8 @@ public sealed class GetTicketComplexityByIdQueryHandler(ISqlConnectionFactory co
         const string sql = """
             SELECT
                 tc.Id,
+                tc.CompanyId,
+                c.Name AS CompanyName,
                 tc.Name,
                 tc.Description,
                 tc.Code,
@@ -37,6 +39,7 @@ public sealed class GetTicketComplexityByIdQueryHandler(ISqlConnectionFactory co
                 tc.IsActive,
                 tc.Created AS CreatedAt
             FROM Messaging.TicketComplexities tc
+            LEFT JOIN Common.Companies c ON c.Id = tc.CompanyId
             WHERE tc.Id = @Id
               AND tc.CompanyId = @TenantId
               AND tc.GcRecord = 0;

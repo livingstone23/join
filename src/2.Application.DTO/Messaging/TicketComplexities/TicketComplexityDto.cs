@@ -13,6 +13,16 @@ public record TicketComplexityDto
     public Guid Id { get; init; }
 
     /// <summary>
+    /// Gets the tenant company identifier.
+    /// </summary>
+    public Guid CompanyId { get; init; }
+
+    /// <summary>
+    /// Gets the tenant company display name.
+    /// </summary>
+    public string? CompanyName { get; init; }
+
+    /// <summary>
     /// Gets the display name of the ticket complexity.
     /// </summary>
     public string Name { get; init; } = string.Empty;

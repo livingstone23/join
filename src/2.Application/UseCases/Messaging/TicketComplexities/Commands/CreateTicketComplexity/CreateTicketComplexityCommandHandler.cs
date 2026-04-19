@@ -86,6 +86,8 @@ public sealed class CreateTicketComplexityCommandHandler(IUnitOfWork unitOfWork,
             Data = new TicketComplexityDto
             {
                 Id = entity.Id,
+                CompanyId = entity.CompanyId,
+                CompanyName = entity.Company?.Name,
                 Name = entity.Name,
                 Description = entity.Description,
                 Code = entity.Code,

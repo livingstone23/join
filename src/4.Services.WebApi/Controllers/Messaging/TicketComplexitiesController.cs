@@ -4,6 +4,7 @@ using JOIN.Application.UseCases.Messaging.TicketComplexities.Commands;
 using JOIN.Application.UseCases.Messaging.TicketComplexities.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 
@@ -39,6 +40,36 @@ public class TicketComplexitiesController(ISender sender) : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var response = await _sender.Send(new GetTicketComplexitiesQuery(pageNumber, pageSize, name, isActive), cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Retrieves a paginated system-wide list of ticket complexities across all companies.
+    /// Access is restricted to SuperAdmin users only.
+    /// </summary>
+    [HttpGet("system-wide")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<PagedResult<TicketComplexityDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetSystemWide(
+        [FromQuery] int? pageNumber = null,
+        [FromQuery] int? pageSize = null,
+        [FromQuery] string? name = null,
+        [FromQuery] bool? isActive = null,
+        [FromQuery] string? companyName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(
+            new GetSystemWideTicketComplexitiesQuery(pageNumber, pageSize, name, isActive, companyName),
+            cancellationToken);
 
         if (!response.IsSuccess)
         {
