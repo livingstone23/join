@@ -36,8 +36,8 @@ public class CurrentUserService : ICurrentUserService
 
     /// <summary>
     /// Resolves the CompanyId (Tenant) for the current request.
-    /// It prioritizes the 'CompanyId' claim from the authenticated JWT and only falls back
-    /// to the 'X-Company-Id' header for local development or testing scenarios.
+    /// For authenticated requests, the value must come from the JWT claim.
+    /// The header fallback remains available only for unauthenticated local development scenarios.
     /// </summary>
     public Guid CompanyId
     {
@@ -46,14 +46,21 @@ public class CurrentUserService : ICurrentUserService
             var httpContext = _httpContextAccessor.HttpContext;
             if (httpContext == null) return Guid.Empty;
 
-            // 1. Try to extract from JWT Claims (Standard for authenticated users)
+            var isAuthenticated = httpContext.User?.Identity?.IsAuthenticated ?? false;
+
+            // 1. Authenticated requests must resolve the tenant from JWT claims.
             var companyClaim = httpContext.User?.FindFirstValue("CompanyId");
             if (Guid.TryParse(companyClaim, out var claimCompanyId))
             {
                 return claimCompanyId;
             }
 
-            // 2. Optional fallback for development/testing tools
+            if (isAuthenticated)
+            {
+                return Guid.Empty;
+            }
+
+            // 2. Optional fallback for local development/testing without authentication.
             var headerValue = httpContext.Request.Headers["X-Company-Id"].FirstOrDefault();
             if (!string.IsNullOrEmpty(headerValue) && Guid.TryParse(headerValue, out var headerCompanyId))
             {

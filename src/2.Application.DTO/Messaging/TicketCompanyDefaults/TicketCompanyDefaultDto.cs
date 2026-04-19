@@ -18,6 +18,21 @@ public record TicketCompanyDefaultDto
     public Guid CompanyId { get; init; }
 
     /// <summary>
+    /// Gets the tenant company display name.
+    /// </summary>
+    public string? CompanyName { get; init; }
+
+    /// <summary>
+    /// Gets the logical delete marker value.
+    /// </summary>
+    public int GcRecord { get; init; }
+
+    /// <summary>
+    /// Gets whether the configuration has been logically deleted.
+    /// </summary>
+    public bool IsDeleted => GcRecord != 0;
+
+    /// <summary>
     /// Gets the ticket code prefix.
     /// </summary>
     public string StartCode { get; init; } = string.Empty;

@@ -19,9 +19,9 @@ public sealed class GetTicketCompanyDefaultsQueryHandler(
     /// </summary>
     public async Task<Response<IReadOnlyCollection<TicketCompanyDefaultDto>>> Handle(GetTicketCompanyDefaultsQuery request, CancellationToken cancellationToken)
     {
-        if (currentUserService.CompanyId == Guid.Empty)
+        if (!currentUserService.IsAuthenticated || currentUserService.CompanyId == Guid.Empty)
         {
-            return Response<IReadOnlyCollection<TicketCompanyDefaultDto>>.Error("COMPANY_REQUIRED", ["The X-Company-Id header is required."]);
+            return Response<IReadOnlyCollection<TicketCompanyDefaultDto>>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
         using var connection = connectionFactory.CreateConnection();

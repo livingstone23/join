@@ -4,9 +4,14 @@ using JOIN.Application.UseCases.Messaging.TicketCompanyDefaults.Commands;
 using JOIN.Application.UseCases.Messaging.TicketCompanyDefaults.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+
+
 namespace JOIN.Services.WebApi.Controllers.Messaging;
+
+
 
 /// <summary>
 /// Exposes REST endpoints for tenant ticket default configuration management.
@@ -17,8 +22,9 @@ namespace JOIN.Services.WebApi.Controllers.Messaging;
 [PermissionResource("TicketCompanyDefaults")]
 public class TicketCompanyDefaultsController(ISender sender) : ControllerBase
 {
-    private readonly ISender _sender = sender ?? throw new ArgumentNullException(nameof(sender));
 
+    private readonly ISender _sender = sender ?? throw new ArgumentNullException(nameof(sender));
+    
     /// <summary>
     /// Retrieves the active tenant configuration list.
     /// </summary>
@@ -32,11 +38,72 @@ public class TicketCompanyDefaultsController(ISender sender) : ControllerBase
 
         if (!response.IsSuccess)
         {
+            if (response.Message == "COMPANY_REQUIRED")
+            {
+                return Unauthorized(response);
+            }
+
             return BadRequest(response);
         }
 
         return Ok(response);
     }
+
+    /// <summary>
+    /// Retrieves a paginated system-wide list of ticket default configurations across all companies.
+    /// Access is restricted to SuperAdmin users only.
+    /// </summary>
+    [HttpGet("system-wide")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<PagedResult<TicketCompanyDefaultDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetSystemWide(
+        [FromQuery] int? pageNumber = null,
+        [FromQuery] int? pageSize = null,
+        [FromQuery] string? companyName = null,
+        [FromQuery] string? startCode = null,
+        [FromQuery] string? ticketStatusDefaultName = null,
+        [FromQuery] string? ticketComplexityDefaultName = null,
+        [FromQuery] string? complexityName = null,
+        [FromQuery] string? timeUnitDefaultName = null,
+        [FromQuery] string? areaName = null,
+        [FromQuery] string? projectName = null,
+        [FromQuery] string? channelName = null,
+        [FromQuery(Name = "channetname")] string? channetname = null,
+        CancellationToken cancellationToken = default)
+    {
+        var effectiveComplexityName = string.IsNullOrWhiteSpace(ticketComplexityDefaultName)
+            ? complexityName
+            : ticketComplexityDefaultName;
+
+        var effectiveChannelName = string.IsNullOrWhiteSpace(channelName)
+            ? channetname
+            : channelName;
+
+        var response = await _sender.Send(
+            new GetSystemWideTicketCompanyDefaultsQuery(
+                pageNumber,
+                pageSize,
+                companyName,
+                startCode,
+                ticketStatusDefaultName,
+                effectiveComplexityName,
+                timeUnitDefaultName,
+                areaName,
+                projectName,
+                effectiveChannelName),
+            cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
 
     /// <summary>
     /// Retrieves a single tenant configuration by identifier.
@@ -51,6 +118,11 @@ public class TicketCompanyDefaultsController(ISender sender) : ControllerBase
 
         if (!response.IsSuccess)
         {
+            if (response.Message == "COMPANY_REQUIRED")
+            {
+                return Unauthorized(response);
+            }
+
             if (response.Message == "TICKET_COMPANY_DEFAULT_NOT_FOUND")
             {
                 return NotFound(response);
@@ -89,6 +161,11 @@ public class TicketCompanyDefaultsController(ISender sender) : ControllerBase
 
         if (!response.IsSuccess)
         {
+            if (response.Message == "COMPANY_REQUIRED")
+            {
+                return Unauthorized(response);
+            }
+
             if (response.Message == "CONFIG_ALREADY_EXISTS")
             {
                 return Conflict(response);
@@ -128,6 +205,11 @@ public class TicketCompanyDefaultsController(ISender sender) : ControllerBase
 
         if (!response.IsSuccess)
         {
+            if (response.Message == "COMPANY_REQUIRED")
+            {
+                return Unauthorized(response);
+            }
+
             if (response.Message == "TICKET_COMPANY_DEFAULT_NOT_FOUND")
             {
                 return NotFound(response);
@@ -153,6 +235,11 @@ public class TicketCompanyDefaultsController(ISender sender) : ControllerBase
 
         if (!response.IsSuccess)
         {
+            if (response.Message == "COMPANY_REQUIRED")
+            {
+                return Unauthorized(response);
+            }
+
             if (response.Message == "TICKET_COMPANY_DEFAULT_NOT_FOUND")
             {
                 return NotFound(response);
@@ -163,4 +250,5 @@ public class TicketCompanyDefaultsController(ISender sender) : ControllerBase
 
         return Ok(response);
     }
+
 }

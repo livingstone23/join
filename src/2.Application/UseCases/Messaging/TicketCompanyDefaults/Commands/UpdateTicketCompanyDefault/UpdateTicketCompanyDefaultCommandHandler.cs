@@ -27,9 +27,9 @@ public sealed class UpdateTicketCompanyDefaultCommandHandler(
     /// </summary>
     public async Task<Response<TicketCompanyDefaultDto>> Handle(UpdateTicketCompanyDefaultCommand request, CancellationToken cancellationToken)
     {
-        if (currentUserService.CompanyId == Guid.Empty)
+        if (!currentUserService.IsAuthenticated || currentUserService.CompanyId == Guid.Empty)
         {
-            return Response<TicketCompanyDefaultDto>.Error("COMPANY_REQUIRED", ["The X-Company-Id header is required."]);
+            return Response<TicketCompanyDefaultDto>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
         var repository = _unitOfWork.GetRepository<TicketCompanyDefault>();

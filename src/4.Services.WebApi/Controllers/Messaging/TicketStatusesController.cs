@@ -25,29 +25,6 @@ public class TicketStatusesController(ISender sender) : ControllerBase
 {
     private readonly ISender _sender = sender ?? throw new ArgumentNullException(nameof(sender));
 
-    /// <summary>
-    /// Retrieves a paginated list of ticket statuses with optional filters by name and active status.
-    /// </summary>
-    [HttpGet]
-    [ProducesResponseType(typeof(Response<PagedResult<TicketStatusDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetAll(
-        [FromQuery] int? pageNumber = null,
-        [FromQuery] int? pageSize = null,
-        [FromQuery] string? name = null,
-        [FromQuery] bool? isActive = null,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await _sender.Send(new GetTicketStatusesQuery(pageNumber, pageSize, name, isActive), cancellationToken);
-
-        if (!response.IsSuccess)
-        {
-            return BadRequest(response);
-        }
-
-        return Ok(response);
-    }
 
     /// <summary>
     /// Retrieves a paginated system-wide list of ticket statuses across all companies.
@@ -83,6 +60,31 @@ public class TicketStatusesController(ISender sender) : ControllerBase
                 companyName,
                 code),
             cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
+
+    /// <summary>
+    /// Retrieves a paginated list of ticket statuses with optional filters by name and active status.
+    /// </summary>
+    [HttpGet]
+    [ProducesResponseType(typeof(Response<PagedResult<TicketStatusDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] int? pageNumber = null,
+        [FromQuery] int? pageSize = null,
+        [FromQuery] string? name = null,
+        [FromQuery] bool? isActive = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new GetTicketStatusesQuery(pageNumber, pageSize, name, isActive), cancellationToken);
 
         if (!response.IsSuccess)
         {
