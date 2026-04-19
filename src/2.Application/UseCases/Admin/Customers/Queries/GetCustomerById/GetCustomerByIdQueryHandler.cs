@@ -30,7 +30,13 @@ public class GetCustomerByIdQueryHandler(
     /// </summary>
     public async Task<Response<CustomerDto>> Handle(GetCustomerByIdQuery request, CancellationToken cancellationToken)
     {
-        
+        if (currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<CustomerDto>.Error(
+                "COMPANY_REQUIRED",
+                ["The X-Company-Id header is required."]);
+        }
+
         var response = new Response<CustomerDto>();
 
         // 1. Create and open the database connection
