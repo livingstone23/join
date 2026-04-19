@@ -29,11 +29,14 @@ public sealed class GetTimeUnitByIdQueryHandler(ISqlConnectionFactory connection
         const string sql = """
             SELECT
                 tu.Id,
+                tu.CompanyId,
+                c.Name AS CompanyName,
                 tu.Name,
                 tu.Code,
                 tu.IsActive,
                 tu.Created AS CreatedAt
             FROM Messaging.TimeUnits tu
+            LEFT JOIN Common.Companies c ON c.Id = tu.CompanyId
             WHERE tu.Id = @Id
               AND tu.CompanyId = @TenantId
               AND tu.GcRecord = 0;

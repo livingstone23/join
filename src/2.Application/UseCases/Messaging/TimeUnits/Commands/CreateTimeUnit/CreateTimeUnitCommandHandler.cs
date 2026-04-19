@@ -73,6 +73,8 @@ public sealed class CreateTimeUnitCommandHandler(IUnitOfWork unitOfWork, ICurren
             Data = new TimeUnitDto
             {
                 Id = entity.Id,
+                CompanyId = entity.CompanyId,
+                CompanyName = entity.Company?.Name,
                 Name = entity.Name,
                 Code = entity.Code,
                 IsActive = entity.IsActive,

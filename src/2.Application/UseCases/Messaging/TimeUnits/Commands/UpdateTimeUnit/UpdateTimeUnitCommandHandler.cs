@@ -70,6 +70,8 @@ public sealed class UpdateTimeUnitCommandHandler(IUnitOfWork unitOfWork)
             Data = new TimeUnitDto
             {
                 Id = entity.Id,
+                CompanyId = entity.CompanyId,
+                CompanyName = entity.Company?.Name,
                 Name = entity.Name,
                 Code = entity.Code,
                 IsActive = entity.IsActive,

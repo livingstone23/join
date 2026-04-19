@@ -10,29 +10,23 @@ using Microsoft.Extensions.Options;
 namespace JOIN.Application.UseCases.Messaging.TimeUnits.Queries;
 
 /// <summary>
-/// Handles paginated time unit queries using Dapper for high-performance reads.
+/// Handles high-performance system-wide time unit queries for SuperAdmin users.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
 /// <param name="paginationOptions">Configurable pagination defaults for the time unit listing endpoint.</param>
-public sealed class GetTimeUnitsQueryHandler(
+public sealed class GetSystemWideTimeUnitsQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions,
-    ICurrentUserService currentUserService)
-    : IRequestHandler<GetTimeUnitsQuery, Response<PagedResult<TimeUnitDto>>>
+    IOptions<PaginationSettings> paginationOptions)
+    : IRequestHandler<GetSystemWideTimeUnitsQuery, Response<PagedResult<TimeUnitDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
-    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     /// <summary>
-    /// Retrieves a paginated list of time units with optional filters by name and active status.
+    /// Retrieves a paginated list of time units across all companies with optional filters.
+    /// Includes logically deleted rows.
     /// </summary>
-    public async Task<Response<PagedResult<TimeUnitDto>>> Handle(GetTimeUnitsQuery request, CancellationToken cancellationToken)
+    public async Task<Response<PagedResult<TimeUnitDto>>> Handle(GetSystemWideTimeUnitsQuery request, CancellationToken cancellationToken)
     {
-        if (_currentUserService.CompanyId == Guid.Empty)
-        {
-            return Response<PagedResult<TimeUnitDto>>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
-        }
-
         var defaultPageNumber = _paginationSettings.DefaultPageNumber < 1 ? 1 : _paginationSettings.DefaultPageNumber;
         var defaultPageSize = _paginationSettings.DefaultPageSize < 1 ? 10 : _paginationSettings.DefaultPageSize;
         var maxPageSize = _paginationSettings.MaxPageSize < defaultPageSize ? defaultPageSize : _paginationSettings.MaxPageSize;
@@ -47,11 +41,10 @@ public sealed class GetTimeUnitsQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("TenantId", _currentUserService.CompanyId);
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE tu.CompanyId = @TenantId AND tu.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
@@ -63,6 +56,12 @@ public sealed class GetTimeUnitsQueryHandler(
         {
             whereBuilder.Append(" AND tu.IsActive = @IsActive");
             parameters.Add("IsActive", request.IsActive.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.CompanyName))
+        {
+            whereBuilder.Append(" AND c.Name LIKE @CompanyName");
+            parameters.Add("CompanyName", $"%{request.CompanyName.Trim()}%");
         }
 
         var whereClause = whereBuilder.ToString();
@@ -79,11 +78,12 @@ public sealed class GetTimeUnitsQueryHandler(
             FROM Messaging.TimeUnits tu
             LEFT JOIN Common.Companies c ON c.Id = tu.CompanyId
             {whereClause}
-            ORDER BY tu.Created DESC, tu.Name ASC
+            ORDER BY c.Name ASC, tu.Created DESC, tu.Name ASC
             {GetPaginationClause(connection)};
 
             SELECT COUNT(*)
             FROM Messaging.TimeUnits tu
+            LEFT JOIN Common.Companies c ON c.Id = tu.CompanyId
             {whereClause};
             """;
 
@@ -96,7 +96,7 @@ public sealed class GetTimeUnitsQueryHandler(
         return new Response<PagedResult<TimeUnitDto>>
         {
             IsSuccess = true,
-            Message = "Time units retrieved successfully.",
+            Message = "System-wide time units retrieved successfully.",
             Data = new PagedResult<TimeUnitDto>
             {
                 Items = items,

@@ -13,6 +13,16 @@ public record TimeUnitDto
     public Guid Id { get; init; }
 
     /// <summary>
+    /// Gets the tenant company identifier.
+    /// </summary>
+    public Guid CompanyId { get; init; }
+
+    /// <summary>
+    /// Gets the tenant company display name.
+    /// </summary>
+    public string? CompanyName { get; init; }
+
+    /// <summary>
     /// Gets the display name of the time unit.
     /// </summary>
     public string Name { get; init; } = string.Empty;
