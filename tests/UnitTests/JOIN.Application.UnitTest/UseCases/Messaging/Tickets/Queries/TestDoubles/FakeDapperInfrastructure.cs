@@ -11,6 +11,7 @@ namespace JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Queries.TestDoubl
 internal class FakeDbConnection : DbConnection
 {
     private readonly List<FakeResultSet> _configuredResultSets = [];
+    private readonly Queue<object?> _scalarResults = new();
     private ConnectionState _state = ConnectionState.Open;
 
     /// <summary>
@@ -30,6 +31,19 @@ internal class FakeDbConnection : DbConnection
     {
         _configuredResultSets.Clear();
         _configuredResultSets.AddRange(resultSets);
+    }
+
+    /// <summary>
+    /// Configures the scalar values that should be returned by subsequent scalar executions.
+    /// </summary>
+    public void SetScalarResults(params object?[] values)
+    {
+        _scalarResults.Clear();
+
+        foreach (var value in values)
+        {
+            _scalarResults.Enqueue(value);
+        }
     }
 
     /// <inheritdoc />
@@ -85,6 +99,11 @@ internal class FakeDbConnection : DbConnection
         {
             CapturedParameters[parameter.ParameterName.TrimStart('@')] = parameter.Value;
         }
+    }
+
+    internal object? DequeueScalarResult()
+    {
+        return _scalarResults.Count > 0 ? _scalarResults.Dequeue() : null;
     }
 }
 
@@ -187,8 +206,8 @@ internal sealed class FakeDbCommand(FakeDbConnection connection, IReadOnlyList<F
     /// <inheritdoc />
     public override object? ExecuteScalar()
     {
-        connection.CaptureExecution(CommandText, _parameters);
-        return null;
+        connection.CaptureExecution(CommandText ?? string.Empty, _parameters);
+        return connection.DequeueScalarResult();
     }
 
     /// <inheritdoc />
