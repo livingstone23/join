@@ -436,6 +436,444 @@ public sealed class UpdateTicketCommandHandlerTests
     }
 
     /// <summary>
+    /// Verifies the error path when the company does not exist in the repository.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenCompanyNotFound_ShouldReturnInvalidCompanyError()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var request = CreateValidCommand(id: _fixture.Create<Guid>());
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock
+            .Setup(x => x.GetAsync(companyId))
+            .ReturnsAsync((Company?)null);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("INVALID_COMPANY");
+        context.MapperMock.Verify(x => x.ApplyUpdate(It.IsAny<UpdateTicketCommand>(), It.IsAny<Ticket>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Verifies the error path when the ticket is not found in the repository (returns null).
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTicketNotFound_ShouldReturnTicketNotFoundError()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var request = CreateValidCommand(id: _fixture.Create<Guid>());
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock
+            .Setup(x => x.GetAsync(companyId))
+            .ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+
+        context.TicketRepositoryMock
+            .Setup(x => x.GetAsync(request.Id))
+            .ReturnsAsync((Ticket?)null);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("TICKET_NOT_FOUND");
+        context.MapperMock.Verify(x => x.ApplyUpdate(It.IsAny<UpdateTicketCommand>(), It.IsAny<Ticket>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Verifies the guard when the ticket status does not exist in the repository.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTicketStatusNotFound_ShouldReturnInvalidStatusError()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var request = CreateValidCommand(id: _fixture.Create<Guid>());
+        var entity = CreateExistingTicket(companyId, currentUserId);
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync((TicketStatus?)null);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("INVALID_TICKET_STATUS");
+    }
+
+    /// <summary>
+    /// Verifies the guard when the ticket complexity does not exist in the repository.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTicketComplexityNotFound_ShouldReturnInvalidComplexityError()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var request = CreateValidCommand(id: _fixture.Create<Guid>());
+        var entity = CreateExistingTicket(companyId, currentUserId);
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync((TicketComplexity?)null);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("INVALID_TICKET_COMPLEXITY");
+    }
+
+    /// <summary>
+    /// Verifies the guard when the time unit does not exist in the repository.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTimeUnitNotFound_ShouldReturnInvalidTimeUnitError()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var request = CreateValidCommand(id: _fixture.Create<Guid>());
+        var entity = CreateExistingTicket(companyId, currentUserId);
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync((TimeUnit?)null);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("INVALID_TIME_UNIT");
+    }
+
+    /// <summary>
+    /// Verifies the guard when the communication channel does not exist in the repository.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenChannelNotFound_ShouldReturnInvalidChannelError()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var request = CreateValidCommand(id: _fixture.Create<Guid>());
+        var entity = CreateExistingTicket(companyId, currentUserId);
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
+        context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync((CommunicationChannel?)null);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("INVALID_CHANNEL");
+    }
+
+    /// <summary>
+    /// Verifies the guard when the optional customer does not exist in the repository.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenCustomerNotFound_ShouldReturnInvalidCustomerError()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var customerId = _fixture.Create<Guid>();
+
+        var request = _fixture.Build<UpdateTicketCommand>()
+            .With(x => x.Id, _fixture.Create<Guid>())
+            .With(x => x.Name, "Ticket")
+            .With(x => x.Description, "Desc")
+            .With(x => x.EstimatedTime, 8m)
+            .With(x => x.ConsumedTime, 1m)
+            .With(x => x.EffortPoints, 3m)
+            .With(x => x.TicketStatusId, _fixture.Create<Guid>())
+            .With(x => x.TicketComplexityId, _fixture.Create<Guid>())
+            .With(x => x.TimeUnitId, _fixture.Create<Guid>())
+            .With(x => x.ChannelId, _fixture.Create<Guid>())
+            .With(x => x.CustomerId, customerId)
+            .Without(x => x.ProjectId)
+            .Without(x => x.AreaId)
+            .Without(x => x.AssignedToUserId)
+            .Without(x => x.PrecedentTicketId)
+            .Create();
+
+        var entity = CreateExistingTicket(companyId, currentUserId);
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
+        context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
+        context.CustomerRepositoryMock.Setup(x => x.GetAsync(customerId)).ReturnsAsync((Customer?)null);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("INVALID_CUSTOMER");
+    }
+
+    /// <summary>
+    /// Verifies the guard when the optional project does not exist in the repository.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenProjectNotFound_ShouldReturnInvalidProjectError()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var projectId = _fixture.Create<Guid>();
+
+        var request = _fixture.Build<UpdateTicketCommand>()
+            .With(x => x.Id, _fixture.Create<Guid>())
+            .With(x => x.Name, "Ticket")
+            .With(x => x.Description, "Desc")
+            .With(x => x.EstimatedTime, 8m)
+            .With(x => x.ConsumedTime, 1m)
+            .With(x => x.EffortPoints, 3m)
+            .With(x => x.TicketStatusId, _fixture.Create<Guid>())
+            .With(x => x.TicketComplexityId, _fixture.Create<Guid>())
+            .With(x => x.TimeUnitId, _fixture.Create<Guid>())
+            .With(x => x.ChannelId, _fixture.Create<Guid>())
+            .With(x => x.ProjectId, projectId)
+            .Without(x => x.CustomerId)
+            .Without(x => x.AreaId)
+            .Without(x => x.AssignedToUserId)
+            .Without(x => x.PrecedentTicketId)
+            .Create();
+
+        var entity = CreateExistingTicket(companyId, currentUserId);
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
+        context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
+        context.CustomerRepositoryMock.Setup(x => x.GetAsync(It.IsAny<Guid>())).ReturnsAsync((Customer?)null);
+        context.ProjectRepositoryMock.Setup(x => x.GetAsync(projectId)).ReturnsAsync((Project?)null);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("INVALID_PROJECT");
+    }
+
+    /// <summary>
+    /// Verifies the guard when the optional area does not exist in the repository.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenAreaNotFound_ShouldReturnInvalidAreaError()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var areaId = _fixture.Create<Guid>();
+
+        var request = _fixture.Build<UpdateTicketCommand>()
+            .With(x => x.Id, _fixture.Create<Guid>())
+            .With(x => x.Name, "Ticket")
+            .With(x => x.Description, "Desc")
+            .With(x => x.EstimatedTime, 8m)
+            .With(x => x.ConsumedTime, 1m)
+            .With(x => x.EffortPoints, 3m)
+            .With(x => x.TicketStatusId, _fixture.Create<Guid>())
+            .With(x => x.TicketComplexityId, _fixture.Create<Guid>())
+            .With(x => x.TimeUnitId, _fixture.Create<Guid>())
+            .With(x => x.ChannelId, _fixture.Create<Guid>())
+            .With(x => x.AreaId, areaId)
+            .Without(x => x.CustomerId)
+            .Without(x => x.ProjectId)
+            .Without(x => x.AssignedToUserId)
+            .Without(x => x.PrecedentTicketId)
+            .Create();
+
+        var entity = CreateExistingTicket(companyId, currentUserId);
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
+        context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
+        context.AreaRepositoryMock.Setup(x => x.GetAsync(areaId)).ReturnsAsync((Area?)null);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("INVALID_AREA");
+    }
+
+    /// <summary>
+    /// Verifies the guard when the optional assigned user does not exist in the repository.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenAssignedUserNotFound_ShouldReturnInvalidAssignedUserError()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var assignedUserId = _fixture.Create<Guid>();
+
+        var request = CreateValidCommand(id: _fixture.Create<Guid>(), assignedToUserId: assignedUserId);
+        var entity = CreateExistingTicket(companyId, currentUserId);
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
+        context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
+        context.UserRepositoryMock.Setup(x => x.GetAsync(assignedUserId)).ReturnsAsync((ApplicationUser?)null);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("INVALID_ASSIGNED_USER");
+    }
+
+    /// <summary>
+    /// Verifies the guard when a non-self precedent ticket does not exist in the repository.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenPrecedentTicketNotFound_ShouldReturnInvalidPrecedentTicketError()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var ticketId = _fixture.Create<Guid>();
+        var precedentId = _fixture.Create<Guid>();
+
+        var request = CreateValidCommand(id: ticketId, precedentTicketId: precedentId);
+        var entity = CreateExistingTicket(companyId, currentUserId);
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(ticketId)).ReturnsAsync(entity);
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(precedentId)).ReturnsAsync((Ticket?)null);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
+        context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("INVALID_PRECEDENT_TICKET");
+    }
+
+    /// <summary>
+    /// Verifies that only a StatusChange log is added when only the status changes.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenOnlyStatusChanges_ShouldAddOnlyStatusChangeLog()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var originalStatusId = _fixture.Create<Guid>();
+        var newStatusId = _fixture.Create<Guid>();
+
+        var request = CreateValidCommand(
+            id: _fixture.Create<Guid>(),
+            ticketStatusId: newStatusId,
+            assignedToUserId: null);
+
+        var entity = CreateExistingTicket(
+            companyId: companyId,
+            createdByUserId: currentUserId,
+            originalStatusId: originalStatusId,
+            originalAssignedToUserId: null);
+
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(newStatusId)).ReturnsAsync(new TicketStatus { Name = "Closed" });
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
+        context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
+        context.TicketRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Ticket>())).ReturnsAsync(true);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        context.UserRepositoryMock.Setup(x => x.GetAsync(currentUserId)).ReturnsAsync(new ApplicationUser { FirstName = "Ana", LastName = "Torres" });
+        context.MapperMock.Setup(x => x.ApplyUpdate(request, entity)).Callback(() => ApplyRequestToTicket(request, entity));
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        entity.TicketLogs.Should().ContainSingle(x => x.LogType == LogType.StatusChange);
+        entity.TicketLogs.Should().NotContain(x => x.LogType == LogType.Reassignment);
+    }
+
+    /// <summary>
+    /// Verifies that only a Reassignment log is added when only the assigned user changes.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenOnlyAssignmentChanges_ShouldAddOnlyReassignmentLog()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var originalAssignedUserId = _fixture.Create<Guid>();
+        var newAssignedUserId = _fixture.Create<Guid>();
+        var statusId = _fixture.Create<Guid>();
+
+        var request = CreateValidCommand(
+            id: _fixture.Create<Guid>(),
+            ticketStatusId: statusId,
+            assignedToUserId: newAssignedUserId);
+
+        var entity = CreateExistingTicket(
+            companyId: companyId,
+            createdByUserId: currentUserId,
+            originalStatusId: statusId,
+            originalAssignedToUserId: originalAssignedUserId);
+
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(statusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
+        context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
+        context.UserRepositoryMock.Setup(x => x.GetAsync(newAssignedUserId)).ReturnsAsync(new ApplicationUser { FirstName = "Luis", LastName = "Gomez" });
+        context.UserCompanyRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(new[]
+        {
+            new UserCompany { CompanyId = companyId, UserId = newAssignedUserId, IsDefault = true }
+        });
+        context.TicketRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Ticket>())).ReturnsAsync(true);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        context.UserRepositoryMock.Setup(x => x.GetAsync(currentUserId)).ReturnsAsync(new ApplicationUser { FirstName = "Ana", LastName = "Torres" });
+        context.MapperMock.Setup(x => x.ApplyUpdate(request, entity)).Callback(() => ApplyRequestToTicket(request, entity));
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        entity.TicketLogs.Should().ContainSingle(x => x.LogType == LogType.Reassignment);
+        entity.TicketLogs.Should().NotContain(x => x.LogType == LogType.StatusChange);
+    }
+
+    /// <summary>
     /// Creates a valid and controlled command for reuse across multiple tests.
     /// The method keeps the setup explicit so each test can focus on the branch it wants to validate.
     /// </summary>

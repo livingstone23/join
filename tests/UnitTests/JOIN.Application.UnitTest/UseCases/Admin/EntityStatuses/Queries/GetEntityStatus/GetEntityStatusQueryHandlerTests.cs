@@ -7,7 +7,11 @@ using JOIN.Application.UseCases.Admin.EntityStatuses.Queries;
 using Microsoft.Extensions.Options;
 using Moq;
 
+
+
 namespace JOIN.Application.UnitTest.UseCases.Admin.EntityStatuses.Queries.GetEntityStatus;
+
+
 
 /// <summary>
 /// Contains the unit tests for the entity status listing query.
@@ -16,7 +20,12 @@ namespace JOIN.Application.UnitTest.UseCases.Admin.EntityStatuses.Queries.GetEnt
 /// </summary>
 public sealed class GetEntityStatusQueryHandlerTests
 {
+
+
+
     private readonly Fixture _fixture = new();
+
+
 
     /// <summary>
     /// Verifies the early exit when the tenant company identifier is missing.
