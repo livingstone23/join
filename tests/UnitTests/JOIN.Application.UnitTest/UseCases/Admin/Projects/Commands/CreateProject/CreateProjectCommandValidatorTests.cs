@@ -63,6 +63,23 @@ public sealed class CreateProjectCommandValidatorTests
     }
 
     /// <summary>
+    /// Verifies that a whitespace-only name triggers the required validation error.
+    /// </summary>
+    [Fact]
+    public void Validate_WhenNameIsWhitespace_ShouldHaveValidationError()
+    {
+        // Arrange
+        var command = CreateValidCommand() with { Name = "   " };
+
+        // Act
+        var result = _validator.TestValidate(command);
+
+        // Assert
+        result.ShouldHaveValidationErrorFor(x => x.Name)
+            .WithErrorMessage("'Name' must not be empty.");
+    }
+
+    /// <summary>
     /// Verifies that a name longer than 150 characters triggers the max-length validation error.
     /// </summary>
     [Fact]

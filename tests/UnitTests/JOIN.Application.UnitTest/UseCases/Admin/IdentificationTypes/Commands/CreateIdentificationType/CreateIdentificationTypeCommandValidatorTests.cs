@@ -46,6 +46,23 @@ public sealed class CreateIdentificationTypeCommandValidatorTests
     }
 
     /// <summary>
+    /// Verifies that a whitespace-only name triggers the required validation error.
+    /// </summary>
+    [Fact]
+    public void Validate_WhenNameIsWhitespace_ShouldHaveValidationError()
+    {
+        // Arrange
+        var command = CreateValidCommand() with { Name = "   " };
+
+        // Act
+        var result = _validator.TestValidate(command);
+
+        // Assert
+        result.ShouldHaveValidationErrorFor(x => x.Name)
+            .WithErrorMessage("'Name' must not be empty.");
+    }
+
+    /// <summary>
     /// Verifies that a name longer than 50 characters triggers the max-length validation error.
     /// </summary>
     [Fact]
@@ -96,6 +113,22 @@ public sealed class CreateIdentificationTypeCommandValidatorTests
     }
 
     /// <summary>
+    /// Verifies that an empty description skips the conditional max-length rule.
+    /// </summary>
+    [Fact]
+    public void Validate_WhenDescriptionIsEmpty_ShouldNotHaveValidationError()
+    {
+        // Arrange
+        var command = CreateValidCommand() with { Description = string.Empty };
+
+        // Act
+        var result = _validator.TestValidate(command);
+
+        // Assert
+        result.ShouldNotHaveValidationErrorFor(x => x.Description);
+    }
+
+    /// <summary>
     /// Verifies that a whitespace-only description skips the conditional max-length rule.
     /// </summary>
     [Fact]
@@ -136,6 +169,22 @@ public sealed class CreateIdentificationTypeCommandValidatorTests
     {
         // Arrange
         var command = CreateValidCommand() with { ValidationPattern = null };
+
+        // Act
+        var result = _validator.TestValidate(command);
+
+        // Assert
+        result.ShouldNotHaveValidationErrorFor(x => x.ValidationPattern);
+    }
+
+    /// <summary>
+    /// Verifies that an empty validation pattern skips the conditional max-length rule.
+    /// </summary>
+    [Fact]
+    public void Validate_WhenValidationPatternIsEmpty_ShouldNotHaveValidationError()
+    {
+        // Arrange
+        var command = CreateValidCommand() with { ValidationPattern = string.Empty };
 
         // Act
         var result = _validator.TestValidate(command);
