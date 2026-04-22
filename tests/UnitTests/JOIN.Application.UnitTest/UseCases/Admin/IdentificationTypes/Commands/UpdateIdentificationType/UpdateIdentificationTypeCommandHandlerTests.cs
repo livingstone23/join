@@ -132,7 +132,8 @@ public sealed class UpdateIdentificationTypeCommandHandlerTests
             Description = "Old description",
             ValidationPattern = "old",
             IsActive = false,
-            GcRecord = 0
+            GcRecord = 0,
+            Created = new DateTime(2026, 4, 18, 10, 30, 0, DateTimeKind.Utc)
         };
 
         var request = CreateValidCommand(entity.Id);
@@ -214,6 +215,7 @@ public sealed class UpdateIdentificationTypeCommandHandlerTests
         response.Data.Description.Should().Be("International document");
         response.Data.ValidationPattern.Should().Be("^[A-Z0-9]{6,20}$");
         response.Data.IsActive.Should().BeTrue();
+        response.Data.CreatedAt.Should().Be(entity.Created);
 
         entity.Name.Should().Be("Passport");
         entity.Description.Should().Be("International document");
@@ -222,6 +224,64 @@ public sealed class UpdateIdentificationTypeCommandHandlerTests
 
         context.RepositoryMock.Verify(x => x.UpdateAsync(entity), Times.Once);
         context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Verifies that blank optional fields are normalized to null during update.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenOptionalFieldsAreBlank_ShouldNormalizeOptionalFieldsToNull()
+    {
+        // Arrange
+        var entity = new IdentificationType
+        {
+            Name = "Legacy",
+            Description = "Old description",
+            ValidationPattern = "old",
+            IsActive = false,
+            GcRecord = 0
+        };
+
+        var request = new UpdateIdentificationTypeCommand
+        {
+            Id = entity.Id,
+            Name = "  Passport  ",
+            Description = "   ",
+            ValidationPattern = "   ",
+            IsActive = true
+        };
+
+        var context = new UpdateIdentificationTypeCommandTestContext();
+
+        context.RepositoryMock
+            .Setup(x => x.GetAsync(entity.Id))
+            .ReturnsAsync(entity);
+
+        context.RepositoryMock
+            .Setup(x => x.GetAllAsync())
+            .ReturnsAsync([entity]);
+
+        context.RepositoryMock
+            .Setup(x => x.UpdateAsync(entity))
+            .ReturnsAsync(true);
+
+        context.UnitOfWorkMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var handler = context.CreateHandler();
+
+        // Act
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeTrue();
+        entity.Name.Should().Be("Passport");
+        entity.Description.Should().BeNull();
+        entity.ValidationPattern.Should().BeNull();
+        response.Data.Should().NotBeNull();
+        response.Data!.Description.Should().BeNull();
+        response.Data.ValidationPattern.Should().BeNull();
     }
 
     /// <summary>

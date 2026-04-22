@@ -92,6 +92,7 @@ public sealed class CreateIdentificationTypeCommandHandlerTests
         // Arrange
         var request = CreateValidCommand();
         var context = new CreateIdentificationTypeCommandTestContext();
+        IdentificationType? insertedEntity = null;
 
         context.RepositoryMock
             .Setup(x => x.GetAllAsync())
@@ -99,6 +100,7 @@ public sealed class CreateIdentificationTypeCommandHandlerTests
 
         context.RepositoryMock
             .Setup(x => x.InsertAsync(It.IsAny<IdentificationType>()))
+            .Callback<IdentificationType>(entity => insertedEntity = entity)
             .ReturnsAsync(true);
 
         context.UnitOfWorkMock
@@ -114,10 +116,13 @@ public sealed class CreateIdentificationTypeCommandHandlerTests
         response.IsSuccess.Should().BeTrue();
         response.Message.Should().Be("Identification type created successfully.");
         response.Data.Should().NotBeNull();
+        insertedEntity.Should().NotBeNull();
+        response.Data!.Id.Should().Be(insertedEntity!.Id);
         response.Data!.Name.Should().Be("Passport");
         response.Data.Description.Should().Be("International document");
         response.Data.ValidationPattern.Should().Be("^[A-Z0-9]{6,20}$");
         response.Data.IsActive.Should().BeTrue();
+        response.Data.CreatedAt.Should().Be(insertedEntity.Created);
 
         context.RepositoryMock.Verify(x => x.InsertAsync(It.Is<IdentificationType>(entity =>
             entity.Name == "Passport"
@@ -126,6 +131,52 @@ public sealed class CreateIdentificationTypeCommandHandlerTests
             && entity.IsActive)), Times.Once);
 
         context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Verifies that blank optional fields are normalized to null during creation.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenOptionalFieldsAreBlank_ShouldNormalizeOptionalFieldsToNull()
+    {
+        // Arrange
+        var request = new CreateIdentificationTypeCommand
+        {
+            Name = "  Passport  ",
+            Description = "   ",
+            ValidationPattern = null,
+            IsActive = true
+        };
+        var context = new CreateIdentificationTypeCommandTestContext();
+        IdentificationType? insertedEntity = null;
+
+        context.RepositoryMock
+            .Setup(x => x.GetAllAsync())
+            .ReturnsAsync(Array.Empty<IdentificationType>());
+
+        context.RepositoryMock
+            .Setup(x => x.InsertAsync(It.IsAny<IdentificationType>()))
+            .Callback<IdentificationType>(entity => insertedEntity = entity)
+            .ReturnsAsync(true);
+
+        context.UnitOfWorkMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var handler = context.CreateHandler();
+
+        // Act
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeTrue();
+        insertedEntity.Should().NotBeNull();
+        insertedEntity!.Name.Should().Be("Passport");
+        insertedEntity.Description.Should().BeNull();
+        insertedEntity.ValidationPattern.Should().BeNull();
+        response.Data.Should().NotBeNull();
+        response.Data!.Description.Should().BeNull();
+        response.Data.ValidationPattern.Should().BeNull();
     }
 
     /// <summary>

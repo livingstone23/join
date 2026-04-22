@@ -87,7 +87,8 @@ public sealed class UpdateAreaCommandHandlerTests
             CompanyId = companyId,
             Name = "Legacy",
             EntityStatusId = _fixture.Create<Guid>(),
-            GcRecord = 0
+            GcRecord = 0,
+            Created = new DateTime(2026, 4, 18, 9, 30, 0, DateTimeKind.Utc)
         };
 
         var request = CreateValidCommand(area.Id, companyId, statusId);
@@ -289,7 +290,9 @@ public sealed class UpdateAreaCommandHandlerTests
         response.Data.Name.Should().Be("Support");
         response.Data.EntityStatusId.Should().Be(statusId);
         response.Data.EntityStatusName.Should().Be("Active");
+        response.Data.Created.Should().Be(area.Created);
 
+        area.CompanyId.Should().Be(companyId);
         area.Name.Should().Be("Support");
         area.EntityStatusId.Should().Be(statusId);
         context.AreaRepositoryMock.Verify(x => x.UpdateAsync(area), Times.Once);

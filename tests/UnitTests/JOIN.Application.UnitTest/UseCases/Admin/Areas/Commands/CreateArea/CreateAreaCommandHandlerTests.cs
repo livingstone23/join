@@ -198,6 +198,7 @@ public sealed class CreateAreaCommandHandlerTests
         var statusId = _fixture.Create<Guid>();
         var request = CreateValidCommand(companyId, statusId);
         var context = new CreateAreaCommandTestContext();
+        Area? insertedArea = null;
 
         context.CompanyRepositoryMock
             .Setup(x => x.GetAsync(companyId))
@@ -213,6 +214,7 @@ public sealed class CreateAreaCommandHandlerTests
 
         context.AreaRepositoryMock
             .Setup(x => x.InsertAsync(It.IsAny<Area>()))
+            .Callback<Area>(area => insertedArea = area)
             .ReturnsAsync(true);
 
         context.UnitOfWorkMock
@@ -228,11 +230,14 @@ public sealed class CreateAreaCommandHandlerTests
         response.IsSuccess.Should().BeTrue();
         response.Message.Should().Be("Area created successfully.");
         response.Data.Should().NotBeNull();
+        insertedArea.Should().NotBeNull();
+        response.Data!.Id.Should().Be(insertedArea!.Id);
         response.Data!.CompanyId.Should().Be(companyId);
         response.Data.CompanyName.Should().Be("JOIN CRM");
         response.Data.Name.Should().Be("Support");
         response.Data.EntityStatusId.Should().Be(statusId);
         response.Data.EntityStatusName.Should().Be("Active");
+        response.Data.Created.Should().Be(insertedArea.Created);
 
         context.AreaRepositoryMock.Verify(x => x.InsertAsync(It.Is<Area>(area =>
             area.CompanyId == companyId

@@ -198,6 +198,7 @@ public sealed class CreateProjectCommandHandlerTests
         var statusId = _fixture.Create<Guid>();
         var request = CreateValidCommand(companyId, statusId);
         var context = new CreateProjectCommandTestContext();
+        Project? insertedProject = null;
 
         context.CompanyRepositoryMock
             .Setup(x => x.GetAsync(companyId))
@@ -213,6 +214,7 @@ public sealed class CreateProjectCommandHandlerTests
 
         context.ProjectRepositoryMock
             .Setup(x => x.InsertAsync(It.IsAny<Project>()))
+            .Callback<Project>(project => insertedProject = project)
             .ReturnsAsync(true);
 
         context.UnitOfWorkMock
@@ -228,11 +230,14 @@ public sealed class CreateProjectCommandHandlerTests
         response.IsSuccess.Should().BeTrue();
         response.Message.Should().Be("Project created successfully.");
         response.Data.Should().NotBeNull();
+        insertedProject.Should().NotBeNull();
+        response.Data!.Id.Should().Be(insertedProject!.Id);
         response.Data!.CompanyId.Should().Be(companyId);
         response.Data.CompanyName.Should().Be("JOIN CRM");
         response.Data.Name.Should().Be("Portal Migration");
         response.Data.EntityStatusId.Should().Be(statusId);
         response.Data.EntityStatusName.Should().Be("Active");
+        response.Data.CreatedAt.Should().Be(insertedProject.Created);
 
         context.ProjectRepositoryMock.Verify(x => x.InsertAsync(It.Is<Project>(project =>
             project.CompanyId == companyId

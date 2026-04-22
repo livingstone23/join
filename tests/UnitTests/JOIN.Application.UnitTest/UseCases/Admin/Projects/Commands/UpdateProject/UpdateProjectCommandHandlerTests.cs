@@ -87,7 +87,8 @@ public sealed class UpdateProjectCommandHandlerTests
             CompanyId = companyId,
             Name = "Legacy",
             EntityStatusId = _fixture.Create<Guid>(),
-            GcRecord = 0
+            GcRecord = 0,
+            Created = new DateTime(2026, 4, 18, 8, 0, 0, DateTimeKind.Utc)
         };
 
         var request = CreateValidCommand(project.Id, companyId, statusId);
@@ -289,7 +290,9 @@ public sealed class UpdateProjectCommandHandlerTests
         response.Data.Name.Should().Be("Portal Migration");
         response.Data.EntityStatusId.Should().Be(statusId);
         response.Data.EntityStatusName.Should().Be("Active");
+        response.Data.CreatedAt.Should().Be(project.Created);
 
+        project.CompanyId.Should().Be(companyId);
         project.Name.Should().Be("Portal Migration");
         project.EntityStatusId.Should().Be(statusId);
         context.ProjectRepositoryMock.Verify(x => x.UpdateAsync(project), Times.Once);
