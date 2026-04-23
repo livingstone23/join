@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultRazorItems>false</EnableDefaultRazorItems>
+    <EnableDefaultViewsItems>false</EnableDefaultViewsItems>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
   </PropertyGroup>
 
@@ -18,9 +20,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\2.Application\JOIN.Application.csproj" />
-    <ProjectReference Include="..\3.Infrastructure\JOIN.Infrastructure.csproj" />
-    <ProjectReference Include="..\3.Persistence\JOIN.Persistence.csproj" />
+    <ProjectReference Include="../2.Application/JOIN.Application.csproj" />
+    <ProjectReference Include="../3.Infrastructure/JOIN.Infrastructure.csproj" />
+    <ProjectReference Include="../3.Persistence/JOIN.Persistence.csproj" />
   </ItemGroup>
 
 </Project>
