@@ -22,7 +22,11 @@ namespace JOIN.Services.WebApi.Controllers.Common;
 [PermissionResource("Companies")]
 public class CompaniesController(IMediator mediator) : ControllerBase
 {
+
+
     private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+
+
 
     /// <summary>
     /// Retrieves a single company record by its unique identifier.

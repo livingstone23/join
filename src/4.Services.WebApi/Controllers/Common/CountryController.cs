@@ -22,7 +22,11 @@ namespace JOIN.Services.WebApi.Controllers.Common;
 [PermissionResource("Countries")]
 public class CountryController(IMediator mediator) : ControllerBase
 {
+
+
     private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+
+
 
     /// <summary>
     /// Retrieves a single country catalog record by its unique identifier.

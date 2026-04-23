@@ -1,0 +1,57 @@
+name: Backend CI Pipeline
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+
+    - name: ⚙️ Setup .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        # AQUÍ ESTÁ LA MAGIA PARA .NET 10
+        dotnet-version: '10.0.x' 
+
+    - name: 📦 Restore dependencies
+      run: dotnet restore
+
+    - name: 🔨 Build
+      run: dotnet build --no-restore --configuration Release
+
+    - name: 🧪 Run Unit Tests & Enforce Coverage
+      # Genera el archivo cobertura.xml y falla si baja del 90%
+      run: >
+        dotnet test --no-build --configuration Release --verbosity normal 
+        /p:CollectCoverage=true 
+        /p:CoverletOutputFormat=cobertura 
+        /p:Threshold=90 
+        /p:ThresholdType=line
+
+    # --- LOS SIGUIENTES PASOS GENERAN EL COMENTARIO VISUAL EN EL PR ---
+    - name: 📊 Generate Code Coverage Report
+      uses: irongut/CodeCoverageSummary@v1.3.0
+      if: github.event_name == 'pull_request' # Solo se activa en Pull Requests
+      with:
+        filename: '**/coverage.cobertura.xml'
+        badge: true
+        format: markdown
+        hide_branch_rate: false
+        hide_complexity: true
+        indicators: true
+        output: both
+
+    - name: 📝 Add Coverage PR Comment
+      uses: marocchino/sticky-pull-request-comment@v2
+      if: github.event_name == 'pull_request'
+      with:
+        recreate: true
+        path: code-coverage-results.md

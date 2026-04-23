@@ -22,7 +22,11 @@ namespace JOIN.Services.WebApi.Controllers.Common;
 [PermissionResource("CommunicationChannels")]
 public class CommunicationChannelsController(IMediator mediator) : ControllerBase
 {
+
+
     private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+
+
 
     /// <summary>
     /// Retrieves a single communication channel by its unique identifier.

@@ -19,7 +19,11 @@ namespace JOIN.Services.WebApi.Controllers.Common;
 [PermissionResource("Municipalities")]
 public class MunicipalitiesController(ISender sender) : ControllerBase
 {
+
+
     private readonly ISender _sender = sender ?? throw new ArgumentNullException(nameof(sender));
+
+
 
     /// <summary>
     /// Retrieves a paginated list of municipalities with optional filters by name, code, and province.
