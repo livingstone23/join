@@ -12,6 +12,7 @@ using JOIN.Persistence.Repositories.Admin;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 
 
@@ -25,6 +26,12 @@ namespace JOIN.Persistence.Configuration;
 /// </summary>
 public static class ConfigureServices
 {
+    /// <summary>
+    /// Registers persistence services for commands (EF Core), repositories, and support services.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <returns>The same service collection for fluent chaining.</returns>
     public static IServiceCollection AddPersistenceServices(this IServiceCollection services, IConfiguration configuration)
     {
         // 1. REPOSITORIO GENÉRICO (PIEZA CLAVE PARA ESCALABILIDAD)
@@ -63,6 +70,61 @@ public static class ConfigureServices
         // 6. SERVICIOS DE APOYO
         services.AddScoped<JOIN.Persistence.DatabaseSeeder>();
         services.AddScoped<ICompanyCatalogSeeder>(sp => sp.GetRequiredService<JOIN.Persistence.DatabaseSeeder>());
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers database health checks based on the configured provider.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <returns>The same service collection for fluent chaining.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the database provider or default connection string is not configured.
+    /// </exception>
+    /// <exception cref="NotSupportedException">
+    /// Thrown when the configured database provider is not supported.
+    /// </exception>
+    public static IServiceCollection AddPersistenceHealthChecks(this IServiceCollection services, IConfiguration configuration)
+    {
+        var provider = configuration["DatabaseProvider"];
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
+
+        if (string.IsNullOrWhiteSpace(provider))
+        {
+            throw new InvalidOperationException("DatabaseProvider is required to configure persistence health checks.");
+        }
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required to configure persistence health checks.");
+        }
+
+        var builder = services.AddHealthChecks();
+
+        switch (provider.Trim())
+        {
+            case "SqlServer":
+                builder.AddSqlServer(
+                    connectionString: connectionString,
+                    name: "sqlserver",
+                    failureStatus: HealthStatus.Unhealthy,
+                    tags: ["db", "sql"]);
+                break;
+
+            case "PostgreSQL":
+            case "Postgres":
+                builder.AddNpgSql(
+                    connectionString: connectionString,
+                    name: "postgresql",
+                    failureStatus: HealthStatus.Unhealthy,
+                    tags: ["db", "pg"]);
+                break;
+
+            default:
+                throw new NotSupportedException($"DatabaseProvider '{provider}' is not supported for persistence health checks.");
+        }
 
         return services;
     }

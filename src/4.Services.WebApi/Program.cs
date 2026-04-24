@@ -11,7 +11,9 @@ using JOIN.Persistence.Contexts;
 using JOIN.Services.WebApi.Filters;
 using JOIN.Services.WebApi.Middlewares;
 using JOIN.Services.WebApi.Services;
+using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -72,6 +74,14 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 // Infrastructure Layer (EF Core, Dapper Context, Repositories, UnitOfWork)
 builder.Services.AddPersistenceServices(builder.Configuration);
+builder.Services.AddPersistenceHealthChecks(builder.Configuration);
+builder.Services.AddInfrastructureHealthChecks(builder.Configuration);
+builder.Services.AddHealthChecksUI(options =>
+{
+    options.SetEvaluationTimeInSeconds(30);
+    options.AddHealthCheckEndpoint("JOIN CRM", "/health/ready");
+})
+.AddInMemoryStorage();
 
 // ============================================================================
 // 3. ADD IDENTITY & SECURITY SERVICES
@@ -162,6 +172,11 @@ app.UseAuthentication();
 app.UseAuthorization();  
 
 app.MapControllers();
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+app.MapHealthChecksUI(options => options.UIPath = "/health-ui");
 
 
 if (app.Environment.IsDevelopment())

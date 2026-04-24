@@ -1,10 +1,12 @@
 using JOIN.Application.Interface;
+using JOIN.Infrastructure.HealthChecks;
 using JOIN.Infrastructure.Messaging.SendGrid;
 using JOIN.Infrastructure.Persistence;
 using JOIN.Infrastructure.Security;
 using JOIN.Infrastructure.Security.Jwt;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 
 
@@ -58,4 +60,18 @@ public static class DependencyInjection
     /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         => services.AddInfrastructureServices(configuration);
+
+    /// <summary>
+    /// Registers infrastructure health check alerting services.
+    /// </summary>
+    /// <param name="services">The <see cref="IServiceCollection"/> to configure.</param>
+    /// <param name="configuration">The application configuration used to bind options.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    public static IServiceCollection AddInfrastructureHealthChecks(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<HealthCheckAlertOptions>(configuration.GetSection("HealthCheckAlerts"));
+        services.AddSingleton<IHealthCheckPublisher, HealthCheckEmailPublisher>();
+
+        return services;
+    }
 }
