@@ -25,5 +25,5 @@ public class UserCompany : BaseTenantEntity
 
     // --- Navigation Properties ---
     public virtual ApplicationUser User { get; set; } = null!;
-    public virtual Company Company { get; set; } = null!;
+
 }

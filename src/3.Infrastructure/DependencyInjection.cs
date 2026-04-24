@@ -1,4 +1,5 @@
 using JOIN.Application.Interface;
+using JOIN.Infrastructure.Messaging.SendGrid;
 using JOIN.Infrastructure.Persistence;
 using JOIN.Infrastructure.Security;
 using JOIN.Infrastructure.Security.Jwt;
@@ -16,22 +17,45 @@ namespace JOIN.Infrastructure;
 /// </summary>
 public static class DependencyInjection
 {
-
-
     /// <summary>
-    /// Adds infrastructure dependencies to the service collection.
+    /// Registers all infrastructure-layer services, adapters, and options.
+    /// This is the canonical entry point called by the Presentation layer (WebApi).
     /// </summary>
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    /// <param name="services">The <see cref="IServiceCollection"/> to configure.</param>
+    /// <param name="configuration">The application configuration used to bind options.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
     {
-        // ... (other configurations for EF Core, Identity, etc.)
-
-        // Register the Dapper connection factory as a Singleton
+        // ------------------------------------------------------------------
+        // Data access: engine-agnostic Dapper connection factory (Singleton
+        // because it holds no mutable state).
+        // ------------------------------------------------------------------
         services.AddSingleton<ISqlConnectionFactory, SqlConnectionFactory>();
 
-        // Register JWT generation services.
+        // ------------------------------------------------------------------
+        // Security services
+        // ------------------------------------------------------------------
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IPermissionService, PermissionService>();
 
+        // ------------------------------------------------------------------
+        // Messaging: SendGrid email adapter (Adapter Pattern — Pillar 4)
+        // Bind strongly-typed options from the "SendGrid" configuration section,
+        // then register the adapter as Transient (stateless, safe per-request).
+        // ------------------------------------------------------------------
+        services.Configure<SendGridOptions>(configuration.GetSection("SendGrid"));
+        services.AddTransient<IEmailService, SendGridEmailAdapter>();
+
         return services;
     }
+
+    /// <summary>
+    /// Backward-compatible wrapper. Delegates to <see cref="AddInfrastructureServices"/>.
+    /// Kept so that existing call sites in Program.cs continue to compile without changes.
+    /// </summary>
+    /// <param name="services">The <see cref="IServiceCollection"/> to configure.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+        => services.AddInfrastructureServices(configuration);
 }

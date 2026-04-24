@@ -81,9 +81,9 @@ public class TicketLog: BaseTenantEntity
     public Guid? NewAssignedToUserId { get; set; }
 
 
-    public virtual Ticket? Ticket { get; set; }
+    public virtual Ticket? Ticket { get; set; } = null!;
 
-    public virtual ApplicationUser UserRegistered { get; set; }
+    public virtual ApplicationUser UserRegistered { get; set; } = null!;
 
     public virtual ApplicationUser? NewAssignedToUser { get; set; }
 
