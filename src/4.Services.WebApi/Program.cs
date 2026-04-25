@@ -10,6 +10,7 @@ using JOIN.Persistence.Configuration;
 using JOIN.Persistence.Contexts;
 using JOIN.Services.WebApi.Filters;
 using JOIN.Services.WebApi.Middlewares;
+using JOIN.Services.WebApi.Services.RateLimiting;
 using JOIN.Services.WebApi.Services;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -76,6 +77,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddPersistenceServices(builder.Configuration);
 builder.Services.AddPersistenceHealthChecks(builder.Configuration);
 builder.Services.AddInfrastructureHealthChecks(builder.Configuration);
+builder.Services.AddJoinRateLimiting(builder.Configuration);
 builder.Services.AddHealthChecksUI(options =>
 {
     options.SetEvaluationTimeInSeconds(30);
@@ -159,6 +161,8 @@ using (var scope = app.Services.CreateScope())
 // ============================================================================
 
 app.UseExceptionHandler(); 
+app.UseForwardedHeaders();
+app.UseMiddleware<DynamicStrictRateLimitingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
@@ -167,6 +171,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseRateLimiter();
 
 app.UseAuthentication(); 
 app.UseAuthorization();  

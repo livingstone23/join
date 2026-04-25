@@ -13,10 +13,11 @@ using JOIN.Application.UseCases.Security.Users.Commands.ReplaceUserRoles;
 using JOIN.Application.UseCases.Security.Users.Queries.GetUsersWithRoles;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
 
 
 
@@ -49,6 +50,7 @@ public class UsersController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">Token used to cancel the authentication request while the login command is being processed.</param>
     /// <returns>The authenticated session payload when the credentials are valid.</returns>
     [AllowAnonymous]
+    [EnableRateLimiting("Strict")]
     [HttpPost("login")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
@@ -88,6 +90,7 @@ public class UsersController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">Token used to cancel the refresh request while the command is being processed.</param>
     /// <returns>The renewed authenticated session payload when the refresh token is valid.</returns>
     [AllowAnonymous]
+    [EnableRateLimiting("Strict")]
     [HttpPost("refresh")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
