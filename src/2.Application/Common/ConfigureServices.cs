@@ -4,6 +4,7 @@
 using System.Reflection;
 using FluentValidation;
 using JOIN.Application.Mappings;
+using JOIN.Application.Mappings.Security.SystemOption;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -41,6 +42,7 @@ public static class ConfigureServices
         services.AddScoped<ICustomerMapper, CustomerMapper>();
         services.AddScoped<ITicketMapper, TicketMapper>();
         services.AddScoped<ITicketCompanyDefaultMapper, TicketCompanyDefaultMapper>();
+        services.AddScoped<ISystemOptionMapper, SystemOptionMapper>();
 
         return services;
     
