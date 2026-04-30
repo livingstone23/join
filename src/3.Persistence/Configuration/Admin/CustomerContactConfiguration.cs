@@ -50,7 +50,7 @@ public class CustomerContactConfiguration : IEntityTypeConfiguration<CustomerCon
         builder.HasOne(cc => cc.Customer)
             .WithMany(c => c.Contacts)
             .HasForeignKey(cc => cc.CustomerId)
-            .OnDelete(DeleteBehavior.Cascade); // Contacts are deleted if the Customer is deleted.
+            .OnDelete(DeleteBehavior.Restrict); // Contacts are deleted if the Customer is deleted.
 
         // --- Query Filters ---
 

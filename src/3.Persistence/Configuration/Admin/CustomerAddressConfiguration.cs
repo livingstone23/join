@@ -45,7 +45,7 @@ public class CustomerAddressConfiguration : IEntityTypeConfiguration<CustomerAdd
         builder.HasOne(ca => ca.Customer)
             .WithMany(c => c.Addresses)
             .HasForeignKey(ca => ca.CustomerId)
-            .OnDelete(DeleteBehavior.Cascade); // Addresses are deleted if the Customer is deleted.
+            .OnDelete(DeleteBehavior.Restrict); // Addresses are deleted if the Customer is deleted.
 
         // Required relationship with Country
         builder.HasOne(ca => ca.Country)

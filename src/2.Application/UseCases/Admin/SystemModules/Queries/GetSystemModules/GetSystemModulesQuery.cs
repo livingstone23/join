@@ -1,8 +1,12 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
+
+
 using MediatR;
 
 namespace JOIN.Application.UseCases.Admin.SystemModules.Queries;
+
+
 
 /// <summary>
 /// Query used to retrieve a paginated and filterable list of system modules.
@@ -17,3 +21,4 @@ public sealed record GetSystemModulesQuery(
     string? Name = null,
     bool? IsActive = null)
     : IRequest<Response<PagedResult<SystemModuleDto>>>;
+

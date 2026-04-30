@@ -47,7 +47,7 @@ public class SystemModuleConfiguration : IEntityTypeConfiguration<SystemModule>
         builder.HasMany(m => m.SystemOptions)
             .WithOne(o => o.Module)
             .HasForeignKey(o => o.ModuleId)
-            .OnDelete(DeleteBehavior.Cascade); // Deleting a module also deletes its options.
+            .OnDelete(DeleteBehavior.Restrict); // Deleting a module also deletes its options.
 
         // --- Indexes ---
 
