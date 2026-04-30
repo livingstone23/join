@@ -1,7 +1,11 @@
 using FluentValidation;
 using JOIN.Domain.Enums;
 
+
+
 namespace JOIN.Application.UseCases.Admin.Customers.Commands;
+
+
 
 /// <summary>
 /// Defines the validation rules for the UpdateCustomerCommand.

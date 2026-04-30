@@ -1,6 +1,10 @@
 using System;
 
+
+
 namespace JOIN.Application.DTO.Admin;
+
+
 
 /// <summary>
 /// Data Transfer Object (DTO) representing a customer contact method.

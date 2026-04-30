@@ -7,7 +7,11 @@ using JOIN.Domain.Common;
 using JOIN.Domain.Enums;
 using MediatR;
 
+
+
 namespace JOIN.Application.UseCases.Admin.Customers.Commands;
+
+
 
 /// <summary>
 /// Handles the update of an existing Customer aggregate, including collection synchronization.

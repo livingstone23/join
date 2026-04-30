@@ -1,6 +1,10 @@
 using FluentValidation;
 
+
+
 namespace JOIN.Application.UseCases.Admin.Customers.Commands;
+
+
 
 /// <summary>
 /// Defines validation rules for <see cref="DeleteCustomerCommand"/>.

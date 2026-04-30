@@ -1,7 +1,11 @@
 using JOIN.Application.Common;
 using MediatR;
 
+
+
 namespace JOIN.Application.UseCases.Admin.Customers.Commands;
+
+
 
 /// <summary>
 /// Command to update an existing Customer aggregate, including addresses and contacts.
