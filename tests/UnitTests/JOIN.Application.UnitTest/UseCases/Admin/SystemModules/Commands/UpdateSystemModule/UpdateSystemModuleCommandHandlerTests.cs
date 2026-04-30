@@ -186,10 +186,12 @@ public sealed class UpdateSystemModuleCommandHandlerTests
         response.Data.Description.Should().Be("Customer management");
         response.Data.Icon.Should().Be("fa-users");
         response.Data.IsActive.Should().BeTrue();
+        response.Data.Order.Should().Be(5);
 
         entity.Name.Should().Be("CRM");
         entity.Description.Should().Be("Customer management");
         entity.Icon.Should().Be("fa-users");
+        entity.Order.Should().Be(5);
 
         context.RepositoryMock.Verify(x => x.UpdateAsync(entity), Times.Once);
     }
@@ -205,7 +207,8 @@ public sealed class UpdateSystemModuleCommandHandlerTests
             Name = "  CRM  ",
             Description = "  Customer management  ",
             Icon = "  fa-users  ",
-            IsActive = true
+            IsActive = true,
+            Order = 5
         };
     }
 
@@ -220,6 +223,7 @@ public sealed class UpdateSystemModuleCommandHandlerTests
             Description = "Old description",
             Icon = "old-icon",
             IsActive = false,
+            Order = null,
             GcRecord = 0
         };
 

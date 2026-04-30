@@ -50,7 +50,8 @@ public sealed class CreateSystemModuleCommandHandler(IUnitOfWork unitOfWork)
             Name = normalizedName,
             Description = normalizedDescription,
             Icon = normalizedIcon,
-            IsActive = request.IsActive
+            IsActive = request.IsActive,
+            Order = request.Order
         };
 
         await systemModuleRepository.InsertAsync(entity);
@@ -73,6 +74,7 @@ public sealed class CreateSystemModuleCommandHandler(IUnitOfWork unitOfWork)
                 Description = entity.Description,
                 Icon = entity.Icon,
                 IsActive = entity.IsActive,
+                Order = entity.Order,
                 CreatedAt = entity.Created
             }
         };

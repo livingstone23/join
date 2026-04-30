@@ -34,6 +34,7 @@ public sealed class GetSystemModuleByIdQueryHandlerTests
                     ["Description"] = "Customer management",
                     ["Icon"] = "fa-users",
                     ["IsActive"] = true,
+                    ["Order"] = 2,
                     ["CreatedAt"] = DateTime.UtcNow
                 }));
 
@@ -48,9 +49,11 @@ public sealed class GetSystemModuleByIdQueryHandlerTests
         response.Data.Should().NotBeNull();
         response.Data!.Id.Should().Be(moduleId);
         response.Data.Name.Should().Be("CRM");
+        response.Data.Order.Should().Be(2);
 
         context.Connection.LastCommandText.Should().Contain("WHERE sm.Id = @Id");
         context.Connection.LastCommandText.Should().Contain("AND sm.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain("AS [Order]");
         context.Connection.CapturedParameters["Id"].Should().Be(moduleId);
     }
 
@@ -71,6 +74,7 @@ public sealed class GetSystemModuleByIdQueryHandlerTests
                 "Description",
                 "Icon",
                 "IsActive",
+                "Order",
                 "CreatedAt"));
 
         var handler = context.CreateHandler();

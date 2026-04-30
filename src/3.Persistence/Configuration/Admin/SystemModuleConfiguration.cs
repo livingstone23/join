@@ -40,6 +40,8 @@ public class SystemModuleConfiguration : IEntityTypeConfiguration<SystemModule>
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(m => m.Order);
+
         // --- Relationships ---
 
         // One-to-many relationship with SystemOption

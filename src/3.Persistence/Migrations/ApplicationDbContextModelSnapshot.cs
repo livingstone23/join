@@ -17,7 +17,7 @@ namespace JOIN.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -468,6 +468,9 @@ namespace JOIN.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("Order")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -2032,7 +2035,7 @@ namespace JOIN.Persistence.Migrations
                     b.HasOne("JOIN.Domain.Admin.Customer", "Customer")
                         .WithMany("Addresses")
                         .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("JOIN.Domain.Common.Municipality", "Municipality")
@@ -2083,7 +2086,7 @@ namespace JOIN.Persistence.Migrations
                     b.HasOne("JOIN.Domain.Admin.Customer", "Customer")
                         .WithMany("Contacts")
                         .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Company");

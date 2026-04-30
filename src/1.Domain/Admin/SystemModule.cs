@@ -34,6 +34,11 @@ public class SystemModule : BaseAuditableEntity
     /// </summary>
     public bool IsActive { get; set; } = true;
 
+    /// <summary>
+    /// Defines the display sequence of the module in the CRM user interface.
+    /// </summary>
+    public int? Order { get; set; }
+
     // --- Navigation Properties ---
     public virtual ICollection<CompanyModule> CompanyModules { get; set; } = new List<CompanyModule>();
     public virtual ICollection<SystemOption> SystemOptions { get; set; } = new List<SystemOption>();

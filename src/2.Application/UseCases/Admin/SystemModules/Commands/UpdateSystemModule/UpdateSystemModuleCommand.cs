@@ -40,4 +40,9 @@ public sealed record UpdateSystemModuleCommand : IRequest<Response<SystemModuleD
     /// Gets or sets a value indicating whether the module is globally active.
     /// </summary>
     public bool IsActive { get; init; } = true;
+
+    /// <summary>
+    /// Gets or sets the display sequence of the module in the CRM user interface.
+    /// </summary>
+    public int? Order { get; init; }
 }

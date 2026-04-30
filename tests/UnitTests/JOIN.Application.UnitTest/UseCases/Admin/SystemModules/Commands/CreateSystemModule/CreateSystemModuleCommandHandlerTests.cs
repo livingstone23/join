@@ -118,12 +118,14 @@ public sealed class CreateSystemModuleCommandHandlerTests
         response.Data.Description.Should().Be("Customer management");
         response.Data.Icon.Should().Be("fa-users");
         response.Data.IsActive.Should().BeTrue();
+        response.Data.Order.Should().Be(10);
 
         context.RepositoryMock.Verify(x => x.InsertAsync(It.Is<SystemModule>(entity =>
             entity.Name == "CRM"
             && entity.Description == "Customer management"
             && entity.Icon == "fa-users"
-            && entity.IsActive)), Times.Once);
+            && entity.IsActive
+            && entity.Order == 10)), Times.Once);
     }
 
     /// <summary>
@@ -136,7 +138,8 @@ public sealed class CreateSystemModuleCommandHandlerTests
             Name = "  CRM  ",
             Description = "  Customer management  ",
             Icon = "  fa-users  ",
-            IsActive = true
+            IsActive = true,
+            Order = 10
         };
     }
 

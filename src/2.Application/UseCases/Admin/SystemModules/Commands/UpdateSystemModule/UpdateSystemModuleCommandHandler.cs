@@ -58,6 +58,7 @@ public sealed class UpdateSystemModuleCommandHandler(IUnitOfWork unitOfWork)
         entity.Description = normalizedDescription;
         entity.Icon = normalizedIcon;
         entity.IsActive = request.IsActive;
+        entity.Order = request.Order;
 
         await systemModuleRepository.UpdateAsync(entity);
         var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -79,6 +80,7 @@ public sealed class UpdateSystemModuleCommandHandler(IUnitOfWork unitOfWork)
                 Description = entity.Description,
                 Icon = entity.Icon,
                 IsActive = entity.IsActive,
+                Order = entity.Order,
                 CreatedAt = entity.Created
             }
         };

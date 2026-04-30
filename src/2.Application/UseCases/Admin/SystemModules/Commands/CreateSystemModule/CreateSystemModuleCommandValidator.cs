@@ -27,5 +27,10 @@ public sealed class CreateSystemModuleCommandValidator : AbstractValidator<Creat
             .MaximumLength(100)
             .When(x => !string.IsNullOrWhiteSpace(x.Icon))
             .WithMessage("Icon must not exceed 100 characters.");
+
+        RuleFor(x => x.Order)
+            .GreaterThanOrEqualTo(0)
+            .When(x => x.Order.HasValue)
+            .WithMessage("Order must be greater than or equal to 0 when provided.");
     }
 }

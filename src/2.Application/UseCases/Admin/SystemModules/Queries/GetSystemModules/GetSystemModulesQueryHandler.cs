@@ -45,6 +45,9 @@ public sealed class GetSystemModulesQueryHandler(
         var offset = (sanitizedPageNumber - 1) * sanitizedPageSize;
 
         using var connection = connectionFactory.CreateConnection();
+        var orderColumn = GetOrderColumn(connection);
+        var orderAlias = GetOrderAlias(connection);
+        var orderByClause = GetOrderByClause(connection, orderColumn);
 
         var parameters = new DynamicParameters();
         parameters.Add("Offset", offset);
@@ -73,10 +76,11 @@ public sealed class GetSystemModulesQueryHandler(
                 sm.Description,
                 sm.Icon,
                 sm.IsActive,
+                {orderColumn} AS {orderAlias},
                 sm.Created AS CreatedAt
             FROM Admin.SystemModules sm
             {whereClause}
-            ORDER BY sm.Name ASC
+            ORDER BY {orderByClause}
             {GetPaginationClause(connection)};
 
             SELECT COUNT(*)
@@ -114,4 +118,19 @@ public sealed class GetSystemModulesQueryHandler(
         => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
             ? "LIMIT @PageSize OFFSET @Offset"
             : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+
+    private static string GetOrderColumn(IDbConnection connection)
+        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
+            ? "sm.\"Order\""
+            : "sm.[Order]";
+
+    private static string GetOrderAlias(IDbConnection connection)
+        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
+            ? "\"Order\""
+            : "[Order]";
+
+    private static string GetOrderByClause(IDbConnection connection, string orderColumn)
+        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
+            ? $"{orderColumn} ASC NULLS LAST, sm.Name ASC"
+            : $"CASE WHEN {orderColumn} IS NULL THEN 1 ELSE 0 END ASC, {orderColumn} ASC, sm.Name ASC";
 }

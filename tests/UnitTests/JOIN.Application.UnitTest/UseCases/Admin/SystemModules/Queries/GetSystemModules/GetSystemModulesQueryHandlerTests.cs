@@ -58,11 +58,13 @@ public sealed class GetSystemModulesQueryHandlerTests
         item.Description.Should().Be("Customer management");
         item.Icon.Should().Be("fa-users");
         item.IsActive.Should().BeTrue();
+        item.Order.Should().Be(1);
         item.CreatedAt.Should().Be(createdAt);
 
         context.Connection.LastCommandText.Should().Contain("WHERE sm.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("sm.Name LIKE @Name");
         context.Connection.LastCommandText.Should().Contain("sm.IsActive = @IsActive");
+        context.Connection.LastCommandText.Should().Contain("ORDER BY sm.\"Order\" ASC NULLS LAST, sm.Name ASC");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
 
         context.Connection.CapturedParameters["Name"].Should().Be("%CRM%");
@@ -86,6 +88,7 @@ public sealed class GetSystemModulesQueryHandlerTests
                 "Description",
                 "Icon",
                 "IsActive",
+                "Order",
                 "CreatedAt"),
             FakeResultSet.FromScalar(0));
 
@@ -104,6 +107,7 @@ public sealed class GetSystemModulesQueryHandlerTests
         response.Data.PageSize.Should().Be(5);
         response.Data.TotalCount.Should().Be(0);
         response.Data.TotalPages.Should().Be(0);
+        context.Connection.LastCommandText.Should().Contain("ORDER BY CASE WHEN sm.[Order] IS NULL THEN 1 ELSE 0 END ASC, sm.[Order] ASC, sm.Name ASC");
         context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
     }
 
@@ -120,6 +124,7 @@ public sealed class GetSystemModulesQueryHandlerTests
                 ["Description"] = "Customer management",
                 ["Icon"] = "fa-users",
                 ["IsActive"] = true,
+                ["Order"] = 1,
                 ["CreatedAt"] = createdAt
             });
     }

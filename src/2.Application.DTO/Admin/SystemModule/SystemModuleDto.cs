@@ -33,6 +33,11 @@ public sealed record SystemModuleDto
     public bool IsActive { get; init; }
 
     /// <summary>
+    /// Gets the display sequence of the module in the CRM user interface.
+    /// </summary>
+    public int? Order { get; init; }
+
+    /// <summary>
     /// Gets the UTC creation timestamp of the module.
     /// </summary>
     public DateTime CreatedAt { get; init; }
