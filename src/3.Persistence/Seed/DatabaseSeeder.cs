@@ -1,14 +1,14 @@
+using System.Linq;
 using JOIN.Application.Interface;
 using JOIN.Domain.Admin;
-using JOIN.Domain.Security;
-using JOIN.Persistence.Contexts;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Logging;
-using Microsoft.EntityFrameworkCore;
 using JOIN.Domain.Common;
 using JOIN.Domain.Enums;
 using JOIN.Domain.Messaging;
-using System.Linq;
+using JOIN.Domain.Security;
+using JOIN.Persistence.Contexts;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 
 
@@ -2052,26 +2052,32 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
     private static List<SystemOptionSeed> GetAdministrativeSystemOptionSeeds() =>
     [
-        new("Administracion", "/administracion", "icon_admin", null, null, false, false, false, false),
-        new("Paises", "/administracion/countries", "icon_country", "Administracion", "Countries", true, true, true, true),
-        new("Regions", "/administracion/regions", "icon_region", "Administracion", "Regions", true, true, true, true),
-        new("Provinces", "/administracion/provinces", "icon_province", "Administracion", "Provinces", true, true, true, true),
-        new("Municipalities", "/administracion/municipalities", "icon_municipality", "Administracion", "Municipalities", true, true, true, true),
-        new("IdentificationTypes", "/administracion/identification-types", "icon_identification_type", "Administracion", "IdentificationTypes", true, true, true, true),
-        new("Areas", "/administracion/areas", "icon_area", "Administracion", "Areas", true, true, true, true),
-        new("Projects", "/administracion/projects", "icon_project", "Administracion", "Projects", true, true, true, true),
-        new("SystemModules"  , "/administracion/system-modules"  , "icon_system_module", "Administracion", "SystemModules", true, true, true, true),
-        new("EntityStatuses" , "/administracion/entity-statuses" , "icon_entity_status", "Administracion", "EntityStatuses", true, true, true, true),
-        new("Compañias"      , "/administracion/companies"       , "icon_company"      ,  "Administracion", "Companies"    , true, true, true, true),
-        new("CompanyModules", "/administracion/company-modules", "icon_company_module", "Administracion", "CompanyModules", true, true, true, true),
-        new("CommunicationChannels", "/administracion/communication-channels", "icon_channel", "Administracion", "CommunicationChannels", true, true, true, true),
+        new("Administracion", "/administracion", "@Icons.Material.Filled.AdminPanelSettings", null, null, false, false, false, false),
+        new("Paises", "/administracion/countries", "@Icons.Material.Filled.AddLocationAlt", "Administracion", "Countries", true, true, true, true),
+        new("Regions", "/administracion/regions", "@Icons.Material.Filled.AddLocationAlt", "Administracion", "Regions", true, true, true, true),
+        new("Provinces", "/administracion/provinces", "@Icons.Material.Filled.AddLocationAlt", "Administracion", "Provinces", true, true, true, true),
+        new("Municipalities", "/administracion/municipalities", "@Icons.Material.Filled.AddLocationAlt", "Administracion", "Municipalities", true, true, true, true),
+        new("IdentificationTypes", "/administracion/identification-types", "@Icons.Material.Filled.AddCard", "Administracion", "IdentificationTypes", true, true, true, true),
+        new("Areas", "/administracion/areas", "@Icons.Material.Filled.Extension", "Administracion", "Areas", true, true, true, true),
+        new("Projects", "/administracion/projects", "@Icons.Material.Filled.Factory", "Administracion", "Projects", true, true, true, true),
+        new("SystemModules"  , "/administracion/system-modules"  , "@Icons.Material.Filled.FolderCopy", "Administracion", "SystemModules", true, true, true, true),
+        new("EntityStatuses" , "/administracion/entity-statuses" , "@Icons.Material.Filled.Highlight", "Administracion", "EntityStatuses", true, true, true, true),
+        new("Compañias"      , "/administracion/companies"       , "@Icons.Material.Filled.HomeWork"      ,  "Administracion", "Companies"    , true, true, true, true),
+        new("CompanyModules", "/administracion/company-modules", "@Icons.Material.Filled.HolidayVillage", "Administracion", "CompanyModules", true, true, true, true),
+        new("CommunicationChannels", "/administracion/communication-channels", "@Icons.Material.Filled.KeyboardAlt", "Administracion", "CommunicationChannels", true, true, true, true),
         
-        new("ManejoTickets", "/ManejoTickets", "icon_ManageTicket", null, null, false, false, false, false),
-        new("Tickets", "/ManejoTickets/tickets", "icon_ticket", "ManejoTickets", "Tickets", false, false, false, false),
-        new("TimeUnits", "/ManejoTickets/time-units", "icon_time_unit", "ManejoTickets", "TimeUnits", true, true, true, true),
-        new("TicketComplexities", "/ManejoTickets/ticket-complexities", "icon_ticket_complexity", "ManejoTickets", "TicketComplexities", true, true, true, true),
-        new("TicketStatuses", "//ManejoTickets/ticket-statuses", "icon_ticket_status", "ManejoTickets", "TicketStatuses", true, true, true, true),
-        new("TicketCompanyDefaults", "/ManejoTickets/ticket-company-defaults", "icon_ticket_defaults", "ManejoTickets", "TicketCompanyDefaults", true, true, true, true)
+        new("ManejoTickets", "/ManejoTickets", "@Icons.Material.Filled.Label", null, null, false, false, false, false),
+        new("Tickets", "/ManejoTickets/tickets", "@Icons.Material.Filled.LocalPlay", "ManejoTickets", "Tickets", false, false, false, false),
+        new("TimeUnits", "/ManejoTickets/time-units", "@Icons.Material.Filled.MoreTime", "ManejoTickets", "TimeUnits", true, true, true, true),
+        new("TicketComplexities", "/ManejoTickets/ticket-complexities", "@Icons.Material.Filled.Fluorescent", "ManejoTickets", "TicketComplexities", true, true, true, true),
+        new("TicketStatuses", "/ManejoTickets/ticket-statuses", "@Icons.Material.Filled.PendingActions", "ManejoTickets", "TicketStatuses", true, true, true, true),
+        new("TicketCompanyDefaults", "/ManejoTickets/ticket-company-defaults", "@Icons.Material.Filled.LocalPlay", "ManejoTickets", "TicketCompanyDefaults", true, true, true, true),
+
+        new("Seguridad", "/Seguridad", "@Icons.Material.Filled.Security", null, null, false, false, false, false),
+        new("Usuarios", "/Seguridad/Usuarios", "@Icons.Material.Filled.SupervisedUserCircle", null,"Users", false, false, false, false),
+        new("Roles", "/Seguridad/Roles", "@Icons.Material.Filled.VerifiedUser", null,"Roles", false, false, false, false),
+        new("SystemOption", "/Seguridad/systemOptions", "@Icons.Material.Filled.SystemSecurityUpdateWarning", null,"SystemOptions", false, false, false, false),
+        new("RoleSystemOption", "/Seguridad/rolesystemoption", "@Icons.Material.Filled.SystemSecurityUpdateGood", null,"RoleSystemOption", false, false, false, false)
 
     ];
 
@@ -2107,6 +2113,14 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "TicketStatuses", true, true, true, true),
         new("Manager", "TicketCompanyDefaults", true, true, true, true),
 
+
+        new("Manager", "Seguridad", true, true, true, true),
+        new("Manager", "Usuarios", true, true, true, true),
+        new("Manager", "Roles", true, true, true, true),
+        new("Manager", "SystemOption", true, true, true, true),
+        new("Manager", "RoleSystemOption", true, true, true, true),
+
+        
         new("Supervisor", "Administracion", false, false, false, false),
         new("Supervisor", "Paises", true, true, true, false),
         new("Supervisor", "Regions", true, true, true, false),

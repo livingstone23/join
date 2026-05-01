@@ -184,7 +184,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<UserCustomer>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<UserRefreshToken>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<UserRoleCompany>().HasQueryFilter(e => e.GcRecord == 0);
-        builder.Entity<RoleSystemOption>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<RoleSystemOption>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<SystemOption>().HasQueryFilter(e => e.GcRecord == 0);
         
         

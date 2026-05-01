@@ -1,4 +1,5 @@
 using JOIN.Application.Interface.Persistence.Admin;
+using JOIN.Application.Interface.Persistence.Security;
 
 namespace JOIN.Application.Interface.Persistence;
 
@@ -12,6 +13,7 @@ public interface IUnitOfWork : IDisposable
     // --- 1. Custom Shortcuts ---
     // Keep this for repositories that have custom logic (non-generic)
     ICustomersRepository Customers { get; }
+    IRoleSystemOptionsRepository RoleSystemOptions { get; }
 
     // --- 2. Scalable Access ---
     // This allows access to any entity without modifying this interface ever again

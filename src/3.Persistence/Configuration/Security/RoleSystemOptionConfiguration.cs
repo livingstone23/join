@@ -23,13 +23,16 @@ public class RoleSystemOptionConfiguration : IEntityTypeConfiguration<RoleSystem
     /// <param name="builder">The builder to be used for configuring the entity.</param>
     public void Configure(EntityTypeBuilder<RoleSystemOption> builder)
     {
-        // Map to table "RoleSystemOptions" in schema "Admin"
-        builder.ToTable("RoleSystemOptions", "Security");
+        // Map to table "RoleSystemOptions" in schema "Admin".
+        builder.ToTable("RoleSystemOptions", "Admin");
 
         // --- Primary Key ---
-        // Define a composite primary key. This ensures a role can only have one
-        // permission entry per system option.
-        builder.HasKey(rso => new { rso.RoleId, rso.SystemOptionId });
+        builder.HasKey(rso => rso.Id);
+
+        // --- Unique Business Constraint ---
+        // A company cannot define duplicate permission rows for the same role and option.
+        builder.HasIndex(rso => new { rso.CompanyId, rso.RoleId, rso.SystemOptionId })
+            .IsUnique();
 
         // --- Properties ---
         // Set default values for permissions to false. Access must be explicitly granted.
@@ -45,19 +48,19 @@ public class RoleSystemOptionConfiguration : IEntityTypeConfiguration<RoleSystem
         builder.HasOne(rso => rso.Role)
             .WithMany(r => r.RoleSystemOptions) 
             .HasForeignKey(rso => rso.RoleId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         // 2. Relación con SystemOption (¡Asegúrate de no olvidarla!)
         builder.HasOne(rso => rso.SystemOption)
             .WithMany(so => so.RoleOptions) 
             .HasForeignKey(rso => rso.SystemOptionId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         // 3. Relación con Company (Multi-tenancy)
         builder.HasOne(x => x.Company)
             .WithMany(c => c.RoleSystemOptions)
             .HasForeignKey(x => x.CompanyId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         // --- Query Filters ---
         // Filtro global para Soft Delete

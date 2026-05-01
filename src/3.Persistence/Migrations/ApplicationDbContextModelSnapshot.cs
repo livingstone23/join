@@ -1379,10 +1379,8 @@ namespace JOIN.Persistence.Migrations
 
             modelBuilder.Entity("JOIN.Domain.Security.RoleSystemOption", b =>
                 {
-                    b.Property<Guid>("RoleId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("SystemOptionId")
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("CanCreate")
@@ -1417,22 +1415,28 @@ namespace JOIN.Persistence.Migrations
                     b.Property<int>("GcRecord")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<DateTime?>("LastModified")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("RoleId", "SystemOptionId");
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uniqueidentifier");
 
-                    b.HasIndex("CompanyId");
+                    b.Property<Guid>("SystemOptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoleId");
 
                     b.HasIndex("SystemOptionId");
 
-                    b.ToTable("RoleSystemOptions", "Security");
+                    b.HasIndex("CompanyId", "RoleId", "SystemOptionId")
+                        .IsUnique();
+
+                    b.ToTable("RoleSystemOptions", "Admin");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Security.SystemOption", b =>
@@ -2365,19 +2369,19 @@ namespace JOIN.Persistence.Migrations
                     b.HasOne("JOIN.Domain.Common.Company", "Company")
                         .WithMany("RoleSystemOptions")
                         .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("JOIN.Domain.Security.ApplicationRole", "Role")
                         .WithMany("RoleSystemOptions")
                         .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("JOIN.Domain.Security.SystemOption", "SystemOption")
                         .WithMany("RoleOptions")
                         .HasForeignKey("SystemOptionId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Company");
