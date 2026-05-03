@@ -23,8 +23,8 @@ public class RoleSystemOptionConfiguration : IEntityTypeConfiguration<RoleSystem
     /// <param name="builder">The builder to be used for configuring the entity.</param>
     public void Configure(EntityTypeBuilder<RoleSystemOption> builder)
     {
-        // Map to table "RoleSystemOptions" in schema "Admin".
-        builder.ToTable("RoleSystemOptions", "Admin");
+        // Map to table "RoleSystemOptions" in schema "Security".
+        builder.ToTable("RoleSystemOptions", "Security");
 
         // --- Primary Key ---
         builder.HasKey(rso => rso.Id);
