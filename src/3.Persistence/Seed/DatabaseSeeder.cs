@@ -2058,6 +2058,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Provinces", "/administracion/provinces", "@Icons.Material.Filled.AddLocationAlt", "Administracion", "Provinces", true, true, true, true),
         new("Municipalities", "/administracion/municipalities", "@Icons.Material.Filled.AddLocationAlt", "Administracion", "Municipalities", true, true, true, true),
         new("IdentificationTypes", "/administracion/identification-types", "@Icons.Material.Filled.AddCard", "Administracion", "IdentificationTypes", true, true, true, true),
+
+        new("StreetTypes", "/administracion/Street-types", "@Icons.Material.Filled.AddCard", "Administracion", "StreetTypes", true, true, true, true),
+        
         new("Areas", "/administracion/areas", "@Icons.Material.Filled.Extension", "Administracion", "Areas", true, true, true, true),
         new("Projects", "/administracion/projects", "@Icons.Material.Filled.Factory", "Administracion", "Projects", true, true, true, true),
         new("SystemModules"  , "/administracion/system-modules"  , "@Icons.Material.Filled.FolderCopy", "Administracion", "SystemModules", true, true, true, true),
@@ -2066,6 +2069,12 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("CompanyModules", "/administracion/company-modules", "@Icons.Material.Filled.HolidayVillage", "Administracion", "CompanyModules", true, true, true, true),
         new("CommunicationChannels", "/administracion/communication-channels", "@Icons.Material.Filled.KeyboardAlt", "Administracion", "CommunicationChannels", true, true, true, true),
         
+
+
+        new("Customers", "/Clientes", "@Icons.Material.Filled.PermContactCalendar", null, null, false, false, false, false),
+        new("Clientes", "/Clientes/Cliente", "@Icons.Material.Filled.PeopleAlt", "Clientes", "Customers", true, true, true, true),
+
+
         new("ManejoTickets", "/ManejoTickets", "@Icons.Material.Filled.Label", null, null, false, false, false, false),
         new("Tickets", "/ManejoTickets/tickets", "@Icons.Material.Filled.LocalPlay", "ManejoTickets", "Tickets", false, false, false, false),
         new("TimeUnits", "/ManejoTickets/time-units", "@Icons.Material.Filled.MoreTime", "ManejoTickets", "TimeUnits", true, true, true, true),
@@ -2100,11 +2109,16 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "Provinces", true, true, true, true),
         new("Manager", "Municipalities", true, true, true, true),
         new("Manager", "IdentificationTypes", true, true, true, true),
+        new("Manager", "StreetTypes", true, true, true, true),
         new("Manager", "Areas", true, true, true, true),
         new("Manager", "Projects", true, true, true, true),
         new("Manager", "EntityStatuses", true, true, true, true),
         new("Manager", "CompanyModules", true, true, true, true),
         new("Manager", "CommunicationChannels", true, true, true, true),
+        
+        new("Manager", "Customers", true, true, true, true),
+        new("Manager", "Clientes", true, true, true, true),
+        
         new("Manager", "Compañias", true, true, true, true),
         new("Manager", "ManejoTickets", true, true, true, true),
         new("Manager", "Tickets", true, true, true, true),
@@ -2112,8 +2126,6 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "TicketComplexities", true, true, true, true),
         new("Manager", "TicketStatuses", true, true, true, true),
         new("Manager", "TicketCompanyDefaults", true, true, true, true),
-
-
         new("Manager", "Seguridad", true, true, true, true),
         new("Manager", "Usuarios", true, true, true, true),
         new("Manager", "Roles", true, true, true, true),
@@ -2127,10 +2139,13 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "Provinces", true, true, true, false),
         new("Supervisor", "Municipalities", true, true, true, false),
         new("Supervisor", "IdentificationTypes", true, true, true, false),
+        new("Supervisor", "StreetTypes", true, true, true, true),
         new("Supervisor", "Areas", true, true, true, false),
         new("Supervisor", "Projects", true, true, true, false),
         new("Supervisor", "EntityStatuses", true, true, true, false),
         new("Supervisor", "CompanyModules", true, true, true, false),
+        new("Supervisor", "Customers", true, true, true, true),
+        new("Supervisor", "Clientes", true, true, true, true),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Compañias", true, true, true, false),
         new("Supervisor", "ManejoTickets", true, true, true, true),
@@ -2146,6 +2161,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("UsuarioSimple", "Provinces", false, false, false, false),
         new("UsuarioSimple", "Municipalities", false, false, false, false),
         new("UsuarioSimple", "IdentificationTypes", true, false, false, false),
+        new("UsuarioSimple", "StreetTypes", true, true, true, true),
         new("UsuarioSimple", "Areas", true, false, false, false),
         new("UsuarioSimple", "Projects", true, false, false, false),
         new("UsuarioSimple", "EntityStatuses", true, false, false, false),

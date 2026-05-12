@@ -1,0 +1,50 @@
+using FluentValidation;
+
+namespace JOIN.Application.UseCases.Admin.CustomerAddresses.Commands;
+
+/// <summary>
+/// Validation rules for <see cref="UpdateCustomerAddressCommand"/>.
+/// </summary>
+public sealed class UpdateCustomerAddressValidator : AbstractValidator<UpdateCustomerAddressCommand>
+{
+    /// <summary>
+    /// Initializes a new instance of the validator with all required rules.
+    /// </summary>
+    public UpdateCustomerAddressValidator()
+    {
+        RuleFor(x => x.Id)
+            .NotEmpty().WithMessage("Address id is required.");
+
+        RuleFor(x => x.CustomerId)
+            .NotEmpty().WithMessage("Customer id is required.");
+
+        RuleFor(x => x.AddressLine1)
+            .NotEmpty().WithMessage("Address line 1 is required.")
+            .MaximumLength(200).WithMessage("Address line 1 cannot exceed 200 characters.");
+
+        RuleFor(x => x.AddressLine2)
+            .MaximumLength(200).WithMessage("Address line 2 cannot exceed 200 characters.")
+            .When(x => !string.IsNullOrWhiteSpace(x.AddressLine2));
+
+        RuleFor(x => x.ZipCode)
+            .NotEmpty().WithMessage("Zip code is required.")
+            .MaximumLength(20).WithMessage("Zip code cannot exceed 20 characters.");
+
+        RuleFor(x => x.StreetTypeId)
+            .NotEmpty().WithMessage("Street type is required.");
+
+        RuleFor(x => x.CountryId)
+            .NotEmpty().WithMessage("Country is required.");
+
+        RuleFor(x => x.ProvinceId)
+            .NotEmpty().WithMessage("Province is required.");
+
+        RuleFor(x => x.MunicipalityId)
+            .NotEmpty().WithMessage("Municipality is required.");
+
+        RuleFor(x => x.RegionId)
+            .NotEqual(Guid.Empty)
+            .When(x => x.RegionId.HasValue)
+            .WithMessage("Region id cannot be an empty guid.");
+    }
+}
