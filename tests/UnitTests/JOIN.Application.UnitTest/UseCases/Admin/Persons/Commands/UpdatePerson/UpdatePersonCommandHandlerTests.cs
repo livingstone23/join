@@ -144,18 +144,24 @@ public sealed class UpdatePersonCommandHandlerTests
         customer.FirstName.Should().Be(request.FirstName);
         customer.IdentificationNumber.Should().Be(request.IdentificationNumber);
 
-        customer.Addresses.Should().HaveCount(3);
-        customer.Contacts.Should().HaveCount(3);
+        // Existing addresses remain in the collection (2); new addresses are inserted directly via the repository.
+        customer.Addresses.Should().HaveCount(2);
+        customer.Contacts.Should().HaveCount(2);
 
         customer.Addresses.Should().Contain(x => x.Id == existingAddressId && x.GcRecord == 0);
         customer.Addresses.Should().Contain(x => x.Id == removedAddressId && x.GcRecord > 0);
-        customer.Addresses.Should().Contain(x => x.Id != existingAddressId && x.Id != removedAddressId && x.PersonId == customerId && x.CompanyId == companyId);
 
         customer.Contacts.Should().Contain(x => x.Id == existingContactId && x.GcRecord == 0);
         customer.Contacts.Should().Contain(x => x.Id == removedContactId && x.GcRecord > 0);
-        customer.Contacts.Should().Contain(x => x.Id != existingContactId && x.Id != removedContactId && x.PersonId == customerId && x.CompanyId == companyId);
 
-        context.PersonsRepositoryMock.Verify(x => x.UpdateAsync(customer), Times.Once);
+        // New address and contact are inserted via repository, not added to the in-memory collection.
+        context.PersonAddressRepositoryMock.Verify(
+            x => x.InsertAsync(It.Is<PersonAddress>(a => a.PersonId == customerId && a.CompanyId == companyId)),
+            Times.Once);
+        context.PersonContactRepositoryMock.Verify(
+            x => x.InsertAsync(It.Is<PersonContact>(c => c.PersonId == customerId && c.CompanyId == companyId)),
+            Times.Once);
+
         context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -351,7 +357,6 @@ public sealed class UpdatePersonCommandHandlerTests
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("UPDATE_FAILED");
 
-        context.PersonsRepositoryMock.Verify(x => x.UpdateAsync(customer), Times.Once);
         context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -603,6 +608,11 @@ public sealed class UpdatePersonCommandHandlerTests
             SetupRepository(UnitOfWorkMock, RegionRepositoryMock);
             SetupRepository(UnitOfWorkMock, ProvinceRepositoryMock);
             SetupRepository(UnitOfWorkMock, MunicipalityRepositoryMock);
+            SetupRepository(UnitOfWorkMock, PersonAddressRepositoryMock);
+            SetupRepository(UnitOfWorkMock, PersonContactRepositoryMock);
+
+            PersonAddressRepositoryMock.Setup(x => x.InsertAsync(It.IsAny<PersonAddress>())).ReturnsAsync(true);
+            PersonContactRepositoryMock.Setup(x => x.InsertAsync(It.IsAny<PersonContact>())).ReturnsAsync(true);
         }
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
@@ -616,6 +626,8 @@ public sealed class UpdatePersonCommandHandlerTests
         public Mock<IGenericRepository<Region>> RegionRepositoryMock { get; } = CreateRepositoryMock<Region>();
         public Mock<IGenericRepository<Province>> ProvinceRepositoryMock { get; } = CreateRepositoryMock<Province>();
         public Mock<IGenericRepository<Municipality>> MunicipalityRepositoryMock { get; } = CreateRepositoryMock<Municipality>();
+        public Mock<IGenericRepository<PersonAddress>> PersonAddressRepositoryMock { get; } = CreateRepositoryMock<PersonAddress>();
+        public Mock<IGenericRepository<PersonContact>> PersonContactRepositoryMock { get; } = CreateRepositoryMock<PersonContact>();
 
         public UpdatePersonCommandHandler CreateHandler()
         {
