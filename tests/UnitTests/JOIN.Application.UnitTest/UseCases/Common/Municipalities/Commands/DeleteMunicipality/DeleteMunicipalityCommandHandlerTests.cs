@@ -42,7 +42,7 @@ public sealed class DeleteMunicipalityCommandHandlerTests
     /// Verifies the protected branch when active customer addresses reference the municipality.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenMunicipalityIsUsedByCustomerAddresses_ShouldReturnInUseError()
+    public async Task Handle_WhenMunicipalityIsUsedByPersonAddresses_ShouldReturnInUseError()
     {
         // Arrange
         var municipalityId = _fixture.Create<Guid>();
@@ -50,12 +50,12 @@ public sealed class DeleteMunicipalityCommandHandlerTests
         var entity = CreateMunicipality(municipalityId);
 
         context.MunicipalityRepositoryMock.Setup(x => x.GetAsync(municipalityId)).ReturnsAsync(entity);
-        context.CustomerAddressRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(new[]
+        context.PersonAddressRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(new[]
         {
-            new CustomerAddress
+            new PersonAddress
             {
                 CompanyId = Guid.NewGuid(),
-                CustomerId = Guid.NewGuid(),
+                PersonId = Guid.NewGuid(),
                 AddressLine1 = "Main street",
                 ZipCode = "12001",
                 StreetTypeId = Guid.NewGuid(),
@@ -90,7 +90,7 @@ public sealed class DeleteMunicipalityCommandHandlerTests
         var entity = CreateMunicipality(municipalityId);
 
         context.MunicipalityRepositoryMock.Setup(x => x.GetAsync(municipalityId)).ReturnsAsync(entity);
-        context.CustomerAddressRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<CustomerAddress>());
+        context.PersonAddressRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<PersonAddress>());
         context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
 
         var handler = context.CreateHandler();
@@ -117,7 +117,7 @@ public sealed class DeleteMunicipalityCommandHandlerTests
         var entity = CreateMunicipality(municipalityId);
 
         context.MunicipalityRepositoryMock.Setup(x => x.GetAsync(municipalityId)).ReturnsAsync(entity);
-        context.CustomerAddressRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<CustomerAddress>());
+        context.PersonAddressRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<PersonAddress>());
 
         var handler = context.CreateHandler();
 
@@ -157,13 +157,13 @@ public sealed class DeleteMunicipalityCommandHandlerTests
         {
             MunicipalityRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Municipality>())).ReturnsAsync(true);
             UnitOfWorkMock.Setup(x => x.GetRepository<Municipality>()).Returns(MunicipalityRepositoryMock.Object);
-            UnitOfWorkMock.Setup(x => x.GetRepository<CustomerAddress>()).Returns(CustomerAddressRepositoryMock.Object);
+            UnitOfWorkMock.Setup(x => x.GetRepository<PersonAddress>()).Returns(PersonAddressRepositoryMock.Object);
             UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         }
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
         public Mock<IGenericRepository<Municipality>> MunicipalityRepositoryMock { get; } = new();
-        public Mock<IGenericRepository<CustomerAddress>> CustomerAddressRepositoryMock { get; } = new();
+        public Mock<IGenericRepository<PersonAddress>> PersonAddressRepositoryMock { get; } = new();
 
         public DeleteMunicipalityCommandHandler CreateHandler()
         {

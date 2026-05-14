@@ -44,8 +44,8 @@ public class MunicipalityConfiguration : IEntityTypeConfiguration<Municipality>
             .HasForeignKey(m => m.ProvinceId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // One-to-many relationship with CustomerAddress
-        builder.HasMany(m => m.CustomerAddresses)
+        // One-to-many relationship with PersonAddress
+        builder.HasMany(m => m.PersonAddresses)
             .WithOne(ca => ca.Municipality)
             .HasForeignKey(ca => ca.MunicipalityId);
 

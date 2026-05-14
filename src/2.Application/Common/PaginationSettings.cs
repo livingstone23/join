@@ -1,5 +1,7 @@
 namespace JOIN.Application.Common;
 
+
+
 /// <summary>
 /// Represents configurable pagination defaults that can be reused across paged endpoints.
 /// </summary>

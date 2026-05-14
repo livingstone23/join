@@ -587,7 +587,7 @@ public sealed class UpdateTicketCommandHandlerTests
     /// Verifies the guard when the optional customer does not exist in the repository.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenCustomerNotFound_ShouldReturnInvalidCustomerError()
+    public async Task Handle_WhenPersonNotFound_ShouldReturnInvalidPersonError()
     {
         var companyId = _fixture.Create<Guid>();
         var currentUserId = _fixture.Create<Guid>();
@@ -604,7 +604,7 @@ public sealed class UpdateTicketCommandHandlerTests
             .With(x => x.TicketComplexityId, _fixture.Create<Guid>())
             .With(x => x.TimeUnitId, _fixture.Create<Guid>())
             .With(x => x.ChannelId, _fixture.Create<Guid>())
-            .With(x => x.CustomerId, customerId)
+            .With(x => x.PersonId, customerId)
             .Without(x => x.ProjectId)
             .Without(x => x.AreaId)
             .Without(x => x.AssignedToUserId)
@@ -620,7 +620,7 @@ public sealed class UpdateTicketCommandHandlerTests
         context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
         context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
         context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
-        context.CustomerRepositoryMock.Setup(x => x.GetAsync(customerId)).ReturnsAsync((Customer?)null);
+        context.PersonRepositoryMock.Setup(x => x.GetAsync(customerId)).ReturnsAsync((Person?)null);
 
         var handler = context.CreateHandler();
         var response = await handler.Handle(request, CancellationToken.None);
@@ -651,7 +651,7 @@ public sealed class UpdateTicketCommandHandlerTests
             .With(x => x.TimeUnitId, _fixture.Create<Guid>())
             .With(x => x.ChannelId, _fixture.Create<Guid>())
             .With(x => x.ProjectId, projectId)
-            .Without(x => x.CustomerId)
+            .Without(x => x.PersonId)
             .Without(x => x.AreaId)
             .Without(x => x.AssignedToUserId)
             .Without(x => x.PrecedentTicketId)
@@ -666,7 +666,7 @@ public sealed class UpdateTicketCommandHandlerTests
         context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
         context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
         context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
-        context.CustomerRepositoryMock.Setup(x => x.GetAsync(It.IsAny<Guid>())).ReturnsAsync((Customer?)null);
+        context.PersonRepositoryMock.Setup(x => x.GetAsync(It.IsAny<Guid>())).ReturnsAsync((Person?)null);
         context.ProjectRepositoryMock.Setup(x => x.GetAsync(projectId)).ReturnsAsync((Project?)null);
 
         var handler = context.CreateHandler();
@@ -698,7 +698,7 @@ public sealed class UpdateTicketCommandHandlerTests
             .With(x => x.TimeUnitId, _fixture.Create<Guid>())
             .With(x => x.ChannelId, _fixture.Create<Guid>())
             .With(x => x.AreaId, areaId)
-            .Without(x => x.CustomerId)
+            .Without(x => x.PersonId)
             .Without(x => x.ProjectId)
             .Without(x => x.AssignedToUserId)
             .Without(x => x.PrecedentTicketId)
@@ -895,7 +895,7 @@ public sealed class UpdateTicketCommandHandlerTests
             .With(x => x.TicketComplexityId, _fixture.Create<Guid>())
             .With(x => x.TimeUnitId, _fixture.Create<Guid>())
             .With(x => x.ChannelId, _fixture.Create<Guid>())
-            .With(x => x.CustomerId, (Guid?)null)
+            .With(x => x.PersonId, (Guid?)null)
             .With(x => x.ProjectId, (Guid?)null)
             .With(x => x.AreaId, (Guid?)null)
             .With(x => x.AssignedToUserId, assignedToUserId)
@@ -950,7 +950,7 @@ public sealed class UpdateTicketCommandHandlerTests
         entity.TicketStatusId = request.TicketStatusId;
         entity.TicketComplexityId = request.TicketComplexityId;
         entity.TimeUnitId = request.TimeUnitId;
-        entity.CustomerId = request.CustomerId;
+        entity.PersonId = request.PersonId;
         entity.ProjectId = request.ProjectId;
         entity.AreaId = request.AreaId;
         entity.ChannelId = request.ChannelId;
@@ -1004,7 +1004,7 @@ public sealed class UpdateTicketCommandHandlerTests
             SetupRepository(UnitOfWorkMock, ComplexityRepositoryMock);
             SetupRepository(UnitOfWorkMock, TimeUnitRepositoryMock);
             SetupRepository(UnitOfWorkMock, ChannelRepositoryMock);
-            SetupRepository(UnitOfWorkMock, CustomerRepositoryMock);
+            SetupRepository(UnitOfWorkMock, PersonRepositoryMock);
             SetupRepository(UnitOfWorkMock, ProjectRepositoryMock);
             SetupRepository(UnitOfWorkMock, AreaRepositoryMock);
             SetupRepository(UnitOfWorkMock, UserRepositoryMock);
@@ -1020,7 +1020,7 @@ public sealed class UpdateTicketCommandHandlerTests
         public Mock<IGenericRepository<TicketComplexity>> ComplexityRepositoryMock { get; } = CreateRepositoryMock<TicketComplexity>();
         public Mock<IGenericRepository<TimeUnit>> TimeUnitRepositoryMock { get; } = CreateRepositoryMock<TimeUnit>();
         public Mock<IGenericRepository<CommunicationChannel>> ChannelRepositoryMock { get; } = CreateRepositoryMock<CommunicationChannel>();
-        public Mock<IGenericRepository<Customer>> CustomerRepositoryMock { get; } = CreateRepositoryMock<Customer>();
+        public Mock<IGenericRepository<Person>> PersonRepositoryMock { get; } = CreateRepositoryMock<Person>();
         public Mock<IGenericRepository<Project>> ProjectRepositoryMock { get; } = CreateRepositoryMock<Project>();
         public Mock<IGenericRepository<Area>> AreaRepositoryMock { get; } = CreateRepositoryMock<Area>();
         public Mock<IGenericRepository<ApplicationUser>> UserRepositoryMock { get; } = CreateRepositoryMock<ApplicationUser>();

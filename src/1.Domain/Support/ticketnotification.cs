@@ -17,6 +17,7 @@ namespace JOIN.Domain.Support;
 /// </summary>
 public class TicketNotification : BaseTenantEntity
 {
+    
     /// <summary>
     /// Foreign key to the associated Ticket. 
     /// Nullable to support generic notifications (e.g., "You have 5 pending tasks").

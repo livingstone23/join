@@ -17,7 +17,7 @@ namespace JOIN.Domain.Common;
 public class CommunicationChannel : BaseAuditableEntity
 {
     /// <summary>
-    /// Gets or sets the name of the channel (e.g., "WhatsApp Business", "Customer Portal").
+    /// Gets or sets the name of the channel (e.g., "WhatsApp Business", "Person Portal").
     /// </summary>
     public string Name { get; set; } = string.Empty;
 

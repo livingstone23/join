@@ -92,7 +92,7 @@ public sealed class DeleteSystemModuleCommandHandlerTests
                 new SystemOption
                 {
                     ModuleId = entity.Id,
-                    Name = "Manage Customers",
+                    Name = "Manage Persons",
                     Route = "/customers",
                     GcRecord = 0
                 }
@@ -193,7 +193,7 @@ public sealed class DeleteSystemModuleCommandHandlerTests
         var entity = new SystemModule
         {
             Name = "CRM",
-            Description = "Customer management",
+            Description = "Person management",
             Icon = "fa-users",
             IsActive = true,
             GcRecord = gcRecord

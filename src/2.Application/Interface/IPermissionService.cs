@@ -13,6 +13,7 @@ namespace JOIN.Application.Interface;
 /// </summary>
 public interface IPermissionService
 {
+    
     /// <summary>
     /// Validates if the user has permission to execute an action on a specific resource.
     /// Uses in-memory caching to ensure sub-millisecond response times, avoiding direct DB hits.

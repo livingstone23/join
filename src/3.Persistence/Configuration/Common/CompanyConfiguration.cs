@@ -43,7 +43,7 @@ public class CompanyConfiguration : IEntityTypeConfiguration<Company>
 
         // --- Relationships ---
 
-        builder.HasMany(c => c.Customers)
+        builder.HasMany(c => c.Persons)
             .WithOne(cu => cu.Company)
             .HasForeignKey(cu => cu.CompanyId);
             

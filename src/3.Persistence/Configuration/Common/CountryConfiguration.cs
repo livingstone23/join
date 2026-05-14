@@ -49,7 +49,7 @@ public class CountryConfiguration : IEntityTypeConfiguration<Country>
             .HasForeignKey(r => r.CountryId);
 
         // One-to-many relationship with Province
-        builder.HasMany(c => c.CustomerAddresses)
+        builder.HasMany(c => c.PersonAddresses)
             .WithOne(p => p.Country)
             .HasForeignKey(p => p.CountryId);
 

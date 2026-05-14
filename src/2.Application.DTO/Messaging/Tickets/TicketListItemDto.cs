@@ -55,12 +55,12 @@ public record TicketListItemDto
     /// <summary>
     /// Gets the optional customer identifier.
     /// </summary>
-    public Guid? CustomerId { get; init; }
+    public Guid? PersonId { get; init; }
 
     /// <summary>
     /// Gets the optional customer name.
     /// </summary>
-    public string? CustomerName { get; init; }
+    public string? PersonName { get; init; }
 
     /// <summary>
     /// Gets the optional assigned user identifier.

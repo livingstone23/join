@@ -1,6 +1,10 @@
 using JOIN.Domain.Audit;
 
+
+
 namespace JOIN.Domain.Security;
+
+
 
 /// <summary>
 /// Represents a persisted refresh token issued for an authenticated user session.

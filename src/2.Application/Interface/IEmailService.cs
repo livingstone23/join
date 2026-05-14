@@ -1,5 +1,7 @@
 namespace JOIN.Application.Interface;
 
+
+
 /// <summary>
 /// Defines the contract for the email sending service.
 /// Acts as the Adapter boundary between the Application layer and any concrete
@@ -10,6 +12,8 @@ namespace JOIN.Application.Interface;
 /// </summary>
 public interface IEmailService
 {
+
+    
     /// <summary>
     /// Sends an HTML email message to a single recipient.
     /// </summary>
@@ -28,4 +32,6 @@ public interface IEmailService
     /// <c>false</c> if the delivery attempt failed (provider error, invalid credentials, etc.).
     /// </returns>
     Task<bool> SendEmailAsync(string to, string subject, string htmlContent);
+
+
 }

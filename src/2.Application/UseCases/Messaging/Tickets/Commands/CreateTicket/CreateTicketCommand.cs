@@ -57,7 +57,7 @@ public record CreateTicketCommand : IRequest<Response<TicketDto>>
     /// <summary>
     /// Gets or sets the optional customer identifier.
     /// </summary>
-    public Guid? CustomerId { get; init; }
+    public Guid? PersonId { get; init; }
 
     /// <summary>
     /// Gets or sets the optional project identifier.

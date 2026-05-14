@@ -2,7 +2,11 @@
 using FluentValidation;
 using MediatR;
 
+
+
 namespace JOIN.Application.Common;
+
+
 
 /// <summary>
 /// MediatR pipeline behavior that automatically runs FluentValidation rules before executing a request handler.

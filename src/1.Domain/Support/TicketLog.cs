@@ -28,7 +28,7 @@ public class TicketLog: BaseTenantEntity
     public LogType LogType { get; set; }
     
     /// <summary>
-    /// Action describing by the user indicated in the log (e.g., "Status changed from Open to In Progress", "Added note: 'Customer called for update'").
+    /// Action describing by the user indicated in the log (e.g., "Status changed from Open to In Progress", "Added note: 'Person called for update'").
     /// it can be a description of any significant event or change related to the ticket.
     /// </summary>
     public string Summary { get; set; } = string.Empty;

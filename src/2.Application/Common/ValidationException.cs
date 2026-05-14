@@ -15,10 +15,13 @@ namespace JOIN.Application.Common;
 /// </summary>
 public class ValidationException : Exception
 {
+
+
     /// <summary>
     /// Gets the dictionary of validation errors grouped by property name.
     /// </summary>
     public IDictionary<string, string[]> Errors { get; }
+
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ValidationException"/> class.
@@ -28,6 +31,7 @@ public class ValidationException : Exception
     {
         Errors = new Dictionary<string, string[]>();
     }
+
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ValidationException"/> class 
@@ -41,6 +45,8 @@ public class ValidationException : Exception
             .GroupBy(e => e.PropertyName, e => e.ErrorMessage)
             .ToDictionary(failureGroup => failureGroup.Key, failureGroup => failureGroup.ToArray());
     }
+
+    
 }
 
 

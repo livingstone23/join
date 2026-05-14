@@ -24,7 +24,7 @@ public sealed class DeleteMunicipalityCommandHandler(IUnitOfWork unitOfWork)
     public async Task<Response<Guid>> Handle(DeleteMunicipalityCommand request, CancellationToken cancellationToken)
     {
         var municipalityRepository = _unitOfWork.GetRepository<Municipality>();
-        var customerAddressRepository = _unitOfWork.GetRepository<CustomerAddress>();
+        var customerAddressRepository = _unitOfWork.GetRepository<PersonAddress>();
 
         var municipalityEntity = await municipalityRepository.GetAsync(request.Id);
         if (municipalityEntity is null)

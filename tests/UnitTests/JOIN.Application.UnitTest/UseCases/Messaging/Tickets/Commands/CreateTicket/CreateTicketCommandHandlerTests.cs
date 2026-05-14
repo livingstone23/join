@@ -52,7 +52,7 @@ public sealed class CreateTicketCommandHandlerTests
         var complexityRepositoryMock = CreateRepositoryMock<TicketComplexity>();
         var timeUnitRepositoryMock = CreateRepositoryMock<TimeUnit>();
         var channelRepositoryMock = CreateRepositoryMock<CommunicationChannel>();
-        var customerRepositoryMock = CreateRepositoryMock<Customer>();
+        var customerRepositoryMock = CreateRepositoryMock<Person>();
         var projectRepositoryMock = CreateRepositoryMock<Project>();
         var areaRepositoryMock = CreateRepositoryMock<Area>();
         var userRepositoryMock = CreateRepositoryMock<ApplicationUser>();
@@ -111,7 +111,7 @@ public sealed class CreateTicketCommandHandlerTests
     /// from being persisted with invalid references inside the current tenant.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenCustomerDoesNotExist_ShouldReturnInvalidCustomerError()
+    public async Task Handle_WhenPersonDoesNotExist_ShouldReturnInvalidPersonError()
     {
         var companyId = _fixture.Create<Guid>();
         var currentUserId = _fixture.Create<Guid>();
@@ -129,7 +129,7 @@ public sealed class CreateTicketCommandHandlerTests
         var complexityRepositoryMock = CreateRepositoryMock<TicketComplexity>();
         var timeUnitRepositoryMock = CreateRepositoryMock<TimeUnit>();
         var channelRepositoryMock = CreateRepositoryMock<CommunicationChannel>();
-        var customerRepositoryMock = CreateRepositoryMock<Customer>();
+        var customerRepositoryMock = CreateRepositoryMock<Person>();
         var projectRepositoryMock = CreateRepositoryMock<Project>();
         var areaRepositoryMock = CreateRepositoryMock<Area>();
         var userRepositoryMock = CreateRepositoryMock<ApplicationUser>();
@@ -140,7 +140,7 @@ public sealed class CreateTicketCommandHandlerTests
         complexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "Alta" });
         timeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Horas" });
         channelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "WhatsApp" });
-        customerRepositoryMock.Setup(x => x.GetAsync(customerId)).ReturnsAsync((Customer?)null);
+        customerRepositoryMock.Setup(x => x.GetAsync(customerId)).ReturnsAsync((Person?)null);
 
         SetupRepository(unitOfWorkMock, companyRepositoryMock);
         SetupRepository(unitOfWorkMock, ticketRepositoryMock);
@@ -196,7 +196,7 @@ public sealed class CreateTicketCommandHandlerTests
         var complexityRepositoryMock = CreateRepositoryMock<TicketComplexity>();
         var timeUnitRepositoryMock = CreateRepositoryMock<TimeUnit>();
         var channelRepositoryMock = CreateRepositoryMock<CommunicationChannel>();
-        var customerRepositoryMock = CreateRepositoryMock<Customer>();
+        var customerRepositoryMock = CreateRepositoryMock<Person>();
         var projectRepositoryMock = CreateRepositoryMock<Project>();
         var areaRepositoryMock = CreateRepositoryMock<Area>();
         var userRepositoryMock = CreateRepositoryMock<ApplicationUser>();
@@ -258,7 +258,7 @@ public sealed class CreateTicketCommandHandlerTests
         var complexityRepositoryMock = CreateRepositoryMock<TicketComplexity>();
         var timeUnitRepositoryMock = CreateRepositoryMock<TimeUnit>();
         var channelRepositoryMock = CreateRepositoryMock<CommunicationChannel>();
-        var customerRepositoryMock = CreateRepositoryMock<Customer>();
+        var customerRepositoryMock = CreateRepositoryMock<Person>();
         var projectRepositoryMock = CreateRepositoryMock<Project>();
         var areaRepositoryMock = CreateRepositoryMock<Area>();
         var userRepositoryMock = CreateRepositoryMock<ApplicationUser>();
@@ -505,7 +505,7 @@ public sealed class CreateTicketCommandHandlerTests
             .With(x => x.TimeUnitId, request.TimeUnitId)
             .With(x => x.ChannelId, request.ChannelId)
             .With(x => x.ProjectId, projectId)
-            .Without(x => x.CustomerId)
+            .Without(x => x.PersonId)
             .Without(x => x.AreaId)
             .Without(x => x.AssignedToUserId)
             .Without(x => x.PrecedentTicketId)
@@ -520,7 +520,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, SetupStatus<TicketComplexity>(request.TicketComplexityId, new TicketComplexity { Name = "High" }));
         SetupRepository(unitOfWorkMock, SetupStatus<TimeUnit>(request.TimeUnitId, new TimeUnit { Name = "Hours" }));
         SetupRepository(unitOfWorkMock, SetupStatus<CommunicationChannel>(request.ChannelId, new CommunicationChannel { Name = "Portal" }));
-        var customerRepo = CreateRepositoryMock<Customer>();
+        var customerRepo = CreateRepositoryMock<Person>();
         SetupRepository(unitOfWorkMock, customerRepo);
         var projectRepo = CreateRepositoryMock<Project>();
         projectRepo.Setup(x => x.GetAsync(projectId)).ReturnsAsync((Project?)null);
@@ -557,7 +557,7 @@ public sealed class CreateTicketCommandHandlerTests
             .With(x => x.TimeUnitId, _fixture.Create<Guid>())
             .With(x => x.ChannelId, _fixture.Create<Guid>())
             .With(x => x.AreaId, areaId)
-            .Without(x => x.CustomerId)
+            .Without(x => x.PersonId)
             .Without(x => x.ProjectId)
             .Without(x => x.AssignedToUserId)
             .Without(x => x.PrecedentTicketId)
@@ -572,7 +572,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, SetupStatus<TicketComplexity>(request.TicketComplexityId, new TicketComplexity { Name = "High" }));
         SetupRepository(unitOfWorkMock, SetupStatus<TimeUnit>(request.TimeUnitId, new TimeUnit { Name = "Hours" }));
         SetupRepository(unitOfWorkMock, SetupStatus<CommunicationChannel>(request.ChannelId, new CommunicationChannel { Name = "Portal" }));
-        SetupRepository(unitOfWorkMock, CreateRepositoryMock<Customer>());
+        SetupRepository(unitOfWorkMock, CreateRepositoryMock<Person>());
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Project>());
         var areaRepo = CreateRepositoryMock<Area>();
         areaRepo.Setup(x => x.GetAsync(areaId)).ReturnsAsync((Area?)null);
@@ -609,7 +609,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, SetupStatus<TicketComplexity>(request.TicketComplexityId, new TicketComplexity { Name = "High" }));
         SetupRepository(unitOfWorkMock, SetupStatus<TimeUnit>(request.TimeUnitId, new TimeUnit { Name = "Hours" }));
         SetupRepository(unitOfWorkMock, SetupStatus<CommunicationChannel>(request.ChannelId, new CommunicationChannel { Name = "Portal" }));
-        SetupRepository(unitOfWorkMock, CreateRepositoryMock<Customer>());
+        SetupRepository(unitOfWorkMock, CreateRepositoryMock<Person>());
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Project>());
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Area>());
         var userRepo = CreateRepositoryMock<ApplicationUser>();
@@ -647,7 +647,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, SetupStatus<TicketComplexity>(request.TicketComplexityId, new TicketComplexity { Name = "High" }));
         SetupRepository(unitOfWorkMock, SetupStatus<TimeUnit>(request.TimeUnitId, new TimeUnit { Name = "Hours" }));
         SetupRepository(unitOfWorkMock, SetupStatus<CommunicationChannel>(request.ChannelId, new CommunicationChannel { Name = "Portal" }));
-        SetupRepository(unitOfWorkMock, CreateRepositoryMock<Customer>());
+        SetupRepository(unitOfWorkMock, CreateRepositoryMock<Person>());
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Project>());
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Area>());
         var userRepo = CreateRepositoryMock<ApplicationUser>();
@@ -688,7 +688,7 @@ public sealed class CreateTicketCommandHandlerTests
             .With(x => x.TimeUnitId, _fixture.Create<Guid>())
             .With(x => x.ChannelId, _fixture.Create<Guid>())
             .With(x => x.PrecedentTicketId, precedentId)
-            .Without(x => x.CustomerId)
+            .Without(x => x.PersonId)
             .Without(x => x.ProjectId)
             .Without(x => x.AreaId)
             .Without(x => x.AssignedToUserId)
@@ -703,7 +703,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, SetupStatus<TicketComplexity>(request.TicketComplexityId, new TicketComplexity { Name = "High" }));
         SetupRepository(unitOfWorkMock, SetupStatus<TimeUnit>(request.TimeUnitId, new TimeUnit { Name = "Hours" }));
         SetupRepository(unitOfWorkMock, SetupStatus<CommunicationChannel>(request.ChannelId, new CommunicationChannel { Name = "Portal" }));
-        SetupRepository(unitOfWorkMock, CreateRepositoryMock<Customer>());
+        SetupRepository(unitOfWorkMock, CreateRepositoryMock<Person>());
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Project>());
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Area>());
         var ticketRepo = CreateRepositoryMock<Ticket>();
@@ -744,7 +744,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, SetupStatus<TicketComplexity>(request.TicketComplexityId, new TicketComplexity { Name = "High" }));
         SetupRepository(unitOfWorkMock, SetupStatus<TimeUnit>(request.TimeUnitId, new TimeUnit { Name = "Hours" }));
         SetupRepository(unitOfWorkMock, SetupStatus<CommunicationChannel>(request.ChannelId, new CommunicationChannel { Name = "Portal" }));
-        SetupRepository(unitOfWorkMock, CreateRepositoryMock<Customer>());
+        SetupRepository(unitOfWorkMock, CreateRepositoryMock<Person>());
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Project>());
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Area>());
 
@@ -846,7 +846,7 @@ public sealed class CreateTicketCommandHandlerTests
             .With(x => x.TicketComplexityId, _fixture.Create<Guid>())
             .With(x => x.TimeUnitId, _fixture.Create<Guid>())
             .With(x => x.ChannelId, _fixture.Create<Guid>())
-            .With(x => x.CustomerId, customerId)
+            .With(x => x.PersonId, customerId)
             .Without(x => x.ProjectId)
             .Without(x => x.AreaId)
             .With(x => x.AssignedToUserId, assignedToUserId)
@@ -872,7 +872,7 @@ public sealed class CreateTicketCommandHandlerTests
             TicketStatusId = request.TicketStatusId,
             TicketComplexityId = request.TicketComplexityId,
             TimeUnitId = request.TimeUnitId,
-            CustomerId = request.CustomerId,
+            PersonId = request.PersonId,
             ProjectId = request.ProjectId,
             AreaId = request.AreaId,
             ChannelId = request.ChannelId,

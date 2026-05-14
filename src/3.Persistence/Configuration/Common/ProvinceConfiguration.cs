@@ -57,7 +57,7 @@ public class ProvinceConfiguration : IEntityTypeConfiguration<Province>
             .HasForeignKey(m => m.ProvinceId);
 
         // One-to-many relationship with Municipality
-        builder.HasMany(p => p.CustomerAddresses)
+        builder.HasMany(p => p.PersonAddresses)
             .WithOne(m => m.Province)
             .HasForeignKey(m => m.ProvinceId);    
             

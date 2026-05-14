@@ -3,7 +3,11 @@ using JOIN.Application.DTO.Security;
 using JOIN.Application.UseCases.Security.SystemOptions.Commands;
 using Riok.Mapperly.Abstractions;
 
+
+
 namespace JOIN.Application.Mappings.Security.SystemOption;
+
+
 
 /// <summary>
 /// Mapperly implementation for SystemOption entity and DTOs.
@@ -11,6 +15,8 @@ namespace JOIN.Application.Mappings.Security.SystemOption;
 [Mapper]
 public partial class SystemOptionMapper : ISystemOptionMapper
 {
+
+
     [MapperIgnoreSource(nameof(JOIN.Domain.Security.SystemOption.Module))]
     [MapperIgnoreSource(nameof(JOIN.Domain.Security.SystemOption.Parent))]
     [MapperIgnoreSource(nameof(JOIN.Domain.Security.SystemOption.Children))]
@@ -41,4 +47,7 @@ public partial class SystemOptionMapper : ISystemOptionMapper
     [MapperIgnoreTarget(nameof(JOIN.Domain.Security.SystemOption.RoleOptions))]
     [MapperIgnoreSource(nameof(UpdateSystemOptionCommand.Id))]
     public partial void ApplyUpdate(UpdateSystemOptionCommand command, JOIN.Domain.Security.SystemOption entity);
+
+
 }
+

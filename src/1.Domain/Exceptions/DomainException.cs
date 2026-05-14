@@ -1,5 +1,7 @@
 namespace JOIN.Domain.Exceptions;
 
+
+
 /// <summary>
 /// Represents a business rule violation raised by the domain model.
 /// </summary>

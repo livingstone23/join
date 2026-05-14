@@ -55,7 +55,7 @@ public sealed class GetSystemModulesQueryHandlerTests
 
         var item = response.Data.Items.Single();
         item.Name.Should().Be("CRM");
-        item.Description.Should().Be("Customer management");
+        item.Description.Should().Be("Person management");
         item.Icon.Should().Be("fa-users");
         item.IsActive.Should().BeTrue();
         item.Order.Should().Be(1);
@@ -121,7 +121,7 @@ public sealed class GetSystemModulesQueryHandlerTests
             {
                 ["Id"] = Guid.NewGuid(),
                 ["Name"] = "CRM",
-                ["Description"] = "Customer management",
+                ["Description"] = "Person management",
                 ["Icon"] = "fa-users",
                 ["IsActive"] = true,
                 ["Order"] = 1,

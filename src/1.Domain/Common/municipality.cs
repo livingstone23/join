@@ -39,6 +39,6 @@ public class Municipality : BaseAuditableEntity
     /// <summary>
     /// Collection of customer addresses located within this specific municipality.
     /// </summary>
-    public virtual ICollection<CustomerAddress> CustomerAddresses { get; set; } = new List<CustomerAddress>();
+    public virtual ICollection<PersonAddress> PersonAddresses { get; set; } = new List<PersonAddress>();
 
 }

@@ -4,7 +4,11 @@ using JOIN.Application.UseCases.Security.RoleSystemOptions.Commands;
 using JOIN.Domain.Security;
 using Riok.Mapperly.Abstractions;
 
+
+
 namespace JOIN.Application.Mappings.Security.RoleSystemOption;
+
+
 
 /// <summary>
 /// Mapperly implementation for RoleSystemOption entity and DTO projections.
@@ -12,6 +16,8 @@ namespace JOIN.Application.Mappings.Security.RoleSystemOption;
 [Mapper]
 public partial class RoleSystemOptionMapper : IRoleSystemOptionMapper
 {
+
+
     [MapperIgnoreSource(nameof(JOIN.Domain.Security.RoleSystemOption.Role))]
     [MapperIgnoreSource(nameof(JOIN.Domain.Security.RoleSystemOption.SystemOption))]
     [MapperIgnoreSource(nameof(JOIN.Domain.Security.RoleSystemOption.Company))]
@@ -50,4 +56,7 @@ public partial class RoleSystemOptionMapper : IRoleSystemOptionMapper
     [MapperIgnoreTarget(nameof(JOIN.Domain.Security.RoleSystemOption.SystemOption))]
     [MapperIgnoreTarget(nameof(JOIN.Domain.Security.RoleSystemOption.Company))]
     public partial void ApplyUpdate(UpdateRoleSystemOptionCommand command, JOIN.Domain.Security.RoleSystemOption entity);
+
+
 }
+

@@ -2,7 +2,11 @@ using JOIN.Application.UseCases.Messaging.TicketCompanyDefaults.Commands;
 using JOIN.Domain.Messaging;
 using Riok.Mapperly.Abstractions;
 
+
+
 namespace JOIN.Application.Mappings;
+
+
 
 /// <summary>
 /// Auto-generated mapper for tenant ticket default configuration entities.
@@ -10,6 +14,7 @@ namespace JOIN.Application.Mappings;
 [Mapper]
 public partial class TicketCompanyDefaultMapper : ITicketCompanyDefaultMapper
 {
+
     /// <summary>
     /// Maps a create command into a new entity while ignoring infrastructure-owned fields.
     /// </summary>
@@ -48,4 +53,7 @@ public partial class TicketCompanyDefaultMapper : ITicketCompanyDefaultMapper
     [MapperIgnoreTarget(nameof(TicketCompanyDefault.ChannelDefault))]
     [MapperIgnoreSource(nameof(UpdateTicketCompanyDefaultCommand.Id))]
     public partial void ApplyUpdate(UpdateTicketCompanyDefaultCommand command, TicketCompanyDefault entity);
+
 }
+
+

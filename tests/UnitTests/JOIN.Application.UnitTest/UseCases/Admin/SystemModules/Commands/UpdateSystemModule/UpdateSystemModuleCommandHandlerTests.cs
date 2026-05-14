@@ -183,13 +183,13 @@ public sealed class UpdateSystemModuleCommandHandlerTests
         response.Data.Should().NotBeNull();
         response.Data!.Id.Should().Be(entity.Id);
         response.Data.Name.Should().Be("CRM");
-        response.Data.Description.Should().Be("Customer management");
+        response.Data.Description.Should().Be("Person management");
         response.Data.Icon.Should().Be("fa-users");
         response.Data.IsActive.Should().BeTrue();
         response.Data.Order.Should().Be(5);
 
         entity.Name.Should().Be("CRM");
-        entity.Description.Should().Be("Customer management");
+        entity.Description.Should().Be("Person management");
         entity.Icon.Should().Be("fa-users");
         entity.Order.Should().Be(5);
 
@@ -205,7 +205,7 @@ public sealed class UpdateSystemModuleCommandHandlerTests
         {
             Id = id,
             Name = "  CRM  ",
-            Description = "  Customer management  ",
+            Description = "  Person management  ",
             Icon = "  fa-users  ",
             IsActive = true,
             Order = 5

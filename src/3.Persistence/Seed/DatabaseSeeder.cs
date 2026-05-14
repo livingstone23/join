@@ -102,9 +102,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedTicketCompanyDefaultsAsync(joinCompanyId, defaultTimeUnitId);
 
             // 7. Entidades operacionales (Clientes)
-            await SeedJoinCustomersAsync(joinCompanyId, idTypeId);
-            await SeedPrivateCustomersAsync(privateCompanyId, idTypeId);
-            await SeedJoinCustomerAddressesAndContactsAsync(joinCompanyId);
+            await SeedJoinPersonsAsync(joinCompanyId, idTypeId);
+            await SeedPrivatePersonsAsync(privateCompanyId, idTypeId);
+            await SeedJoinPersonAddressesAndContactsAsync(joinCompanyId);
             await SeedJoinTicketsAsync(joinCompanyId);
 
             // Guardado final para asegurar consistencia
@@ -120,7 +120,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
     private async Task SeedRolesAsync()
     {
-        string[] roles = { "SuperAdmin", "Admin", "Agent", "Customer", "Manager", "Supervisor", "Coordinador", "UsuarioSimple" };
+        string[] roles = { "SuperAdmin", "Admin", "Agent", "Person", "Manager", "Supervisor", "Coordinador", "UsuarioSimple" };
 
         foreach (var roleName in roles)
         {
@@ -581,20 +581,20 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         _logger.LogInformation("Projects seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
     }
 
-    private async Task SeedJoinCustomersAsync(Guid companyId, Guid idTypeId)
+    private async Task SeedJoinPersonsAsync(Guid companyId, Guid idTypeId)
     {
-        var seeds = GetJoinCustomerSeeds();
+        var seeds = GetJoinPersonSeeds();
         var inserted = 0;
 
         foreach (var seed in seeds)
         {
-            var exists = await _context.Customers
+            var exists = await _context.Persons
                 .IgnoreQueryFilters()
                 .AnyAsync(c => c.CompanyId == companyId && c.IdentificationNumber == seed.IdentificationNumber);
 
             if (exists) continue;
 
-            _context.Customers.Add(new Customer
+            _context.Persons.Add(new Person
             {
                 CompanyId = companyId,
                 PersonType = seed.PersonType,
@@ -616,20 +616,20 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         _logger.LogInformation("JOIN customers seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
     }
 
-    private async Task SeedPrivateCustomersAsync(Guid companyId, Guid idTypeId)
+    private async Task SeedPrivatePersonsAsync(Guid companyId, Guid idTypeId)
     {
-        var seeds = GetPrivateCustomerSeeds();
+        var seeds = GetPrivatePersonSeeds();
         var inserted = 0;
 
         foreach (var seed in seeds)
         {
-            var exists = await _context.Customers
+            var exists = await _context.Persons
                 .IgnoreQueryFilters()
                 .AnyAsync(c => c.CompanyId == companyId && c.IdentificationNumber == seed.IdentificationNumber);
 
             if (exists) continue;
 
-            _context.Customers.Add(new Customer
+            _context.Persons.Add(new Person
             {
                 CompanyId = companyId,
                 PersonType = seed.PersonType,
@@ -651,14 +651,14 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         _logger.LogInformation("Private Company customers seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
     }
 
-    private async Task SeedJoinCustomerAddressesAndContactsAsync(Guid companyId)
+    private async Task SeedJoinPersonAddressesAndContactsAsync(Guid companyId)
     {
-        var joinSeeds = GetJoinCustomerSeeds().Take(30).ToList();
+        var joinSeeds = GetJoinPersonSeeds().Take(30).ToList();
         var identificationNumbers = joinSeeds
             .Select(x => x.IdentificationNumber)
             .ToList();
 
-        var customersByIdNumber = await _context.Customers
+        var customersByIdNumber = await _context.Persons
             .IgnoreQueryFilters()
             .Where(c => c.CompanyId == companyId && identificationNumbers.Contains(c.IdentificationNumber))
             .ToDictionaryAsync(c => c.IdentificationNumber, c => c);
@@ -688,19 +688,19 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var customerIds = customersByIdNumber.Values.Select(c => c.Id).ToList();
 
-        var existingAddressCounts = await _context.CustomerAddresses
+        var existingAddressCounts = await _context.PersonAddresses
             .IgnoreQueryFilters()
-            .Where(a => customerIds.Contains(a.CustomerId))
-            .GroupBy(a => a.CustomerId)
-            .Select(g => new { CustomerId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.CustomerId, x => x.Count);
+            .Where(a => customerIds.Contains(a.PersonId))
+            .GroupBy(a => a.PersonId)
+            .Select(g => new { PersonId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.PersonId, x => x.Count);
 
-        var existingContactCounts = await _context.CustomerContacts
+        var existingContactCounts = await _context.PersonContacts
             .IgnoreQueryFilters()
-            .Where(c => customerIds.Contains(c.CustomerId))
-            .GroupBy(c => c.CustomerId)
-            .Select(g => new { CustomerId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.CustomerId, x => x.Count);
+            .Where(c => customerIds.Contains(c.PersonId))
+            .GroupBy(c => c.PersonId)
+            .Select(g => new { PersonId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.PersonId, x => x.Count);
 
         var insertedAddresses = 0;
         var insertedContacts = 0;
@@ -710,7 +710,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             var seed = joinSeeds[i];
             if (!customersByIdNumber.TryGetValue(seed.IdentificationNumber, out var customer))
             {
-                _logger.LogWarning("Customer with identification {IdentificationNumber} was not found for address/contact seeding.", seed.IdentificationNumber);
+                _logger.LogWarning("Person with identification {IdentificationNumber} was not found for address/contact seeding.", seed.IdentificationNumber);
                 continue;
             }
 
@@ -720,10 +720,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
             for (var j = currentAddressCount; j < targetCount; j++)
             {
-                _context.CustomerAddresses.Add(new CustomerAddress
+                _context.PersonAddresses.Add(new PersonAddress
                 {
                     CompanyId = companyId,
-                    CustomerId = customer.Id,
+                    PersonId = customer.Id,
                     AddressLine1 = $"Avenida {i + 1:D2}, Bloque {j + 1:D2}",
                     AddressLine2 = $"Colonia Empresarial {((i % 5) + 1):D2}",
                     ZipCode = $"21{i + 1:D2}{j + 1:D2}",
@@ -759,10 +759,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                     _ => $"+504220{i + 1:D2}{j + 1:D2}"
                 };
 
-                _context.CustomerContacts.Add(new CustomerContact
+                _context.PersonContacts.Add(new PersonContact
                 {
                     CompanyId = companyId,
-                    CustomerId = customer.Id,
+                    PersonId = customer.Id,
                     ContactType = contactType,
                     ContactValue = contactValue,
                     IsPrimary = j == 0,
@@ -787,7 +787,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             insertedContacts);
     }
 
-    private static List<CustomerSeed> GetJoinCustomerSeeds() =>
+    private static List<PersonSeed> GetJoinPersonSeeds() =>
     [
         // Physical persons (22)
         new(PersonType.Physical, "Carlos",     "101-1980101-1", LastName: "Mendoza"),
@@ -823,7 +823,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new(PersonType.Legal, "Monica",  "0614-01010-10008", LastName: "Salazar",  CommercialName: "Consultores Estrategicos Unificados S.A.")
     ];
 
-    private static List<CustomerSeed> GetPrivateCustomerSeeds() =>
+    private static List<PersonSeed> GetPrivatePersonSeeds() =>
     [
         // Physical persons (3)
         new(PersonType.Physical, "Michael", "PC-2000001-1", LastName: "Johnson"),
@@ -1377,7 +1377,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(x => x.GcRecord == 0);
 
-        var customers = await _context.Customers
+        var customers = await _context.Persons
             .IgnoreQueryFilters()
             .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
             .OrderBy(x => x.Created)
@@ -1418,7 +1418,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             new($"{codePrefix}0001", "Portal login intermittent failure", "Users report intermittent login failures in customer portal.", managerUser.Id, openStatusId, highComplexityId, 16m, 2m, true, customers.ElementAtOrDefault(0)?.Id, projects.ElementAtOrDefault(0)?.Id, areas.ElementAtOrDefault(0)?.Id),
             new($"{codePrefix}0002", "Invoice PDF formatting issue", "Generated invoice PDF truncates long customer names.", managerUser.Id, inProgressStatusId, mediumComplexityId, 8m, 3m, false, customers.ElementAtOrDefault(1)?.Id, projects.ElementAtOrDefault(1)?.Id, areas.ElementAtOrDefault(1)?.Id),
             new($"{codePrefix}0003", "Email notifications delayed", "Outbound email notifications are delayed more than 10 minutes.", managerUser.Id, openStatusId, mediumComplexityId, 12m, 1m, false, customers.ElementAtOrDefault(2)?.Id, projects.ElementAtOrDefault(2)?.Id, areas.ElementAtOrDefault(2)?.Id),
-            new($"{codePrefix}0004", "Customer merge validation", "Validation message should explain duplicate tax id behavior.", simpleUser.Id, resolvedStatusId, lowComplexityId, 4m, 4m, false, customers.ElementAtOrDefault(0)?.Id, projects.ElementAtOrDefault(0)?.Id, areas.ElementAtOrDefault(1)?.Id),
+            new($"{codePrefix}0004", "Person merge validation", "Validation message should explain duplicate tax id behavior.", simpleUser.Id, resolvedStatusId, lowComplexityId, 4m, 4m, false, customers.ElementAtOrDefault(0)?.Id, projects.ElementAtOrDefault(0)?.Id, areas.ElementAtOrDefault(1)?.Id),
             new($"{codePrefix}0005", "Dashboard KPI discrepancy", "KPI cards display different totals than exports.", simpleUser.Id, inProgressStatusId, highComplexityId, 20m, 6m, false, customers.ElementAtOrDefault(1)?.Id, projects.ElementAtOrDefault(1)?.Id, areas.ElementAtOrDefault(2)?.Id),
             new($"{codePrefix}0006", "WhatsApp template selection", "Support agents need default template suggestion by ticket type.", simpleUser.Id, openStatusId, lowComplexityId, 6m, 0m, true, customers.ElementAtOrDefault(2)?.Id, projects.ElementAtOrDefault(2)?.Id, areas.ElementAtOrDefault(0)?.Id),
             new($"{codePrefix}0007", "Audit report export timeout", "Large audit report export times out after 90 seconds.", simpleUser.Id, openStatusId, highComplexityId, 24m, 5m, false, customers.ElementAtOrDefault(0)?.Id, projects.ElementAtOrDefault(0)?.Id, areas.ElementAtOrDefault(2)?.Id)
@@ -1449,7 +1449,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 TimeUnitId = defaultTimeUnit.Id,
                 TicketStatusId = seed.TicketStatusId,
                 TicketComplexityId = seed.TicketComplexityId,
-                CustomerId = seed.CustomerId,
+                PersonId = seed.PersonId,
                 ProjectId = seed.ProjectId,
                 AreaId = seed.AreaId,
                 ChannelId = channel.Id,
@@ -1656,12 +1656,25 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var seeds = GetAdministrativeSystemOptionSeeds();
         var optionNames = seeds.Select(x => x.Name).ToList();
+        var optionRoutes = seeds
+            .Select(x => x.Route)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         var existingOptions = await _context.SystemOptions
             .IgnoreQueryFilters()
-            .Where(o => o.ModuleId == adminModule.Id && optionNames.Contains(o.Name))
+            .Where(o => o.ModuleId == adminModule.Id
+                && (optionNames.Contains(o.Name)
+                    || (o.Route != null && optionRoutes.Contains(o.Route))))
             .ToListAsync();
 
         var optionsByName = existingOptions.ToDictionary(o => o.Name, StringComparer.OrdinalIgnoreCase);
+        var optionsByRoute = existingOptions
+            .Where(o => !string.IsNullOrWhiteSpace(o.Route))
+            .GroupBy(o => o.Route!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
         var now = DateTime.UtcNow;
         var inserted = 0;
         var updated = 0;
@@ -1676,30 +1689,46 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
             if (!optionsByName.TryGetValue(seed.Name, out var option))
             {
-                option = new SystemOption
+                if (!string.IsNullOrWhiteSpace(seed.Route)
+                    && optionsByRoute.TryGetValue(seed.Route, out var optionByRoute))
                 {
-                    ModuleId = adminModule.Id,
-                    Name = seed.Name,
-                    Route = seed.Route,
-                    Icon = seed.Icon,
-                    ParentId = parentId,
-                    ControllerName = seed.ControllerName,
-                    CanRead = seed.CanRead,
-                    CanCreate = seed.CanCreate,
-                    CanUpdate = seed.CanUpdate,
-                    CanDelete = seed.CanDelete,
-                    Created = now,
-                    CreatedBy = "System_Seeder",
-                    GcRecord = 0
-                };
+                    option = optionByRoute;
+                    optionsByName[seed.Name] = option;
+                }
+                else
+                {
+                    option = new SystemOption
+                    {
+                        ModuleId = adminModule.Id,
+                        Name = seed.Name,
+                        Route = seed.Route,
+                        Icon = seed.Icon,
+                        ParentId = parentId,
+                        ControllerName = seed.ControllerName,
+                        CanRead = seed.CanRead,
+                        CanCreate = seed.CanCreate,
+                        CanUpdate = seed.CanUpdate,
+                        CanDelete = seed.CanDelete,
+                        Created = now,
+                        CreatedBy = "System_Seeder",
+                        GcRecord = 0
+                    };
 
-                _context.SystemOptions.Add(option);
-                optionsByName[seed.Name] = option;
-                inserted++;
-                continue;
+                    _context.SystemOptions.Add(option);
+                    optionsByName[seed.Name] = option;
+                    if (!string.IsNullOrWhiteSpace(option.Route))
+                    {
+                        optionsByRoute[option.Route] = option;
+                    }
+
+                    inserted++;
+                    continue;
+                }
             }
 
+            var previousRoute = option.Route;
             var hasChanges = option.Route != seed.Route
+                || option.Name != seed.Name
                 || option.Icon != seed.Icon
                 || option.ParentId != parentId
                 || option.ControllerName != seed.ControllerName
@@ -1714,6 +1743,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 continue;
             }
 
+            option.Name = seed.Name;
             option.Route = seed.Route;
             option.Icon = seed.Icon;
             option.ParentId = parentId;
@@ -1725,6 +1755,18 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             option.GcRecord = 0;
             option.LastModified = now;
             option.LastModifiedBy = "System_Seeder";
+
+            if (!string.IsNullOrWhiteSpace(previousRoute)
+                && !string.Equals(previousRoute, option.Route, StringComparison.OrdinalIgnoreCase))
+            {
+                optionsByRoute.Remove(previousRoute);
+            }
+
+            if (!string.IsNullOrWhiteSpace(option.Route))
+            {
+                optionsByRoute[option.Route] = option;
+            }
+
             updated++;
         }
 
@@ -2071,8 +2113,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         
 
 
-        new("Customers", "/Clientes", "@Icons.Material.Filled.PermContactCalendar", null, null, false, false, false, false),
-        new("Clientes", "/Clientes/Cliente", "@Icons.Material.Filled.PeopleAlt", "Clientes", "Customers", true, true, true, true),
+        new("Persons", "/Clientes", "@Icons.Material.Filled.PermContactCalendar", null, null, false, false, false, false),
+        new("Clientes", "/Clientes/Cliente", "@Icons.Material.Filled.PeopleAlt", "Persons", "Persons", true, true, true, true),
 
 
         new("ManejoTickets", "/ManejoTickets", "@Icons.Material.Filled.Label", null, null, false, false, false, false),
@@ -2116,7 +2158,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "CompanyModules", true, true, true, true),
         new("Manager", "CommunicationChannels", true, true, true, true),
         
-        new("Manager", "Customers", true, true, true, true),
+        new("Manager", "Persons", true, true, true, true),
         new("Manager", "Clientes", true, true, true, true),
         
         new("Manager", "Compañias", true, true, true, true),
@@ -2144,7 +2186,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "Projects", true, true, true, false),
         new("Supervisor", "EntityStatuses", true, true, true, false),
         new("Supervisor", "CompanyModules", true, true, true, false),
-        new("Supervisor", "Customers", true, true, true, true),
+        new("Supervisor", "Persons", true, true, true, true),
         new("Supervisor", "Clientes", true, true, true, true),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Compañias", true, true, true, false),
@@ -2180,7 +2222,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     private sealed record ProvinceSeed(string CountryIsoCode, string Name, string Code);
     private sealed record MunicipalitySeed(string CountryIsoCode, string ProvinceCode, string Name, string? Code = null);
     private sealed record StreetTypeSeed(string Name, string Abbreviation);
-    private sealed record CustomerSeed(
+    private sealed record PersonSeed(
         PersonType PersonType,
         string FirstName,
         string IdentificationNumber,
@@ -2221,7 +2263,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         decimal EstimatedTime,
         decimal ConsumedTime,
         bool IsVisibleToExternals,
-        Guid? CustomerId,
+        Guid? PersonId,
         Guid? ProjectId,
         Guid? AreaId);
 }

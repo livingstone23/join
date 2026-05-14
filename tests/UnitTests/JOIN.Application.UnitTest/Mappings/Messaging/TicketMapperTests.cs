@@ -35,7 +35,7 @@ public sealed class TicketMapperTests
         entity.TicketStatusId.Should().Be(command.TicketStatusId);
         entity.TicketComplexityId.Should().Be(command.TicketComplexityId);
         entity.TimeUnitId.Should().Be(command.TimeUnitId);
-        entity.CustomerId.Should().Be(command.CustomerId);
+        entity.PersonId.Should().Be(command.PersonId);
         entity.ProjectId.Should().Be(command.ProjectId);
         entity.AreaId.Should().Be(command.AreaId);
         entity.ChannelId.Should().Be(command.ChannelId);
@@ -51,7 +51,7 @@ public sealed class TicketMapperTests
         entity.LastModified.Should().BeNull();
         entity.LastModifiedBy.Should().BeNull();
         entity.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
-        entity.Customer.Should().BeNull();
+        entity.Person.Should().BeNull();
         entity.Project.Should().BeNull();
         entity.Area.Should().BeNull();
         entity.Channel.Should().BeNull();
@@ -75,7 +75,7 @@ public sealed class TicketMapperTests
         // Arrange
         var command = CreateValidCreateCommand() with
         {
-            CustomerId = null,
+            PersonId = null,
             ProjectId = null,
             AreaId = null,
             AssignedToUserId = null,
@@ -87,7 +87,7 @@ public sealed class TicketMapperTests
         var entity = _mapper.ToEntity(command);
 
         // Assert
-        entity.CustomerId.Should().BeNull();
+        entity.PersonId.Should().BeNull();
         entity.ProjectId.Should().BeNull();
         entity.AreaId.Should().BeNull();
         entity.AssignedToUserId.Should().BeNull();
@@ -148,7 +148,7 @@ public sealed class TicketMapperTests
         ticket.TicketStatusId.Should().Be(command.TicketStatusId);
         ticket.TicketComplexityId.Should().Be(command.TicketComplexityId);
         ticket.TimeUnitId.Should().Be(command.TimeUnitId);
-        ticket.CustomerId.Should().Be(command.CustomerId);
+        ticket.PersonId.Should().Be(command.PersonId);
         ticket.ProjectId.Should().Be(command.ProjectId);
         ticket.AreaId.Should().Be(command.AreaId);
         ticket.ChannelId.Should().Be(command.ChannelId);
@@ -168,7 +168,7 @@ public sealed class TicketMapperTests
         // Arrange
         var command = CreateValidUpdateCommand() with
         {
-            CustomerId = null,
+            PersonId = null,
             ProjectId = null,
             AreaId = null,
             AssignedToUserId = null,
@@ -181,7 +181,7 @@ public sealed class TicketMapperTests
         _mapper.ApplyUpdate(command, ticket);
 
         // Assert
-        ticket.CustomerId.Should().BeNull();
+        ticket.PersonId.Should().BeNull();
         ticket.ProjectId.Should().BeNull();
         ticket.AreaId.Should().BeNull();
         ticket.AssignedToUserId.Should().BeNull();
@@ -218,7 +218,7 @@ public sealed class TicketMapperTests
         TicketStatusId = Guid.NewGuid(),
         TicketComplexityId = Guid.NewGuid(),
         TimeUnitId = Guid.NewGuid(),
-        CustomerId = Guid.NewGuid(),
+        PersonId = Guid.NewGuid(),
         ProjectId = Guid.NewGuid(),
         AreaId = Guid.NewGuid(),
         ChannelId = Guid.NewGuid(),
@@ -238,7 +238,7 @@ public sealed class TicketMapperTests
         TicketStatusId = Guid.NewGuid(),
         TicketComplexityId = Guid.NewGuid(),
         TimeUnitId = Guid.NewGuid(),
-        CustomerId = Guid.NewGuid(),
+        PersonId = Guid.NewGuid(),
         ProjectId = Guid.NewGuid(),
         AreaId = Guid.NewGuid(),
         ChannelId = Guid.NewGuid(),
@@ -260,7 +260,7 @@ public sealed class TicketMapperTests
             TicketStatusId = Guid.NewGuid(),
             TicketComplexityId = Guid.NewGuid(),
             TimeUnitId = Guid.NewGuid(),
-            CustomerId = Guid.NewGuid(),
+            PersonId = Guid.NewGuid(),
             ProjectId = Guid.NewGuid(),
             AreaId = Guid.NewGuid(),
             ChannelId = Guid.NewGuid(),

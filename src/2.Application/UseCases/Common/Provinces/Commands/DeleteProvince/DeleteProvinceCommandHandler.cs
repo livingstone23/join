@@ -25,7 +25,7 @@ public sealed class DeleteProvinceCommandHandler(IUnitOfWork unitOfWork)
     {
         var provinceRepository = _unitOfWork.GetRepository<Province>();
         var municipalityRepository = _unitOfWork.GetRepository<Municipality>();
-        var customerAddressRepository = _unitOfWork.GetRepository<CustomerAddress>();
+        var customerAddressRepository = _unitOfWork.GetRepository<PersonAddress>();
 
         var provinceEntity = await provinceRepository.GetAsync(request.Id);
         if (provinceEntity is null)

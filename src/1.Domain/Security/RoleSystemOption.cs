@@ -1,6 +1,4 @@
 using JOIN.Domain.Audit;
-using JOIN.Domain.Common;
-using JOIN.Domain.Security;
 
 
 
@@ -14,6 +12,7 @@ namespace JOIN.Domain.Security;
 /// </summary>
 public class RoleSystemOption : BaseTenantEntity
 {
+
     /// <summary>
     /// Foreign key to the ApplicationRole.
     /// </summary>

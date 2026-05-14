@@ -11,6 +11,7 @@ namespace JOIN.Application.Interface;
 /// </summary>
 public interface IJwtTokenGenerator
 {
+
     /// <summary>
     /// Generates a signed access token and a secure refresh token for the specified user session.
     /// </summary>
@@ -19,4 +20,5 @@ public interface IJwtTokenGenerator
     /// <param name="roles">All effective role names for the session.</param>
     /// <returns>A tuple containing the access token, refresh token, and their expiration metadata.</returns>
     (string Token, string RefreshToken, DateTime Expiration, DateTime RefreshTokenExpiration) GenerateToken(ApplicationUser user, Guid? companyId, IEnumerable<string> roles);
+    
 }

@@ -31,7 +31,7 @@ public sealed class GetSystemModuleByIdQueryHandlerTests
                 {
                     ["Id"] = moduleId,
                     ["Name"] = "CRM",
-                    ["Description"] = "Customer management",
+                    ["Description"] = "Person management",
                     ["Icon"] = "fa-users",
                     ["IsActive"] = true,
                     ["Order"] = 2,

@@ -91,12 +91,12 @@ public record TicketDto
     /// <summary>
     /// Gets the optional customer identifier.
     /// </summary>
-    public Guid? CustomerId { get; init; }
+    public Guid? PersonId { get; init; }
 
     /// <summary>
     /// Gets the optional customer display name.
     /// </summary>
-    public string? CustomerName { get; init; }
+    public string? PersonName { get; init; }
 
     /// <summary>
     /// Gets the optional project identifier.

@@ -101,204 +101,6 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("CompanyModules", "Admin");
                 });
 
-            modelBuilder.Entity("JOIN.Domain.Admin.Customer", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("CommercialName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FirstName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("GcRecord")
-                        .HasColumnType("int");
-
-                    b.Property<string>("IdentificationNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<Guid>("IdentificationTypeId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("LastModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("LastName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("MiddleName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("PersonType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("SecondLastName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IdentificationTypeId");
-
-                    b.HasIndex("CompanyId", "IdentificationNumber")
-                        .IsUnique();
-
-                    b.ToTable("Customers", "Admin");
-                });
-
-            modelBuilder.Entity("JOIN.Domain.Admin.CustomerAddress", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("AddressLine1")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("AddressLine2")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CountryId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid>("CustomerId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("GcRecord")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsDefault")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("LastModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid>("MunicipalityId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("ProvinceId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("RegionId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("StreetTypeId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ZipCode")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("CountryId");
-
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("MunicipalityId");
-
-                    b.HasIndex("ProvinceId");
-
-                    b.HasIndex("RegionId");
-
-                    b.HasIndex("StreetTypeId");
-
-                    b.ToTable("CustomerAddresses", "Admin");
-                });
-
-            modelBuilder.Entity("JOIN.Domain.Admin.CustomerContact", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Comments")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("ContactType")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ContactValue")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid>("CustomerId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("GcRecord")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsPrimary")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("LastModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("CustomerId");
-
-                    b.ToTable("CustomerContacts", "Admin");
-                });
-
             modelBuilder.Entity("JOIN.Domain.Admin.EntityStatus", b =>
                 {
                     b.Property<Guid>("Id")
@@ -385,6 +187,204 @@ namespace JOIN.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("IdentificationTypes", "Admin");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Admin.Person", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CommercialName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("int");
+
+                    b.Property<string>("IdentificationNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("IdentificationTypeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("MiddleName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PersonType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("SecondLastName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdentificationTypeId");
+
+                    b.HasIndex("CompanyId", "IdentificationNumber")
+                        .IsUnique();
+
+                    b.ToTable("Persons", "Admin");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Admin.PersonAddress", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AddressLine1")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("AddressLine2")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CountryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("MunicipalityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProvinceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("RegionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StreetTypeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ZipCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("CountryId");
+
+                    b.HasIndex("MunicipalityId");
+
+                    b.HasIndex("PersonId");
+
+                    b.HasIndex("ProvinceId");
+
+                    b.HasIndex("RegionId");
+
+                    b.HasIndex("StreetTypeId");
+
+                    b.ToTable("PersonAddresses", "Admin");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Admin.PersonContact", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Comments")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ContactType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContactValue")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("PersonId");
+
+                    b.ToTable("PersonContacts", "Admin");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Admin.Project", b =>
@@ -882,9 +882,6 @@ namespace JOIN.Persistence.Migrations
                     b.Property<Guid>("CreatedByUserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("CustomerId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -913,6 +910,9 @@ namespace JOIN.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
+
+                    b.Property<Guid?>("PersonId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("PrecedentTicketId")
                         .HasColumnType("uniqueidentifier");
@@ -944,7 +944,7 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasIndex("CreatedByUserId");
 
-                    b.HasIndex("CustomerId");
+                    b.HasIndex("PersonId");
 
                     b.HasIndex("PrecedentTicketId");
 
@@ -1597,7 +1597,7 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("UserConnectionLogs", "Security");
                 });
 
-            modelBuilder.Entity("JOIN.Domain.Security.UserCustomer", b =>
+            modelBuilder.Entity("JOIN.Domain.Security.UserPerson", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1609,9 +1609,6 @@ namespace JOIN.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("CustomerId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<int>("GcRecord")
                         .HasColumnType("int");
 
@@ -1621,17 +1618,20 @@ namespace JOIN.Persistence.Migrations
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CustomerId");
+                    b.HasIndex("PersonId");
 
-                    b.HasIndex("UserId", "CustomerId")
+                    b.HasIndex("UserId", "PersonId")
                         .IsUnique();
 
-                    b.ToTable("UserCustomers", "Security");
+                    b.ToTable("UserPersons", "Security");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Security.UserRefreshToken", b =>
@@ -2001,10 +2001,10 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Module");
                 });
 
-            modelBuilder.Entity("JOIN.Domain.Admin.Customer", b =>
+            modelBuilder.Entity("JOIN.Domain.Admin.Person", b =>
                 {
                     b.HasOne("JOIN.Domain.Common.Company", "Company")
-                        .WithMany("Customers")
+                        .WithMany("Persons")
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -2020,7 +2020,7 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("IdentificationType");
                 });
 
-            modelBuilder.Entity("JOIN.Domain.Admin.CustomerAddress", b =>
+            modelBuilder.Entity("JOIN.Domain.Admin.PersonAddress", b =>
                 {
                     b.HasOne("JOIN.Domain.Common.Company", "Company")
                         .WithMany()
@@ -2029,25 +2029,25 @@ namespace JOIN.Persistence.Migrations
                         .IsRequired();
 
                     b.HasOne("JOIN.Domain.Common.Country", "Country")
-                        .WithMany("CustomerAddresses")
+                        .WithMany("PersonAddresses")
                         .HasForeignKey("CountryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("JOIN.Domain.Admin.Customer", "Customer")
-                        .WithMany("Addresses")
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("JOIN.Domain.Common.Municipality", "Municipality")
-                        .WithMany("CustomerAddresses")
+                        .WithMany("PersonAddresses")
                         .HasForeignKey("MunicipalityId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("JOIN.Domain.Admin.Person", "Person")
+                        .WithMany("Addresses")
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("JOIN.Domain.Common.Province", "Province")
-                        .WithMany("CustomerAddresses")
+                        .WithMany("PersonAddresses")
                         .HasForeignKey("ProvinceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -2057,7 +2057,7 @@ namespace JOIN.Persistence.Migrations
                         .HasForeignKey("RegionId");
 
                     b.HasOne("JOIN.Domain.Common.StreetType", "StreetType")
-                        .WithMany("CustomerAddresses")
+                        .WithMany("PersonAddresses")
                         .HasForeignKey("StreetTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -2066,9 +2066,9 @@ namespace JOIN.Persistence.Migrations
 
                     b.Navigation("Country");
 
-                    b.Navigation("Customer");
-
                     b.Navigation("Municipality");
+
+                    b.Navigation("Person");
 
                     b.Navigation("Province");
 
@@ -2077,7 +2077,7 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("StreetType");
                 });
 
-            modelBuilder.Entity("JOIN.Domain.Admin.CustomerContact", b =>
+            modelBuilder.Entity("JOIN.Domain.Admin.PersonContact", b =>
                 {
                     b.HasOne("JOIN.Domain.Common.Company", "Company")
                         .WithMany()
@@ -2085,15 +2085,15 @@ namespace JOIN.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("JOIN.Domain.Admin.Customer", "Customer")
+                    b.HasOne("JOIN.Domain.Admin.Person", "Person")
                         .WithMany("Contacts")
-                        .HasForeignKey("CustomerId")
+                        .HasForeignKey("PersonId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Company");
 
-                    b.Navigation("Customer");
+                    b.Navigation("Person");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Admin.Project", b =>
@@ -2212,9 +2212,9 @@ namespace JOIN.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("JOIN.Domain.Admin.Customer", "Customer")
+                    b.HasOne("JOIN.Domain.Admin.Person", "Person")
                         .WithMany("Tickets")
-                        .HasForeignKey("CustomerId")
+                        .HasForeignKey("PersonId")
                         .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("JOIN.Domain.Messaging.Ticket", "PrecedentTicket")
@@ -2257,7 +2257,7 @@ namespace JOIN.Persistence.Migrations
 
                     b.Navigation("CreatedByUser");
 
-                    b.Navigation("Customer");
+                    b.Navigation("Person");
 
                     b.Navigation("PrecedentTicket");
 
@@ -2437,11 +2437,11 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("JOIN.Domain.Security.UserCustomer", b =>
+            modelBuilder.Entity("JOIN.Domain.Security.UserPerson", b =>
                 {
-                    b.HasOne("JOIN.Domain.Admin.Customer", "Customer")
+                    b.HasOne("JOIN.Domain.Admin.Person", "Person")
                         .WithMany()
-                        .HasForeignKey("CustomerId")
+                        .HasForeignKey("PersonId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -2451,7 +2451,7 @@ namespace JOIN.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Customer");
+                    b.Navigation("Person");
 
                     b.Navigation("User");
                 });
@@ -2632,20 +2632,20 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Tickets");
                 });
 
-            modelBuilder.Entity("JOIN.Domain.Admin.Customer", b =>
+            modelBuilder.Entity("JOIN.Domain.Admin.EntityStatus", b =>
+                {
+                    b.Navigation("Areas");
+
+                    b.Navigation("Projects");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Admin.Person", b =>
                 {
                     b.Navigation("Addresses");
 
                     b.Navigation("Contacts");
 
                     b.Navigation("Tickets");
-                });
-
-            modelBuilder.Entity("JOIN.Domain.Admin.EntityStatus", b =>
-                {
-                    b.Navigation("Areas");
-
-                    b.Navigation("Projects");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Admin.Project", b =>
@@ -2669,7 +2669,7 @@ namespace JOIN.Persistence.Migrations
                 {
                     b.Navigation("Areas");
 
-                    b.Navigation("Customers");
+                    b.Navigation("Persons");
 
                     b.Navigation("Projects");
 
@@ -2684,7 +2684,7 @@ namespace JOIN.Persistence.Migrations
 
             modelBuilder.Entity("JOIN.Domain.Common.Country", b =>
                 {
-                    b.Navigation("CustomerAddresses");
+                    b.Navigation("PersonAddresses");
 
                     b.Navigation("Provinces");
 
@@ -2693,14 +2693,14 @@ namespace JOIN.Persistence.Migrations
 
             modelBuilder.Entity("JOIN.Domain.Common.Municipality", b =>
                 {
-                    b.Navigation("CustomerAddresses");
+                    b.Navigation("PersonAddresses");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Common.Province", b =>
                 {
-                    b.Navigation("CustomerAddresses");
-
                     b.Navigation("Municipalities");
+
+                    b.Navigation("PersonAddresses");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Common.Region", b =>
@@ -2710,7 +2710,7 @@ namespace JOIN.Persistence.Migrations
 
             modelBuilder.Entity("JOIN.Domain.Common.StreetType", b =>
                 {
-                    b.Navigation("CustomerAddresses");
+                    b.Navigation("PersonAddresses");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Messaging.Ticket", b =>

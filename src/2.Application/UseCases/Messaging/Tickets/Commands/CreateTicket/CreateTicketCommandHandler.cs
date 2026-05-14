@@ -51,7 +51,7 @@ public sealed class CreateTicketCommandHandler(
         var complexityRepository = _unitOfWork.GetRepository<TicketComplexity>();
         var timeUnitRepository = _unitOfWork.GetRepository<TimeUnit>();
         var channelRepository = _unitOfWork.GetRepository<CommunicationChannel>();
-        var customerRepository = _unitOfWork.GetRepository<Customer>();
+        var customerRepository = _unitOfWork.GetRepository<Person>();
         var projectRepository = _unitOfWork.GetRepository<Project>();
         var areaRepository = _unitOfWork.GetRepository<Area>();
         var userRepository = _unitOfWork.GetRepository<ApplicationUser>();
@@ -78,7 +78,7 @@ public sealed class CreateTicketCommandHandler(
             return Response<TicketDto>.Error("INVALID_CHANNEL", ["The provided communication channel does not exist or is inactive."]);
         }
 
-        if (request.CustomerId.HasValue && await customerRepository.GetAsync(request.CustomerId.Value) is null)
+        if (request.PersonId.HasValue && await customerRepository.GetAsync(request.PersonId.Value) is null)
         {
             return Response<TicketDto>.Error("INVALID_CUSTOMER", ["The provided customer does not exist for the current company."]);
         }
@@ -181,7 +181,7 @@ public sealed class CreateTicketCommandHandler(
         var status = await statusRepository.GetAsync(entity.TicketStatusId);
         var complexity = await complexityRepository.GetAsync(entity.TicketComplexityId);
         var timeUnit = await timeUnitRepository.GetAsync(entity.TimeUnitId);
-        var customer = entity.CustomerId.HasValue ? await customerRepository.GetAsync(entity.CustomerId.Value) : null;
+        var customer = entity.PersonId.HasValue ? await customerRepository.GetAsync(entity.PersonId.Value) : null;
         var project = entity.ProjectId.HasValue ? await projectRepository.GetAsync(entity.ProjectId.Value) : null;
         var area = entity.AreaId.HasValue ? await areaRepository.GetAsync(entity.AreaId.Value) : null;
         var precedentTicket = entity.PrecedentTicketId.HasValue ? await ticketRepository.GetAsync(entity.PrecedentTicketId.Value) : null;
@@ -208,8 +208,8 @@ public sealed class CreateTicketCommandHandler(
                 TicketComplexityName = complexity?.Name ?? string.Empty,
                 TimeUnitId = entity.TimeUnitId,
                 TimeUnitName = timeUnit?.Name ?? string.Empty,
-                CustomerId = entity.CustomerId,
-                CustomerName = ResolveCustomerName(customer),
+                PersonId = entity.PersonId,
+                PersonName = ResolvePersonName(customer),
                 ProjectId = entity.ProjectId,
                 ProjectName = project?.Name,
                 AreaId = entity.AreaId,
@@ -227,7 +227,7 @@ public sealed class CreateTicketCommandHandler(
         };
     }
 
-    private static string? ResolveCustomerName(Customer? customer)
+    private static string? ResolvePersonName(Person? customer)
     {
         if (customer is null)
         {

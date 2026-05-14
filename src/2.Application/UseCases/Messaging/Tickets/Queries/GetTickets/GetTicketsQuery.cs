@@ -14,7 +14,7 @@ public record GetTicketsQuery(
     Guid? TicketStatusId = null,
     Guid? TicketComplexityId = null,
     Guid? AssignedToUserId = null,
-    Guid? CustomerId = null,
+    Guid? PersonId = null,
     Guid? ProjectId = null,
     bool? IsVisibleToExternals = null,
     DateTime? FromDate = null,

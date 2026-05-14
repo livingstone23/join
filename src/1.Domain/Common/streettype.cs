@@ -29,5 +29,5 @@ public class StreetType : BaseAuditableEntity
     public bool IsActive { get; set; } = true;
     
     // --- Navigation Properties ---
-    public virtual ICollection<CustomerAddress> CustomerAddresses { get; set; } = new List<CustomerAddress>();
+    public virtual ICollection<PersonAddress> PersonAddresses { get; set; } = new List<PersonAddress>();
 }

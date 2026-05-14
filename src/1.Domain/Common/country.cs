@@ -42,5 +42,5 @@ public class Country : BaseAuditableEntity
     /// <summary>
     /// Collection of customer addresses located within this specific country.
     /// </summary>
-    public virtual ICollection<CustomerAddress> CustomerAddresses { get; set; } = new List<CustomerAddress>();
+    public virtual ICollection<PersonAddress> PersonAddresses { get; set; } = new List<PersonAddress>();
 }

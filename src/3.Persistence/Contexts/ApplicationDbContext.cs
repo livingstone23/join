@@ -41,9 +41,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     // --- 2. ADMINISTRATIVE MODULE ---
     public DbSet<Area> Areas => Set<Area>();
     public DbSet<CompanyModule> CompanyModules => Set<CompanyModule>();
-    public DbSet<Customer> Customers => Set<Customer>();
-    public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
-    public DbSet<CustomerContact> CustomerContacts => Set<CustomerContact>();
+    public DbSet<Person> Persons => Set<Person>();
+    public DbSet<PersonAddress> PersonAddresses => Set<PersonAddress>();
+    public DbSet<PersonContact> PersonContacts => Set<PersonContact>();
     public DbSet<EntityStatus> EntityStatuses => Set<EntityStatus>();
     public DbSet<IdentificationType> IdentificationTypes => Set<IdentificationType>();
     public DbSet<Project> Projects => Set<Project>();
@@ -75,7 +75,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<ApplicationUser> ApplicationUsers => Set<ApplicationUser>();
     public DbSet<UserCompany> UserCompanies => Set<UserCompany>();
     public DbSet<UserConnectionLog> UserConnectionLogs => Set<UserConnectionLog>();
-    public DbSet<UserCustomer> UserCustomers => Set<UserCustomer>();
+    public DbSet<UserPerson> UserPersons => Set<UserPerson>();
     public DbSet<UserRefreshToken> UserRefreshTokens => Set<UserRefreshToken>();
     public DbSet<UserRoleCompany> UserRoleCompanies => Set<UserRoleCompany>();
     public DbSet<SystemOption> SystemOptions => Set<SystemOption>();
@@ -137,10 +137,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         // --- 1. TENANT-SPECIFIC & SOFT DELETE ENTITIES ---
         // These entities MUST belong to the current Company and NOT be deleted.
         
-        // Administrative / Customers
-        builder.Entity<Customer>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
-        builder.Entity<CustomerAddress>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
-        builder.Entity<CustomerContact>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        // Administrative / Persons
+        builder.Entity<Person>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<PersonAddress>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<PersonContact>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<Project>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<Area>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<UserCommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
@@ -181,7 +181,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         // These link users to tenants or customers and should respect the delete flag.
         
         builder.Entity<UserCompany>().HasQueryFilter(e => e.GcRecord == 0);
-        builder.Entity<UserCustomer>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<UserPerson>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<UserRefreshToken>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<UserRoleCompany>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<RoleSystemOption>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
@@ -269,11 +269,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     {
 
 
-        // Prevent delete cycles between Users and Customers
-        builder.Entity<UserCustomer>()
-            .HasOne(uc => uc.Customer)
+        // Prevent delete cycles between Users and Persons
+        builder.Entity<UserPerson>()
+            .HasOne(uc => uc.Person)
             .WithMany()
-            .HasForeignKey(uc => uc.CustomerId)
+            .HasForeignKey(uc => uc.PersonId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 

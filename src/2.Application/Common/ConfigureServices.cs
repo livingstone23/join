@@ -41,7 +41,7 @@ public static class ConfigureServices
         services.AddValidatorsFromAssembly(assembly);
 
         // Register Mapperly mappers
-        services.AddScoped<ICustomerMapper, CustomerMapper>();
+        services.AddScoped<IPersonMapper, PersonMapper>();
         services.AddScoped<ITicketMapper, TicketMapper>();
         services.AddScoped<ITicketCompanyDefaultMapper, TicketCompanyDefaultMapper>();
         services.AddScoped<ISystemOptionMapper, SystemOptionMapper>();

@@ -43,12 +43,12 @@ public sealed class GetTicketByIdQueryHandler(
                 tc.Name AS TicketComplexityName,
                 t.TimeUnitId,
                 tu.Name AS TimeUnitName,
-                t.CustomerId,
+                t.PersonId,
                 CASE
                     WHEN c.Id IS NULL THEN NULL
                     WHEN c.CommercialName IS NOT NULL AND c.CommercialName <> '' THEN c.CommercialName
                     ELSE CONCAT(c.FirstName, ' ', COALESCE(c.MiddleName, ''), ' ', COALESCE(c.LastName, ''), ' ', COALESCE(c.SecondLastName, ''))
-                END AS CustomerName,
+                END AS PersonName,
                 t.ProjectId,
                 p.Name AS ProjectName,
                 t.AreaId,
@@ -70,7 +70,7 @@ public sealed class GetTicketByIdQueryHandler(
             INNER JOIN Messaging.TicketStatuses ts ON t.TicketStatusId = ts.Id
             INNER JOIN Messaging.TicketComplexities tc ON t.TicketComplexityId = tc.Id
             INNER JOIN Messaging.TimeUnits tu ON t.TimeUnitId = tu.Id
-            LEFT JOIN Admin.Customers c ON t.CustomerId = c.Id
+            LEFT JOIN Admin.Persons c ON t.PersonId = c.Id
             LEFT JOIN Admin.Projects p ON t.ProjectId = p.Id
             LEFT JOIN Admin.Areas a ON t.AreaId = a.Id
             INNER JOIN Common.CommunicationChannels ch ON t.ChannelId = ch.Id

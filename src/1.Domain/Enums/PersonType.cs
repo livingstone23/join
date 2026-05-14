@@ -1,6 +1,10 @@
 
 
 
+using System.ComponentModel.DataAnnotations;
+
+
+
 namespace JOIN.Domain.Enums;
 
 
@@ -13,9 +17,11 @@ public enum PersonType
 {
 
     /// <summary> Individual person (Persona Física). </summary>
+    [Display(Name = "Natural")]
     Physical = 1,
     
     /// <summary> Business or Organization (Persona Jurídica). </summary>
+    [Display(Name = "Jurídica")]
     Legal = 2
 
 }

@@ -38,8 +38,8 @@ public class StreetTypeConfiguration : IEntityTypeConfiguration<StreetType>
 
         // --- Relationships ---
 
-        // One-to-many relationship with CustomerAddress
-        builder.HasMany(st => st.CustomerAddresses)
+        // One-to-many relationship with PersonAddress
+        builder.HasMany(st => st.PersonAddresses)
             .WithOne(ca => ca.StreetType)
             .HasForeignKey(ca => ca.StreetTypeId);
             

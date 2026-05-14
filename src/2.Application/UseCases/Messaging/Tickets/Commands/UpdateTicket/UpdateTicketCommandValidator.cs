@@ -51,9 +51,9 @@ public sealed class UpdateTicketCommandValidator : AbstractValidator<UpdateTicke
             .Must(value => !value.HasValue || value.Value != Guid.Empty)
             .WithMessage("Assigned user id is invalid.");
 
-        RuleFor(x => x.CustomerId)
+        RuleFor(x => x.PersonId)
             .Must(value => !value.HasValue || value.Value != Guid.Empty)
-            .WithMessage("Customer id is invalid.");
+            .WithMessage("Person id is invalid.");
 
         RuleFor(x => x.ProjectId)
             .Must(value => !value.HasValue || value.Value != Guid.Empty)

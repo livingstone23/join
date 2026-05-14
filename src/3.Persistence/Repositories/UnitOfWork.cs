@@ -41,7 +41,7 @@ public class UnitOfWork : IUnitOfWork
 
     // --- 1. SPECIFIC REPOSITORIES (EXPLICIT) ---
     // This explicit cast will now succeed because GetRepository returns the specific class type
-    public ICustomersRepository Customers => (ICustomersRepository)GetRepository<Customer>();
+    public IPersonsRepository Persons => (IPersonsRepository)GetRepository<Person>();
     public IRoleSystemOptionsRepository RoleSystemOptions => (IRoleSystemOptionsRepository)GetRepository<RoleSystemOption>();
 
     // --- 2. DYNAMIC REPOSITORY FACTORY ---
@@ -56,10 +56,10 @@ public class UnitOfWork : IUnitOfWork
             object repositoryInstance;
 
             // Check if the entity requires a specialized repository
-            if (typeof(TEntity) == typeof(Customer))
+            if (typeof(TEntity) == typeof(Person))
             {
-                // Instantiate the specific class that implements ICustomersRepository
-                repositoryInstance = new CustomersRepository(_dbContext, _dapperContext);
+                // Instantiate the specific class that implements IPersonsRepository
+                repositoryInstance = new PersonsRepository(_dbContext, _dapperContext);
             }
             else if (typeof(TEntity) == typeof(RoleSystemOption))
             {

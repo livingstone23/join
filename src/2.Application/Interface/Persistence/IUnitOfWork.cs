@@ -12,7 +12,7 @@ public interface IUnitOfWork : IDisposable
     
     // --- 1. Custom Shortcuts ---
     // Keep this for repositories that have custom logic (non-generic)
-    ICustomersRepository Customers { get; }
+    IPersonsRepository Persons { get; }
     IRoleSystemOptionsRepository RoleSystemOptions { get; }
 
     // --- 2. Scalable Access ---

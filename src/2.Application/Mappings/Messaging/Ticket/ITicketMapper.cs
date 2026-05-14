@@ -1,7 +1,11 @@
 using JOIN.Application.UseCases.Messaging.Tickets.Commands;
 using JOIN.Domain.Messaging;
 
+
+
 namespace JOIN.Application.Mappings;
+
+
 
 /// <summary>
 /// Defines mapping operations for ticket commands and entities.

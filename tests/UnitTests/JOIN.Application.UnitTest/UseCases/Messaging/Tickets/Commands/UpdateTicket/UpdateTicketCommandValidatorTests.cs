@@ -198,7 +198,7 @@ public sealed class UpdateTicketCommandValidatorTests
     /// </summary>
     [Theory]
     [InlineData(nameof(UpdateTicketCommand.AssignedToUserId), "Assigned user id is invalid.")]
-    [InlineData(nameof(UpdateTicketCommand.CustomerId), "Customer id is invalid.")]
+    [InlineData(nameof(UpdateTicketCommand.PersonId), "Person id is invalid.")]
     [InlineData(nameof(UpdateTicketCommand.ProjectId), "Project id is invalid.")]
     [InlineData(nameof(UpdateTicketCommand.AreaId), "Area id is invalid.")]
     [InlineData(nameof(UpdateTicketCommand.PrecedentTicketId), "Precedent ticket id is invalid.")]
@@ -270,7 +270,7 @@ public sealed class UpdateTicketCommandValidatorTests
         TimeUnitId = Guid.NewGuid(),
         ChannelId = Guid.NewGuid(),
         AssignedToUserId = null,
-        CustomerId = null,
+        PersonId = null,
         ProjectId = null,
         AreaId = null,
         PrecedentTicketId = null
@@ -296,7 +296,7 @@ public sealed class UpdateTicketCommandValidatorTests
         propertyName switch
         {
             nameof(UpdateTicketCommand.AssignedToUserId) => command with { AssignedToUserId = value },
-            nameof(UpdateTicketCommand.CustomerId) => command with { CustomerId = value },
+            nameof(UpdateTicketCommand.PersonId) => command with { PersonId = value },
             nameof(UpdateTicketCommand.ProjectId) => command with { ProjectId = value },
             nameof(UpdateTicketCommand.AreaId) => command with { AreaId = value },
             nameof(UpdateTicketCommand.PrecedentTicketId) => command with { PrecedentTicketId = value },

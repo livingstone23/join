@@ -47,10 +47,10 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             .HasForeignKey(t => t.CompanyId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Optional relationship with Customer.
-        builder.HasOne(t => t.Customer)
-            .WithMany(c => c.Tickets) // CORREGIDO: Evita shadow property CustomerId1
-            .HasForeignKey(t => t.CustomerId)
+        // Optional relationship with Person.
+        builder.HasOne(t => t.Person)
+            .WithMany(c => c.Tickets) // CORREGIDO: Evita shadow property PersonId1
+            .HasForeignKey(t => t.PersonId)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.NoAction); // CORREGIDO: Evita error de ciclos en SQL Server
 

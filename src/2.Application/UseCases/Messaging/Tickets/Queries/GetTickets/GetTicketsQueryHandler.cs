@@ -76,10 +76,10 @@ public sealed class GetTicketsQueryHandler(
             parameters.Add("AssignedToUserId", request.AssignedToUserId.Value);
         }
 
-        if (request.CustomerId.HasValue && request.CustomerId.Value != Guid.Empty)
+        if (request.PersonId.HasValue && request.PersonId.Value != Guid.Empty)
         {
-            whereBuilder.Append(" AND t.CustomerId = @CustomerId");
-            parameters.Add("CustomerId", request.CustomerId.Value);
+            whereBuilder.Append(" AND t.PersonId = @PersonId");
+            parameters.Add("PersonId", request.PersonId.Value);
         }
 
         if (request.ProjectId.HasValue && request.ProjectId.Value != Guid.Empty)
@@ -119,12 +119,12 @@ public sealed class GetTicketsQueryHandler(
                 ts.Name AS TicketStatusName,
                 t.TicketComplexityId,
                 tc.Name AS TicketComplexityName,
-                t.CustomerId,
+                t.PersonId,
                 CASE
                     WHEN c.Id IS NULL THEN NULL
                     WHEN c.CommercialName IS NOT NULL AND c.CommercialName <> '' THEN c.CommercialName
                     ELSE CONCAT(c.FirstName, ' ', COALESCE(c.MiddleName, ''), ' ', COALESCE(c.LastName, ''), ' ', COALESCE(c.SecondLastName, ''))
-                END AS CustomerName,
+                END AS PersonName,
                 t.AssignedToUserId,
                 CASE
                     WHEN au.Id IS NULL THEN NULL
@@ -135,7 +135,7 @@ public sealed class GetTicketsQueryHandler(
             LEFT JOIN Common.Companies co ON t.CompanyId = co.Id
             INNER JOIN Messaging.TicketStatuses ts ON t.TicketStatusId = ts.Id
             INNER JOIN Messaging.TicketComplexities tc ON t.TicketComplexityId = tc.Id
-            LEFT JOIN Admin.Customers c ON t.CustomerId = c.Id
+            LEFT JOIN Admin.Persons c ON t.PersonId = c.Id
             LEFT JOIN Security.Users au ON t.AssignedToUserId = au.Id
             {whereClause}
             ORDER BY t.Created DESC, t.Code DESC

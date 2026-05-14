@@ -22,7 +22,7 @@ public class Ticket : BaseTenantEntity
 {
 
     /// <summary>
-    /// Human-readable ticket identifier managed exclusively by the domain.
+    /// Human-readable Ticket identifier managed exclusively by the domain.
     /// </summary>
     public string Code { get; private set; } = string.Empty;
 
@@ -41,16 +41,16 @@ public class Ticket : BaseTenantEntity
 
     // --- Context & Hierarchy ---
 
-    public Guid? CustomerId { get; set; }
+    public Guid? PersonId { get; set; }
     public Guid? ProjectId { get; set; } // Opcional
     public Guid? AreaId { get; set; }    // Opcional
     public Guid ChannelId { get; set; } // Canal de creación (Bot, Web, etc.)
     
-    /// <summary> Link to the parent ticket if this is a follow-up. </summary>
+    /// <summary> Link to the parent Ticket if this is a follow-up. </summary>
     public Guid? PrecedentTicketId { get; set; }
 
     /// <summary>
-    /// Indicates whether this ticket is visible to external users (e.g., customers) 
+    /// Indicates whether this Ticket is visible to external users (e.g., customers) 
     /// through a self-service portal or external tracking system.
     /// </summary>
     public bool IsVisibleToExternals { get; set; } = false;
@@ -62,7 +62,7 @@ public class Ticket : BaseTenantEntity
 
 
     // --- Navigation ---
-    public virtual Customer? Customer { get; set; }
+    public virtual Person? Person { get; set; }
     public virtual Project? Project { get; set; }
     public virtual Area? Area { get; set; }
     public virtual CommunicationChannel Channel { get; set; } = null!;
@@ -81,15 +81,15 @@ public class Ticket : BaseTenantEntity
 
 
 
-    /// <summary> Collection of follow-up tickets spawned from this specific ticket. </summary>
+    /// <summary> Collection of follow-up Tickets spawned from this specific Ticket. </summary>
     public virtual ICollection<Ticket> ChildTickets { get; set; } = new List<Ticket>();
 
     /// <summary>
     /// Assigns the standard system-generated code using the format TICK-YYYYMM-XXXX.
     /// </summary>
-    /// <param name="year">The UTC year used for the ticket prefix.</param>
-    /// <param name="month">The UTC month used for the ticket prefix.</param>
-    /// <param name="sequence">The monthly ticket sequence number.</param>
+    /// <param name="year">The UTC year used for the Ticket prefix.</param>
+    /// <param name="month">The UTC month used for the Ticket prefix.</param>
+    /// <param name="sequence">The monthly Ticket sequence number.</param>
     public void SetStandardCode(int year, int month, int sequence)
     {
         if (year is < 1 or > 9999)
@@ -113,8 +113,8 @@ public class Ticket : BaseTenantEntity
     /// <summary>
     /// Assigns a personalized code using the configured start code and padded numeric sequence.
     /// </summary>
-    /// <param name="startCode">The configured ticket prefix for the tenant.</param>
-    /// <param name="sequence">The ticket sequence number to format.</param>
+    /// <param name="startCode">The configured Ticket prefix for the tenant.</param>
+    /// <param name="sequence">The Ticket sequence number to format.</param>
     /// <param name="length">The total length of the numeric sequence padding.</param>
     public void SetPersonalizedCode(string startCode, int sequence, int length)
     {
@@ -138,7 +138,7 @@ public class Ticket : BaseTenantEntity
     }
 
     /// <summary>
-    /// Appends a new audit log entry to the current ticket aggregate.
+    /// Appends a new audit log entry to the current Ticket aggregate.
     /// </summary>
     /// <param name="userId">The identifier of the user responsible for the action.</param>
     /// <param name="logType">The type of audit event to register.</param>

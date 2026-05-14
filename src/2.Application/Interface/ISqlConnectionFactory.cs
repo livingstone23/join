@@ -12,10 +12,11 @@ namespace JOIN.Application.Interface;
 /// </summary>
 public interface ISqlConnectionFactory
 {
+
     /// <summary>
     /// Creates and returns an open database connection.
     /// </summary>
     /// <returns>An instance of IDbConnection.</returns>
     IDbConnection CreateConnection();
-
+    
 }
