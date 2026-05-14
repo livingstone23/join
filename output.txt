@@ -1,0 +1,1968 @@
+Using launch settings from src/4.Services.WebApi/Properties/launchSettings.json...
+info: Program[0]
+      Applying database migrations...
+warn: Microsoft.EntityFrameworkCore.Model.Validation[10622]
+      Entity 'ApplicationUser' has a global query filter defined and is the required end of a relationship with the entity 'UserConnectionLog'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+warn: Microsoft.EntityFrameworkCore.Model.Validation[10400]
+      Sensitive data logging is enabled. Log entries and exception messages may include sensitive application data; this mode should only be enabled during development.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (22ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT 1
+info: Microsoft.EntityFrameworkCore.Migrations[20411]
+      Acquiring an exclusive lock for migration application. See https://aka.ms/efcore-docs-migrations-lock for more information if this takes too long.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (14ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      DECLARE @result int;
+      EXEC @result = sp_getapplock @Resource = '__EFMigrationsLock', @LockOwner = 'Session', @LockMode = 'Exclusive';
+      SELECT @result
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (5ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      IF OBJECT_ID(N'[__EFMigrationsHistory]') IS NULL
+      BEGIN
+          CREATE TABLE [__EFMigrationsHistory] (
+              [MigrationId] nvarchar(150) NOT NULL,
+              [ProductVersion] nvarchar(32) NOT NULL,
+              CONSTRAINT [PK___EFMigrationsHistory] PRIMARY KEY ([MigrationId])
+          );
+      END;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT [MigrationId], [ProductVersion]
+      FROM [__EFMigrationsHistory]
+      ORDER BY [MigrationId];
+info: Microsoft.EntityFrameworkCore.Migrations[20405]
+      No migrations were applied. The database is already up to date.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      DECLARE @result int;
+      EXEC @result = sp_releaseapplock @Resource = '__EFMigrationsLock', @LockOwner = 'Session';
+      SELECT @result
+info: Program[0]
+      Database migrations applied successfully.
+info: JOIN.Persistence.DatabaseSeeder[0]
+      🚀 Starting master data seeding process...
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (10ms) [Parameters=[@normalizedName='SUPERADMIN' (Size = 256)], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [r].[Id], [r].[ConcurrencyStamp], [r].[Created], [r].[CreatedBy], [r].[Description], [r].[GcRecord], [r].[IsSystemDefault], [r].[LastModified], [r].[LastModifiedBy], [r].[Name], [r].[NormalizedName]
+      FROM [Security].[Roles] AS [r]
+      WHERE [r].[NormalizedName] = @normalizedName
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@normalizedName='ADMIN' (Size = 256)], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [r].[Id], [r].[ConcurrencyStamp], [r].[Created], [r].[CreatedBy], [r].[Description], [r].[GcRecord], [r].[IsSystemDefault], [r].[LastModified], [r].[LastModifiedBy], [r].[Name], [r].[NormalizedName]
+      FROM [Security].[Roles] AS [r]
+      WHERE [r].[NormalizedName] = @normalizedName
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@normalizedName='AGENT' (Size = 256)], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [r].[Id], [r].[ConcurrencyStamp], [r].[Created], [r].[CreatedBy], [r].[Description], [r].[GcRecord], [r].[IsSystemDefault], [r].[LastModified], [r].[LastModifiedBy], [r].[Name], [r].[NormalizedName]
+      FROM [Security].[Roles] AS [r]
+      WHERE [r].[NormalizedName] = @normalizedName
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (10ms) [Parameters=[@normalizedName='PERSON' (Size = 256)], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [r].[Id], [r].[ConcurrencyStamp], [r].[Created], [r].[CreatedBy], [r].[Description], [r].[GcRecord], [r].[IsSystemDefault], [r].[LastModified], [r].[LastModifiedBy], [r].[Name], [r].[NormalizedName]
+      FROM [Security].[Roles] AS [r]
+      WHERE [r].[NormalizedName] = @normalizedName
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (5ms) [Parameters=[@normalizedName='MANAGER' (Size = 256)], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [r].[Id], [r].[ConcurrencyStamp], [r].[Created], [r].[CreatedBy], [r].[Description], [r].[GcRecord], [r].[IsSystemDefault], [r].[LastModified], [r].[LastModifiedBy], [r].[Name], [r].[NormalizedName]
+      FROM [Security].[Roles] AS [r]
+      WHERE [r].[NormalizedName] = @normalizedName
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@normalizedName='SUPERVISOR' (Size = 256)], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [r].[Id], [r].[ConcurrencyStamp], [r].[Created], [r].[CreatedBy], [r].[Description], [r].[GcRecord], [r].[IsSystemDefault], [r].[LastModified], [r].[LastModifiedBy], [r].[Name], [r].[NormalizedName]
+      FROM [Security].[Roles] AS [r]
+      WHERE [r].[NormalizedName] = @normalizedName
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (11ms) [Parameters=[@normalizedName='COORDINADOR' (Size = 256)], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [r].[Id], [r].[ConcurrencyStamp], [r].[Created], [r].[CreatedBy], [r].[Description], [r].[GcRecord], [r].[IsSystemDefault], [r].[LastModified], [r].[LastModifiedBy], [r].[Name], [r].[NormalizedName]
+      FROM [Security].[Roles] AS [r]
+      WHERE [r].[NormalizedName] = @normalizedName
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (6ms) [Parameters=[@normalizedName='USUARIOSIMPLE' (Size = 256)], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [r].[Id], [r].[ConcurrencyStamp], [r].[Created], [r].[CreatedBy], [r].[Description], [r].[GcRecord], [r].[IsSystemDefault], [r].[LastModified], [r].[LastModifiedBy], [r].[Name], [r].[NormalizedName]
+      FROM [Security].[Roles] AS [r]
+      WHERE [r].[NormalizedName] = @normalizedName
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (6ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [c].[Id], [c].[Created], [c].[CreatedBy], [c].[Description], [c].[Email], [c].[GcRecord], [c].[IsActive], [c].[LastModified], [c].[LastModifiedBy], [c].[Name], [c].[Phone], [c].[TaxId], [c].[WebSite]
+      FROM [Common].[Companies] AS [c]
+      WHERE [c].[TaxId] = N'JOIN-001'
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [c].[Id], [c].[Created], [c].[CreatedBy], [c].[Description], [c].[Email], [c].[GcRecord], [c].[IsActive], [c].[LastModified], [c].[LastModifiedBy], [c].[Name], [c].[Phone], [c].[TaxId], [c].[WebSite]
+      FROM [Common].[Companies] AS [c]
+      WHERE [c].[TaxId] = N'PRIV-001'
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [i].[Id], [i].[Created], [i].[CreatedBy], [i].[Description], [i].[GcRecord], [i].[IsActive], [i].[LastModified], [i].[LastModifiedBy], [i].[Name], [i].[ValidationPattern]
+      FROM [Admin].[IdentificationTypes] AS [i]
+      WHERE [i].[Name] = N'Cedula'
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@seed_IsoCode='HN' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Countries] AS [c]
+              WHERE [c].[IsoCode] = @seed_IsoCode) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_IsoCode='NI' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Countries] AS [c]
+              WHERE [c].[IsoCode] = @seed_IsoCode) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_IsoCode='US' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Countries] AS [c]
+              WHERE [c].[IsoCode] = @seed_IsoCode) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_IsoCode='PA' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Countries] AS [c]
+              WHERE [c].[IsoCode] = @seed_IsoCode) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_IsoCode='ES' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Countries] AS [c]
+              WHERE [c].[IsoCode] = @seed_IsoCode) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: JOIN.Persistence.DatabaseSeeder[0]
+      Countries catalog seed finished. Inserted: 0, Existing: 5
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@countryIsoCodes1='HN' (Size = 10), @countryIsoCodes2='NI' (Size = 10), @countryIsoCodes3='US' (Size = 10), @countryIsoCodes4='PA' (Size = 10), @countryIsoCodes5='ES' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT [c].[Id], [c].[Created], [c].[CreatedBy], [c].[GcRecord], [c].[IsoCode], [c].[LastModified], [c].[LastModifiedBy], [c].[Name]
+      FROM [Common].[Countries] AS [c]
+      WHERE [c].[IsoCode] IN (@countryIsoCodes1, @countryIsoCodes2, @countryIsoCodes3, @countryIsoCodes4, @countryIsoCodes5)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@countryId='89b44622-63a0-474c-9fde-60d3e823a996', @8__locals1_seed_Code='HN-CR' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='89b44622-63a0-474c-9fde-60d3e823a996', @8__locals1_seed_Code='HN-FM' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='89b44622-63a0-474c-9fde-60d3e823a996', @8__locals1_seed_Code='HN-YO' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='89b44622-63a0-474c-9fde-60d3e823a996', @8__locals1_seed_Code='HN-OL' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='89b44622-63a0-474c-9fde-60d3e823a996', @8__locals1_seed_Code='HN-AT' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='89b44622-63a0-474c-9fde-60d3e823a996', @8__locals1_seed_Code='HN-CM' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='89b44622-63a0-474c-9fde-60d3e823a996', @8__locals1_seed_Code='HN-CH' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='89b44622-63a0-474c-9fde-60d3e823a996', @8__locals1_seed_Code='HN-CL' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='89b44622-63a0-474c-9fde-60d3e823a996', @8__locals1_seed_Code='HN-EP' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='89b44622-63a0-474c-9fde-60d3e823a996', @8__locals1_seed_Code='HN-CP' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='21af4f13-4928-4979-a23c-c8823de2c148', @8__locals1_seed_Code='NI-MN' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='21af4f13-4928-4979-a23c-c8823de2c148', @8__locals1_seed_Code='NI-LE' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='21af4f13-4928-4979-a23c-c8823de2c148', @8__locals1_seed_Code='NI-MT' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='21af4f13-4928-4979-a23c-c8823de2c148', @8__locals1_seed_Code='NI-CH' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='21af4f13-4928-4979-a23c-c8823de2c148', @8__locals1_seed_Code='NI-MS' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='21af4f13-4928-4979-a23c-c8823de2c148', @8__locals1_seed_Code='NI-ES' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='21af4f13-4928-4979-a23c-c8823de2c148', @8__locals1_seed_Code='NI-JI' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@countryId='21af4f13-4928-4979-a23c-c8823de2c148', @8__locals1_seed_Code='NI-GR' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='21af4f13-4928-4979-a23c-c8823de2c148', @8__locals1_seed_Code='NI-CA' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@countryId='21af4f13-4928-4979-a23c-c8823de2c148', @8__locals1_seed_Code='NI-RI' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='158d2a76-1434-47e3-a38d-25fd20ab8810', @8__locals1_seed_Code='US-CA' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='158d2a76-1434-47e3-a38d-25fd20ab8810', @8__locals1_seed_Code='US-TX' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@countryId='158d2a76-1434-47e3-a38d-25fd20ab8810', @8__locals1_seed_Code='US-FL' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='158d2a76-1434-47e3-a38d-25fd20ab8810', @8__locals1_seed_Code='US-NY' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@countryId='158d2a76-1434-47e3-a38d-25fd20ab8810', @8__locals1_seed_Code='US-PA' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='158d2a76-1434-47e3-a38d-25fd20ab8810', @8__locals1_seed_Code='US-IL' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='158d2a76-1434-47e3-a38d-25fd20ab8810', @8__locals1_seed_Code='US-OH' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='158d2a76-1434-47e3-a38d-25fd20ab8810', @8__locals1_seed_Code='US-GA' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='158d2a76-1434-47e3-a38d-25fd20ab8810', @8__locals1_seed_Code='US-NC' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='158d2a76-1434-47e3-a38d-25fd20ab8810', @8__locals1_seed_Code='US-MI' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='2f82dd90-87df-4e7c-adfa-1e24fe835ad2', @8__locals1_seed_Code='PA-PA' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='2f82dd90-87df-4e7c-adfa-1e24fe835ad2', @8__locals1_seed_Code='PA-WP' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='2f82dd90-87df-4e7c-adfa-1e24fe835ad2', @8__locals1_seed_Code='PA-CH' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='2f82dd90-87df-4e7c-adfa-1e24fe835ad2', @8__locals1_seed_Code='PA-CO' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='2f82dd90-87df-4e7c-adfa-1e24fe835ad2', @8__locals1_seed_Code='PA-CL' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='2f82dd90-87df-4e7c-adfa-1e24fe835ad2', @8__locals1_seed_Code='PA-VR' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='2f82dd90-87df-4e7c-adfa-1e24fe835ad2', @8__locals1_seed_Code='PA-BT' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='2f82dd90-87df-4e7c-adfa-1e24fe835ad2', @8__locals1_seed_Code='PA-DR' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='2f82dd90-87df-4e7c-adfa-1e24fe835ad2', @8__locals1_seed_Code='PA-HE' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='2f82dd90-87df-4e7c-adfa-1e24fe835ad2', @8__locals1_seed_Code='PA-LS' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='d288926a-32e7-4de1-a1f8-9e114a8d3787', @8__locals1_seed_Code='ES-M' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='d288926a-32e7-4de1-a1f8-9e114a8d3787', @8__locals1_seed_Code='ES-B' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='d288926a-32e7-4de1-a1f8-9e114a8d3787', @8__locals1_seed_Code='ES-V' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='d288926a-32e7-4de1-a1f8-9e114a8d3787', @8__locals1_seed_Code='ES-SE' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='d288926a-32e7-4de1-a1f8-9e114a8d3787', @8__locals1_seed_Code='ES-A' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='d288926a-32e7-4de1-a1f8-9e114a8d3787', @8__locals1_seed_Code='ES-MA' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='d288926a-32e7-4de1-a1f8-9e114a8d3787', @8__locals1_seed_Code='ES-MU' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='d288926a-32e7-4de1-a1f8-9e114a8d3787', @8__locals1_seed_Code='ES-CA' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='d288926a-32e7-4de1-a1f8-9e114a8d3787', @8__locals1_seed_Code='ES-BI' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryId='d288926a-32e7-4de1-a1f8-9e114a8d3787', @8__locals1_seed_Code='ES-GC' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Provinces] AS [p]
+              WHERE [p].[CountryId] = @countryId AND [p].[Code] = @8__locals1_seed_Code) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: JOIN.Persistence.DatabaseSeeder[0]
+      Provinces catalog seed finished. Inserted: 0, Existing: 50
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@countryIsoCodes1='HN' (Size = 10), @countryIsoCodes2='NI' (Size = 10), @countryIsoCodes3='US' (Size = 10), @countryIsoCodes4='PA' (Size = 10), @countryIsoCodes5='ES' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT [c].[Id], [c].[Created], [c].[CreatedBy], [c].[GcRecord], [c].[IsoCode], [c].[LastModified], [c].[LastModifiedBy], [c].[Name]
+      FROM [Common].[Countries] AS [c]
+      WHERE [c].[IsoCode] IN (@countryIsoCodes1, @countryIsoCodes2, @countryIsoCodes3, @countryIsoCodes4, @countryIsoCodes5)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@targetCountryIds1='2f82dd90-87df-4e7c-adfa-1e24fe835ad2', @targetCountryIds2='158d2a76-1434-47e3-a38d-25fd20ab8810', @targetCountryIds3='89b44622-63a0-474c-9fde-60d3e823a996', @targetCountryIds4='d288926a-32e7-4de1-a1f8-9e114a8d3787', @targetCountryIds5='21af4f13-4928-4979-a23c-c8823de2c148'], CommandType='Text', CommandTimeout='30']
+      SELECT [p].[Id], [p].[Code], [p].[CountryId], [p].[Created], [p].[CreatedBy], [p].[GcRecord], [p].[LastModified], [p].[LastModifiedBy], [p].[Name], [p].[RegionId]
+      FROM [Common].[Provinces] AS [p]
+      WHERE [p].[CountryId] IN (@targetCountryIds1, @targetCountryIds2, @targetCountryIds3, @targetCountryIds4, @targetCountryIds5)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@provinceId='f865d594-4b37-4ced-865c-00b706a16a29', @8__locals1_seed_Name='San Pedro Sula' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='f865d594-4b37-4ced-865c-00b706a16a29', @8__locals1_seed_Name='Choloma' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='f865d594-4b37-4ced-865c-00b706a16a29', @8__locals1_seed_Name='Puerto Cortes' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='f865d594-4b37-4ced-865c-00b706a16a29', @8__locals1_seed_Name='Villanueva' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='e1a711c9-d8a7-42c9-8511-b915a74c6ce2', @8__locals1_seed_Name='Distrito Central' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='e1a711c9-d8a7-42c9-8511-b915a74c6ce2', @8__locals1_seed_Name='Talanga' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='e1a711c9-d8a7-42c9-8511-b915a74c6ce2', @8__locals1_seed_Name='Valle de Angeles' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='e1a711c9-d8a7-42c9-8511-b915a74c6ce2', @8__locals1_seed_Name='Santa Lucia' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='15878744-5115-49e9-9284-2f070da193a9', @8__locals1_seed_Name='El Progreso' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='15878744-5115-49e9-9284-2f070da193a9', @8__locals1_seed_Name='Yoro' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='15878744-5115-49e9-9284-2f070da193a9', @8__locals1_seed_Name='Olanchito' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='15878744-5115-49e9-9284-2f070da193a9', @8__locals1_seed_Name='Morazan' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='8a776b68-fd21-4990-b9db-f80fa65a2502', @8__locals1_seed_Name='La Ceiba' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='8a776b68-fd21-4990-b9db-f80fa65a2502', @8__locals1_seed_Name='Tela' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='8a776b68-fd21-4990-b9db-f80fa65a2502', @8__locals1_seed_Name='Jutiapa' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='8a776b68-fd21-4990-b9db-f80fa65a2502', @8__locals1_seed_Name='Arizona' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='b12b4252-898f-4800-a5fb-e57724ca7f87', @8__locals1_seed_Name='Comayagua' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='b12b4252-898f-4800-a5fb-e57724ca7f87', @8__locals1_seed_Name='Siguatepeque' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='b12b4252-898f-4800-a5fb-e57724ca7f87', @8__locals1_seed_Name='Taulabe' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='b12b4252-898f-4800-a5fb-e57724ca7f87', @8__locals1_seed_Name='Villa de San Antonio' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='3683e7f0-1a2a-4476-930d-5a4ebdbd71e1', @8__locals1_seed_Name='Managua' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='3683e7f0-1a2a-4476-930d-5a4ebdbd71e1', @8__locals1_seed_Name='Ciudad Sandino' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='3683e7f0-1a2a-4476-930d-5a4ebdbd71e1', @8__locals1_seed_Name='Tipitapa' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='3683e7f0-1a2a-4476-930d-5a4ebdbd71e1', @8__locals1_seed_Name='Ticuantepe' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='4c79b004-fbb1-4b8f-af83-d22648c5e488', @8__locals1_seed_Name='Leon' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='4c79b004-fbb1-4b8f-af83-d22648c5e488', @8__locals1_seed_Name='Nagarote' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='4c79b004-fbb1-4b8f-af83-d22648c5e488', @8__locals1_seed_Name='La Paz Centro' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@provinceId='4c79b004-fbb1-4b8f-af83-d22648c5e488', @8__locals1_seed_Name='Quezalguaque' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='0a84b030-fdde-426a-b75f-6880096f35e3', @8__locals1_seed_Name='Matagalpa' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='0a84b030-fdde-426a-b75f-6880096f35e3', @8__locals1_seed_Name='Matiguas' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='0a84b030-fdde-426a-b75f-6880096f35e3', @8__locals1_seed_Name='Sebaco' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='0a84b030-fdde-426a-b75f-6880096f35e3', @8__locals1_seed_Name='Rio Blanco' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='fd73c477-9b0b-491e-a4e3-e7ee1c794bec', @8__locals1_seed_Name='Chinandega' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='fd73c477-9b0b-491e-a4e3-e7ee1c794bec', @8__locals1_seed_Name='Corinto' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@provinceId='fd73c477-9b0b-491e-a4e3-e7ee1c794bec', @8__locals1_seed_Name='El Viejo' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='fd73c477-9b0b-491e-a4e3-e7ee1c794bec', @8__locals1_seed_Name='Chichigalpa' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@provinceId='d952e083-e47c-4bb9-ba61-ba19a03700e1', @8__locals1_seed_Name='Masaya' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@provinceId='d952e083-e47c-4bb9-ba61-ba19a03700e1', @8__locals1_seed_Name='Nindiri' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='d952e083-e47c-4bb9-ba61-ba19a03700e1', @8__locals1_seed_Name='Catarina' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='d952e083-e47c-4bb9-ba61-ba19a03700e1', @8__locals1_seed_Name='Niquinohomo' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='0b542951-43bd-4acf-8a8d-319680ecc2b1', @8__locals1_seed_Name='Los Angeles' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='0b542951-43bd-4acf-8a8d-319680ecc2b1', @8__locals1_seed_Name='San Diego' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='0b542951-43bd-4acf-8a8d-319680ecc2b1', @8__locals1_seed_Name='San Jose' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='0b542951-43bd-4acf-8a8d-319680ecc2b1', @8__locals1_seed_Name='San Francisco' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='7db2b8cd-87a8-456f-831e-e1bb3b511836', @8__locals1_seed_Name='Houston' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='7db2b8cd-87a8-456f-831e-e1bb3b511836', @8__locals1_seed_Name='Dallas' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='7db2b8cd-87a8-456f-831e-e1bb3b511836', @8__locals1_seed_Name='Austin' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@provinceId='7db2b8cd-87a8-456f-831e-e1bb3b511836', @8__locals1_seed_Name='San Antonio' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@provinceId='0fc35c75-7788-474d-b61e-da9527828bfc', @8__locals1_seed_Name='Jacksonville' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@provinceId='0fc35c75-7788-474d-b61e-da9527828bfc', @8__locals1_seed_Name='Miami' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@provinceId='0fc35c75-7788-474d-b61e-da9527828bfc', @8__locals1_seed_Name='Tampa' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@provinceId='0fc35c75-7788-474d-b61e-da9527828bfc', @8__locals1_seed_Name='Orlando' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='6e06be6e-e3f4-4a6b-b5a9-3d4253006dce', @8__locals1_seed_Name='New York City' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='6e06be6e-e3f4-4a6b-b5a9-3d4253006dce', @8__locals1_seed_Name='Buffalo' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='6e06be6e-e3f4-4a6b-b5a9-3d4253006dce', @8__locals1_seed_Name='Rochester' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='6e06be6e-e3f4-4a6b-b5a9-3d4253006dce', @8__locals1_seed_Name='Yonkers' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='80339ae4-c2e1-43ec-8749-b7d47d5379fe', @8__locals1_seed_Name='Chicago' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='80339ae4-c2e1-43ec-8749-b7d47d5379fe', @8__locals1_seed_Name='Aurora' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='80339ae4-c2e1-43ec-8749-b7d47d5379fe', @8__locals1_seed_Name='Naperville' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='80339ae4-c2e1-43ec-8749-b7d47d5379fe', @8__locals1_seed_Name='Joliet' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='96c1200a-309e-4b60-9f82-449b2512ab46', @8__locals1_seed_Name='Panama City' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='96c1200a-309e-4b60-9f82-449b2512ab46', @8__locals1_seed_Name='San Miguelito' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='96c1200a-309e-4b60-9f82-449b2512ab46', @8__locals1_seed_Name='Chepo' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='96c1200a-309e-4b60-9f82-449b2512ab46', @8__locals1_seed_Name='Taboga' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='999ddb3d-64fe-4b56-9182-51ac3c9f3a68', @8__locals1_seed_Name='La Chorrera' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='999ddb3d-64fe-4b56-9182-51ac3c9f3a68', @8__locals1_seed_Name='Arraijan' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='999ddb3d-64fe-4b56-9182-51ac3c9f3a68', @8__locals1_seed_Name='Chame' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='999ddb3d-64fe-4b56-9182-51ac3c9f3a68', @8__locals1_seed_Name='San Carlos' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='f478ed2a-3ccf-4a8b-8edd-87eb60321dc9', @8__locals1_seed_Name='David' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='f478ed2a-3ccf-4a8b-8edd-87eb60321dc9', @8__locals1_seed_Name='Boquete' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='f478ed2a-3ccf-4a8b-8edd-87eb60321dc9', @8__locals1_seed_Name='Bugaba' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='f478ed2a-3ccf-4a8b-8edd-87eb60321dc9', @8__locals1_seed_Name='Dolega' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='ff2df26b-c42c-465c-9037-74fd446bc7a2', @8__locals1_seed_Name='Colon' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='ff2df26b-c42c-465c-9037-74fd446bc7a2', @8__locals1_seed_Name='Chagres' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='ff2df26b-c42c-465c-9037-74fd446bc7a2', @8__locals1_seed_Name='Donoso' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='ff2df26b-c42c-465c-9037-74fd446bc7a2', @8__locals1_seed_Name='Portobelo' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='56b9c6c6-8090-40c5-9056-2bec36de4c3e', @8__locals1_seed_Name='Penonome' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='56b9c6c6-8090-40c5-9056-2bec36de4c3e', @8__locals1_seed_Name='Aguadulce' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='56b9c6c6-8090-40c5-9056-2bec36de4c3e', @8__locals1_seed_Name='Anton' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='56b9c6c6-8090-40c5-9056-2bec36de4c3e', @8__locals1_seed_Name='La Pintada' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='01775ab1-db1d-48f5-bc77-4d878e561fa2', @8__locals1_seed_Name='Madrid' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='01775ab1-db1d-48f5-bc77-4d878e561fa2', @8__locals1_seed_Name='Mostoles' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='01775ab1-db1d-48f5-bc77-4d878e561fa2', @8__locals1_seed_Name='Alcala de Henares' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@provinceId='01775ab1-db1d-48f5-bc77-4d878e561fa2', @8__locals1_seed_Name='Fuenlabrada' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@provinceId='6cb07920-71ff-4efd-9ffd-910c6327c3e6', @8__locals1_seed_Name='Barcelona' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@provinceId='6cb07920-71ff-4efd-9ffd-910c6327c3e6', @8__locals1_seed_Name='LHospitalet de Llobregat' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='6cb07920-71ff-4efd-9ffd-910c6327c3e6', @8__locals1_seed_Name='Badalona' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='6cb07920-71ff-4efd-9ffd-910c6327c3e6', @8__locals1_seed_Name='Terrassa' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@provinceId='68ed02dc-e029-42b1-80bb-c0c08e95a818', @8__locals1_seed_Name='Valencia' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='68ed02dc-e029-42b1-80bb-c0c08e95a818', @8__locals1_seed_Name='Torrent' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='68ed02dc-e029-42b1-80bb-c0c08e95a818', @8__locals1_seed_Name='Gandia' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='68ed02dc-e029-42b1-80bb-c0c08e95a818', @8__locals1_seed_Name='Paterna' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='978064ac-0b85-45d3-b3aa-ff4a8715b8c1', @8__locals1_seed_Name='Sevilla' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='978064ac-0b85-45d3-b3aa-ff4a8715b8c1', @8__locals1_seed_Name='Dos Hermanas' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='978064ac-0b85-45d3-b3aa-ff4a8715b8c1', @8__locals1_seed_Name='Alcala de Guadaira' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='978064ac-0b85-45d3-b3aa-ff4a8715b8c1', @8__locals1_seed_Name='Utrera' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='448e44d9-5fea-45dc-8933-7baa8572b75b', @8__locals1_seed_Name='Malaga' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='448e44d9-5fea-45dc-8933-7baa8572b75b', @8__locals1_seed_Name='Marbella' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='448e44d9-5fea-45dc-8933-7baa8572b75b', @8__locals1_seed_Name='Velez-Malaga' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@provinceId='448e44d9-5fea-45dc-8933-7baa8572b75b', @8__locals1_seed_Name='Fuengirola' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[Municipalities] AS [m]
+              WHERE [m].[ProvinceId] = @provinceId AND [m].[Name] = @8__locals1_seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: JOIN.Persistence.DatabaseSeeder[0]
+      Municipalities catalog seed finished. Inserted: 0, Existing: 100
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Avenida' (Size = 50), @seed_Abbreviation='Av.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Calle' (Size = 50), @seed_Abbreviation='C.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Boulevard' (Size = 50), @seed_Abbreviation='Blvd.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Pasaje' (Size = 50), @seed_Abbreviation='Psj.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Carretera' (Size = 50), @seed_Abbreviation='Carr.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Camino' (Size = 50), @seed_Abbreviation='Cno.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Autopista' (Size = 50), @seed_Abbreviation='Aut.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Diagonal' (Size = 50), @seed_Abbreviation='Diag.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Transversal' (Size = 50), @seed_Abbreviation='Trans.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Circunvalacion' (Size = 50), @seed_Abbreviation='Circ.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Plaza' (Size = 50), @seed_Abbreviation='Plz.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Paseo' (Size = 50), @seed_Abbreviation='Pso.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Sendero' (Size = 50), @seed_Abbreviation='Snd.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Via' (Size = 50), @seed_Abbreviation='V.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Callejon' (Size = 50), @seed_Abbreviation='Cjon.' (Size = 10)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[StreetTypes] AS [s]
+              WHERE [s].[Name] = @seed_Name OR [s].[Abbreviation] = @seed_Abbreviation) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: JOIN.Persistence.DatabaseSeeder[0]
+      Street types catalog seed finished. Inserted: 0, Existing: 15
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='SendGrid' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[CommunicationChannels] AS [c]
+              WHERE [c].[Name] = @seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Telegram' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[CommunicationChannels] AS [c]
+              WHERE [c].[Name] = @seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Twilio' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[CommunicationChannels] AS [c]
+              WHERE [c].[Name] = @seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='WhatsApp' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Common].[CommunicationChannels] AS [c]
+              WHERE [c].[Name] = @seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: JOIN.Persistence.DatabaseSeeder[0]
+      Communication channels catalog seed finished. Inserted: 0, Existing: 4
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@companyId='d84128e0-e34f-4a3e-b344-c771e26d50ed'], CommandType='Text', CommandTimeout='30']
+      SELECT [t].[Id], [t].[Code], [t].[CompanyId], [t].[Created], [t].[CreatedBy], [t].[GcRecord], [t].[IsActive], [t].[LastModified], [t].[LastModifiedBy], [t].[Name]
+      FROM [Messaging].[TimeUnits] AS [t]
+      WHERE [t].[CompanyId] = @companyId AND [t].[GcRecord] = 0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@companyId='d84128e0-e34f-4a3e-b344-c771e26d50ed'], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [t].[Id], [t].[Code], [t].[CompanyId], [t].[Created], [t].[CreatedBy], [t].[GcRecord], [t].[IsActive], [t].[LastModified], [t].[LastModifiedBy], [t].[Name]
+      FROM [Messaging].[TimeUnits] AS [t]
+      WHERE [t].[CompanyId] = @companyId AND [t].[GcRecord] = 0
+      ORDER BY [t].[Code]
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@companyId='d84128e0-e34f-4a3e-b344-c771e26d50ed'], CommandType='Text', CommandTimeout='30']
+      SELECT [t].[Id], [t].[Code], [t].[CompanyId], [t].[Created], [t].[CreatedBy], [t].[Description], [t].[GcRecord], [t].[IsActive], [t].[IsFinal], [t].[IsInitial], [t].[IsPaused], [t].[LastModified], [t].[LastModifiedBy], [t].[Name]
+      FROM [Messaging].[TicketStatuses] AS [t]
+      WHERE [t].[CompanyId] = @companyId AND [t].[GcRecord] = 0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@companyId='d84128e0-e34f-4a3e-b344-c771e26d50ed'], CommandType='Text', CommandTimeout='30']
+      SELECT [t].[Id], [t].[Code], [t].[CompanyId], [t].[Created], [t].[CreatedBy], [t].[Description], [t].[GcRecord], [t].[IsActive], [t].[LastModified], [t].[LastModifiedBy], [t].[Name], [t].[ResolutionTimeUnits], [t].[TimeUnitId]
+      FROM [Messaging].[TicketComplexities] AS [t]
+      WHERE [t].[CompanyId] = @companyId AND [t].[GcRecord] = 0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@companyId='383a0021-2016-4058-b9da-6eb296a1aa4c'], CommandType='Text', CommandTimeout='30']
+      SELECT [t].[Id], [t].[Code], [t].[CompanyId], [t].[Created], [t].[CreatedBy], [t].[GcRecord], [t].[IsActive], [t].[LastModified], [t].[LastModifiedBy], [t].[Name]
+      FROM [Messaging].[TimeUnits] AS [t]
+      WHERE [t].[CompanyId] = @companyId AND [t].[GcRecord] = 0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@companyId='383a0021-2016-4058-b9da-6eb296a1aa4c'], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [t].[Id], [t].[Code], [t].[CompanyId], [t].[Created], [t].[CreatedBy], [t].[GcRecord], [t].[IsActive], [t].[LastModified], [t].[LastModifiedBy], [t].[Name]
+      FROM [Messaging].[TimeUnits] AS [t]
+      WHERE [t].[CompanyId] = @companyId AND [t].[GcRecord] = 0
+      ORDER BY [t].[Code]
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@companyId='383a0021-2016-4058-b9da-6eb296a1aa4c'], CommandType='Text', CommandTimeout='30']
+      SELECT [t].[Id], [t].[Code], [t].[CompanyId], [t].[Created], [t].[CreatedBy], [t].[Description], [t].[GcRecord], [t].[IsActive], [t].[IsFinal], [t].[IsInitial], [t].[IsPaused], [t].[LastModified], [t].[LastModifiedBy], [t].[Name]
+      FROM [Messaging].[TicketStatuses] AS [t]
+      WHERE [t].[CompanyId] = @companyId AND [t].[GcRecord] = 0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@companyId='383a0021-2016-4058-b9da-6eb296a1aa4c'], CommandType='Text', CommandTimeout='30']
+      SELECT [t].[Id], [t].[Code], [t].[CompanyId], [t].[Created], [t].[CreatedBy], [t].[Description], [t].[GcRecord], [t].[IsActive], [t].[LastModified], [t].[LastModifiedBy], [t].[Name], [t].[ResolutionTimeUnits], [t].[TimeUnitId]
+      FROM [Messaging].[TicketComplexities] AS [t]
+      WHERE [t].[CompanyId] = @companyId AND [t].[GcRecord] = 0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Administracion' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Admin].[SystemModules] AS [s]
+              WHERE [s].[Name] = @seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Seguridad' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Admin].[SystemModules] AS [s]
+              WHERE [s].[Name] = @seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Clientes' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Admin].[SystemModules] AS [s]
+              WHERE [s].[Name] = @seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@seed_Name='Tickets' (Size = 100)], CommandType='Text', CommandTimeout='30']
+      SELECT CASE
+          WHEN EXISTS (
+              SELECT 1
+              FROM [Admin].[SystemModules] AS [s]
+              WHERE [s].[Name] = @seed_Name) THEN CAST(1 AS bit)
+          ELSE CAST(0 AS bit)
+      END
+info: JOIN.Persistence.DatabaseSeeder[0]
+      System modules catalog seed finished. Inserted: 0, Existing: 4
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT [c].[Id]
+      FROM [Common].[Companies] AS [c]
+      WHERE [c].[IsActive] = CAST(1 AS bit)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT [s].[Id]
+      FROM [Admin].[SystemModules] AS [s]
+      WHERE [s].[IsActive] = CAST(1 AS bit)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@companyIds1='383a0021-2016-4058-b9da-6eb296a1aa4c', @companyIds2='d84128e0-e34f-4a3e-b344-c771e26d50ed', @moduleIds1='ae7a95ab-e51d-4d06-b386-3552cbda41a3', @moduleIds2='1097e14f-4bb0-484d-b47a-8a58cbb08890', @moduleIds3='4a2a7973-a499-436e-8dcd-d4236e479546', @moduleIds4='6e3b184e-6ac6-43c3-be10-d4a8663c3798', @moduleIds5='33711c28-3a31-457e-bb4d-d802d10fbebd'], CommandType='Text', CommandTimeout='30']
+      SELECT [c].[CompanyId], [c].[ModuleId]
+      FROM [Admin].[CompanyModules] AS [c]
+      WHERE [c].[CompanyId] IN (@companyIds1, @companyIds2) AND [c].[ModuleId] IN (@moduleIds1, @moduleIds2, @moduleIds3, @moduleIds4, @moduleIds5)
+info: JOIN.Persistence.DatabaseSeeder[0]
+      Company modules seed finished. Inserted: 0, Existing: 10, TotalExpected: 10
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT TOP(1) [s].[Id], [s].[Created], [s].[CreatedBy], [s].[Description], [s].[GcRecord], [s].[Icon], [s].[IsActive], [s].[LastModified], [s].[LastModifiedBy], [s].[Name], [s].[Order]
+      FROM [Admin].[SystemModules] AS [s]
+      WHERE [s].[Name] = N'Administracion'
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@adminModule_Id='33711c28-3a31-457e-bb4d-d802d10fbebd', @optionNames1='Administracion' (Size = 150), @optionNames2='Paises' (Size = 150), @optionNames3='Regions' (Size = 150), @optionNames4='Provinces' (Size = 150), @optionNames5='Municipalities' (Size = 150), @optionNames6='IdentificationTypes' (Size = 150), @optionNames7='StreetTypes' (Size = 150), @optionNames8='Areas' (Size = 150), @optionNames9='Projects' (Size = 150), @optionNames10='SystemModules' (Size = 150), @optionNames11='EntityStatuses' (Size = 150), @optionNames12='Compañias' (Size = 150), @optionNames13='CompanyModules' (Size = 150), @optionNames14='CommunicationChannels' (Size = 150), @optionNames15='Persons' (Size = 150), @optionNames16='Clientes' (Size = 150), @optionNames17='ManejoTickets' (Size = 150), @optionNames18='Tickets' (Size = 150), @optionNames19='TimeUnits' (Size = 150), @optionNames20='TicketComplexities' (Size = 150), @optionNames21='TicketStatuses' (Size = 150), @optionNames22='TicketCompanyDefaults' (Size = 150), @optionNames23='Seguridad' (Size = 150), @optionNames24='Usuarios' (Size = 150), @optionNames25='Roles' (Size = 150), @optionNames26='SystemOption' (Size = 150), @optionNames27='RoleSystemOption' (Size = 150), @optionNames28='RoleSystemOption' (Size = 150), @optionNames29='RoleSystemOption' (Size = 150), @optionNames30='RoleSystemOption' (Size = 150)], CommandType='Text', CommandTimeout='30']
+      SELECT [s].[Id], [s].[CanCreate], [s].[CanDelete], [s].[CanRead], [s].[CanUpdate], [s].[ControllerName], [s].[Created], [s].[CreatedBy], [s].[GcRecord], [s].[Icon], [s].[LastModified], [s].[LastModifiedBy], [s].[ModuleId], [s].[Name], [s].[ParentId], [s].[Route]
+      FROM [Security].[SystemOptions] AS [s]
+      WHERE [s].[ModuleId] = @adminModule_Id AND [s].[Name] IN (@optionNames1, @optionNames2, @optionNames3, @optionNames4, @optionNames5, @optionNames6, @optionNames7, @optionNames8, @optionNames9, @optionNames10, @optionNames11, @optionNames12, @optionNames13, @optionNames14, @optionNames15, @optionNames16, @optionNames17, @optionNames18, @optionNames19, @optionNames20, @optionNames21, @optionNames22, @optionNames23, @optionNames24, @optionNames25, @optionNames26, @optionNames27, @optionNames28, @optionNames29, @optionNames30)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (11ms) [Parameters=[@p3='d4fe0cf7-8414-441f-bd34-23c2bcf7ba6d', @p0='Persons' (Size = 250), @p1='2026-05-14T08:04:30.0199940Z' (Nullable = true), @p2='System' (Size = 4000), @p4='b3ea1366-3c70-4c4a-9cd6-a2329ea6ee0f', @p5='False', @p6='False', @p7='False', @p8='False', @p9=NULL (Size = 250), @p10='2026-05-14T08:04:30.0199940Z', @p11='System' (Size = 4000), @p12='0', @p13='@Icons.Material.Filled.PermContactCalendar' (Size = 100), @p14='2026-05-14T08:04:30.0199940Z' (Nullable = true), @p15='System' (Size = 4000), @p16='33711c28-3a31-457e-bb4d-d802d10fbebd', @p17='Persons' (Nullable = false) (Size = 150), @p18=NULL (DbType = Guid), @p19='/Clientes' (Nullable = false) (Size = 250)], CommandType='Text', CommandTimeout='30']
+      SET NOCOUNT ON;
+      UPDATE [Security].[SystemOptions] SET [ControllerName] = @p0, [LastModified] = @p1, [LastModifiedBy] = @p2
+      OUTPUT 1
+      WHERE [Id] = @p3;
+      INSERT INTO [Security].[SystemOptions] ([Id], [CanCreate], [CanDelete], [CanRead], [CanUpdate], [ControllerName], [Created], [CreatedBy], [GcRecord], [Icon], [LastModified], [LastModifiedBy], [ModuleId], [Name], [ParentId], [Route])
+      VALUES (@p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19);
+fail: Microsoft.EntityFrameworkCore.Update[10000]
+      An exception occurred in the database while saving changes for context type 'JOIN.Persistence.Contexts.ApplicationDbContext'.
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+       ---> Microsoft.Data.SqlClient.SqlException (0x80131904): Cannot insert duplicate key row in object 'Security.SystemOptions' with unique index 'IX_SystemOptions_ModuleId_Route'. The duplicate key value is (33711c28-3a31-457e-bb4d-d802d10fbebd, /Clientes).
+         at Microsoft.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+         at Microsoft.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+         at Microsoft.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, SqlCommand command, Boolean callerHasConnectionLock, Boolean asyncClose)
+         at Microsoft.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryHasMoreRows(Boolean& moreRows)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryHasMoreResults(Boolean& moreResults)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryNextResult(Boolean& more)
+         at Microsoft.Data.SqlClient.SqlDataReader.NextResultAsyncExecute(Task task, Object state)
+         at Microsoft.Data.SqlClient.SqlDataReader.InvokeAsyncCall[T](SqlDataReaderBaseAsyncCallContext`1 context)
+      --- End of stack trace from previous location ---
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeAsync(RelationalDataReader reader, CancellationToken cancellationToken)
+      ClientConnectionId:46ac3e7f-17cc-4438-a59d-0dc192432d77
+      Error Number:2601,State:1,Class:14
+         --- End of inner exception stack trace ---
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeAsync(RelationalDataReader reader, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.SqlServer.Update.Internal.SqlServerModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal.SqlServerExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+       ---> Microsoft.Data.SqlClient.SqlException (0x80131904): Cannot insert duplicate key row in object 'Security.SystemOptions' with unique index 'IX_SystemOptions_ModuleId_Route'. The duplicate key value is (33711c28-3a31-457e-bb4d-d802d10fbebd, /Clientes).
+         at Microsoft.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+         at Microsoft.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+         at Microsoft.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, SqlCommand command, Boolean callerHasConnectionLock, Boolean asyncClose)
+         at Microsoft.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryHasMoreRows(Boolean& moreRows)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryHasMoreResults(Boolean& moreResults)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryNextResult(Boolean& more)
+         at Microsoft.Data.SqlClient.SqlDataReader.NextResultAsyncExecute(Task task, Object state)
+         at Microsoft.Data.SqlClient.SqlDataReader.InvokeAsyncCall[T](SqlDataReaderBaseAsyncCallContext`1 context)
+      --- End of stack trace from previous location ---
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeAsync(RelationalDataReader reader, CancellationToken cancellationToken)
+      ClientConnectionId:46ac3e7f-17cc-4438-a59d-0dc192432d77
+      Error Number:2601,State:1,Class:14
+         --- End of inner exception stack trace ---
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeAsync(RelationalDataReader reader, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.SqlServer.Update.Internal.SqlServerModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal.SqlServerExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+crit: JOIN.Persistence.DatabaseSeeder[0]
+      ❌ Fatal error during the seeding process.
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+       ---> Microsoft.Data.SqlClient.SqlException (0x80131904): Cannot insert duplicate key row in object 'Security.SystemOptions' with unique index 'IX_SystemOptions_ModuleId_Route'. The duplicate key value is (33711c28-3a31-457e-bb4d-d802d10fbebd, /Clientes).
+         at Microsoft.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+         at Microsoft.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+         at Microsoft.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, SqlCommand command, Boolean callerHasConnectionLock, Boolean asyncClose)
+         at Microsoft.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryHasMoreRows(Boolean& moreRows)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryHasMoreResults(Boolean& moreResults)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryNextResult(Boolean& more)
+         at Microsoft.Data.SqlClient.SqlDataReader.NextResultAsyncExecute(Task task, Object state)
+         at Microsoft.Data.SqlClient.SqlDataReader.InvokeAsyncCall[T](SqlDataReaderBaseAsyncCallContext`1 context)
+      --- End of stack trace from previous location ---
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeAsync(RelationalDataReader reader, CancellationToken cancellationToken)
+      ClientConnectionId:46ac3e7f-17cc-4438-a59d-0dc192432d77
+      Error Number:2601,State:1,Class:14
+         --- End of inner exception stack trace ---
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeAsync(RelationalDataReader reader, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.SqlServer.Update.Internal.SqlServerModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal.SqlServerExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at JOIN.Persistence.DatabaseSeeder.SeedSystemOptionsAsync() in /Users/lcano/github.com/join/src/3.Persistence/Seed/DatabaseSeeder.cs:line 1733
+         at JOIN.Persistence.DatabaseSeeder.SeedAsync() in /Users/lcano/github.com/join/src/3.Persistence/Seed/DatabaseSeeder.cs:line 91
+fail: Program[0]
+      An error occurred while migrating the database.
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+       ---> Microsoft.Data.SqlClient.SqlException (0x80131904): Cannot insert duplicate key row in object 'Security.SystemOptions' with unique index 'IX_SystemOptions_ModuleId_Route'. The duplicate key value is (33711c28-3a31-457e-bb4d-d802d10fbebd, /Clientes).
+         at Microsoft.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+         at Microsoft.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+         at Microsoft.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, SqlCommand command, Boolean callerHasConnectionLock, Boolean asyncClose)
+         at Microsoft.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryHasMoreRows(Boolean& moreRows)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryHasMoreResults(Boolean& moreResults)
+         at Microsoft.Data.SqlClient.SqlDataReader.TryNextResult(Boolean& more)
+         at Microsoft.Data.SqlClient.SqlDataReader.NextResultAsyncExecute(Task task, Object state)
+         at Microsoft.Data.SqlClient.SqlDataReader.InvokeAsyncCall[T](SqlDataReaderBaseAsyncCallContext`1 context)
+      --- End of stack trace from previous location ---
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeAsync(RelationalDataReader reader, CancellationToken cancellationToken)
+      ClientConnectionId:46ac3e7f-17cc-4438-a59d-0dc192432d77
+      Error Number:2601,State:1,Class:14
+         --- End of inner exception stack trace ---
+         at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeAsync(RelationalDataReader reader, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.SqlServer.Update.Internal.SqlServerModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal.SqlServerExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at JOIN.Persistence.DatabaseSeeder.SeedSystemOptionsAsync() in /Users/lcano/github.com/join/src/3.Persistence/Seed/DatabaseSeeder.cs:line 1733
+         at JOIN.Persistence.DatabaseSeeder.SeedAsync() in /Users/lcano/github.com/join/src/3.Persistence/Seed/DatabaseSeeder.cs:line 91
+         at Program.<Main>$(String[] args) in /Users/lcano/github.com/join/src/4.Services.WebApi/Program.cs:line 149
+Unhandled exception. Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.SqlClient.SqlException (0x80131904): Cannot insert duplicate key row in object 'Security.SystemOptions' with unique index 'IX_SystemOptions_ModuleId_Route'. The duplicate key value is (33711c28-3a31-457e-bb4d-d802d10fbebd, /Clientes).
+   at Microsoft.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at Microsoft.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at Microsoft.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, SqlCommand command, Boolean callerHasConnectionLock, Boolean asyncClose)
+   at Microsoft.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+   at Microsoft.Data.SqlClient.SqlDataReader.TryHasMoreRows(Boolean& moreRows)
+   at Microsoft.Data.SqlClient.SqlDataReader.TryHasMoreResults(Boolean& moreResults)
+   at Microsoft.Data.SqlClient.SqlDataReader.TryNextResult(Boolean& more)
+   at Microsoft.Data.SqlClient.SqlDataReader.NextResultAsyncExecute(Task task, Object state)
+   at Microsoft.Data.SqlClient.SqlDataReader.InvokeAsyncCall[T](SqlDataReaderBaseAsyncCallContext`1 context)
+--- End of stack trace from previous location ---
+   at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeAsync(RelationalDataReader reader, CancellationToken cancellationToken)
+ClientConnectionId:46ac3e7f-17cc-4438-a59d-0dc192432d77
+Error Number:2601,State:1,Class:14
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.AffectedCountModificationCommandBatch.ConsumeAsync(RelationalDataReader reader, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.SqlServer.Update.Internal.SqlServerModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal.SqlServerExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at JOIN.Persistence.DatabaseSeeder.SeedSystemOptionsAsync() in /Users/lcano/github.com/join/src/3.Persistence/Seed/DatabaseSeeder.cs:line 1733
+   at JOIN.Persistence.DatabaseSeeder.SeedAsync() in /Users/lcano/github.com/join/src/3.Persistence/Seed/DatabaseSeeder.cs:line 91
+   at Program.<Main>$(String[] args) in /Users/lcano/github.com/join/src/4.Services.WebApi/Program.cs:line 149
+   at Program.<Main>(String[] args)
