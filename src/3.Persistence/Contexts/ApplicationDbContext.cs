@@ -48,7 +48,16 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<IdentificationType> IdentificationTypes => Set<IdentificationType>();
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<UserCommunicationChannel> UserCommunicationChannels => Set<UserCommunicationChannel>();
+
     
+    public DbSet<Industry> Industries => Set<Industry>();
+    public DbSet<TaxRegime> TaxRegimes => Set<TaxRegime>();
+    public DbSet<IncomeRange> IncomeRanges => Set<IncomeRange>();
+    public DbSet<Gender> Genders => Set<Gender>();
+    public DbSet<PersonEmployment> PersonEmployments => Set<PersonEmployment>();
+    public DbSet<PersonBusinessProfile> PersonBusinessProfiles => Set<PersonBusinessProfile>();
+    public DbSet<PersonFinancialProfile> PersonFinancialProfiles => Set<PersonFinancialProfile>();
+
 
 
     // --- 3. COMMON MODULE ---
