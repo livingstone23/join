@@ -25,6 +25,11 @@ public class Person : BaseTenantEntity
     public PersonType PersonType { get; set; }
 
     /// <summary>
+    /// Gets or sets the foreign key for the gender.
+    /// </summary>
+    public Guid? GenderId { get; set; }
+
+    /// <summary>
     /// Gets or sets the first name of the person.
     /// Mandatory for Physical persons.
     /// </summary>
@@ -61,9 +66,21 @@ public class Person : BaseTenantEntity
     /// </summary>
     public string IdentificationNumber { get; set; } = string.Empty;
 
+
+    /// <summary>
+    /// Indicates whether the person is currently active in the system.
+    /// Defaults to true. Used for the Soft Delete pattern.
+    /// </summary>
+    public bool IsActive { get; private set; } = true;
+
+
+    
     // --- Navigation Properties ---
 
-
+    /// <summary>
+    /// Reference to the specific Gender catalog entry.
+    /// </summary>
+    public virtual Gender Gender { get; set; } = null!;
 
     /// <summary>
     /// Reference to the specific Identification Type catalog entry.
@@ -84,4 +101,48 @@ public class Person : BaseTenantEntity
     /// Collection of tickets opened by or for this person.
     /// </summary>
     public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
+
+
+    /// <summary>
+    /// Collection of employment history records.
+    /// </summary>
+    public virtual ICollection<PersonEmployment> EmploymentHistory { get; set; } = new List<PersonEmployment>();
+
+
+    /// <summary>
+    /// Business or commercial profiles linked to the person.
+    /// </summary>
+    public virtual ICollection<PersonBusinessProfile> BusinessProfiles { get; set; } = new List<PersonBusinessProfile>();
+
+    
+    /// <summary>
+    /// Historical record of declared financial profiles and income ranges.
+    /// </summary>
+    public virtual ICollection<PersonFinancialProfile> FinancialProfiles { get; set; } = new List<PersonFinancialProfile>();
+    
+
+    /// <summary>
+    /// This action is heavily restricted at the Application layer.
+    /// </summary>
+    public void Deactivate()
+    {
+        if (!IsActive) return; // Already deactivated
+        
+        IsActive = false;
+        
+        // Note: You could also register a Domain Event here if other aggregates 
+        // need to react to this person being deactivated.
+        // AddDomainEvent(new PersonDeactivatedEvent(this.Id));
+    }
+
+    /// <summary>
+    /// Restores a previously soft-deleted person.
+    /// </summary>
+    public void Reactivate()
+    {
+        if (IsActive) return;
+        IsActive = true;
+    }
+
+
 }

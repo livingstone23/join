@@ -51,7 +51,13 @@ public class PersonContact : BaseTenantEntity
     /// <value>E.g., "Do not call during office hours" or "Primary email for billing".</value>
     public string? Comments { get; set; }
 
-    
+
+    /// <summary>
+    /// Indicates whether the person is currently active in the system.
+    /// Defaults to true. Used for the Soft Delete pattern.
+    /// </summary>
+    public bool IsActive { get; private set; } = true;
+
     // --- Navigation Properties ---
 
     /// <summary>
@@ -59,5 +65,26 @@ public class PersonContact : BaseTenantEntity
     /// Managed through lazy loading or explicit inclusion depending on the Persistence configuration.
     /// </summary>
     public virtual Person Person { get; set; } = null!;
+
+    /// <summary>
+    /// indicates that the address is not active in the system.
+    /// This action is heavily restricted at the Application layer.
+    /// </summary>
+    public void Deactivate()
+    {
+        if (!IsActive) return;
+        IsActive = false;
+        IsPrimary = false; // Regla: Una dirección inactiva no puede ser la predeterminada
+    }
+
+    /// <summary>
+    /// Indicates that the address is active in the system.
+    /// This action is heavily restricted at the Application layer.
+    /// </summary>
+    public void Reactivate()
+    {
+        if (IsActive) return;
+        IsActive = true;
+    }
 
 }

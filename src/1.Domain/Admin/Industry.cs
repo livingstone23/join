@@ -1,0 +1,49 @@
+using JOIN.Domain.Audit;
+
+
+
+namespace JOIN.Domain.Admin;
+
+
+
+/// <summary>
+/// Represents a tenant-specific catalog of economic sectors or industries.
+/// Examples: "Technology", "Healthcare", "Retail".
+/// </summary>
+public class Industry : BaseTenantEntity
+{
+
+    /// <summary>
+    /// Gets or sets the standard or internal code for the industry.
+    /// </summary>
+    public string Code { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the display name of the industry.
+    /// </summary>
+    public string Name { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Optional description providing more details about what this industry covers.
+    /// </summary>
+    public string? Description { get; private set; }
+
+    public bool IsActive { get; private set; } = true;
+
+
+    // --- Domain Behavior ---
+
+    public void Deactivate()
+    {
+        if (!IsActive) return;
+        IsActive = false;
+    }
+
+    public void Reactivate()
+    {
+        if (IsActive) return;
+        IsActive = true;
+    }
+    
+    
+}

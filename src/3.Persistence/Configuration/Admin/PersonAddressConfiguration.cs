@@ -15,7 +15,7 @@ namespace JOIN.Persistence.Configuration.Admin;
 
 /// <summary>
 /// Configures the database mapping for the <see cref="PersonAddress"/> entity.
-/// Defines table structure, constraints, and relationships for customer addresses,
+/// Defines table structure, constraints, multi-tenant isolation, and relationships for customer addresses,
 /// including the geographical hierarchy.
 /// </summary>
 public class PersonAddressConfiguration : IEntityTypeConfiguration<PersonAddress>
@@ -26,6 +26,7 @@ public class PersonAddressConfiguration : IEntityTypeConfiguration<PersonAddress
     /// <param name="builder">The builder to be used for configuring the entity.</param>
     public void Configure(EntityTypeBuilder<PersonAddress> builder)
     {
+        // --- Table & Schema ---
         // Map to table "PersonAddresses" in schema "Admin"
         builder.ToTable("PersonAddresses", "Admin");
         
@@ -34,24 +35,68 @@ public class PersonAddressConfiguration : IEntityTypeConfiguration<PersonAddress
 
         // --- Properties ---
 
-        builder.Property(ca => ca.AddressLine1).IsRequired().HasMaxLength(200);
-        builder.Property(ca => ca.AddressLine2).HasMaxLength(200);
-        builder.Property(ca => ca.ZipCode).IsRequired().HasMaxLength(20);
-        builder.Property(ca => ca.IsDefault).IsRequired();
+        builder.Property(ca => ca.AddressLine1)
+            .IsRequired()
+            .HasMaxLength(200);
+
+        builder.Property(ca => ca.AddressLine2)
+            .HasMaxLength(200)
+            .IsRequired(false);
+
+        builder.Property(ca => ca.ZipCode)
+            .IsRequired()
+            .HasMaxLength(20);
+
+        // State flags
+        builder.Property(ca => ca.IsDefault)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(ca => ca.IsActive)
+            .IsRequired()
+            .HasDefaultValue(true);
+
+        // Soft delete flag mapping (0 means active)
+        builder.Property(ca => ca.GcRecord)
+            .IsRequired()
+            .HasDefaultValue(0);
+
+        // --- Indexes ---
+
+        // Performance Index: Crucial for CQRS/Dapper reads.
+        // Quickly locates the active default address for a specific person within a tenant.
+        builder.HasIndex(ca => new { ca.CompanyId, ca.PersonId, ca.IsDefault })
+            .HasDatabaseName("IX_PersonAddresses_Company_Person_Default");
 
         // --- Relationships ---
-        
-        // Required relationship with Person
+
+        // 1. Required relationship with Company (Tenant)
+        builder.HasOne(ca => ca.Company)
+            .WithMany()
+            .HasForeignKey(ca => ca.CompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // 2. Required relationship with Person
         builder.HasOne(ca => ca.Person)
             .WithMany(c => c.Addresses)
             .HasForeignKey(ca => ca.PersonId)
-            .OnDelete(DeleteBehavior.Restrict); // Addresses are deleted if the Person is deleted.
+            // Enforces Application Layer soft-delete instead of DB physical cascade
+            .OnDelete(DeleteBehavior.Restrict); 
+
+        // --- Geographical Hierarchy Relationships ---
 
         // Required relationship with Country
         builder.HasOne(ca => ca.Country)
             .WithMany(c => c.PersonAddresses)
             .HasForeignKey(ca => ca.CountryId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // OPTIONAL relationship with Region (As defined in the Domain with Guid?)
+        builder.HasOne(ca => ca.Region)
+            .WithMany(r => r.PersonAddresses)
+            .HasForeignKey(ca => ca.RegionId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false); // Indicates the Foreign Key is nullable
 
         // Required relationship with Province
         builder.HasOne(ca => ca.Province)
@@ -73,7 +118,7 @@ public class PersonAddressConfiguration : IEntityTypeConfiguration<PersonAddress
 
         // --- Query Filters ---
         
-        // Apply a soft-delete filter.
+        // Apply a soft-delete filter. 0 indicates the record is active.
         builder.HasQueryFilter(ca => ca.GcRecord == 0);
     }
 }

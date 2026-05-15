@@ -5,7 +5,11 @@ using JOIN.Domain.Admin;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
+
+
 namespace JOIN.Persistence.Configuration.Admin;
+
+
 
 /// <summary>
 /// Configures the database mapping for the <see cref="CompanyModule"/> entity.
@@ -20,6 +24,8 @@ public class CompanyModuleConfiguration : IEntityTypeConfiguration<CompanyModule
     /// <param name="builder">The builder to be used for configuring the entity.</param>
     public void Configure(EntityTypeBuilder<CompanyModule> builder)
     {
+
+        
         // Map to table "CompanyModules" in schema "Admin"
         builder.ToTable("CompanyModules", "Admin");
 

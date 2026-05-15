@@ -15,7 +15,7 @@ namespace JOIN.Domain.Admin;
 public class PersonAddress : BaseTenantEntity
 {
 
-
+    
     /// <summary>
     /// Foreign key for the Person who owns this address.
     /// </summary>
@@ -69,6 +69,14 @@ public class PersonAddress : BaseTenantEntity
     /// </summary>
     public bool IsDefault { get; set; }
 
+    /// <summary>
+    /// Indicates whether the person is currently active in the system.
+    /// Defaults to true. Used for the Soft Delete pattern.
+    /// </summary>
+    public bool IsActive { get; private set; } = true;
+
+
+
     // --- Navigation Properties ---
 
     /// <summary> Navigation to owner customer. </summary>
@@ -88,6 +96,27 @@ public class PersonAddress : BaseTenantEntity
 
     /// <summary> Navigation to StreetType catalog. </summary>
     public virtual StreetType StreetType { get; set; } = null!;
-    
+
+
+    /// <summary>
+    /// indicates that the address is not active in the system.
+    /// This action is heavily restricted at the Application layer.
+    /// </summary>
+    public void Deactivate()
+    {
+        if (!IsActive) return;
+        IsActive = false;
+        IsDefault = false; // Regla: Una dirección inactiva no puede ser la predeterminada
+    }
+
+    /// <summary>
+    /// Indicates that the address is active in the system.
+    /// This action is heavily restricted at the Application layer.
+    /// </summary>
+    public void Reactivate()
+    {
+        if (IsActive) return;
+        IsActive = true;
+    }
 
 }

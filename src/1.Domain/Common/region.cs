@@ -1,6 +1,7 @@
 
 
 
+using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 
 
@@ -13,7 +14,7 @@ namespace JOIN.Domain.Common;
 /// Represents a major administrative division within a Country (e.g., Autonomous Community, State, or Region).
 /// Acts as the second level in the geographical hierarchy: Country -> Region.
 /// </summary>
-public class Region : BaseAuditableEntity
+public class Region : BaseTenantEntity
 {
     /// <summary>
     /// Gets or sets the official name of the region.
@@ -42,4 +43,7 @@ public class Region : BaseAuditableEntity
     /// Collection of provinces or secondary divisions belonging to this region.
     /// </summary>
     public virtual ICollection<Province> Provinces { get; set; } = new List<Province>();
+
+
+    public virtual ICollection<PersonAddress> PersonAddresses { get; set; } = new List<PersonAddress>();
 }
