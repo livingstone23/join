@@ -24,10 +24,47 @@ public class TaxRegime : BaseTenantEntity
     /// </summary>
     public string Name { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Optional description of the tax regime.
+    /// </summary>
+    public string? Description { get; private set; }
+
     public bool IsActive { get; private set; } = true;
 
 
     // --- Domain Behavior ---
+
+    public static TaxRegime Create(Guid companyId, string code, string name, string? description = null)
+    {
+        if (companyId == Guid.Empty)
+            throw new ArgumentException("CompanyId is required.", nameof(companyId));
+        if (string.IsNullOrWhiteSpace(code))
+            throw new ArgumentException("Code is required.", nameof(code));
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Name is required.", nameof(name));
+
+        return new TaxRegime
+        {
+            CompanyId = companyId,
+            Code = code.Trim(),
+            Name = name.Trim(),
+            Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+            IsActive = true,
+            GcRecord = ActiveGcRecord
+        };
+    }
+
+    public void Update(string code, string name, string? description = null)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            throw new ArgumentException("Code is required.", nameof(code));
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Name is required.", nameof(name));
+
+        Code = code.Trim();
+        Name = name.Trim();
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+    }
 
     public void Deactivate()
     {

@@ -6,7 +6,11 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
+
+
 namespace JOIN.Presentation.Controllers.Admin;
+
+
 
 /// <summary>
 /// Exposes REST endpoints for managing tenant-scoped projects.
@@ -14,7 +18,6 @@ namespace JOIN.Presentation.Controllers.Admin;
 /// </summary>
 [ApiController]
 [Route("api/v1/[controller]")]
-[Route("api/admin/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Projects")]
 public class ProjectsController(ISender sender) : ControllerBase

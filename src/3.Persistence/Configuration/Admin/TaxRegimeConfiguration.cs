@@ -43,6 +43,10 @@ public class TaxRegimeConfiguration : IEntityTypeConfiguration<TaxRegime>
             .IsRequired()
             .HasMaxLength(150);
 
+        builder.Property(tr => tr.Description)
+            .HasMaxLength(500)
+            .IsRequired(false);
+
         builder.Property(tr => tr.IsActive)
             .IsRequired()
             .HasDefaultValue(true);

@@ -38,6 +38,53 @@ public class IncomeRange : BaseTenantEntity
 
     // --- Domain Behavior ---
 
+    public static IncomeRange Create(
+        Guid companyId,
+        string displayName,
+        decimal minimumValue,
+        decimal? maximumValue,
+        string currencyCode)
+    {
+        if (companyId == Guid.Empty)
+            throw new ArgumentException("CompanyId is required.", nameof(companyId));
+        if (string.IsNullOrWhiteSpace(displayName))
+            throw new ArgumentException("DisplayName is required.", nameof(displayName));
+        if (string.IsNullOrWhiteSpace(currencyCode))
+            throw new ArgumentException("CurrencyCode is required.", nameof(currencyCode));
+        if (maximumValue.HasValue && maximumValue.Value < minimumValue)
+            throw new ArgumentException("MaximumValue must be greater than or equal to MinimumValue.", nameof(maximumValue));
+
+        return new IncomeRange
+        {
+            CompanyId = companyId,
+            DisplayName = displayName.Trim(),
+            MinimumValue = minimumValue,
+            MaximumValue = maximumValue,
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            IsActive = true,
+            GcRecord = ActiveGcRecord
+        };
+    }
+
+    public void Update(
+        string displayName,
+        decimal minimumValue,
+        decimal? maximumValue,
+        string currencyCode)
+    {
+        if (string.IsNullOrWhiteSpace(displayName))
+            throw new ArgumentException("DisplayName is required.", nameof(displayName));
+        if (string.IsNullOrWhiteSpace(currencyCode))
+            throw new ArgumentException("CurrencyCode is required.", nameof(currencyCode));
+        if (maximumValue.HasValue && maximumValue.Value < minimumValue)
+            throw new ArgumentException("MaximumValue must be greater than or equal to MinimumValue.", nameof(maximumValue));
+
+        DisplayName = displayName.Trim();
+        MinimumValue = minimumValue;
+        MaximumValue = maximumValue;
+        CurrencyCode = currencyCode.Trim().ToUpperInvariant();
+    }
+
     public void Deactivate()
     {
         if (!IsActive) return;

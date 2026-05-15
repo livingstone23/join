@@ -33,6 +33,57 @@ public class Industry : BaseTenantEntity
 
     // --- Domain Behavior ---
 
+    /// <summary>
+    /// Creates a new tenant-scoped industry catalog entry.
+    /// </summary>
+    public static Industry Create(Guid companyId, string code, string name, string? description)
+    {
+        if (companyId == Guid.Empty)
+        {
+            throw new ArgumentException("CompanyId is required.", nameof(companyId));
+        }
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            throw new ArgumentException("Code is required.", nameof(code));
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Name is required.", nameof(name));
+        }
+
+        return new Industry
+        {
+            CompanyId = companyId,
+            Code = code.Trim(),
+            Name = name.Trim(),
+            Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+            IsActive = true,
+            GcRecord = ActiveGcRecord
+        };
+    }
+
+    /// <summary>
+    /// Updates the industry catalog data.
+    /// </summary>
+    public void Update(string code, string name, string? description)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            throw new ArgumentException("Code is required.", nameof(code));
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Name is required.", nameof(name));
+        }
+
+        Code = code.Trim();
+        Name = name.Trim();
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+    }
+
     public void Deactivate()
     {
         if (!IsActive) return;

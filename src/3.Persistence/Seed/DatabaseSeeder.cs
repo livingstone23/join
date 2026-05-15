@@ -99,6 +99,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             var activeStatusId = await SeedActiveEntityStatusAsync();
             await SeedAreasByCompanyAsync(joinCompanyId, privateCompanyId, activeStatusId);
             await SeedProjectsByCompanyAsync(joinCompanyId, privateCompanyId, activeStatusId);
+            await SeedGendersAsync(joinCompanyId);
+            await SeedTaxRegimesAsync(joinCompanyId);
+            await SeedIndustriesAsync(joinCompanyId);
+            await SeedIncomeRangesAsync(joinCompanyId);
             await SeedTicketCompanyDefaultsAsync(joinCompanyId, defaultTimeUnitId);
 
             // 7. Entidades operacionales (Clientes)
@@ -581,9 +585,176 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         _logger.LogInformation("Projects seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
     }
 
+    private async Task SeedGendersAsync(Guid joinCompanyId)
+    {
+        var seeds = new List<string>
+        {
+            "Masculino",
+            "Femenino"
+        };
+
+        var inserted = 0;
+
+        foreach (var seedName in seeds)
+        {
+            var exists = await _context.Genders
+                .IgnoreQueryFilters()
+                .AnyAsync(g => g.CompanyId == joinCompanyId && g.Name == seedName);
+
+            if (exists)
+            {
+                continue;
+            }
+
+            var entity = Gender.Create(joinCompanyId, seedName);
+            entity.Created = DateTime.UtcNow;
+            entity.CreatedBy = "System_Seeder";
+
+            _context.Genders.Add(entity);
+            inserted++;
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        _logger.LogInformation("Genders seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
+    }
+
+    private async Task SeedTaxRegimesAsync(Guid joinCompanyId)
+    {
+        var seeds = new List<(string Code, string Name, string Description)>
+        {
+            ("SAR-RG", "Régimen General", "Contribuyentes estándar (ISV 15%/18%)."),
+            ("SAR-RS", "Régimen Simplificado", "Pequeños contribuyentes."),
+            ("SAR-ZOLI", "Régimen ZOLI", "Zonas Libres exentas de impuestos."),
+            ("SAR-EX", "Exonerado", "Instituciones con resolución de exención.")
+        };
+
+        var inserted = 0;
+
+        foreach (var seed in seeds)
+        {
+            var exists = await _context.TaxRegimes
+                .IgnoreQueryFilters()
+                .AnyAsync(tr => tr.CompanyId == joinCompanyId && tr.Code == seed.Code);
+
+            if (exists)
+            {
+                continue;
+            }
+
+            var entity = TaxRegime.Create(joinCompanyId, seed.Code, seed.Name, seed.Description);
+            entity.Created = DateTime.UtcNow;
+            entity.CreatedBy = "System_Seeder";
+
+            _context.TaxRegimes.Add(entity);
+            inserted++;
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        _logger.LogInformation("Tax regimes seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
+    }
+
+    private async Task SeedIndustriesAsync(Guid joinCompanyId)
+    {
+        var seeds = new List<(string Code, string Name, string Description)>
+        {
+            ("AGRI", "Agroindustria y Agricultura", "Producción, procesamiento y exportación de productos agrícolas (café, banano, palma africana, azúcar)."),
+            ("MAQ", "Manufactura y Maquila", "Industria textil, ensamblaje y manufactura ligera, operando frecuentemente bajo regímenes de zona libre."),
+            ("LOG", "Logística y Transporte", "Navieras, aduanas, transporte de carga terrestre y operaciones portuarias (clave en el corredor logístico regional)."),
+            ("TOUR", "Turismo y Hospitalidad", "Hotelería, agencias de viaje, restaurantes y operadores turísticos."),
+            ("RET", "Comercio Mayorista y Minorista", "Distribución de bienes de consumo masivo (FMCG), supermercados, ferreterías y tiendas por departamento."),
+            ("FIN", "Servicios Financieros", "Bancos comerciales, cooperativas de ahorro y crédito, aseguradoras y emergentes Fintech."),
+            ("BPO", "Tecnología y BPO / Call Centers", "Servicios de tercerización (BPO/KPO), soporte técnico, atención al cliente y desarrollo de software."),
+            ("CONS", "Construcción y Bienes Raíces", "Desarrolladoras inmobiliarias, constructoras de obra civil y despachos de arquitectura."),
+            ("HLTH", "Salud y Farmacéutica", "Hospitales privados, clínicas, laboratorios y distribución de insumos médicos."),
+            ("PROF", "Servicios Profesionales", "Consultoría legal, contable, auditoría, agencias de marketing y recursos humanos.")
+        };
+
+        var inserted = 0;
+
+        foreach (var seed in seeds)
+        {
+            var exists = await _context.Industries
+                .IgnoreQueryFilters()
+                .AnyAsync(i => i.CompanyId == joinCompanyId && i.Code == seed.Code);
+
+            if (exists)
+            {
+                continue;
+            }
+
+            var entity = Industry.Create(joinCompanyId, seed.Code, seed.Name, seed.Description);
+            entity.Created = DateTime.UtcNow;
+            entity.CreatedBy = "System_Seeder";
+
+            _context.Industries.Add(entity);
+            inserted++;
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        _logger.LogInformation("Industries seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
+    }
+
+    private async Task SeedIncomeRangesAsync(Guid joinCompanyId)
+    {
+        var seeds = new List<(string DisplayName, decimal MinimumValue, decimal? MaximumValue, string Currency)>
+        {
+            ("$0 - $500 USD", 0.00m, 500.00m, "USD"),
+            ("$501 - $1,500 USD", 501.00m, 1500.00m, "USD"),
+            ("$1,501 - $3,000 USD", 1501.00m, 3000.00m, "USD"),
+            ("$3,001 - $5,000 USD", 3001.00m, 5000.00m, "USD"),
+            ("Más de $5,000 USD", 5001.00m, null, "USD")
+        };
+
+        var inserted = 0;
+
+        foreach (var seed in seeds)
+        {
+            var exists = await _context.IncomeRanges
+                .IgnoreQueryFilters()
+                .AnyAsync(ir => ir.CompanyId == joinCompanyId && ir.DisplayName == seed.DisplayName);
+
+            if (exists)
+            {
+                continue;
+            }
+
+            var entity = IncomeRange.Create(
+                joinCompanyId,
+                seed.DisplayName,
+                seed.MinimumValue,
+                seed.MaximumValue,
+                seed.Currency);
+            entity.Created = DateTime.UtcNow;
+            entity.CreatedBy = "System_Seeder";
+
+            _context.IncomeRanges.Add(entity);
+            inserted++;
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        _logger.LogInformation("Income ranges seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
+    }
+
     private async Task SeedJoinPersonsAsync(Guid companyId, Guid idTypeId)
     {
         var seeds = GetJoinPersonSeeds();
+        var gendersByName = await GetGenderIdsByNameAsync(companyId);
         var inserted = 0;
 
         foreach (var seed in seeds)
@@ -594,7 +765,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
             if (exists) continue;
 
-            _context.Persons.Add(new Person
+            var person = new Person
             {
                 CompanyId = companyId,
                 PersonType = seed.PersonType,
@@ -603,10 +774,14 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 CommercialName = seed.CommercialName,
                 IdentificationTypeId = idTypeId,
                 IdentificationNumber = seed.IdentificationNumber,
+                GenderId = ResolveGenderId(seed.FirstName, gendersByName),
                 Created = DateTime.UtcNow,
                 CreatedBy = "System_Seeder",
                 GcRecord = 0
-            });
+            };
+            person.Reactivate();
+
+            _context.Persons.Add(person);
             inserted++;
         }
 
@@ -629,7 +804,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
             if (exists) continue;
 
-            _context.Persons.Add(new Person
+            var person = new Person
             {
                 CompanyId = companyId,
                 PersonType = seed.PersonType,
@@ -641,7 +816,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 Created = DateTime.UtcNow,
                 CreatedBy = "System_Seeder",
                 GcRecord = 0
-            });
+            };
+            person.Reactivate();
+
+            _context.Persons.Add(person);
             inserted++;
         }
 
@@ -720,7 +898,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
             for (var j = currentAddressCount; j < targetCount; j++)
             {
-                _context.PersonAddresses.Add(new PersonAddress
+                var address = new PersonAddress
                 {
                     CompanyId = companyId,
                     PersonId = customer.Id,
@@ -735,7 +913,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                     Created = DateTime.UtcNow,
                     CreatedBy = "System_Seeder",
                     GcRecord = 0
-                });
+                };
+                address.Reactivate();
+                _context.PersonAddresses.Add(address);
                 insertedAddresses++;
             }
 
@@ -759,7 +939,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                     _ => $"+504220{i + 1:D2}{j + 1:D2}"
                 };
 
-                _context.PersonContacts.Add(new PersonContact
+                var contact = new PersonContact
                 {
                     CompanyId = companyId,
                     PersonId = customer.Id,
@@ -770,7 +950,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                     Created = DateTime.UtcNow,
                     CreatedBy = "System_Seeder",
                     GcRecord = 0
-                });
+                };
+                contact.Reactivate();
+                _context.PersonContacts.Add(contact);
 
                 insertedContacts++;
             }
@@ -2110,7 +2292,12 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Compañias"      , "/administracion/companies"       , "@Icons.Material.Filled.HomeWork"      ,  "Administracion", "Companies"    , true, true, true, true),
         new("CompanyModules", "/administracion/company-modules", "@Icons.Material.Filled.HolidayVillage", "Administracion", "CompanyModules", true, true, true, true),
         new("CommunicationChannels", "/administracion/communication-channels", "@Icons.Material.Filled.KeyboardAlt", "Administracion", "CommunicationChannels", true, true, true, true),
-        
+
+
+        new("Genero", "/administracion/gender", "@Icons.Material.Filled.Factory", "Administracion", "Genders", true, true, true, true),
+        new("Industria", "/administracion/industry", "@Icons.Material.Filled.Factory", "Administracion", "Industries", true, true, true, true),
+        new("Rango Ingreso", "/administracion/incomerange", "@Icons.Material.Filled.Factory", "Administracion", "IncomeRanges", true, true, true, true),
+        new("Regimen Tributario", "/administracion/taxregime", "@Icons.Material.Filled.Factory", "Administracion", "TaxRegimes", true, true, true, true),
 
 
         new("Persons", "/Clientes", "@Icons.Material.Filled.PermContactCalendar", null, null, false, false, false, false),
@@ -2154,6 +2341,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "StreetTypes", true, true, true, true),
         new("Manager", "Areas", true, true, true, true),
         new("Manager", "Projects", true, true, true, true),
+        new("Manager", "Genders", true, true, true, true),
+        new("Manager", "Industries", true, true, true, true),
+        new("Manager", "IncomeRanges", true, true, true, true),
+        new("Manager", "TaxRegimes", true, true, true, true),
         new("Manager", "EntityStatuses", true, true, true, true),
         new("Manager", "CompanyModules", true, true, true, true),
         new("Manager", "CommunicationChannels", true, true, true, true),
@@ -2184,6 +2375,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "StreetTypes", true, true, true, true),
         new("Supervisor", "Areas", true, true, true, false),
         new("Supervisor", "Projects", true, true, true, false),
+        new("Supervisor", "Genders", true, true, true, false),
+        new("Supervisor", "Industries", true, true, true, false),
+        new("Supervisor", "IncomeRanges", true, true, true, false),
+        new("Supervisor", "TaxRegimes", true, true, true, false),
         new("Supervisor", "EntityStatuses", true, true, true, false),
         new("Supervisor", "CompanyModules", true, true, true, false),
         new("Supervisor", "Persons", true, true, true, true),
@@ -2206,6 +2401,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("UsuarioSimple", "StreetTypes", true, true, true, true),
         new("UsuarioSimple", "Areas", true, false, false, false),
         new("UsuarioSimple", "Projects", true, false, false, false),
+        new("UsuarioSimple", "Genders", true, false, false, false),
+        new("UsuarioSimple", "Industries", true, false, false, false),
+        new("UsuarioSimple", "IncomeRanges", true, false, false, false),
+        new("UsuarioSimple", "TaxRegimes", true, false, false, false),
         new("UsuarioSimple", "EntityStatuses", true, false, false, false),
         new("UsuarioSimple", "CompanyModules", true, false, false, false),
         new("UsuarioSimple", "CommunicationChannels", false, false, false, false),
@@ -2222,6 +2421,29 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     private sealed record ProvinceSeed(string CountryIsoCode, string Name, string Code);
     private sealed record MunicipalitySeed(string CountryIsoCode, string ProvinceCode, string Name, string? Code = null);
     private sealed record StreetTypeSeed(string Name, string Abbreviation);
+    private static readonly HashSet<string> FemaleSeedFirstNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Ana", "Maria", "Sandra", "Claudia", "Patricia", "Carmen", "Silvia", "Diana", "Valeria", "Natalia",
+        "Beatriz", "Lucia", "Monica", "Sarah", "Emily"
+    };
+
+    private async Task<Dictionary<string, Guid>> GetGenderIdsByNameAsync(Guid companyId) =>
+        await _context.Genders
+            .IgnoreQueryFilters()
+            .Where(g => g.CompanyId == companyId && g.GcRecord == 0)
+            .ToDictionaryAsync(g => g.Name, g => g.Id, StringComparer.OrdinalIgnoreCase);
+
+    private static Guid? ResolveGenderId(string firstName, IReadOnlyDictionary<string, Guid> gendersByName)
+    {
+        if (!gendersByName.TryGetValue("Masculino", out var maleId) ||
+            !gendersByName.TryGetValue("Femenino", out var femaleId))
+        {
+            return null;
+        }
+
+        return FemaleSeedFirstNames.Contains(firstName.Trim()) ? femaleId : maleId;
+    }
+
     private sealed record PersonSeed(
         PersonType PersonType,
         string FirstName,
