@@ -10,7 +10,7 @@ namespace JOIN.Application.UnitTest.UseCases.Admin.Persons.Queries.GetPersonById
 /// <summary>
 /// Contains the unit tests for the customer detail query handler.
 /// These tests verify tenant protection, not-found behavior, and the happy path
-/// that returns flattened customer details with address and contact collections.
+/// that returns person details with related collections.
 /// </summary>
 public sealed class GetPersonByIdQueryHandlerTests
 {
@@ -34,17 +34,15 @@ public sealed class GetPersonByIdQueryHandlerTests
         // Assert
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("COMPANY_REQUIRED");
-        response.Errors.Should().Contain("The X-Company-Id header is required.");
+        response.Errors.Should().Contain("The authenticated token must contain a valid CompanyId claim.");
         context.ConnectionFactoryMock.Verify(x => x.CreateConnection(), Times.Never);
     }
 
     /// <summary>
     /// Verifies the happy path when the customer exists for the current tenant.
-    /// This test ensures the handler returns the flattened customer payload together
-    /// with mapped addresses and contacts from the shared Dapper fake infrastructure.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenPersonExists_ShouldReturnFlattenedDetails()
+    public async Task Handle_WhenPersonExists_ShouldReturnPersonDetailWithCollections()
     {
         // Arrange
         var companyId = _fixture.Create<Guid>();
@@ -54,7 +52,10 @@ public sealed class GetPersonByIdQueryHandlerTests
         context.Connection.SetResults(
             CreatePersonDetailResultSet(customerId, companyId),
             CreateAddressResultSet(),
-            CreateContactResultSet());
+            CreateContactResultSet(),
+            FakeResultSet.Empty("Id", "EmployerName", "JobTitle", "StartDate", "EndDate", "IsCurrent", "IsActive"),
+            FakeResultSet.Empty("Id", "IndustryId", "IndustryName", "TaxRegimeId", "TaxRegimeName", "Website", "FoundationDate", "IsActive"),
+            FakeResultSet.Empty("Id", "IncomeRangeId", "IncomeRangeName", "SourceOfFunds", "DeclaredDate", "IsCurrent", "IsActive"));
 
         var query = new GetPersonByIdQuery(customerId);
         var handler = context.CreateHandler();
@@ -67,31 +68,40 @@ public sealed class GetPersonByIdQueryHandlerTests
         response.Message.Should().Be("Person retrieved successfully.");
         response.Data.Should().NotBeNull();
 
-        var customer = response.Data!;
-        customer.Id.Should().Be(customerId);
-        customer.CompanyId.Should().Be(companyId);
-        customer.PersonType.Should().Be("Physical");
-        customer.FirstName.Should().Be("Jane");
-        customer.LastName.Should().Be("Doe");
-        customer.IdentificationTypeName.Should().Be("Passport");
-        customer.IdentificationNumber.Should().Be("ID-12345");
+        var detail = response.Data!;
+        detail.Person.Id.Should().Be(customerId);
+        detail.Person.CompanyId.Should().Be(companyId);
+        detail.Person.CompanyName.Should().Be("JOIN Software Group");
+        detail.Person.PersonType.Should().Be("1");
+        detail.Person.PersonTypeName.Should().Be("Natural");
+        detail.Person.FirstName.Should().Be("Jane");
+        detail.Person.LastName.Should().Be("Doe");
+        detail.Person.IdentificationTypeName.Should().Be("Passport");
+        detail.Person.IdentificationNumber.Should().Be("ID-12345");
 
-        customer.Addresses.Should().NotBeNull();
-        customer.Addresses!.Should().HaveCount(2);
-        customer.Addresses.First().AddressLine1.Should().Be("Main street 100");
-        customer.Addresses.First().StreetTypeName.Should().Be("Street");
-        customer.Addresses.First().CountryName.Should().Be("Nicaragua");
-        customer.Addresses.First().CreatedAt.Should().Be("2026-04-19 14:30");
+        detail.Addresses.Should().NotBeNull();
+        detail.Addresses!.Should().HaveCount(2);
+        detail.Addresses.First().AddressLine1.Should().Be("Main street 100");
+        detail.Addresses.First().StreetTypeName.Should().Be("Street");
+        detail.Addresses.First().CountryName.Should().Be("Nicaragua");
+        detail.Addresses.First().CreatedAt.Should().Be("2026-04-19 14:30");
 
-        customer.Contacts.Should().NotBeNull();
-        customer.Contacts!.Should().HaveCount(2);
-        customer.Contacts.First().ContactType.Should().Be("2");
-        customer.Contacts.First().ContactValue.Should().Be("jane@contoso.com");
-        customer.Contacts.First().CreatedAt.Should().Be("2026-04-19 15:00");
+        detail.Contacts.Should().NotBeNull();
+        detail.Contacts!.Should().HaveCount(2);
+        detail.Contacts.First().ContactType.Should().Be("2");
+        detail.Contacts.First().ContactName.Should().Be("Correo Alternativo");
+        detail.Contacts.First().ContactValue.Should().Be("jane@contoso.com");
+        detail.Contacts.Last().ContactType.Should().Be("4");
+        detail.Contacts.Last().ContactName.Should().Be("Teléfono Fijo");
+        detail.Contacts.First().CreatedAt.Should().Be("2026-04-19 15:00");
+
+        detail.Employments.Should().BeNull();
+        detail.BusinessProfiles.Should().BeNull();
+        detail.FinancialProfiles.Should().BeNull();
 
         context.Connection.LastCommandText.Should().Contain("WHERE c.Id = @Id AND c.CompanyId = @TenantId AND c.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("WHERE a.PersonId = @Id AND a.CompanyId = @TenantId AND a.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("WHERE co.PersonId = @Id AND co.CompanyId = @TenantId AND co.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain("WHERE pc.PersonId = @Id AND pc.CompanyId = @TenantId AND pc.GcRecord = 0");
         context.Connection.CapturedParameters["Id"].Should().Be(customerId);
         context.Connection.CapturedParameters["TenantId"].Should().Be(companyId);
     }
@@ -111,15 +121,20 @@ public sealed class GetPersonByIdQueryHandlerTests
             FakeResultSet.Empty(
                 "Id",
                 "CompanyId",
+                "CompanyName",
+                "PersonType",
+                "PersonTypeName",
+                "GenderId",
+                "GenderName",
+                "IsActive",
                 "FirstName",
                 "MiddleName",
                 "LastName",
                 "SecondLastName",
-                "PersonType",
+                "CommercialName",
                 "IdentificationTypeId",
                 "IdentificationTypeName",
-                "IdentificationNumber",
-                "Created"),
+                "IdentificationNumber"),
             FakeResultSet.Empty(
                 "Id",
                 "AddressLine1",
@@ -143,7 +158,10 @@ public sealed class GetPersonByIdQueryHandlerTests
                 "ContactValue",
                 "IsPrimary",
                 "Comments",
-                "Created"));
+                "Created"),
+            FakeResultSet.Empty("Id", "EmployerName", "JobTitle", "StartDate", "EndDate", "IsCurrent", "IsActive"),
+            FakeResultSet.Empty("Id", "IndustryId", "IndustryName", "TaxRegimeId", "TaxRegimeName", "Website", "FoundationDate", "IsActive"),
+            FakeResultSet.Empty("Id", "IncomeRangeId", "IncomeRangeName", "SourceOfFunds", "DeclaredDate", "IsCurrent", "IsActive"));
 
         var query = new GetPersonByIdQuery(customerId);
         var handler = context.CreateHandler();
@@ -153,13 +171,10 @@ public sealed class GetPersonByIdQueryHandlerTests
 
         // Assert
         response.IsSuccess.Should().BeFalse();
-        response.Message.Should().Be("Person not found.");
+        response.Message.Should().Be("PERSON_NOT_FOUND");
         response.Data.Should().BeNull();
     }
 
-    /// <summary>
-    /// Creates a fake result set containing one customer detail row.
-    /// </summary>
     private static FakeResultSet CreatePersonDetailResultSet(Guid customerId, Guid companyId)
     {
         return FakeResultSet.FromRows(
@@ -167,21 +182,23 @@ public sealed class GetPersonByIdQueryHandlerTests
             {
                 ["Id"] = customerId,
                 ["CompanyId"] = companyId,
+                ["CompanyName"] = "JOIN Software Group",
+                ["PersonType"] = 1,
+                ["PersonTypeName"] = "Natural",
+                ["GenderId"] = Guid.NewGuid(),
+                ["GenderName"] = "Masculino",
+                ["IsActive"] = true,
                 ["FirstName"] = "Jane",
                 ["MiddleName"] = "Maria",
                 ["LastName"] = "Doe",
                 ["SecondLastName"] = "Smith",
-                ["PersonType"] = "Physical",
+                ["CommercialName"] = null,
                 ["IdentificationTypeId"] = Guid.NewGuid(),
                 ["IdentificationTypeName"] = "Passport",
-                ["IdentificationNumber"] = "ID-12345",
-                ["Created"] = new DateTime(2026, 4, 19, 13, 45, 0, DateTimeKind.Utc)
+                ["IdentificationNumber"] = "ID-12345"
             });
     }
 
-    /// <summary>
-    /// Creates a fake result set containing two customer addresses.
-    /// </summary>
     private static FakeResultSet CreateAddressResultSet()
     {
         return FakeResultSet.FromRows(
@@ -225,9 +242,6 @@ public sealed class GetPersonByIdQueryHandlerTests
             });
     }
 
-    /// <summary>
-    /// Creates a fake result set containing two customer contacts.
-    /// </summary>
     private static FakeResultSet CreateContactResultSet()
     {
         return FakeResultSet.FromRows(
@@ -251,9 +265,6 @@ public sealed class GetPersonByIdQueryHandlerTests
             });
     }
 
-    /// <summary>
-    /// Holds the reusable mocks and fake connection used by the customer detail query tests.
-    /// </summary>
     private sealed class GetPersonByIdQueryHandlerTestContext
     {
         public GetPersonByIdQueryHandlerTestContext(Guid companyId)

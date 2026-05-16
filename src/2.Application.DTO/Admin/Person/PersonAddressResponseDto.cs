@@ -39,9 +39,19 @@ public sealed record PersonAddressResponseDto
     public Guid StreetTypeId { get; init; }
 
     /// <summary>
+    /// Gets the street type display name.
+    /// </summary>
+    public string? StreetTypeName { get; init; }
+
+    /// <summary>
     /// Gets the country identifier.
     /// </summary>
     public Guid CountryId { get; init; }
+
+    /// <summary>
+    /// Gets the country display name.
+    /// </summary>
+    public string? CountryName { get; init; }
 
     /// <summary>
     /// Gets the region identifier.
@@ -49,9 +59,19 @@ public sealed record PersonAddressResponseDto
     public Guid? RegionId { get; init; }
 
     /// <summary>
+    /// Gets the region display name.
+    /// </summary>
+    public string? RegionName { get; init; }
+
+    /// <summary>
     /// Gets the province identifier.
     /// </summary>
     public Guid ProvinceId { get; init; }
+
+    /// <summary>
+    /// Gets the province display name.
+    /// </summary>
+    public string? ProvinceName { get; init; }
 
     /// <summary>
     /// Gets the municipality identifier.
@@ -59,8 +79,17 @@ public sealed record PersonAddressResponseDto
     public Guid MunicipalityId { get; init; }
 
     /// <summary>
+    /// Gets the municipality display name.
+    /// </summary>
+    public string? MunicipalityName { get; init; }
+
+    /// <summary>
     /// Gets whether the address is the default one for the person.
     /// </summary>
     public bool IsDefault { get; init; }
-    
+
+    /// <summary>
+    /// Gets the creation timestamp formatted as yyyy-MM-dd HH:mm.
+    /// </summary>
+    public string CreatedAt { get; init; } = string.Empty;
 }

@@ -33,27 +33,15 @@ public sealed class GetPersonAddressesByPersonIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
-            SELECT
-                a.Id,
-                a.PersonId,
-                a.AddressLine1,
-                a.AddressLine2,
-                a.ZipCode,
-                a.StreetTypeId,
-                a.CountryId,
-                a.RegionId,
-                a.ProvinceId,
-                a.MunicipalityId,
-                a.IsDefault
-            FROM Admin.PersonAddresses a
+        var sql = $"""
+            {PersonAddressQuerySql.SelectWithCatalogNames}
             WHERE a.PersonId = @PersonId
               AND a.CompanyId = @CompanyId
               AND a.GcRecord = 0
             ORDER BY a.IsDefault DESC, a.Created DESC;
             """;
 
-        var rows = await connection.QueryAsync<PersonAddressResponseDto>(
+        var rows = await connection.QueryAsync<PersonAddressReadRow>(
             new CommandDefinition(
                 sql,
                 new
@@ -67,7 +55,7 @@ public sealed class GetPersonAddressesByPersonIdQueryHandler(
         {
             IsSuccess = true,
             Message = "Person addresses retrieved successfully.",
-            Data = rows.ToList()
+            Data = rows.Select(PersonAddressQuerySql.ToResponseDto).ToList()
         };
     }
 }

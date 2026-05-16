@@ -22,9 +22,34 @@ public record PersonListItemDto
     public Guid CompanyId { get; init; }
 
     /// <summary>
+    /// Gets the display name of the company that owns the customer.
+    /// </summary>
+    public string CompanyName { get; init; } = string.Empty;
+
+    /// <summary>
     /// Gets the customer type exposed as a string value.
     /// </summary>
     public string PersonType { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the human-readable name of the customer type.
+    /// </summary>
+    public string PersonTypeName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the gender catalog identifier when the person is a natural person.
+    /// </summary>
+    public Guid? GenderId { get; init; }
+
+    /// <summary>
+    /// Gets the display name of the linked gender catalog entry.
+    /// </summary>
+    public string? GenderName { get; init; }
+
+    /// <summary>
+    /// Gets whether the person record is active in the system.
+    /// </summary>
+    public bool IsActive { get; init; }
 
     /// <summary>
     /// Gets the first name of the customer.

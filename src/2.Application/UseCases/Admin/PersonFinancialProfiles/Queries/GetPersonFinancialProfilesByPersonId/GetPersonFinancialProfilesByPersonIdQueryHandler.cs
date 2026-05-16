@@ -38,7 +38,7 @@ public sealed class GetPersonFinancialProfilesByPersonIdQueryHandler(
                 pfp.Id,
                 pfp.PersonId,
                 pfp.IncomeRangeId,
-                ir.DisplayName AS IncomeRangeDisplayName,
+                ir.DisplayName AS IncomeRangeName,
                 pfp.SourceOfFunds,
                 pfp.DeclaredDate,
                 pfp.IsCurrent,

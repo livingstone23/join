@@ -67,6 +67,17 @@ public class CreatePersonCommandHandler(
             return response;
         }
 
+        if (request.PersonType == PersonType.Physical)
+        {
+            var gender = await _unitOfWork.GetRepository<Gender>().GetAsync(request.GenderId!.Value);
+            if (gender is null || gender.CompanyId != currentUserService.CompanyId || gender.GcRecord != 0)
+            {
+                return Response<Guid>.Error(
+                    "INVALID_REFERENCES",
+                    [$"GenderId '{request.GenderId}' does not exist in the current tenant."]);
+            }
+        }
+
         if (request.Addresses is { Count: > 0 })
         {
             var streetTypeRepository = _unitOfWork.GetRepository<StreetType>();
@@ -168,6 +179,11 @@ public class CreatePersonCommandHandler(
         // 1. Map command payload to aggregate root with nested collections.
         var customerEntity = _customerMapper.ToEntity(request);
         customerEntity.CompanyId = currentUserService.CompanyId;
+
+        if (request.PersonType == PersonType.Legal)
+        {
+            customerEntity.GenderId = null;
+        }
 
         foreach (var address in customerEntity.Addresses)
         {

@@ -63,6 +63,7 @@ public sealed class UpdatePersonCommandHandlerTests
             .ReturnsAsync(false);
 
         SetupValidAddressReferences(context, request);
+        SetupValidGenderReference(context, companyId, request.GenderId!.Value);
 
         context.MapperMock
             .Setup(x => x.ApplyUpdate(request, customer))
@@ -306,6 +307,7 @@ public sealed class UpdatePersonCommandHandlerTests
             .ReturnsAsync(false);
 
         SetupValidAddressReferences(context, request);
+        SetupValidGenderReference(context, companyId, request.GenderId!.Value);
 
         context.MapperMock
             .Setup(x => x.ApplyUpdate(request, customer))
@@ -413,7 +415,9 @@ public sealed class UpdatePersonCommandHandlerTests
 
         return _fixture.Build<UpdatePersonCommand>()
             .With(x => x.Id, customerId)
-            .With(x => x.PersonType, nameof(PersonType.Physical))
+            .With(x => x.PersonType, PersonType.Physical)
+            .With(x => x.GenderId, _fixture.Create<Guid>())
+            .With(x => x.IsActive, true)
             .With(x => x.FirstName, "Updated Jane")
             .With(x => x.MiddleName, "Maria")
             .With(x => x.LastName, "Doe")
@@ -468,10 +472,16 @@ public sealed class UpdatePersonCommandHandlerTests
     /// Applies scalar updates from the command to the tracked customer entity.
     /// This callback emulates the real mapper behavior while keeping the test focused on the handler.
     /// </summary>
+    private static void SetupValidGenderReference(UpdatePersonTestContext context, Guid companyId, Guid genderId)
+    {
+        context.GenderRepositoryMock
+            .Setup(x => x.GetAsync(genderId))
+            .ReturnsAsync(Gender.Create(companyId, "M", "Masculino"));
+    }
+
     private static void ApplyPersonUpdate(UpdatePersonCommand request, Person customer)
     {
-        Enum.TryParse<PersonType>(request.PersonType, true, out var parsedPersonType);
-        customer.PersonType = parsedPersonType;
+        customer.PersonType = request.PersonType;
         customer.FirstName = request.FirstName;
         customer.MiddleName = request.MiddleName;
         customer.LastName = request.LastName;
@@ -603,6 +613,7 @@ public sealed class UpdatePersonCommandHandlerTests
 
             SetupRepository(UnitOfWorkMock, CompanyRepositoryMock);
             SetupRepository(UnitOfWorkMock, IdentificationTypeRepositoryMock);
+            SetupRepository(UnitOfWorkMock, GenderRepositoryMock);
             SetupRepository(UnitOfWorkMock, StreetTypeRepositoryMock);
             SetupRepository(UnitOfWorkMock, CountryRepositoryMock);
             SetupRepository(UnitOfWorkMock, RegionRepositoryMock);
@@ -621,6 +632,7 @@ public sealed class UpdatePersonCommandHandlerTests
         public Mock<IPersonsRepository> PersonsRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Company>> CompanyRepositoryMock { get; } = CreateRepositoryMock<Company>();
         public Mock<IGenericRepository<IdentificationType>> IdentificationTypeRepositoryMock { get; } = CreateRepositoryMock<IdentificationType>();
+        public Mock<IGenericRepository<Gender>> GenderRepositoryMock { get; } = CreateRepositoryMock<Gender>();
         public Mock<IGenericRepository<StreetType>> StreetTypeRepositoryMock { get; } = CreateRepositoryMock<StreetType>();
         public Mock<IGenericRepository<Country>> CountryRepositoryMock { get; } = CreateRepositoryMock<Country>();
         public Mock<IGenericRepository<Region>> RegionRepositoryMock { get; } = CreateRepositoryMock<Region>();

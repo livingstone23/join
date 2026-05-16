@@ -171,47 +171,59 @@ public sealed class CreatePersonCommandValidatorTests
     /// Verifies that an empty person type triggers the required error.
     /// </summary>
     [Fact]
-    public void Validate_WhenPersonTypeIsEmpty_ShouldReturnPersonTypeRequiredError()
+    public void Validate_WhenPersonTypeIsInvalid_ShouldReturnPersonTypeError()
     {
-        var command = CreateValidCommand() with { PersonType = string.Empty };
+        var command = CreateValidCommand() with { PersonType = (PersonType)99 };
 
         var result = _validator.Validate(command);
 
         result.Errors.Should().Contain(x =>
             x.PropertyName == nameof(CreatePersonCommand.PersonType) &&
-            x.ErrorMessage == "Person type must be specified (e.g., Physical or Legal).");
+            x.ErrorMessage == "Person type must be Physical (1) or Legal (2).");
     }
 
-    /// <summary>
-    /// Verifies that an unrecognized person type string triggers the invalid enum error.
-    /// </summary>
-    [Fact]
-    public void Validate_WhenPersonTypeIsInvalidEnum_ShouldReturnInvalidPersonTypeError()
-    {
-        var command = CreateValidCommand() with { PersonType = "Unknown" };
-
-        var result = _validator.Validate(command);
-
-        result.Errors.Should().Contain(x =>
-            x.PropertyName == nameof(CreatePersonCommand.PersonType) &&
-            x.ErrorMessage == "Person type must be a valid value: Physical or Legal.");
-    }
-
-    /// <summary>
-    /// Verifies that valid person type strings (case-insensitive) produce no person type error.
-    /// </summary>
     [Theory]
-    [InlineData("Physical")]
-    [InlineData("Legal")]
-    [InlineData("physical")]
-    [InlineData("LEGAL")]
-    public void Validate_WhenPersonTypeIsValidEnum_ShouldNotReturnPersonTypeError(string personType)
+    [InlineData(PersonType.Physical)]
+    [InlineData(PersonType.Legal)]
+    public void Validate_WhenPersonTypeIsValid_ShouldNotReturnPersonTypeError(PersonType personType)
     {
-        var command = CreateValidCommand() with { PersonType = personType };
+        var command = CreateValidCommand() with
+        {
+            PersonType = personType,
+            GenderId = personType == PersonType.Physical ? Guid.NewGuid() : null
+        };
 
         var result = _validator.Validate(command);
 
         result.Errors.Should().NotContain(x => x.PropertyName == nameof(CreatePersonCommand.PersonType));
+    }
+
+    [Fact]
+    public void Validate_WhenPhysicalPersonHasNoGenderId_ShouldReturnGenderRequiredError()
+    {
+        var command = CreateValidCommand() with { GenderId = null };
+
+        var result = _validator.Validate(command);
+
+        result.Errors.Should().Contain(x =>
+            x.PropertyName == nameof(CreatePersonCommand.GenderId) &&
+            x.ErrorMessage == "Gender id is required for natural persons.");
+    }
+
+    [Fact]
+    public void Validate_WhenLegalPersonHasGenderId_ShouldReturnGenderMustNotBeProvidedError()
+    {
+        var command = CreateValidCommand() with
+        {
+            PersonType = PersonType.Legal,
+            GenderId = Guid.NewGuid()
+        };
+
+        var result = _validator.Validate(command);
+
+        result.Errors.Should().Contain(x =>
+            x.PropertyName == nameof(CreatePersonCommand.GenderId) &&
+            x.ErrorMessage == "Gender id must not be provided for legal persons.");
     }
 
     // ──────────────────────────────────────────────
@@ -491,7 +503,8 @@ public sealed class CreatePersonCommandValidatorTests
     private static CreatePersonCommand CreateValidCommand() =>
         new()
         {
-            PersonType = nameof(PersonType.Physical),
+            PersonType = PersonType.Physical,
+            GenderId = Guid.NewGuid(),
             FirstName = "Jane",
             LastName = "Doe",
             IdentificationTypeId = Guid.NewGuid(),

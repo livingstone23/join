@@ -151,7 +151,36 @@ public class UpdatePersonCommandHandler(
             return Response<Guid>.Error("INVALID_REFERENCES", referenceErrors);
         }
 
+        if (request.PersonType == PersonType.Physical)
+        {
+            var gender = await _unitOfWork.GetRepository<Gender>().GetAsync(request.GenderId!.Value);
+            if (gender is null || gender.CompanyId != currentUserService.CompanyId || gender.GcRecord != 0)
+            {
+                return Response<Guid>.Error(
+                    "INVALID_REFERENCES",
+                    [$"GenderId '{request.GenderId}' does not exist in the current tenant."]);
+            }
+        }
+
         _customerMapper.ApplyUpdate(request, customerEntity);
+
+        if (request.PersonType == PersonType.Legal)
+        {
+            customerEntity.GenderId = null;
+        }
+        else
+        {
+            customerEntity.GenderId = request.GenderId;
+        }
+
+        if (request.IsActive)
+        {
+            customerEntity.Reactivate();
+        }
+        else
+        {
+            customerEntity.Deactivate();
+        }
 
         var collectionSyncErrors = new List<string>();
         await SyncAddresses(request, customerEntity, currentUserService.CompanyId, collectionSyncErrors, cancellationToken);

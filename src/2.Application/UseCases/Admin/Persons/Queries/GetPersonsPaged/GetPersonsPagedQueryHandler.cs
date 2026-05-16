@@ -76,7 +76,16 @@ public class GetPersonsPagedQueryHandler(
             SELECT
                 c.Id,
                 c.CompanyId,
+                co.Name AS CompanyName,
                 c.PersonType,
+                CASE
+                    WHEN c.PersonType = 1 THEN 'Natural'
+                    WHEN c.PersonType = 2 THEN 'Jurídica'
+                    ELSE 'Desconocido'
+                END AS PersonTypeName,
+                c.GenderId,
+                g.Name AS GenderName,
+                c.IsActive,
                 c.FirstName,
                 c.MiddleName,
                 c.LastName,
@@ -86,6 +95,13 @@ public class GetPersonsPagedQueryHandler(
                 it.Name AS IdentificationTypeName,
                 c.IdentificationNumber
             FROM Admin.Persons c
+            INNER JOIN Common.Companies co
+                ON co.Id = c.CompanyId
+               AND co.GcRecord = 0
+            LEFT JOIN Admin.Genders g
+                ON g.Id = c.GenderId
+               AND g.CompanyId = @TenantId
+               AND g.GcRecord = 0
             LEFT JOIN Admin.IdentificationTypes it ON c.IdentificationTypeId = it.Id
             {whereClause}
             ORDER BY c.Created DESC

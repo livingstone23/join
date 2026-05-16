@@ -3,9 +3,9 @@ namespace JOIN.Application.DTO.Admin;
 
 
 /// <summary>
-/// Data transfer object representing a person financial profile payload exposed by Application queries.
+/// Financial profile item embedded in a person detail response (without redundant person identifier).
 /// </summary>
-public sealed record PersonFinancialProfileResponseDto
+public sealed record PersonFinancialProfileDetailDto
 {
     /// <summary>
     /// Gets the unique identifier of the person financial profile record.
@@ -13,17 +13,12 @@ public sealed record PersonFinancialProfileResponseDto
     public Guid Id { get; init; }
 
     /// <summary>
-    /// Gets the unique identifier of the owner person.
-    /// </summary>
-    public Guid PersonId { get; init; }
-
-    /// <summary>
     /// Gets the income range catalog identifier.
     /// </summary>
     public Guid IncomeRangeId { get; init; }
 
     /// <summary>
-    /// Gets the name of the linked income range catalog entry.
+    /// Gets the display name of the linked income range catalog entry.
     /// </summary>
     public string IncomeRangeName { get; init; } = string.Empty;
 

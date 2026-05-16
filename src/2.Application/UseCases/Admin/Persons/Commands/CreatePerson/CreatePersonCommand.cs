@@ -2,6 +2,7 @@
 
 
 using JOIN.Application.Common;
+using JOIN.Domain.Enums;
 using MediatR;
 
 
@@ -19,7 +20,12 @@ public record CreatePersonCommand : IRequest<Response<Guid>>
 	/// <summary>
 	/// Categorizes the customer as Physical (Natural Person) or Legal (Company/Organization).
 	/// </summary>
-	public string PersonType { get; init; } = string.Empty;
+	public PersonType PersonType { get; init; }
+
+	/// <summary>
+	/// Gets the gender catalog identifier. Required for natural persons; must be omitted for legal persons.
+	/// </summary>
+	public Guid? GenderId { get; init; }
 
 	/// <summary>
 	/// Gets or sets the first name of the customer.

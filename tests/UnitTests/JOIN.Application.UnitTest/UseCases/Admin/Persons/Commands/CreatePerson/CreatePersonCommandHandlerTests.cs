@@ -44,6 +44,10 @@ public sealed class CreatePersonCommandHandlerTests
             .Setup(x => x.GetAsync(request.IdentificationTypeId))
             .ReturnsAsync(new IdentificationType { Name = "Passport" });
 
+        context.GenderRepositoryMock
+            .Setup(x => x.GetAsync(request.GenderId!.Value))
+            .ReturnsAsync(Gender.Create(companyId, "M", "Masculino"));
+
         SetupValidAddressReferences(context, request);
 
         context.PersonsRepositoryMock
@@ -419,7 +423,8 @@ public sealed class CreatePersonCommandHandlerTests
             : Array.Empty<CreatePersonCommand.CreatePersonContactDto>();
 
         return _fixture.Build<CreatePersonCommand>()
-            .With(x => x.PersonType, nameof(PersonType.Physical))
+            .With(x => x.PersonType, PersonType.Physical)
+            .With(x => x.GenderId, _fixture.Create<Guid>())
             .With(x => x.FirstName, "Jane")
             .With(x => x.MiddleName, "Maria")
             .With(x => x.LastName, "Doe")
@@ -438,11 +443,10 @@ public sealed class CreatePersonCommandHandlerTests
     /// </summary>
     private static Person CreateMappedPerson(CreatePersonCommand request)
     {
-        Enum.TryParse<PersonType>(request.PersonType, true, out var parsedPersonType);
-
         return new Person
         {
-            PersonType = parsedPersonType,
+            PersonType = request.PersonType,
+            GenderId = request.GenderId,
             FirstName = request.FirstName,
             MiddleName = request.MiddleName,
             LastName = request.LastName,
@@ -564,6 +568,7 @@ public sealed class CreatePersonCommandHandlerTests
             SetupRepository(UnitOfWorkMock, RegionRepositoryMock);
             SetupRepository(UnitOfWorkMock, ProvinceRepositoryMock);
             SetupRepository(UnitOfWorkMock, MunicipalityRepositoryMock);
+            SetupRepository(UnitOfWorkMock, GenderRepositoryMock);
         }
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
@@ -577,6 +582,7 @@ public sealed class CreatePersonCommandHandlerTests
         public Mock<IGenericRepository<Region>> RegionRepositoryMock { get; } = CreateRepositoryMock<Region>();
         public Mock<IGenericRepository<Province>> ProvinceRepositoryMock { get; } = CreateRepositoryMock<Province>();
         public Mock<IGenericRepository<Municipality>> MunicipalityRepositoryMock { get; } = CreateRepositoryMock<Municipality>();
+        public Mock<IGenericRepository<Gender>> GenderRepositoryMock { get; } = CreateRepositoryMock<Gender>();
 
         public CreatePersonCommandHandler CreateHandler()
         {

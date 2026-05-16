@@ -33,7 +33,7 @@ public class PersonsController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">Token used to cancel the request while the query is being processed.</param>
     /// <returns>A standardized response containing the requested customer data when the aggregate exists.</returns>
     [HttpGet("{id:guid}")]
-    [ProducesResponseType(typeof(Response<PersonDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<PersonDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)

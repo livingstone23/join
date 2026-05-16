@@ -16,6 +16,6 @@ namespace JOIN.Application.UseCases.Admin.Persons.Queries;
 /// Implements IRequest to be routed by MediatR.
 /// </summary>
 /// <param name="PersonId">The unique identifier of the customer.</param>
-public record GetPersonByIdQuery(Guid PersonId) : IRequest<Response<PersonDto>>;
+public record GetPersonByIdQuery(Guid PersonId) : IRequest<Response<PersonDetailDto>>;
 
 

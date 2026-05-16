@@ -79,6 +79,7 @@ public partial class PersonMapper : IPersonMapper
     [MapperIgnoreTarget(nameof(Person.GcRecord))]
     [MapperIgnoreTarget(nameof(Person.Company))]
     [MapperIgnoreTarget(nameof(Person.IdentificationType))]
+    [MapperIgnoreTarget(nameof(Person.Gender))]
     [MapperIgnoreTarget(nameof(Person.Tickets))]
     public partial Person ToEntity(CreatePersonCommand command);
 
@@ -181,10 +182,14 @@ public partial class PersonMapper : IPersonMapper
     [MapperIgnoreTarget(nameof(Person.GcRecord))]
     [MapperIgnoreTarget(nameof(Person.Company))]
     [MapperIgnoreTarget(nameof(Person.IdentificationType))]
+    [MapperIgnoreTarget(nameof(Person.Gender))]
+    [MapperIgnoreTarget(nameof(Person.IsActive))]
     [MapperIgnoreTarget(nameof(Person.Addresses))]
     [MapperIgnoreTarget(nameof(Person.Contacts))]
     [MapperIgnoreTarget(nameof(Person.Tickets))]
     [MapperIgnoreSource(nameof(UpdatePersonCommand.Id))]
+    [MapperIgnoreSource(nameof(UpdatePersonCommand.GenderId))]
+    [MapperIgnoreSource(nameof(UpdatePersonCommand.IsActive))]
     [MapperIgnoreSource(nameof(UpdatePersonCommand.Addresses))]
     [MapperIgnoreSource(nameof(UpdatePersonCommand.Contacts))]
     public partial void ApplyUpdate(UpdatePersonCommand command, Person person);

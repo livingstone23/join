@@ -43,10 +43,21 @@ public class CreatePersonCommandValidator : AbstractValidator<CreatePersonComman
             .MaximumLength(50).WithMessage("Identification number cannot exceed 50 characters.");
 
         RuleFor(x => x.PersonType)
-            .NotEmpty().WithMessage("Person type must be specified (e.g., Physical or Legal).")
-            .MaximumLength(50).WithMessage("Person type cannot exceed 50 characters.")
-            .Must(value => Enum.TryParse<PersonType>(value, true, out _))
-            .WithMessage("Person type must be a valid value: Physical or Legal.");
+            .IsInEnum().WithMessage("Person type must be a valid value.")
+            .Must(value => value is PersonType.Physical or PersonType.Legal)
+            .WithMessage("Person type must be Physical (1) or Legal (2).");
+
+        When(x => x.PersonType == PersonType.Physical, () =>
+        {
+            RuleFor(x => x.GenderId)
+                .NotEmpty().WithMessage("Gender id is required for natural persons.");
+        });
+
+        When(x => x.PersonType == PersonType.Legal, () =>
+        {
+            RuleFor(x => x.GenderId)
+                .Null().WithMessage("Gender id must not be provided for legal persons.");
+        });
 
         RuleFor(x => x.IdentificationTypeId)
             .NotEmpty().WithMessage("Identification type is required.");

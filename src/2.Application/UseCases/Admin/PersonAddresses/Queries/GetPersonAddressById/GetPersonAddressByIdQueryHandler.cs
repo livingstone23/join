@@ -39,27 +39,14 @@ public sealed class GetPersonAddressByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
-            SELECT
-                Id,
-                PersonId,
-                AddressLine1,
-                AddressLine2,
-                ZipCode,
-                StreetTypeId,
-                CountryId,
-                RegionId,
-                ProvinceId,
-                MunicipalityId,
-                IsDefault,
-                CompanyId
-            FROM Admin.PersonAddresses
-            WHERE Id = @Id
-              AND CompanyId = @CompanyId
-              AND GcRecord = 0;
+        var sql = $"""
+            {PersonAddressQuerySql.SelectWithCatalogNames}
+            WHERE a.Id = @Id
+              AND a.CompanyId = @CompanyId
+              AND a.GcRecord = 0;
             """;
 
-        var address = await connection.QuerySingleOrDefaultAsync<PersonAddressResponseDto>(
+        var address = await connection.QuerySingleOrDefaultAsync<PersonAddressReadRow>(
             new CommandDefinition(
                 sql,
                 new
@@ -80,7 +67,7 @@ public sealed class GetPersonAddressByIdQueryHandler(
         {
             IsSuccess = true,
             Message = "Person address retrieved successfully.",
-            Data = address
+            Data = PersonAddressQuerySql.ToResponseDto(address)
         };
     }
 }

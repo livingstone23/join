@@ -1,4 +1,5 @@
 using JOIN.Application.Common;
+using JOIN.Domain.Enums;
 using MediatR;
 
 
@@ -20,7 +21,17 @@ public record UpdatePersonCommand : IRequest<Response<Guid>>
     /// <summary>
     /// Categorizes the customer as Physical (Natural Person) or Legal (Company/Organization).
     /// </summary>
-    public string PersonType { get; init; } = string.Empty;
+    public PersonType PersonType { get; init; }
+
+    /// <summary>
+    /// Gets the gender catalog identifier. Required for natural persons; must be omitted for legal persons.
+    /// </summary>
+    public Guid? GenderId { get; init; }
+
+    /// <summary>
+    /// Gets whether the person record should be active in the system.
+    /// </summary>
+    public bool IsActive { get; init; } = true;
 
     /// <summary>
     /// Gets or sets the first name of the customer.

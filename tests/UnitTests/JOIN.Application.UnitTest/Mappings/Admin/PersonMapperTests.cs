@@ -612,7 +612,7 @@ public sealed class PersonMapperTests
 
     private static CreatePersonCommand CreateValidCreatePersonCommand() => new()
     {
-        PersonType = nameof(PersonType.Legal),
+        PersonType = PersonType.Legal,
         FirstName = "Jane",
         MiddleName = "Marie",
         LastName = "Doe",
@@ -650,7 +650,9 @@ public sealed class PersonMapperTests
     private static UpdatePersonCommand CreateValidUpdatePersonCommand() => new()
     {
         Id = Guid.NewGuid(),
-        PersonType = nameof(PersonType.Physical),
+        PersonType = PersonType.Physical,
+        GenderId = Guid.NewGuid(),
+        IsActive = true,
         FirstName = "Updated",
         MiddleName = "Anne",
         LastName = "Person",

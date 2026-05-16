@@ -17,9 +17,14 @@ public record PersonContactDto
     public Guid Id { get; init; }
 
     /// <summary>
-    /// Contact category (e.g., Mobile, Email, WhatsApp).
+    /// Contact category numeric code (e.g., 1 = PrimaryEmail, 3 = MobilePhone).
     /// </summary>
     public string ContactType { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Localized display name for <see cref="ContactType"/>.
+    /// </summary>
+    public string ContactName { get; init; } = string.Empty;
 
     /// <summary>
     /// Contact information value (phone, email, etc.).
