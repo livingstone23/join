@@ -40,6 +40,9 @@ public class RoleSystemOptionConfiguration : IEntityTypeConfiguration<RoleSystem
         builder.Property(rso => rso.CanCreate).HasDefaultValue(false);
         builder.Property(rso => rso.CanUpdate).HasDefaultValue(false);
         builder.Property(rso => rso.CanDelete).HasDefaultValue(false);
+        builder.Property(rso => rso.CanDownload).HasDefaultValue(false);
+        builder.Property(rso => rso.IsVisibleMenu).HasDefaultValue(false);
+        builder.Property(rso => rso.OrderMenu).IsRequired(false);
 
         // --- Relationships ---
 

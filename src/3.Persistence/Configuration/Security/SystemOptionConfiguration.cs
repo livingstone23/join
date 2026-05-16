@@ -41,6 +41,9 @@ public class SystemOptionConfiguration : IEntityTypeConfiguration<SystemOption>
         builder.Property(o => o.CanCreate).HasDefaultValue(true);
         builder.Property(o => o.CanUpdate).HasDefaultValue(true);
         builder.Property(o => o.CanDelete).HasDefaultValue(true);
+        builder.Property(o => o.CanDownload).HasDefaultValue(true);
+        builder.Property(o => o.IsVisibleMenu).HasDefaultValue(true);
+        builder.Property(o => o.OrderMenu).HasDefaultValue(0);
 
         // --- Relationships ---
         // Relación con SystemModule
@@ -57,6 +60,7 @@ public class SystemOptionConfiguration : IEntityTypeConfiguration<SystemOption>
 
         // --- Indexes ---
         builder.HasIndex(o => new { o.ModuleId, o.Route }).IsUnique();
+        builder.HasIndex(o => new { o.ModuleId, o.OrderMenu });
         
         // --- Query Filters ---
         builder.HasQueryFilter(o => o.GcRecord == 0);

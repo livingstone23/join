@@ -1718,10 +1718,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         var now = DateTime.UtcNow;
         var seeds = new List<SystemModule>
         {
-            new() { Name = "Administracion", Description = "Modulo de gestion administrativa", Icon = "fa-solid fa-building", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
-            new() { Name = "Seguridad", Description = "Modulo de seguridad y control de acceso", Icon = "fa-solid fa-shield-halved", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
-            new() { Name = "Clientes", Description = "Modulo de gestion de clientes", Icon = "fa-solid fa-users", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
-            new() { Name = "Tickets", Description = "Modulo de gestion de tickets", Icon = "fa-solid fa-ticket", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 }
+            new() { Name = "Administracion", Description = "Modulo de gestion administrativa", Icon = "fa-solid fa-building", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0, Order = 1},
+            new() { Name = "Clientes", Description = "Modulo de gestion de clientes", Icon = "fa-solid fa-users", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 , Order = 2},
+            new() { Name = "Tickets", Description = "Modulo de gestion de tickets", Icon = "fa-solid fa-ticket", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 , Order = 3},
+            new() { Name = "Seguridad", Description = "Modulo de seguridad", Icon = "fa-solid fa-shield-halved", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 , Order = 99}
         };
 
         var inserted = 0;
@@ -1860,6 +1860,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         var now = DateTime.UtcNow;
         var inserted = 0;
         var updated = 0;
+        var menuOrder = 0;
 
         foreach (var seed in seeds.OrderBy(x => x.ParentName is null ? 0 : 1))
         {
@@ -1868,6 +1869,11 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             {
                 parentId = parentOption.Id;
             }
+
+            menuOrder += 10;
+            var orderMenu = seed.OrderMenu ?? menuOrder;
+            var canDownload = seed.CanDownload ?? seed.CanRead;
+            var isVisibleMenu = seed.IsVisibleMenu ?? true;
 
             if (!optionsByName.TryGetValue(seed.Name, out var option))
             {
@@ -1891,6 +1897,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                         CanCreate = seed.CanCreate,
                         CanUpdate = seed.CanUpdate,
                         CanDelete = seed.CanDelete,
+                        CanDownload = canDownload,
+                        IsVisibleMenu = isVisibleMenu,
+                        OrderMenu = orderMenu,
                         Created = now,
                         CreatedBy = "System_Seeder",
                         GcRecord = 0
@@ -1918,6 +1927,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 || option.CanCreate != seed.CanCreate
                 || option.CanUpdate != seed.CanUpdate
                 || option.CanDelete != seed.CanDelete
+                || option.CanDownload != canDownload
+                || option.IsVisibleMenu != isVisibleMenu
+                || option.OrderMenu != orderMenu
                 || option.GcRecord != 0;
 
             if (!hasChanges)
@@ -1934,6 +1946,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             option.CanCreate = seed.CanCreate;
             option.CanUpdate = seed.CanUpdate;
             option.CanDelete = seed.CanDelete;
+            option.CanDownload = canDownload;
+            option.IsVisibleMenu = isVisibleMenu;
+            option.OrderMenu = orderMenu;
             option.GcRecord = 0;
             option.LastModified = now;
             option.LastModifiedBy = "System_Seeder";
@@ -2007,6 +2022,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 continue;
             }
 
+            var canDownload = seed.CanDownload ?? seed.CanRead;
+            var isVisibleMenu = seed.IsVisibleMenu ?? seed.CanRead;
+
             if (!permissionByKey.TryGetValue((role.Id, option.Id), out var permission))
             {
                 _context.RoleSystemOptions.Add(new RoleSystemOption
@@ -2018,6 +2036,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                     CanCreate = seed.CanCreate,
                     CanUpdate = seed.CanUpdate,
                     CanDelete = seed.CanDelete,
+                    CanDownload = canDownload,
+                    IsVisibleMenu = isVisibleMenu,
+                    OrderMenu = seed.OrderMenu,
                     Created = now,
                     CreatedBy = "System_Seeder",
                     GcRecord = 0
@@ -2032,6 +2053,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 || permission.CanCreate != seed.CanCreate
                 || permission.CanUpdate != seed.CanUpdate
                 || permission.CanDelete != seed.CanDelete
+                || permission.CanDownload != canDownload
+                || permission.IsVisibleMenu != isVisibleMenu
+                || permission.OrderMenu != seed.OrderMenu
                 || permission.GcRecord != 0;
 
             if (!hasChanges)
@@ -2044,6 +2068,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             permission.CanCreate = seed.CanCreate;
             permission.CanUpdate = seed.CanUpdate;
             permission.CanDelete = seed.CanDelete;
+            permission.CanDownload = canDownload;
+            permission.IsVisibleMenu = isVisibleMenu;
+            permission.OrderMenu = seed.OrderMenu;
             permission.GcRecord = 0;
             permission.LastModified = now;
             permission.LastModifiedBy = "System_Seeder";
@@ -2466,14 +2493,20 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         bool CanRead,
         bool CanCreate,
         bool CanUpdate,
-        bool CanDelete);
+        bool CanDelete,
+        bool? CanDownload = null,
+        bool? IsVisibleMenu = null,
+        int? OrderMenu = null);
     private sealed record RoleSystemOptionSeed(
         string RoleName,
         string SystemOptionName,
         bool CanRead,
         bool CanCreate,
         bool CanUpdate,
-        bool CanDelete);
+        bool CanDelete,
+        bool? CanDownload = null,
+        bool? IsVisibleMenu = null,
+        int? OrderMenu = null);
 
     private sealed record TicketSeed(
         string Code,

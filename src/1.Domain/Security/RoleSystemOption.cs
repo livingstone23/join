@@ -47,6 +47,21 @@ public class RoleSystemOption : BaseTenantEntity
     /// </summary>
     public bool CanDelete { get; set; }
 
+    /// <summary>
+    /// Indicates if the role can export or download data from this screen.
+    /// </summary>
+    public bool CanDownload { get; set; }
+
+    /// <summary>
+    /// Indicates if this option is visible in the menu for the role.
+    /// </summary>
+    public bool IsVisibleMenu { get; set; }
+
+    /// <summary>
+    /// Optional menu order override for the role. When null, the system option order applies.
+    /// </summary>
+    public int? OrderMenu { get; set; }
+
     // --- Navigation Properties ---
     public virtual ApplicationRole Role { get; set; } = null!;
     public virtual SystemOption SystemOption { get; set; } = null!;

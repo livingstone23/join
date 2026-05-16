@@ -55,6 +55,22 @@ public class SystemOption : BaseAuditableEntity
     public bool CanUpdate { get; set; } = true;
     public bool CanDelete { get; set; } = true;
 
+    /// <summary>
+    /// Indicates if the screen supports export or download actions by default.
+    /// </summary>
+    public bool CanDownload { get; set; } = true;
+
+    /// <summary>
+    /// Indicates if the option is visible in the menu.
+    /// </summary>
+    public bool IsVisibleMenu { get; set; } = true;
+
+    /// <summary>
+    /// Defines the order of the option in the menu within its module.
+    /// </summary>
+    public int? OrderMenu { get; set; } = 0;
+
+
     // --- Navigation Properties ---
     public virtual SystemModule Module { get; set; } = null!;
     
