@@ -2329,6 +2329,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         new("Persons", "/Clientes", "@Icons.Material.Filled.PermContactCalendar", null, null, false, false, false, false),
         new("Clientes", "/Clientes/Cliente", "@Icons.Material.Filled.PeopleAlt", "Persons", "Persons", true, true, true, true),
+        new("Customers", "/Clientes/customers", "@Icons.Material.Filled.Badge", "Persons", "Customers", true, true, true, true, CanDownload: true, IsVisibleMenu: true, OrderMenu: 15),
 
 
         new("ManejoTickets", "/ManejoTickets", "@Icons.Material.Filled.Label", null, null, false, false, false, false),
@@ -2353,11 +2354,13 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("SuperAdmin", "TicketComplexities", true, true, true, true),
         new("SuperAdmin", "TicketStatuses", true, true, true, true),
         new("SuperAdmin", "TicketCompanyDefaults", true, true, true, true),
+        new("SuperAdmin", "Customers", true, true, true, true),
         new("Admin", "Administracion", false, false, false, false),
         new("Admin", "TimeUnits", true, true, true, true),
         new("Admin", "TicketComplexities", true, true, true, true),
         new("Admin", "TicketStatuses", true, true, true, true),
         new("Admin", "TicketCompanyDefaults", true, true, true, true),
+        new("Admin", "Customers", true, true, true, true),
 
         new("Manager", "Administracion", false, false, false, false),
         new("Manager", "Paises", true, true, true, true),
@@ -2378,6 +2381,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         
         new("Manager", "Persons", true, true, true, true),
         new("Manager", "Clientes", true, true, true, true),
+        new("Manager", "Customers", true, true, true, true),
         
         new("Manager", "Compañias", true, true, true, true),
         new("Manager", "ManejoTickets", true, true, true, true),
@@ -2410,6 +2414,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "CompanyModules", true, true, true, false),
         new("Supervisor", "Persons", true, true, true, true),
         new("Supervisor", "Clientes", true, true, true, true),
+        new("Supervisor", "Customers", true, true, true, false),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Compañias", true, true, true, false),
         new("Supervisor", "ManejoTickets", true, true, true, true),

@@ -3,7 +3,9 @@
 
 using System.Reflection;
 using FluentValidation;
+using JOIN.Application.Interface.Admin;
 using JOIN.Application.Mappings;
+using JOIN.Application.Services.Admin;
 using JOIN.Application.Mappings.Security;
 using JOIN.Application.Mappings.Security.RoleSystemOption;
 using JOIN.Application.Mappings.Security.SystemOption;
@@ -46,7 +48,7 @@ public static class ConfigureServices
         services.AddScoped<ITicketCompanyDefaultMapper, TicketCompanyDefaultMapper>();
         services.AddScoped<ISystemOptionMapper, SystemOptionMapper>();
         services.AddScoped<IRoleSystemOptionMapper, RoleSystemOptionMapper>();
-        
+        services.AddScoped<ICustomerCodeGenerator, CustomerCodeGenerator>();
 
         return services;
     

@@ -42,6 +42,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Area> Areas => Set<Area>();
     public DbSet<CompanyModule> CompanyModules => Set<CompanyModule>();
     public DbSet<Person> Persons => Set<Person>();
+    public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<PersonAddress> PersonAddresses => Set<PersonAddress>();
     public DbSet<PersonContact> PersonContacts => Set<PersonContact>();
     public DbSet<EntityStatus> EntityStatuses => Set<EntityStatus>();
