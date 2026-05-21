@@ -68,7 +68,7 @@ public class RefreshTokenCommandHandler(
             .ToList();
 
         var effectiveCompanyId = await ResolveEffectiveCompanyIdAsync(userCompanies, roleAssignments, isSuperAdmin);
-        var roleNames = await ResolveRoleNamesAsync(effectiveCompanyId, roleAssignments, isSuperAdmin);
+        var roleNames = await ResolveRoleNamesAsync(user.IsSuperAdminCompany, effectiveCompanyId, roleAssignments, isSuperAdmin);
         var (accessToken, newRefreshToken, expiration, refreshTokenExpiration) =
             _jwtTokenGenerator.GenerateToken(user, effectiveCompanyId, roleNames);
 
@@ -153,6 +153,7 @@ public class RefreshTokenCommandHandler(
     /// <param name="isSuperAdmin">Indicates whether the user bypasses tenant restrictions.</param>
     /// <returns>The ordered role names for the renewed session.</returns>
     private async Task<IReadOnlyCollection<string>> ResolveRoleNamesAsync(
+        bool isSuperAdminCompany,
         Guid? companyId,
         IReadOnlyCollection<UserRoleCompany> roleAssignments,
         bool isSuperAdmin)
@@ -185,6 +186,15 @@ public class RefreshTokenCommandHandler(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(role => role)
             .ToArray();
+
+        if (isSuperAdminCompany && !resolvedRoles.Contains("SuperAdminCompany", StringComparer.OrdinalIgnoreCase))
+        {
+            resolvedRoles = resolvedRoles
+                .Append("SuperAdminCompany")
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(role => role)
+                .ToArray();
+        }
 
         return resolvedRoles.Length > 0 ? resolvedRoles : ["Basic"];
     }

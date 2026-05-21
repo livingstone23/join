@@ -82,8 +82,7 @@ public class AccountController(ISender sender, ICurrentUserService currentUserSe
             UserId = userId,
             FirstName = request.FirstName,
             LastName = request.LastName,
-            AvatarUrl = request.AvatarUrl,
-            CommunicationChannels = request.CommunicationChannels
+            PhoneNumber = request.PhoneNumber
         }, cancellationToken);
 
         return Ok(response);

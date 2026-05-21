@@ -22,16 +22,10 @@ public sealed class DeleteCompanyModulesCommandHandler(IUnitOfWork unitOfWork)
     /// <returns>A standardized response containing the deleted assignment identifier.</returns>
     public async Task<Response<Guid>> Handle(DeleteCompanyModulesCommand request, CancellationToken cancellationToken)
     {
-        if (request.CompanyId == Guid.Empty)
-        {
-            return Response<Guid>.Error("INVALID_COMPANY_ID", ["The X-Company-Id header is required."]);
-        }
-
         var companyModuleRepository = _unitOfWork.GetRepository<CompanyModule>();
         var existingAssignments = await companyModuleRepository.GetAllAsync();
         var entity = existingAssignments.FirstOrDefault(x =>
             x.Id == request.Id
-            && x.CompanyId == request.CompanyId
             && x.GcRecord == 0);
 
         if (entity is null)

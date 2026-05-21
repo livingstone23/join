@@ -220,6 +220,15 @@ public class LoginCommandHandler(
             .OrderBy(role => role)
             .ToArray();
 
+        if (user.IsSuperAdminCompany && !resolvedRoles.Contains("SuperAdminCompany", StringComparer.OrdinalIgnoreCase))
+        {
+            resolvedRoles = resolvedRoles
+                .Append("SuperAdminCompany")
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(role => role)
+                .ToArray();
+        }
+
         return resolvedRoles.Length > 0
             ? resolvedRoles
             : ["Basic"];

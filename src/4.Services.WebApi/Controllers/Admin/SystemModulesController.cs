@@ -7,7 +7,11 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+
+
 namespace JOIN.Presentation.Controllers.Admin;
+
+
 
 /// <summary>
 /// Exposes REST endpoints for managing global system modules.
@@ -15,7 +19,6 @@ namespace JOIN.Presentation.Controllers.Admin;
 /// </summary>
 [ApiController]
 [Authorize(Roles = "SuperAdmin")]
-[Route("api/admin/[controller]")]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
 [PermissionResource("SystemModules")]

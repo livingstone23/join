@@ -19,12 +19,7 @@ public sealed record UpdateAccountProfileRequestDto
     public string LastName { get; init; } = string.Empty;
 
     /// <summary>
-    /// Gets the avatar URL to store in the user profile.
+    /// Gets the phone number to store in the user profile.
     /// </summary>
-    public string? AvatarUrl { get; init; }
-
-    /// <summary>
-    /// Gets the communication channels to upsert for the profile.
-    /// </summary>
-    public IReadOnlyCollection<CommunicationChannelDto> CommunicationChannels { get; init; } = Array.Empty<CommunicationChannelDto>();
+    public string? PhoneNumber { get; init; }
 }

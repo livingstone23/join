@@ -26,7 +26,7 @@ public sealed class UpdateCompanyModulesCommandHandler(IUnitOfWork unitOfWork)
     {
         if (request.CompanyId == Guid.Empty)
         {
-            return Response<CompanyModuleDto>.Error("INVALID_COMPANY_ID", ["The X-Company-Id header is required."]);
+            return Response<CompanyModuleDto>.Error("INVALID_COMPANY_ID", ["CompanyId is required."]);
         }
 
         var companyRepository = _unitOfWork.GetRepository<Company>();

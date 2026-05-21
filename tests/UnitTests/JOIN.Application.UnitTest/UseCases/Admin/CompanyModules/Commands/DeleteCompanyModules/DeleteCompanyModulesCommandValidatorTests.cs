@@ -24,7 +24,6 @@ public sealed class DeleteCompanyModulesCommandValidatorTests
 
         // Assert
         result.ShouldNotHaveValidationErrorFor(x => x.Id);
-        result.ShouldNotHaveValidationErrorFor(x => x.CompanyId);
     }
 
     /// <summary>
@@ -44,22 +43,5 @@ public sealed class DeleteCompanyModulesCommandValidatorTests
             .WithErrorMessage("Id is required.");
     }
 
-    /// <summary>
-    /// Verifies that an empty company identifier triggers the required validation error.
-    /// </summary>
-    [Fact]
-    public void Validate_WhenCompanyIdIsEmpty_ShouldHaveValidationError()
-    {
-        // Arrange
-        var command = CreateValidCommand() with { CompanyId = Guid.Empty };
-
-        // Act
-        var result = _validator.TestValidate(command);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.CompanyId)
-            .WithErrorMessage("CompanyId is required.");
-    }
-
-    private static DeleteCompanyModulesCommand CreateValidCommand() => new(Guid.NewGuid(), Guid.NewGuid());
+    private static DeleteCompanyModulesCommand CreateValidCommand() => new(Guid.NewGuid());
 }

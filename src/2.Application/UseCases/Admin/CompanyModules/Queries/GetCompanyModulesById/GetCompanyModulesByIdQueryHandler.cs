@@ -25,7 +25,7 @@ public sealed class GetCompanyModulesByIdQueryHandler(ISqlConnectionFactory conn
         {
             return Response<CompanyModuleDto>.Error(
                 "INVALID_COMPANY_ID",
-                ["The X-Company-Id header is required."]);
+                ["CompanyId query parameter is required."]);
         }
 
         using var connection = connectionFactory.CreateConnection();

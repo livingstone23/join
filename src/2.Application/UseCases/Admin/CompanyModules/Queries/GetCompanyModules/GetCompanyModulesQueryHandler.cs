@@ -29,13 +29,6 @@ public sealed class GetCompanyModulesQueryHandler(
     /// <returns>A standardized paged response containing the matching module assignments.</returns>
     public async Task<Response<PagedResult<CompanyModuleListItemDto>>> Handle(GetCompanyModulesQuery request, CancellationToken cancellationToken)
     {
-        if (request.CompanyId == Guid.Empty)
-        {
-            return Response<PagedResult<CompanyModuleListItemDto>>.Error(
-                "INVALID_COMPANY_ID",
-                ["The X-Company-Id header is required."]);
-        }
-
         if (request.CreatedFrom.HasValue && request.CreatedTo.HasValue && request.CreatedFrom.Value.Date > request.CreatedTo.Value.Date)
         {
             return Response<PagedResult<CompanyModuleListItemDto>>.Error(
@@ -57,11 +50,16 @@ public sealed class GetCompanyModulesQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("CompanyId", request.CompanyId);
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE cm.CompanyId = @CompanyId AND cm.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE cm.GcRecord = 0");
+
+        if (request.CompanyId.HasValue)
+        {
+            whereBuilder.Append(" AND cm.CompanyId = @CompanyId");
+            parameters.Add("CompanyId", request.CompanyId.Value);
+        }
 
         if (!string.IsNullOrWhiteSpace(request.CompanyName))
         {

@@ -1,9 +1,11 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Common;
+using JOIN.Application.Interface;
 using JOIN.Application.UseCases.Common.Companies.Commands;
 using JOIN.Application.UseCases.Common.Companies.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 
@@ -20,11 +22,11 @@ namespace JOIN.Services.WebApi.Controllers.Common;
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Companies")]
-public class CompaniesController(IMediator mediator) : ControllerBase
+[Authorize]
+public class CompaniesController(IMediator mediator, ICurrentUserService currentUserService) : ControllerBase
 {
-
-
     private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+    private readonly ICurrentUserService _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
 
 
 
@@ -36,6 +38,7 @@ public class CompaniesController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">Token used to cancel the request while the read operation is in progress.</param>
     /// <returns>A standardized response containing the requested company when it exists.</returns>
     [HttpGet("{id:guid}")]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(Response<CompanyDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
@@ -49,7 +52,7 @@ public class CompaniesController(IMediator mediator) : ControllerBase
 
         return Ok(response);
     }
-
+    
     /// <summary>
     /// Returns a paginated company list with optional text filtering.
     /// This endpoint supports management grids that need server-side pagination and search over the active catalog.
@@ -60,6 +63,7 @@ public class CompaniesController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">Token used to cancel the request while the paged query executes.</param>
     /// <returns>A standardized paged response containing the requested company slice.</returns>
     [HttpGet]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(Response<PagedResult<CompanyListItemDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -86,6 +90,7 @@ public class CompaniesController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">Token used to cancel the request while the creation command is being handled.</param>
     /// <returns>A `201 Created` response containing the newly created company resource.</returns>
     [HttpPost]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(Response<CompanyDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -115,6 +120,7 @@ public class CompaniesController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">Token used to cancel the request while the update command is being processed.</param>
     /// <returns>A standardized response containing the updated company data.</returns>
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(Response<CompanyDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -151,6 +157,7 @@ public class CompaniesController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">Token used to cancel the request while the delete command is executing.</param>
     /// <returns>A standardized response containing the identifier of the deleted company.</returns>
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -163,6 +170,54 @@ public class CompaniesController(IMediator mediator) : ControllerBase
             if (response.Message == "COMPANY_NOT_FOUND")
             {
                 return NotFound(response);
+            }
+
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Allows an authenticated Admin user to update their own company data.
+    /// The company identifier is resolved exclusively from the authenticated token; it is not accepted as a parameter.
+    /// </summary>
+    /// <param name="command">The update payload containing the new company state.</param>
+    /// <param name="cancellationToken">Token used to cancel the request while the update command is being processed.</param>
+    /// <returns>A standardized response containing the updated company data.</returns>
+    [HttpPut("updatebyadmin")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(Response<CompanyDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateByAdmin(
+        [FromBody] UpdateCompanyCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var companyId = _currentUserService.CompanyId;
+        if (companyId == Guid.Empty)
+        {
+            return BadRequest(Response<CompanyDto>.Error(
+                "INVALID_COMPANY_ID",
+                ["Authenticated token must contain a valid CompanyId claim."]));
+        }
+
+        var request = command with { Id = companyId };
+        var response = await _mediator.Send(request, cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            if (response.Message == "COMPANY_NOT_FOUND")
+            {
+                return NotFound(response);
+            }
+
+            if (response.Message == "COMPANY_TAXID_IN_USE")
+            {
+                return Conflict(response);
             }
 
             return BadRequest(response);

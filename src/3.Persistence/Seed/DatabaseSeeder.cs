@@ -124,7 +124,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
     private async Task SeedRolesAsync()
     {
-        string[] roles = { "SuperAdmin", "Admin", "Agent", "Person", "Manager", "Supervisor", "Coordinador", "UsuarioSimple" };
+        string[] roles = { "SuperAdmin", "SuperAdminCompany", "Admin", "Agent", "Person", "Manager", "Supervisor", "Coordinador", "UsuarioSimple" };
 
         foreach (var roleName in roles)
         {
@@ -263,7 +263,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             user.EmailConfirmed = true;
             user.IsActive = true;
             user.IsSuperAdmin = seed.IsSuperAdmin;
-            user.IsSuperAdminCompany = false;
+            user.IsSuperAdminCompany = seed.IsSuperAdminCompany;
             user.GcRecord = 0;
 
             if (isNewUser)
@@ -305,7 +305,11 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     {
         var seeds = GetDefaultUserSeeds();
         var emails = seeds.Select(x => x.Email).ToList();
-        var roleNames = seeds.Select(x => x.RoleName).Distinct().ToList();
+        var roleNames = seeds
+            .Select(x => x.RoleName)
+            .Append("SuperAdminCompany")
+            .Distinct()
+            .ToList();
 
         var users = await _context.ApplicationUsers
             .IgnoreQueryFilters()
@@ -385,6 +389,23 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             {
                 UserId = user.Id,
                 RoleId = roleId,
+                CompanyId = joinCompanyId,
+                Created = now,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            });
+
+            roleLinksInserted++;
+        }
+
+        if (usersByEmail.TryGetValue("livingstone23@gmail.com", out var superAdminCompanyUser)
+            && roleIdsByName.TryGetValue("SuperAdminCompany", out var superAdminCompanyRoleId)
+            && !userRoleSet.Contains((superAdminCompanyUser.Id, superAdminCompanyRoleId, joinCompanyId)))
+        {
+            _context.UserRoleCompanies.Add(new UserRoleCompany
+            {
+                UserId = superAdminCompanyUser.Id,
+                RoleId = superAdminCompanyRoleId,
                 CompanyId = joinCompanyId,
                 Created = now,
                 CreatedBy = "System_Seeder",
@@ -1981,9 +2002,13 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
     private async Task SeedRoleSystemOptionsAsync(Guid joinCompanyId)
     {
-        var seeds = GetRoleSystemOptionSeeds();
-        var roleNames = seeds.Select(x => x.RoleName).Distinct().ToList();
-        var optionNames = seeds.Select(x => x.SystemOptionName).Distinct().ToList();
+        var baseSeeds = GetRoleSystemOptionSeeds();
+        var privilegedRoleNames = new[] { "Admin", "SuperAdminCompany" };
+        var roleNames = baseSeeds
+            .Select(x => x.RoleName)
+            .Concat(privilegedRoleNames)
+            .Distinct()
+            .ToList();
 
         var roles = await _context.ApplicationRoles
             .IgnoreQueryFilters()
@@ -1992,8 +2017,27 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var systemOptions = await _context.SystemOptions
             .IgnoreQueryFilters()
-            .Where(o => optionNames.Contains(o.Name))
+            .Where(o => o.GcRecord == 0)
             .ToListAsync();
+
+        var privilegedAllOptionSeeds = systemOptions
+            .SelectMany(option => privilegedRoleNames.Select(roleName => new RoleSystemOptionSeed(
+                roleName,
+                option.Name,
+                true,
+                true,
+                true,
+                true,
+                CanDownload: true,
+                IsVisibleMenu: true,
+                OrderMenu: option.OrderMenu)))
+            .ToList();
+
+        var seeds = baseSeeds
+            .Concat(privilegedAllOptionSeeds)
+            .GroupBy(x => $"{x.RoleName}|{x.SystemOptionName}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
+            .ToList();
 
         var rolesByName = roles.ToDictionary(r => r.Name!, StringComparer.OrdinalIgnoreCase);
         var optionsByName = systemOptions.ToDictionary(o => o.Name, StringComparer.OrdinalIgnoreCase);
@@ -2296,10 +2340,32 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     private static List<DefaultUserSeed> GetDefaultUserSeeds() =>
     [
         new("livingstone", "bravo", "lcano@join.com", "ABCabc123*", "SuperAdmin", true),
+        new("Livingstone23", "Admin", "livingstone23@gmail.com", "ABCabc123*", "Admin", false, true),
         new("Manager", "Test", "manager@join.com", "ABCabc123*", "Manager", false),
         new("Supervisor", "Test", "supervisor@join.com", "ABCabc123*", "Supervisor", false),
         new("SimpleUser", "Test", "simpleuser@join.com", "ABCabc123*", "UsuarioSimple", false)
     ];
+
+    private static List<RoleSystemOptionSeed> GetAdminFullSystemOptionPermissionSeeds()
+    {
+        var optionNames = GetAdministrativeSystemOptionSeeds()
+            .Select(x => x.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return optionNames
+            .Select((optionName, index) => new RoleSystemOptionSeed(
+                "Admin",
+                optionName,
+                true,
+                true,
+                true,
+                true,
+                CanDownload: true,
+                IsVisibleMenu: true,
+                OrderMenu: index + 1))
+            .ToList();
+    }
 
     private static List<SystemOptionSeed> GetAdministrativeSystemOptionSeeds() =>
     [
@@ -2355,6 +2421,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("SuperAdmin", "TicketStatuses", true, true, true, true),
         new("SuperAdmin", "TicketCompanyDefaults", true, true, true, true),
         new("SuperAdmin", "Customers", true, true, true, true),
+        new("SuperAdmin", "Compañias", true, true, true, true),
+
+        
         new("Admin", "Administracion", false, false, false, false),
         new("Admin", "TimeUnits", true, true, true, true),
         new("Admin", "TicketComplexities", true, true, true, true),
@@ -2488,7 +2557,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         string Email,
         string Password,
         string RoleName,
-        bool IsSuperAdmin);
+        bool IsSuperAdmin,
+        bool IsSuperAdminCompany = false);
     private sealed record SystemOptionSeed(
         string Name,
         string Route,

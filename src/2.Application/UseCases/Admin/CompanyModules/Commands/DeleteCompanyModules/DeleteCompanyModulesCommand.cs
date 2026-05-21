@@ -7,6 +7,5 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 /// Command used to soft-delete a tenant-scoped company module assignment.
 /// </summary>
 /// <param name="Id">The unique identifier of the assignment to delete.</param>
-/// <param name="CompanyId">The tenant identifier used to scope the delete operation.</param>
-public sealed record DeleteCompanyModulesCommand(Guid Id, Guid CompanyId)
+public sealed record DeleteCompanyModulesCommand(Guid Id)
     : IRequest<Response<Guid>>;

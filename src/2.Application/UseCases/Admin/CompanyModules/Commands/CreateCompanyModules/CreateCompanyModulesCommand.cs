@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
 using MediatR;
@@ -12,9 +11,8 @@ public sealed record CreateCompanyModulesCommand : IRequest<Response<CompanyModu
 {
     /// <summary>
     /// Gets or sets the unique identifier of the company that owns the assignment.
-    /// This value is populated by the API layer from the <c>X-Company-Id</c> header and is not expected in the JSON payload.
+    /// This value is expected in the JSON payload.
     /// </summary>
-    [JsonIgnore]
     public Guid CompanyId { get; init; }
 
     /// <summary>
