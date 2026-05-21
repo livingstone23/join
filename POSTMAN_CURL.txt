@@ -1,0 +1,173 @@
+
+
+curl -X GET "http://localhost:5267/api/v1/companies/COMPANY_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/companies?pageNumber=1&pageSize=10&searchTerm=acme" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/companies" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"New Company","taxId":"123456789","commercialName":"New Co","email":"contact@company.com","phone":"+1234567890","website":"https://company.com","industryId":"INDUSTRY_ID"}'
+
+curl -X PUT "http://localhost:5267/api/v1/companies/COMPANY_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"Updated Company","taxId":"123456789","commercialName":"Updated Co","email":"new@company.com","phone":"+0987654321","website":"https://updated.com","industryId":"INDUSTRY_ID"}'
+
+curl -X DELETE "http://localhost:5267/api/v1/companies/COMPANY_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/customers?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/customers/CUSTOMER_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/customers" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"customerCode":"CUST-001","personId":"PERSON_ID","personLifecycleStage":1,"isActive":true,"notes":"VIP customer"}'
+
+curl -X PUT "http://localhost:5267/api/v1/customers/CUSTOMER_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"customerCode":"CUST-001","personLifecycleStage":2,"isActive":true,"notes":"Updated VIP"}'
+
+curl -X DELETE "http://localhost:5267/api/v1/customers/CUSTOMER_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/persons?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/persons/PERSON_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/persons" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"firstName":"John","middleName":"Michael","lastName":"Doe","secondLastName":"Smith","commercialName":"JM Doe","personType":1,"genderId":"GENDER_ID","identificationTypeId":"ID_TYPE_ID","identificationNumber":"123456789","birthDate":"1990-01-15","email":"john@example.com","phone":"+1234567890"}'
+
+curl -X PUT "http://localhost:5267/api/v1/persons/PERSON_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"firstName":"John","middleName":"Michael","lastName":"Doe Updated","secondLastName":"Smith","commercialName":"JM Doe","personType":1,"genderId":"GENDER_ID","identificationTypeId":"ID_TYPE_ID","identificationNumber":"987654321","birthDate":"1990-01-15","email":"john@example.com","phone":"+0987654321"}'
+
+curl -X DELETE "http://localhost:5267/api/v1/persons/PERSON_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/tickets?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/tickets/system-wide?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/tickets/TICKET_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/tickets" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"title":"Server Down","description":"Production server down","customerId":"CUSTOMER_ID","projectId":"PROJECT_ID","ticketStatusId":"STATUS_ID","ticketComplexityId":"COMPLEXITY_ID","assignedToUserId":"USER_ID","isVisibleToExternals":true,"priority":1}'
+
+curl -X PUT "http://localhost:5267/api/v1/tickets/TICKET_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"title":"Server Down - RESOLVED","description":"Server is back online","ticketStatusId":"RESOLVED_STATUS_ID","ticketComplexityId":"COMPLEXITY_ID","priority":3}'
+
+curl -X DELETE "http://localhost:5267/api/v1/tickets/TICKET_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/ticketstatuses?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/ticketstatuses" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"In Progress","description":"Ticket is being worked on","color":"#FFA500"}'
+
+curl -X PUT "http://localhost:5267/api/v1/ticketstatuses/STATUS_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"In Progress","description":"Actively being worked on","color":"#FF6347"}'
+
+curl -X DELETE "http://localhost:5267/api/v1/ticketstatuses/STATUS_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/ticketcomplexities?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/ticketcomplexities" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"High","description":"Complex issue"}'
+
+curl -X PUT "http://localhost:5267/api/v1/ticketcomplexities/COMPLEXITY_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"Very High","description":"Critical issue"}'
+
+curl -X DELETE "http://localhost:5267/api/v1/ticketcomplexities/COMPLEXITY_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/projects?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/projects/PROJECT_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/projects" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"Mobile App Redesign","description":"Complete redesign","startDate":"2024-01-01","endDate":"2024-06-30","isActive":true}'
+
+curl -X PUT "http://localhost:5267/api/v1/projects/PROJECT_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"Mobile App Redesign v2","description":"Phase 2","endDate":"2024-12-31","isActive":true}'
+
+curl -X DELETE "http://localhost:5267/api/v1/projects/PROJECT_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/countries?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/regions?pageNumber=1&pageSize=10&countryId=COUNTRY_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/provinces?pageNumber=1&pageSize=10&regionId=REGION_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/municipalities?pageNumber=1&pageSize=10&provinceId=PROVINCE_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/communicationchannels?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/genders?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/identificationtypes?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/industries?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/entitystatuses?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/incomeranges?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/taxregimes?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/streettypes?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/areas?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/areas" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"Sales","description":"Sales department"}'
+
+curl -X PUT "http://localhost:5267/api/v1/areas/AREA_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"Sales & Marketing","description":"Sales and Marketing"}'
+
+curl -X DELETE "http://localhost:5267/api/v1/areas/AREA_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/systemmodules?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/companymodules?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/person/PERSON_ID/addresses" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/person/PERSON_ID/addresses" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"streetTypeId":"STREET_TYPE_ID","streetName":"Main Street","streetNumber":"123","floor":"5","apartment":"B","additionalInfo":"Near park","zipCode":"28001","municipalityId":"MUNICIPALITY_ID","countryId":"COUNTRY_ID"}'
+
+curl -X PUT "http://localhost:5267/api/v1/person/PERSON_ID/addresses/ADDRESS_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"streetTypeId":"STREET_TYPE_ID","streetName":"New Main Street","streetNumber":"456","floor":"3","apartment":"A","additionalInfo":"Close to subway","zipCode":"28002","municipalityId":"MUNICIPALITY_ID","countryId":"COUNTRY_ID"}'
+
+curl -X DELETE "http://localhost:5267/api/v1/person/PERSON_ID/addresses/ADDRESS_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/person/PERSON_ID/contacts" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/person/PERSON_ID/contacts" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"contactType":1,"value":"john@company.com","communicationChannelId":"CHANNEL_ID"}'
+
+curl -X PUT "http://localhost:5267/api/v1/person/PERSON_ID/contacts/CONTACT_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"contactType":1,"value":"john.new@company.com","communicationChannelId":"CHANNEL_ID"}'
+
+curl -X DELETE "http://localhost:5267/api/v1/person/PERSON_ID/contacts/CONTACT_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/person/PERSON_ID/business-profile" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/person/PERSON_ID/business-profile" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"jobTitle":"Software Engineer","areaId":"AREA_ID","businessEmail":"john@business.com","businessPhone":"+1234567890"}'
+
+curl -X PUT "http://localhost:5267/api/v1/person/PERSON_ID/business-profile" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"jobTitle":"Senior Software Engineer","areaId":"AREA_ID","businessEmail":"john.senior@business.com","businessPhone":"+0987654321"}'
+
+curl -X GET "http://localhost:5267/api/v1/person/PERSON_ID/employments" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/person/PERSON_ID/employments" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"companyId":"COMPANY_ID","positionTitle":"Developer","startDate":"2020-01-15","endDate":"2024-01-15","currentlyEmployed":false}'
+
+curl -X PUT "http://localhost:5267/api/v1/person/PERSON_ID/employments/EMPLOYMENT_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"positionTitle":"Senior Developer","startDate":"2020-01-15","endDate":null,"currentlyEmployed":true}'
+
+curl -X GET "http://localhost:5267/api/v1/person/PERSON_ID/financial-profile" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/person/PERSON_ID/financial-profile" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"incomeRangeId":"INCOME_ID","taxRegimeId":"TAX_ID","creditLimit":50000,"creditAvailable":50000,"paymentTermsDays":30}'
+
+curl -X PUT "http://localhost:5267/api/v1/person/PERSON_ID/financial-profile" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"incomeRangeId":"INCOME_ID","taxRegimeId":"TAX_ID","creditLimit":100000,"creditAvailable":75000,"paymentTermsDays":60}'
+
+curl -X GET "http://localhost:5267/api/v1/ticketcompanydefaults?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/ticketcompanydefaults" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"ticketStatusId":"STATUS_ID","ticketComplexityId":"COMPLEXITY_ID","defaultAssignedUserId":"USER_ID"}'
+
+curl -X PUT "http://localhost:5267/api/v1/ticketcompanydefaults/DEFAULT_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"ticketStatusId":"STATUS_ID","ticketComplexityId":"COMPLEXITY_ID","defaultAssignedUserId":"OTHER_USER_ID"}'
+
+curl -X DELETE "http://localhost:5267/api/v1/ticketcompanydefaults/DEFAULT_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/timeunits?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/timeunits" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"Hour","abbreviation":"h","factor":1}'
+
+curl -X PUT "http://localhost:5267/api/v1/timeunits/TIMEUNIT_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"Working Hour","abbreviation":"wh","factor":1}'
+
+curl -X DELETE "http://localhost:5267/api/v1/timeunits/TIMEUNIT_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/roles?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/roles" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"Support Manager","description":"Manages support tickets"}'
+
+curl -X PUT "http://localhost:5267/api/v1/roles/ROLE_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"name":"Senior Support Manager","description":"Manages tickets and teams"}'
+
+curl -X DELETE "http://localhost:5267/api/v1/roles/ROLE_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/users?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X GET "http://localhost:5267/api/v1/users/USER_ID" -H "Authorization: Bearer YOUR_TOKEN"
+
+curl -X POST "http://localhost:5267/api/v1/users" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"firstName":"Jane","lastName":"Smith","email":"jane@company.com","roleId":"ROLE_ID"}'
+
+curl -X PUT "http://localhost:5267/api/v1/users/USER_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"firstName":"Jane","lastName":"Smith Updated","email":"jane.updated@company.com","roleId":"ROLE_ID"}'
+
+curl -X DELETE "http://localhost:5267/api/v1/users/USER_ID" -H "Authorization: Bearer YOUR_TOKEN"
