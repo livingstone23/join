@@ -139,14 +139,26 @@ using (var scope = app.Services.CreateScope())
     
     try
     {
-        
-        logger.LogInformation("Applying database migrations...");
         var context = services.GetRequiredService<ApplicationDbContext>();
-        await context.Database.MigrateAsync();
-        logger.LogInformation("Database migrations applied successfully.");
+        var pendingMigrations = (await context.Database.GetPendingMigrationsAsync()).ToList();
 
-        var seeder = services.GetRequiredService<JOIN.Persistence.DatabaseSeeder>();
-        await seeder.SeedAsync(); // Seed the database with initial data (roles, default users, etc.)
+        if (pendingMigrations.Count == 0)
+        {
+            logger.LogInformation("No pending database migrations found. Skipping migration and startup seeding.");
+        }
+        else
+        {
+            logger.LogInformation(
+                "Applying {PendingCount} pending database migration(s): {MigrationNames}",
+                pendingMigrations.Count,
+                string.Join(", ", pendingMigrations));
+
+            await context.Database.MigrateAsync();
+            logger.LogInformation("Database migrations applied successfully.");
+
+            var seeder = services.GetRequiredService<JOIN.Persistence.DatabaseSeeder>();
+            await seeder.SeedAsync();
+        }
 
     }
     catch (Exception ex)
