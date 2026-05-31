@@ -53,7 +53,7 @@ public class IncomeRangesController(ISender sender) : ControllerBase
         var response = await _sender.Send(command, cancellationToken);
         if (!response.IsSuccess)
         {
-            if (response.Message == "INCOME_RANGE_DISPLAY_NAME_IN_USE")
+            if (response.Message is "INCOME_RANGE_DISPLAY_NAME_IN_USE" or "INCOME_RANGE_DISPLAY_ORDER_IN_USE")
                 return Conflict(response);
             return BadRequest(response);
         }
@@ -74,7 +74,7 @@ public class IncomeRangesController(ISender sender) : ControllerBase
         {
             if (response.Message == "INCOME_RANGE_NOT_FOUND")
                 return NotFound(response);
-            if (response.Message == "INCOME_RANGE_DISPLAY_NAME_IN_USE")
+            if (response.Message is "INCOME_RANGE_DISPLAY_NAME_IN_USE" or "INCOME_RANGE_DISPLAY_ORDER_IN_USE")
                 return Conflict(response);
             return BadRequest(response);
         }

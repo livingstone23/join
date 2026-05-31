@@ -18,7 +18,7 @@ public sealed class GetIncomeRangeByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
         const string sql = """
-            SELECT ir.Id, ir.CompanyId, c.Name AS CompanyName, ir.DisplayName, ir.MinimumValue, ir.MaximumValue, ir.CurrencyCode, ir.IsActive, ir.Created AS CreatedAt
+            SELECT ir.Id, ir.CompanyId, c.Name AS CompanyName, ir.DisplayName, ir.MinimumValue, ir.MaximumValue, ir.CurrencyCode, ir.IsActive, ir.DisplayOrder, ir.Created AS CreatedAt
             FROM Admin.IncomeRanges ir
             INNER JOIN Common.Companies c ON c.Id = ir.CompanyId AND c.GcRecord = 0
             WHERE ir.Id = @Id AND ir.CompanyId = @CompanyId AND ir.GcRecord = 0;

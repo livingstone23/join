@@ -86,7 +86,9 @@ curl -X GET "http://localhost:5267/api/v1/industries?pageNumber=1&pageSize=10" -
 
 curl -X GET "http://localhost:5267/api/v1/entitystatuses?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
 
-curl -X GET "http://localhost:5267/api/v1/incomeranges?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
+curl -X GET "http://localhost:5267/api/v1/IncomeRanges?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN" -H "Accept: application/json"
+
+# Response items include displayOrder (ordered ASC). POST/PUT body: displayOrder (>= 1), displayName, minimumValue, maximumValue, currencyCode
 
 curl -X GET "http://localhost:5267/api/v1/taxregimes?pageNumber=1&pageSize=10" -H "Authorization: Bearer YOUR_TOKEN"
 

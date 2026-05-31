@@ -60,6 +60,10 @@ public class IncomeRangeConfiguration : IEntityTypeConfiguration<IncomeRange>
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(ir => ir.DisplayOrder)
+            .IsRequired()
+            .HasDefaultValue(0);
+
         // --- Indexes & Unique Constraints ---
 
         // CRITICAL: Multi-tenant unique constraints.
@@ -68,6 +72,10 @@ public class IncomeRangeConfiguration : IEntityTypeConfiguration<IncomeRange>
         builder.HasIndex(ir => new { ir.CompanyId, ir.DisplayName, ir.GcRecord })
             .IsUnique()
             .HasDatabaseName("IX_IncomeRanges_CompanyId_DisplayName_GcRecord");
+
+        builder.HasIndex(ir => new { ir.CompanyId, ir.DisplayOrder, ir.GcRecord })
+            .IsUnique()
+            .HasDatabaseName("IX_IncomeRanges_CompanyId_DisplayOrder_GcRecord");
 
         // --- Relationships ---
 

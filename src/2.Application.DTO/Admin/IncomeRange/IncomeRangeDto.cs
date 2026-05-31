@@ -13,5 +13,6 @@ public sealed record IncomeRangeDto
     public decimal? MaximumValue { get; init; }
     public string CurrencyCode { get; init; } = string.Empty;
     public bool IsActive { get; init; }
+    public int DisplayOrder { get; init; }
     public DateTime CreatedAt { get; init; }
 }

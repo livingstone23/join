@@ -10,4 +10,5 @@ public sealed record CreateIncomeRangeCommand : IRequest<Response<IncomeRangeDto
     public decimal MinimumValue { get; init; }
     public decimal? MaximumValue { get; init; }
     public string CurrencyCode { get; init; } = string.Empty;
+    public int DisplayOrder { get; init; }
 }

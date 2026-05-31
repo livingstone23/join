@@ -57,10 +57,10 @@ public sealed class GetIncomeRangesQueryHandler(
             : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
         var sql = $"""
-            SELECT ir.Id, ir.CompanyId, c.Name AS CompanyName, ir.DisplayName, ir.MinimumValue, ir.MaximumValue, ir.CurrencyCode, ir.IsActive, ir.Created AS CreatedAt
+            SELECT ir.Id, ir.CompanyId, c.Name AS CompanyName, ir.DisplayName, ir.MinimumValue, ir.MaximumValue, ir.CurrencyCode, ir.IsActive, ir.DisplayOrder, ir.Created AS CreatedAt
             FROM Admin.IncomeRanges ir
             INNER JOIN Common.Companies c ON c.Id = ir.CompanyId AND c.GcRecord = 0
-            {whereClause} ORDER BY ir.DisplayName ASC {pagination};
+            {whereClause} ORDER BY ir.DisplayOrder ASC, ir.DisplayName ASC {pagination};
             SELECT COUNT(*) FROM Admin.IncomeRanges ir
             INNER JOIN Common.Companies c ON c.Id = ir.CompanyId AND c.GcRecord = 0
             {whereClause};

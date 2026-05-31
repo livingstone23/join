@@ -35,9 +35,12 @@ public sealed class UpdateIncomeRangeCommandHandler(
         if (all.Any(x => x.Id != request.Id && x.CompanyId == companyId && x.GcRecord == 0 && string.Equals(x.DisplayName, displayName, StringComparison.OrdinalIgnoreCase)))
             return Response<IncomeRangeDto>.Error("INCOME_RANGE_DISPLAY_NAME_IN_USE", ["Another active income range already uses the same display name in this company."]);
 
+        if (all.Any(x => x.Id != request.Id && x.CompanyId == companyId && x.GcRecord == 0 && x.DisplayOrder == request.DisplayOrder))
+            return Response<IncomeRangeDto>.Error("INCOME_RANGE_DISPLAY_ORDER_IN_USE", ["Another active income range already uses the same display order in this company."]);
+
         try
         {
-            entity.Update(displayName, request.MinimumValue, request.MaximumValue, currencyCode);
+            entity.Update(displayName, request.MinimumValue, request.MaximumValue, currencyCode, request.DisplayOrder);
         }
         catch (ArgumentException ex)
         {
@@ -68,6 +71,7 @@ public sealed class UpdateIncomeRangeCommandHandler(
                 MaximumValue = entity.MaximumValue,
                 CurrencyCode = entity.CurrencyCode,
                 IsActive = entity.IsActive,
+                DisplayOrder = entity.DisplayOrder,
                 CreatedAt = entity.Created
             }
         };

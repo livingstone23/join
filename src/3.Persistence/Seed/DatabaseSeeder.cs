@@ -754,25 +754,40 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
     private async Task SeedIncomeRangesAsync(Guid joinCompanyId)
     {
-        var seeds = new List<(string DisplayName, decimal MinimumValue, decimal? MaximumValue, string Currency)>
+        var seeds = new List<(int DisplayOrder, string DisplayName, decimal MinimumValue, decimal? MaximumValue, string Currency)>
         {
-            ("$0 - $500 USD", 0.00m, 500.00m, "USD"),
-            ("$501 - $1,500 USD", 501.00m, 1500.00m, "USD"),
-            ("$1,501 - $3,000 USD", 1501.00m, 3000.00m, "USD"),
-            ("$3,001 - $5,000 USD", 3001.00m, 5000.00m, "USD"),
-            ("Más de $5,000 USD", 5001.00m, null, "USD")
+            (1, "$0 - $500 USD", 0.00m, 500.00m, "USD"),
+            (2, "$501 - $1,500 USD", 501.00m, 1500.00m, "USD"),
+            (3, "$1,501 - $3,000 USD", 1501.00m, 3000.00m, "USD"),
+            (4, "$3,001 - $5,000 USD", 3001.00m, 5000.00m, "USD"),
+            (5, "Más de $5,000 USD", 5001.00m, null, "USD")
         };
 
         var inserted = 0;
+        var updated = 0;
+        var now = DateTime.UtcNow;
 
         foreach (var seed in seeds)
         {
-            var exists = await _context.IncomeRanges
+            var existing = await _context.IncomeRanges
                 .IgnoreQueryFilters()
-                .AnyAsync(ir => ir.CompanyId == joinCompanyId && ir.DisplayName == seed.DisplayName);
+                .FirstOrDefaultAsync(ir => ir.CompanyId == joinCompanyId && ir.DisplayName == seed.DisplayName);
 
-            if (exists)
+            if (existing is not null)
             {
+                if (existing.GcRecord == 0 && existing.DisplayOrder != seed.DisplayOrder)
+                {
+                    existing.Update(
+                        existing.DisplayName,
+                        existing.MinimumValue,
+                        existing.MaximumValue,
+                        existing.CurrencyCode,
+                        seed.DisplayOrder);
+                    existing.LastModified = now;
+                    existing.LastModifiedBy = "System_Seeder";
+                    updated++;
+                }
+
                 continue;
             }
 
@@ -781,20 +796,25 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 seed.DisplayName,
                 seed.MinimumValue,
                 seed.MaximumValue,
-                seed.Currency);
-            entity.Created = DateTime.UtcNow;
+                seed.Currency,
+                seed.DisplayOrder);
+            entity.Created = now;
             entity.CreatedBy = "System_Seeder";
 
             _context.IncomeRanges.Add(entity);
             inserted++;
         }
 
-        if (inserted > 0)
+        if (inserted > 0 || updated > 0)
         {
             await _context.SaveChangesAsync();
         }
 
-        _logger.LogInformation("Income ranges seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
+        _logger.LogInformation(
+            "Income ranges seed finished. Inserted: {Inserted}, Updated: {Updated}, Existing: {Existing}",
+            inserted,
+            updated,
+            seeds.Count - inserted - updated);
     }
 
     private async Task SeedJoinPersonsAsync(Guid companyId, Guid idTypeId)

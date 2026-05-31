@@ -31,10 +31,13 @@ public sealed class CreateIncomeRangeCommandHandler(
         if (all.Any(x => x.CompanyId == companyId && x.GcRecord == 0 && string.Equals(x.DisplayName, displayName, StringComparison.OrdinalIgnoreCase)))
             return Response<IncomeRangeDto>.Error("INCOME_RANGE_DISPLAY_NAME_IN_USE", ["Another active income range already uses the same display name in this company."]);
 
+        if (all.Any(x => x.CompanyId == companyId && x.GcRecord == 0 && x.DisplayOrder == request.DisplayOrder))
+            return Response<IncomeRangeDto>.Error("INCOME_RANGE_DISPLAY_ORDER_IN_USE", ["Another active income range already uses the same display order in this company."]);
+
         IncomeRange entity;
         try
         {
-            entity = IncomeRange.Create(companyId, displayName, request.MinimumValue, request.MaximumValue, currencyCode);
+            entity = IncomeRange.Create(companyId, displayName, request.MinimumValue, request.MaximumValue, currencyCode, request.DisplayOrder);
         }
         catch (ArgumentException ex)
         {
@@ -63,6 +66,7 @@ public sealed class CreateIncomeRangeCommandHandler(
         MaximumValue = e.MaximumValue,
         CurrencyCode = e.CurrencyCode,
         IsActive = e.IsActive,
+        DisplayOrder = e.DisplayOrder,
         CreatedAt = e.Created
     };
 }

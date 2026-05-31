@@ -7,6 +7,7 @@ public sealed class CreateIncomeRangeCommandValidator : AbstractValidator<Create
     public CreateIncomeRangeCommandValidator()
     {
         RuleFor(x => x.DisplayName).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.DisplayOrder).GreaterThanOrEqualTo(1);
         RuleFor(x => x.CurrencyCode).NotEmpty().MaximumLength(3);
         RuleFor(x => x.MaximumValue)
             .Must((cmd, max) => !max.HasValue || max.Value >= cmd.MinimumValue)

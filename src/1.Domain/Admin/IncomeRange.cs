@@ -36,6 +36,11 @@ public class IncomeRange : BaseTenantEntity
 
     public bool IsActive { get; private set; } = true;
 
+    /// <summary>
+    /// Controls presentation order within the tenant catalog (lower values appear first).
+    /// </summary>
+    public int DisplayOrder { get; private set; }
+
     // --- Domain Behavior ---
 
     public static IncomeRange Create(
@@ -43,7 +48,8 @@ public class IncomeRange : BaseTenantEntity
         string displayName,
         decimal minimumValue,
         decimal? maximumValue,
-        string currencyCode)
+        string currencyCode,
+        int displayOrder)
     {
         if (companyId == Guid.Empty)
             throw new ArgumentException("CompanyId is required.", nameof(companyId));
@@ -51,6 +57,8 @@ public class IncomeRange : BaseTenantEntity
             throw new ArgumentException("DisplayName is required.", nameof(displayName));
         if (string.IsNullOrWhiteSpace(currencyCode))
             throw new ArgumentException("CurrencyCode is required.", nameof(currencyCode));
+        if (displayOrder < 1)
+            throw new ArgumentException("DisplayOrder must be greater than or equal to 1.", nameof(displayOrder));
         if (maximumValue.HasValue && maximumValue.Value < minimumValue)
             throw new ArgumentException("MaximumValue must be greater than or equal to MinimumValue.", nameof(maximumValue));
 
@@ -61,6 +69,7 @@ public class IncomeRange : BaseTenantEntity
             MinimumValue = minimumValue,
             MaximumValue = maximumValue,
             CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            DisplayOrder = displayOrder,
             IsActive = true,
             GcRecord = ActiveGcRecord
         };
@@ -70,12 +79,15 @@ public class IncomeRange : BaseTenantEntity
         string displayName,
         decimal minimumValue,
         decimal? maximumValue,
-        string currencyCode)
+        string currencyCode,
+        int displayOrder)
     {
         if (string.IsNullOrWhiteSpace(displayName))
             throw new ArgumentException("DisplayName is required.", nameof(displayName));
         if (string.IsNullOrWhiteSpace(currencyCode))
             throw new ArgumentException("CurrencyCode is required.", nameof(currencyCode));
+        if (displayOrder < 1)
+            throw new ArgumentException("DisplayOrder must be greater than or equal to 1.", nameof(displayOrder));
         if (maximumValue.HasValue && maximumValue.Value < minimumValue)
             throw new ArgumentException("MaximumValue must be greater than or equal to MinimumValue.", nameof(maximumValue));
 
@@ -83,6 +95,7 @@ public class IncomeRange : BaseTenantEntity
         MinimumValue = minimumValue;
         MaximumValue = maximumValue;
         CurrencyCode = currencyCode.Trim().ToUpperInvariant();
+        DisplayOrder = displayOrder;
     }
 
     public void Deactivate()
