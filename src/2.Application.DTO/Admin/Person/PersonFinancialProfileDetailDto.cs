@@ -41,4 +41,9 @@ public sealed record PersonFinancialProfileDetailDto
     /// Gets whether this financial profile record is active in the system.
     /// </summary>
     public bool IsActive { get; init; }
+
+    /// <summary>
+    /// Gets the UTC timestamp when the financial profile record was created.
+    /// </summary>
+    public DateTime CreatedAt { get; init; }
 }

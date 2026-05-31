@@ -82,7 +82,7 @@ public sealed class GetProvincesQueryHandler(
             INNER JOIN Common.Countries c
                 ON c.Id = p.CountryId
                AND c.GcRecord = 0
-            LEFT JOIN Common.Regions r
+            LEFT JOIN Admin.Regions r
                 ON r.Id = p.RegionId
                AND r.GcRecord = 0
             {whereClause}
@@ -94,7 +94,7 @@ public sealed class GetProvincesQueryHandler(
             INNER JOIN Common.Countries c
                 ON c.Id = p.CountryId
                AND c.GcRecord = 0
-            LEFT JOIN Common.Regions r
+            LEFT JOIN Admin.Regions r
                 ON r.Id = p.RegionId
                AND r.GcRecord = 0
             {whereClause};

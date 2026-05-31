@@ -142,22 +142,26 @@ using (var scope = app.Services.CreateScope())
         var context = services.GetRequiredService<ApplicationDbContext>();
         var pendingMigrations = (await context.Database.GetPendingMigrationsAsync()).ToList();
 
-        if (pendingMigrations.Count == 0)
-        {
-            logger.LogInformation("No pending database migrations found. Skipping migration and startup seeding.");
-        }
-        else
+        await context.Database.MigrateAsync();
+
+        if (pendingMigrations.Count > 0)
         {
             logger.LogInformation(
-                "Applying {PendingCount} pending database migration(s): {MigrationNames}",
+                "Applied {PendingCount} pending database migration(s): {MigrationNames}",
                 pendingMigrations.Count,
                 string.Join(", ", pendingMigrations));
+        }
 
-            await context.Database.MigrateAsync();
-            logger.LogInformation("Database migrations applied successfully.");
+        var seeder = services.GetRequiredService<JOIN.Persistence.DatabaseSeeder>();
 
-            var seeder = services.GetRequiredService<JOIN.Persistence.DatabaseSeeder>();
+        if (pendingMigrations.Count > 0)
+        {
             await seeder.SeedAsync();
+        }
+        else if (app.Environment.IsDevelopment())
+        {
+            logger.LogInformation("Running idempotent menu and permissions seed (Development).");
+            await seeder.SeedMenuAndPermissionsAsync();
         }
 
     }

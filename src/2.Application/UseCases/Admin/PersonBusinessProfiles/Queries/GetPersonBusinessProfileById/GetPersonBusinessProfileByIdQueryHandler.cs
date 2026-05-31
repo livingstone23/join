@@ -45,7 +45,8 @@ public sealed class GetPersonBusinessProfileByIdQueryHandler(
                 tr.Name AS TaxRegimeName,
                 pbp.Website,
                 pbp.FoundationDate,
-                pbp.IsActive
+                pbp.IsActive,
+                pbp.Created AS CreatedAt
             FROM Admin.PersonBusinessProfiles pbp
             INNER JOIN Admin.Industries i
                 ON i.Id = pbp.IndustryId

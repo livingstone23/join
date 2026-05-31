@@ -53,7 +53,7 @@ public sealed class GetProvinceByIdQueryHandlerTests
         response.Data!.Id.Should().Be(provinceId);
         response.Data.RegionId.Should().Be(regionId);
         response.Data.RegionName.Should().Be("Pacific");
-        context.Connection.LastCommandText.Should().Contain("LEFT JOIN Common.Regions r");
+        context.Connection.LastCommandText.Should().Contain("LEFT JOIN Admin.Regions r");
         context.Connection.LastCommandText.Should().Contain("WHERE p.Id = @Id");
         context.Connection.CapturedParameters["Id"].Should().Be(provinceId);
     }

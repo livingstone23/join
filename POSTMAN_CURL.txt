@@ -120,19 +120,25 @@ curl -X PUT "http://localhost:5267/api/v1/person/PERSON_ID/contacts/CONTACT_ID" 
 
 curl -X DELETE "http://localhost:5267/api/v1/person/PERSON_ID/contacts/CONTACT_ID" -H "Authorization: Bearer YOUR_TOKEN"
 
-curl -X GET "http://localhost:5267/api/v1/person/PERSON_ID/business-profile" -H "Authorization: Bearer YOUR_TOKEN"
+curl -X GET "http://localhost:5267/api/v1/PersonBusinessProfile/person/3554B06C-9915-4706-8684-F52259FE8D58" -H "Authorization: Bearer YOUR_TOKEN"
+
+# Response data[] includes: id, personId, industryId, industryName, taxRegimeId, taxRegimeName, website, foundationDate, isActive, createdAt
 
 curl -X POST "http://localhost:5267/api/v1/person/PERSON_ID/business-profile" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"jobTitle":"Software Engineer","areaId":"AREA_ID","businessEmail":"john@business.com","businessPhone":"+1234567890"}'
 
 curl -X PUT "http://localhost:5267/api/v1/person/PERSON_ID/business-profile" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"jobTitle":"Senior Software Engineer","areaId":"AREA_ID","businessEmail":"john.senior@business.com","businessPhone":"+0987654321"}'
 
-curl -X GET "http://localhost:5267/api/v1/person/PERSON_ID/employments" -H "Authorization: Bearer YOUR_TOKEN"
+curl -X GET "http://localhost:5267/api/v1/PersonEmployment/person/3554B06C-9915-4706-8684-F52259FE8D58" -H "Authorization: Bearer YOUR_TOKEN" -H "Accept: application/json"
+
+# Response data[] includes: id, personId, employerName, jobTitle, startDate, endDate, isCurrent, isActive, createdAt
 
 curl -X POST "http://localhost:5267/api/v1/person/PERSON_ID/employments" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"companyId":"COMPANY_ID","positionTitle":"Developer","startDate":"2020-01-15","endDate":"2024-01-15","currentlyEmployed":false}'
 
 curl -X PUT "http://localhost:5267/api/v1/person/PERSON_ID/employments/EMPLOYMENT_ID" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"positionTitle":"Senior Developer","startDate":"2020-01-15","endDate":null,"currentlyEmployed":true}'
 
-curl -X GET "http://localhost:5267/api/v1/person/PERSON_ID/financial-profile" -H "Authorization: Bearer YOUR_TOKEN"
+curl -X GET "http://localhost:5267/api/v1/PersonFinancialProfile/person/3554B06C-9915-4706-8684-F52259FE8D58" -H "Authorization: Bearer YOUR_TOKEN" -H "Accept: application/json"
+
+# Response data[] includes: id, personId, incomeRangeId, incomeRangeName, sourceOfFunds, declaredDate, isCurrent, isActive, createdAt
 
 curl -X POST "http://localhost:5267/api/v1/person/PERSON_ID/financial-profile" -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"incomeRangeId":"INCOME_ID","taxRegimeId":"TAX_ID","creditLimit":50000,"creditAvailable":50000,"paymentTermsDays":30}'
 

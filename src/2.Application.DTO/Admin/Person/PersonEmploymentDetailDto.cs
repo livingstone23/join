@@ -41,4 +41,9 @@ public sealed record PersonEmploymentDetailDto
     /// Gets whether this employment record is active in the system.
     /// </summary>
     public bool IsActive { get; init; }
+
+    /// <summary>
+    /// Gets the UTC timestamp when the employment record was created.
+    /// </summary>
+    public DateTime CreatedAt { get; init; }
 }

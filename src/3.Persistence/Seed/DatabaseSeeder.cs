@@ -62,6 +62,31 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         await SeedMessagingCatalogsForCompanyAsync(companyId, cancellationToken);
     }
 
+    /// <summary>
+    /// Re-runs system option and role permission seeds idempotently for the master tenant.
+    /// </summary>
+    public async Task SeedMenuAndPermissionsAsync(CancellationToken cancellationToken = default)
+    {
+        var joinCompanyId = await _context.Companies
+            .IgnoreQueryFilters()
+            .Where(c => c.TaxId == "JOIN-001")
+            .Select(c => c.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (joinCompanyId == Guid.Empty)
+        {
+            _logger.LogWarning("Menu and permissions seed skipped. Master company JOIN-001 was not found.");
+            return;
+        }
+
+        await SeedRolesAsync();
+        await SeedDefaultUsersAsync();
+        await SeedUserAccessAsync(joinCompanyId);
+        await SeedSystemOptionsAsync();
+        await SeedRoleSystemOptionsAsync(joinCompanyId);
+        _logger.LogInformation("Menu and permissions seed completed for company {CompanyId}.", joinCompanyId);
+    }
+
     public async Task SeedAsync()
     {
         _logger.LogInformation("🚀 Starting master data seeding process...");
@@ -2034,6 +2059,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             .ToList();
 
         var seeds = baseSeeds
+            .Concat(GetAdminFullSystemOptionPermissionSeeds())
             .Concat(privilegedAllOptionSeeds)
             .GroupBy(x => $"{x.RoleName}|{x.SystemOptionName}", StringComparer.OrdinalIgnoreCase)
             .Select(group => group.Last())
@@ -2440,14 +2466,14 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "StreetTypes", true, true, true, true),
         new("Manager", "Areas", true, true, true, true),
         new("Manager", "Projects", true, true, true, true),
-        new("Manager", "Genders", true, true, true, true),
-        new("Manager", "Industries", true, true, true, true),
-        new("Manager", "IncomeRanges", true, true, true, true),
-        new("Manager", "TaxRegimes", true, true, true, true),
+        new("Manager", "Genero", true, true, true, true),
+        new("Manager", "Industria", true, true, true, true),
+        new("Manager", "Rango Ingreso", true, true, true, true),
+        new("Manager", "Regimen Tributario", true, true, true, true),
         new("Manager", "EntityStatuses", true, true, true, true),
         new("Manager", "CompanyModules", true, true, true, true),
         new("Manager", "CommunicationChannels", true, true, true, true),
-        
+
         new("Manager", "Persons", true, true, true, true),
         new("Manager", "Clientes", true, true, true, true),
         new("Manager", "Customers", true, true, true, true),
@@ -2475,10 +2501,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "StreetTypes", true, true, true, true),
         new("Supervisor", "Areas", true, true, true, false),
         new("Supervisor", "Projects", true, true, true, false),
-        new("Supervisor", "Genders", true, true, true, false),
-        new("Supervisor", "Industries", true, true, true, false),
-        new("Supervisor", "IncomeRanges", true, true, true, false),
-        new("Supervisor", "TaxRegimes", true, true, true, false),
+        new("Supervisor", "Genero", true, true, true, false),
+        new("Supervisor", "Industria", true, true, true, false),
+        new("Supervisor", "Rango Ingreso", true, true, true, false),
+        new("Supervisor", "Regimen Tributario", true, true, true, false),
         new("Supervisor", "EntityStatuses", true, true, true, false),
         new("Supervisor", "CompanyModules", true, true, true, false),
         new("Supervisor", "Persons", true, true, true, true),
@@ -2502,10 +2528,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("UsuarioSimple", "StreetTypes", true, true, true, true),
         new("UsuarioSimple", "Areas", true, false, false, false),
         new("UsuarioSimple", "Projects", true, false, false, false),
-        new("UsuarioSimple", "Genders", true, false, false, false),
-        new("UsuarioSimple", "Industries", true, false, false, false),
-        new("UsuarioSimple", "IncomeRanges", true, false, false, false),
-        new("UsuarioSimple", "TaxRegimes", true, false, false, false),
+        new("UsuarioSimple", "Genero", true, false, false, false),
+        new("UsuarioSimple", "Industria", true, false, false, false),
+        new("UsuarioSimple", "Rango Ingreso", true, false, false, false),
+        new("UsuarioSimple", "Regimen Tributario", true, false, false, false),
         new("UsuarioSimple", "EntityStatuses", true, false, false, false),
         new("UsuarioSimple", "CompanyModules", true, false, false, false),
         new("UsuarioSimple", "CommunicationChannels", false, false, false, false),

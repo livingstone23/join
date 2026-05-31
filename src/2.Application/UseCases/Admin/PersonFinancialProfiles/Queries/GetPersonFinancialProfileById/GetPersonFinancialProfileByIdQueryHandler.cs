@@ -44,7 +44,8 @@ public sealed class GetPersonFinancialProfileByIdQueryHandler(
                 pfp.SourceOfFunds,
                 pfp.DeclaredDate,
                 pfp.IsCurrent,
-                pfp.IsActive
+                pfp.IsActive,
+                pfp.Created AS CreatedAt
             FROM Admin.PersonFinancialProfiles pfp
             INNER JOIN Admin.IncomeRanges ir
                 ON ir.Id = pfp.IncomeRangeId

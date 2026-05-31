@@ -46,4 +46,9 @@ public sealed record PersonBusinessProfileDetailDto
     /// Gets whether this business profile record is active in the system.
     /// </summary>
     public bool IsActive { get; init; }
+
+    /// <summary>
+    /// Gets the UTC timestamp when the business profile record was created.
+    /// </summary>
+    public DateTime CreatedAt { get; init; }
 }

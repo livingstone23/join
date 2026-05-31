@@ -31,7 +31,7 @@ public sealed class GetRegionByIdQueryHandler(ISqlConnectionFactory connectionFa
                 r.CountryId,
                 c.Name AS CountryName,
                 r.Created AS CreatedAt
-            FROM Common.Regions r
+            FROM Admin.Regions r
             INNER JOIN Common.Countries c
                 ON c.Id = r.CountryId
                AND c.GcRecord = 0

@@ -42,7 +42,8 @@ public sealed class GetPersonEmploymentsByPersonIdQueryHandler(
                 StartDate,
                 EndDate,
                 IsCurrent,
-                IsActive
+                IsActive,
+                Created AS CreatedAt
             FROM Admin.PersonEmployments
             WHERE PersonId = @PersonId
               AND CompanyId = @CompanyId

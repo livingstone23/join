@@ -109,7 +109,8 @@ public class GetPersonByIdQueryHandler(
                 pe.StartDate,
                 pe.EndDate,
                 pe.IsCurrent,
-                pe.IsActive
+                pe.IsActive,
+                pe.Created AS CreatedAt
             FROM Admin.PersonEmployments pe
             WHERE pe.PersonId = @Id
               AND pe.CompanyId = @TenantId
@@ -124,7 +125,8 @@ public class GetPersonByIdQueryHandler(
                 tr.Name AS TaxRegimeName,
                 pbp.Website,
                 pbp.FoundationDate,
-                pbp.IsActive
+                pbp.IsActive,
+                pbp.Created AS CreatedAt
             FROM Admin.PersonBusinessProfiles pbp
             INNER JOIN Admin.Industries i
                 ON i.Id = pbp.IndustryId
@@ -146,7 +148,8 @@ public class GetPersonByIdQueryHandler(
                 pfp.SourceOfFunds,
                 pfp.DeclaredDate,
                 pfp.IsCurrent,
-                pfp.IsActive
+                pfp.IsActive,
+                pfp.Created AS CreatedAt
             FROM Admin.PersonFinancialProfiles pfp
             INNER JOIN Admin.IncomeRanges ir
                 ON ir.Id = pfp.IncomeRangeId
