@@ -4,6 +4,7 @@
 using System.Reflection;
 using FluentValidation;
 using JOIN.Application.Interface.Admin;
+using JOIN.Application.UseCases.Admin.PersonAddresses;
 using JOIN.Application.Mappings;
 using JOIN.Application.Services.Admin;
 using JOIN.Application.Mappings.Security;
@@ -49,6 +50,7 @@ public static class ConfigureServices
         services.AddScoped<ISystemOptionMapper, SystemOptionMapper>();
         services.AddScoped<IRoleSystemOptionMapper, RoleSystemOptionMapper>();
         services.AddScoped<ICustomerCodeGenerator, CustomerCodeGenerator>();
+        services.AddScoped<PersonAddressDefaultCoordinator>();
 
         return services;
     

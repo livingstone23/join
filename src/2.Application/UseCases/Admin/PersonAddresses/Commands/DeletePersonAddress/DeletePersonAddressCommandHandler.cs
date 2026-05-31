@@ -9,14 +9,11 @@ namespace JOIN.Application.UseCases.Admin.PersonAddresses.Commands;
 /// <summary>
 /// Handles soft delete operations for customer addresses using Entity Framework Core.
 /// </summary>
-/// <param name="unitOfWork">Unit of work used to coordinate persistence.</param>
-/// <param name="currentUserService">Service that exposes the active tenant identifier.</param>
 public sealed class DeletePersonAddressCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService) : IRequestHandler<DeletePersonAddressCommand, Response<bool>>
+    ICurrentUserService currentUserService,
+    PersonAddressDefaultCoordinator defaultCoordinator) : IRequestHandler<DeletePersonAddressCommand, Response<bool>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-
     /// <summary>
     /// Marks the customer address as logically deleted for the current tenant.
     /// </summary>
@@ -32,25 +29,41 @@ public sealed class DeletePersonAddressCommandHandler(
                 ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        var repository = _unitOfWork.GetRepository<PersonAddress>();
-        var addresses = await repository.GetAllAsync();
-
-        var entity = addresses.FirstOrDefault(address =>
-            address.Id == request.Id &&
-            address.CompanyId == currentUserService.CompanyId);
+        var companyId = currentUserService.CompanyId;
+        var repository = unitOfWork.PersonAddresses;
+        var entity = await repository.GetActiveByIdAsync(request.Id, companyId, cancellationToken);
 
         if (entity is null)
         {
             return Response<bool>.Error(
-                "CUSTOMER_ADDRESS_NOT_FOUND",
-                ["No active address was found for the current tenant."]);
+                "PERSON_ADDRESS_NOT_FOUND",
+                ["Person address not found for the current tenant."]);
         }
 
+        var wasDefault = entity.IsDefault;
+
+        entity.Deactivate();
         entity.MarkAsDeleted();
 
         await repository.UpdateAsync(entity);
 
-        var affected = await _unitOfWork.SaveChangesAsync(cancellationToken);
+        if (wasDefault)
+        {
+            try
+            {
+                await defaultCoordinator.PromoteNextDefaultAsync(
+                    companyId,
+                    entity.PersonId,
+                    entity.Id,
+                    cancellationToken);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Response<bool>.Error("INVALID_ADDRESS_DEFAULT", [ex.Message]);
+            }
+        }
+
+        var affected = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         if (affected <= 0)
         {

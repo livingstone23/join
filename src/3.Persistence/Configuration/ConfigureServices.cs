@@ -65,6 +65,7 @@ public static class ConfigureServices
         // 5. REPOSITORIOS ESPECÍFICOS Y UNIT OF WORK
         // Registramos el repositorio de clientes explícitamente para permitir lógica personalizada.
         services.AddScoped<IPersonsRepository, PersonsRepository>();
+        services.AddScoped<IPersonAddressRepository, PersonAddressRepository>();
         services.AddScoped<IRoleSystemOptionsRepository, RoleSystemOptionsRepository>();
         
         // El UnitOfWork ahora es híbrido y manejará el resto de los módulos dinámicamente.

@@ -12,10 +12,9 @@ namespace JOIN.Application.UseCases.Admin.PersonAddresses.Commands;
 /// </summary>
 public sealed class CreatePersonAddressCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService) : IRequestHandler<CreatePersonAddressCommand, Response<Guid>>
+    ICurrentUserService currentUserService,
+    PersonAddressDefaultCoordinator defaultCoordinator) : IRequestHandler<CreatePersonAddressCommand, Response<Guid>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-
     /// <summary>
     /// Creates a customer address associated with the authenticated tenant company.
     /// </summary>
@@ -29,31 +28,31 @@ public sealed class CreatePersonAddressCommandHandler(
             return Response<Guid>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        var customerRepository = _unitOfWork.GetRepository<Person>();
+        var companyId = currentUserService.CompanyId;
+        var customerRepository = unitOfWork.GetRepository<Person>();
         var customer = await customerRepository.GetAsync(request.PersonId);
 
-        if (customer is null || customer.CompanyId != currentUserService.CompanyId || customer.GcRecord != 0)
+        if (customer is null || customer.CompanyId != companyId || customer.GcRecord != 0)
         {
             return Response<Guid>.Error("CUSTOMER_NOT_FOUND", ["The requested customer does not exist in the current tenant."]);
         }
 
-        // Validate catalog FK references before attempting INSERT
         var referenceErrors = new List<string>();
 
-        if (await _unitOfWork.GetRepository<Country>().GetAsync(request.CountryId) is null)
+        if (await unitOfWork.GetRepository<Country>().GetAsync(request.CountryId) is null)
             referenceErrors.Add($"CountryId '{request.CountryId}' does not exist.");
 
-        if (await _unitOfWork.GetRepository<StreetType>().GetAsync(request.StreetTypeId) is null)
+        if (await unitOfWork.GetRepository<StreetType>().GetAsync(request.StreetTypeId) is null)
             referenceErrors.Add($"StreetTypeId '{request.StreetTypeId}' does not exist.");
 
         if (request.RegionId.HasValue &&
-            await _unitOfWork.GetRepository<Region>().GetAsync(request.RegionId.Value) is null)
+            await unitOfWork.GetRepository<Region>().GetAsync(request.RegionId.Value) is null)
             referenceErrors.Add($"RegionId '{request.RegionId}' does not exist.");
 
-        if (await _unitOfWork.GetRepository<Province>().GetAsync(request.ProvinceId) is null)
+        if (await unitOfWork.GetRepository<Province>().GetAsync(request.ProvinceId) is null)
             referenceErrors.Add($"ProvinceId '{request.ProvinceId}' does not exist.");
 
-        if (await _unitOfWork.GetRepository<Municipality>().GetAsync(request.MunicipalityId) is null)
+        if (await unitOfWork.GetRepository<Municipality>().GetAsync(request.MunicipalityId) is null)
             referenceErrors.Add($"MunicipalityId '{request.MunicipalityId}' does not exist.");
 
         if (referenceErrors.Count != 0)
@@ -72,14 +71,30 @@ public sealed class CreatePersonAddressCommandHandler(
             RegionId = request.RegionId,
             ProvinceId = request.ProvinceId,
             MunicipalityId = request.MunicipalityId,
-            IsDefault = request.IsDefault,
-            CompanyId = currentUserService.CompanyId
+            CompanyId = companyId
         };
 
-        var addressRepository = _unitOfWork.GetRepository<PersonAddress>();
+        try
+        {
+            if (request.IsDefault)
+            {
+                await defaultCoordinator.ClearOtherDefaultsAsync(companyId, request.PersonId, null, cancellationToken);
+                entity.SetAsDefault();
+            }
+            else
+            {
+                entity.RemoveDefault();
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Response<Guid>.Error("INVALID_ADDRESS_DEFAULT", [ex.Message]);
+        }
+
+        var addressRepository = unitOfWork.PersonAddresses;
         await addressRepository.InsertAsync(entity);
 
-        var result = await _unitOfWork.SaveAsync(cancellationToken);
+        var result = await unitOfWork.SaveAsync(cancellationToken);
         if (result <= 0)
         {
             return Response<Guid>.Error("ADDRESS_CREATE_FAILED", ["The customer address could not be created due to a persistence error."]);

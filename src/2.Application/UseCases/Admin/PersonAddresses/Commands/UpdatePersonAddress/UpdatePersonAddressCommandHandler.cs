@@ -12,10 +12,9 @@ namespace JOIN.Application.UseCases.Admin.PersonAddresses.Commands;
 /// </summary>
 public sealed class UpdatePersonAddressCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService) : IRequestHandler<UpdatePersonAddressCommand, Response<Guid>>
+    ICurrentUserService currentUserService,
+    PersonAddressDefaultCoordinator defaultCoordinator) : IRequestHandler<UpdatePersonAddressCommand, Response<Guid>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-
     /// <summary>
     /// Updates a customer address for the current tenant.
     /// </summary>
@@ -31,12 +30,9 @@ public sealed class UpdatePersonAddressCommandHandler(
                 ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        var addressRepository = _unitOfWork.GetRepository<PersonAddress>();
-        var addresses = await addressRepository.GetAllAsync();
-
-        var entity = addresses.FirstOrDefault(address =>
-            address.Id == request.Id &&
-            address.CompanyId == currentUserService.CompanyId);
+        var companyId = currentUserService.CompanyId;
+        var addressRepository = unitOfWork.PersonAddresses;
+        var entity = await addressRepository.GetActiveByIdAsync(request.Id, companyId, cancellationToken);
 
         if (entity is null)
         {
@@ -62,11 +58,31 @@ public sealed class UpdatePersonAddressCommandHandler(
         entity.RegionId = request.RegionId;
         entity.ProvinceId = request.ProvinceId;
         entity.MunicipalityId = request.MunicipalityId;
-        entity.IsDefault = request.IsDefault;
+
+        try
+        {
+            if (request.IsDefault)
+            {
+                await defaultCoordinator.ClearOtherDefaultsAsync(
+                    companyId,
+                    request.PersonId,
+                    entity.Id,
+                    cancellationToken);
+                entity.SetAsDefault();
+            }
+            else
+            {
+                entity.RemoveDefault();
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Response<Guid>.Error("INVALID_ADDRESS_DEFAULT", [ex.Message]);
+        }
 
         await addressRepository.UpdateAsync(entity);
 
-        var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
+        var result = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         if (result <= 0)
         {

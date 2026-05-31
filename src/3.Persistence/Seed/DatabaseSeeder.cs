@@ -975,12 +975,15 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                     CountryId = country.Id,
                     ProvinceId = province.Id,
                     MunicipalityId = municipality.Id,
-                    IsDefault = j == 0,
                     Created = DateTime.UtcNow,
                     CreatedBy = "System_Seeder",
                     GcRecord = 0
                 };
                 address.Reactivate();
+                if (j == 0)
+                {
+                    address.SetAsDefault();
+                }
                 _context.PersonAddresses.Add(address);
                 insertedAddresses++;
             }

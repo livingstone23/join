@@ -67,13 +67,18 @@ public class PersonAddress : BaseTenantEntity
     /// <summary>
     /// Indicates if this is the default shipping address for the customer.
     /// </summary>
-    public bool IsDefault { get; set; }
+    public bool IsDefault { get; private set; }
 
     /// <summary>
-    /// Indicates whether the person is currently active in the system.
-    /// Defaults to true. Used for the Soft Delete pattern.
+    /// Indicates whether the address is currently active in the system.
+    /// Defaults to true. Used together with soft-delete (<see cref="BaseAuditableEntity.GcRecord"/>).
     /// </summary>
     public bool IsActive { get; private set; } = true;
+
+    /// <summary>
+    /// Gets whether the address is eligible to be marked as default (active and not soft-deleted).
+    /// </summary>
+    public bool CanBeDefault => IsActive && GcRecord == ActiveGcRecord;
 
 
 
@@ -98,24 +103,62 @@ public class PersonAddress : BaseTenantEntity
     public virtual StreetType StreetType { get; set; } = null!;
 
 
+    // --- Domain Behavior ---
+
     /// <summary>
-    /// indicates that the address is not active in the system.
+    /// Marks this address as the default for its owner.
+    /// Only active, non-deleted addresses can be set as default.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when the address is not active.</exception>
+    public void SetAsDefault()
+    {
+        if (!CanBeDefault)
+        {
+            throw new InvalidOperationException("Only an active address can be marked as default.");
+        }
+
+        IsDefault = true;
+    }
+
+    /// <summary>
+    /// Clears the default flag for this address.
+    /// </summary>
+    public void RemoveDefault()
+    {
+        if (!IsDefault)
+        {
+            return;
+        }
+
+        IsDefault = false;
+    }
+
+    /// <summary>
+    /// Deactivates the address and clears its default flag.
     /// This action is heavily restricted at the Application layer.
     /// </summary>
     public void Deactivate()
     {
-        if (!IsActive) return;
+        if (!IsActive)
+        {
+            return;
+        }
+
         IsActive = false;
-        IsDefault = false; // Regla: Una dirección inactiva no puede ser la predeterminada
+        RemoveDefault();
     }
 
     /// <summary>
-    /// Indicates that the address is active in the system.
+    /// Reactivates the address in the system.
     /// This action is heavily restricted at the Application layer.
     /// </summary>
     public void Reactivate()
     {
-        if (IsActive) return;
+        if (IsActive)
+        {
+            return;
+        }
+
         IsActive = true;
     }
 
