@@ -2,6 +2,7 @@ using JOIN.Application.Common;
 using JOIN.Application.Exceptions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.UseCases.Admin.PersonFinancialProfiles;
 using JOIN.Domain.Admin;
 using MediatR;
 
@@ -12,16 +13,9 @@ namespace JOIN.Application.UseCases.Admin.PersonFinancialProfiles.Commands;
 /// </summary>
 public sealed class UpdatePersonFinancialProfileCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService) : IRequestHandler<UpdatePersonFinancialProfileCommand, Response<Guid>>
+    ICurrentUserService currentUserService,
+    PersonFinancialProfileCurrentCoordinator currentCoordinator) : IRequestHandler<UpdatePersonFinancialProfileCommand, Response<Guid>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-
-    /// <summary>
-    /// Updates a person financial profile for the current tenant.
-    /// </summary>
-    /// <param name="request">The update-financial-profile command.</param>
-    /// <param name="cancellationToken">A cancellation token for the asynchronous workflow.</param>
-    /// <returns>A response containing the updated financial profile identifier.</returns>
     public async Task<Response<Guid>> Handle(UpdatePersonFinancialProfileCommand request, CancellationToken cancellationToken)
     {
         if (currentUserService.CompanyId == Guid.Empty)
@@ -32,13 +26,8 @@ public sealed class UpdatePersonFinancialProfileCommandHandler(
         }
 
         var companyId = currentUserService.CompanyId;
-
-        var profileRepository = _unitOfWork.GetRepository<PersonFinancialProfile>();
-        var profiles = await profileRepository.GetAllAsync();
-
-        var entity = profiles.FirstOrDefault(profile =>
-            profile.Id == request.Id &&
-            profile.CompanyId == companyId);
+        var profileRepository = unitOfWork.PersonFinancialProfiles;
+        var entity = await profileRepository.GetActiveByIdAsync(request.Id, companyId, cancellationToken);
 
         if (entity is null)
         {
@@ -56,7 +45,7 @@ public sealed class UpdatePersonFinancialProfileCommandHandler(
                 "Person financial profile not found for the requested person.");
         }
 
-        var incomeRange = await _unitOfWork.GetRepository<IncomeRange>().GetAsync(request.IncomeRangeId);
+        var incomeRange = await unitOfWork.GetRepository<IncomeRange>().GetAsync(request.IncomeRangeId);
         if (incomeRange is null || incomeRange.CompanyId != companyId || incomeRange.GcRecord != 0)
         {
             return Response<Guid>.Error(
@@ -64,30 +53,45 @@ public sealed class UpdatePersonFinancialProfileCommandHandler(
                 [$"IncomeRangeId '{request.IncomeRangeId}' does not exist in the current tenant."]);
         }
 
-        entity.IncomeRangeId = request.IncomeRangeId;
-        entity.SourceOfFunds = request.SourceOfFunds.Trim();
-        entity.DeclaredDate = request.DeclaredDate;
-
-        if (request.IsActive.HasValue)
+        try
         {
-            if (request.IsActive.Value)
+            entity.Update(request.IncomeRangeId, request.SourceOfFunds, request.DeclaredDate);
+
+            if (request.IsActive == true)
             {
                 entity.Reactivate();
             }
-            else
+            else if (request.IsActive == false)
             {
                 entity.Deactivate();
             }
-        }
 
-        if (request.IsCurrent == false)
+            if (request.IsCurrent == true)
+            {
+                await currentCoordinator.ArchiveOtherCurrentAsync(
+                    companyId,
+                    request.PersonId,
+                    entity.Id,
+                    cancellationToken);
+                entity.SetAsCurrent();
+            }
+            else if (request.IsCurrent == false)
+            {
+                entity.Archive();
+            }
+        }
+        catch (ArgumentException ex)
         {
-            entity.Archive();
+            return Response<Guid>.Error("INVALID_FINANCIAL_PROFILE_DATA", [ex.Message]);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Response<Guid>.Error("INVALID_FINANCIAL_PROFILE_CURRENT", [ex.Message]);
         }
 
         await profileRepository.UpdateAsync(entity);
 
-        var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
+        var result = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         if (result <= 0)
         {

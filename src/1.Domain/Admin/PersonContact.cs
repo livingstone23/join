@@ -1,4 +1,3 @@
-using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Enums;
 
@@ -14,77 +13,171 @@ namespace JOIN.Domain.Admin;
 /// </summary>
 public class PersonContact : BaseTenantEntity
 {
-
-
     /// <summary>
-    /// Gets or sets the unique identifier for the associated Person.
-    /// This is the foreign key that establishes the relationship with the CRM module.
+    /// Gets the unique identifier for the associated Person.
     /// </summary>
-    public Guid PersonId { get; set; }
-
+    public Guid PersonId { get; private set; }
 
     /// <summary>
-    /// Gets or sets the category of the contact.
+    /// Gets the category of the contact.
     /// Common values include: 'Mobile', 'Email', 'WhatsApp', 'Landline', 'Emergency'.
     /// </summary>
-    /// <example>WhatsApp</example>
-    public ContactType ContactType { get; set; }
-
+    public ContactType ContactType { get; private set; }
 
     /// <summary>
-    /// Gets or sets the actual contact information.
-    /// Should follow international formatting for phone numbers (e.g., +34600000000) 
+    /// Gets the actual contact information.
+    /// Should follow international formatting for phone numbers (e.g., +34600000000)
     /// or standard email RFC formats.
     /// </summary>
-    public string ContactValue { get; set; } = string.Empty;
-
+    public string ContactValue { get; private set; } = string.Empty;
 
     /// <summary>
-    /// Indicates if this is the primary contact method for the customer.
+    /// Indicates if this is the primary contact method for the customer within its <see cref="ContactType"/>.
     /// </summary>
-    public bool IsPrimary { get; set; }
-
+    public bool IsPrimary { get; private set; }
 
     /// <summary>
-    /// Gets or sets optional administrative notes or specific instructions regarding this contact.
+    /// Gets optional administrative notes or specific instructions regarding this contact.
     /// </summary>
-    /// <value>E.g., "Do not call during office hours" or "Primary email for billing".</value>
-    public string? Comments { get; set; }
-
+    public string? Comments { get; private set; }
 
     /// <summary>
-    /// Indicates whether the person is currently active in the system.
-    /// Defaults to true. Used for the Soft Delete pattern.
+    /// Indicates whether the contact is currently active in the system.
+    /// Defaults to true. Used together with soft-delete (<see cref="BaseAuditableEntity.GcRecord"/>).
     /// </summary>
     public bool IsActive { get; private set; } = true;
+
+    /// <summary>
+    /// Gets whether the contact is eligible to be marked as primary (active and not soft-deleted).
+    /// </summary>
+    public bool CanBePrimary => IsActive && GcRecord == ActiveGcRecord;
 
     // --- Navigation Properties ---
 
     /// <summary>
     /// Reference to the Person entity that owns this contact record.
-    /// Managed through lazy loading or explicit inclusion depending on the Persistence configuration.
     /// </summary>
     public virtual Person Person { get; set; } = null!;
 
+    // --- Factory & Mutation ---
+
     /// <summary>
-    /// indicates that the address is not active in the system.
+    /// Creates a new active contact for a person within a tenant.
+    /// </summary>
+    /// <param name="companyId">The tenant company identifier.</param>
+    /// <param name="personId">The person identifier.</param>
+    /// <param name="contactType">The contact category.</param>
+    /// <param name="contactValue">The contact value (email, phone, etc.).</param>
+    /// <param name="comments">Optional administrative notes.</param>
+    /// <returns>A new <see cref="PersonContact"/> instance with <see cref="IsPrimary"/> set to <c>false</c>.</returns>
+    public static PersonContact Create(
+        Guid companyId,
+        Guid personId,
+        ContactType contactType,
+        string contactValue,
+        string? comments = null)
+    {
+        if (companyId == Guid.Empty)
+        {
+            throw new ArgumentException("CompanyId is required.", nameof(companyId));
+        }
+
+        if (personId == Guid.Empty)
+        {
+            throw new ArgumentException("PersonId is required.", nameof(personId));
+        }
+
+        if (string.IsNullOrWhiteSpace(contactValue))
+        {
+            throw new ArgumentException("ContactValue is required.", nameof(contactValue));
+        }
+
+        return new PersonContact
+        {
+            CompanyId = companyId,
+            PersonId = personId,
+            ContactType = contactType,
+            ContactValue = contactValue.Trim(),
+            Comments = comments?.Trim(),
+            IsActive = true,
+            GcRecord = ActiveGcRecord
+        };
+    }
+
+    /// <summary>
+    /// Updates the editable contact data.
+    /// </summary>
+    /// <param name="contactType">The contact category.</param>
+    /// <param name="contactValue">The contact value.</param>
+    /// <param name="comments">Optional administrative notes.</param>
+    public void Update(ContactType contactType, string contactValue, string? comments)
+    {
+        if (string.IsNullOrWhiteSpace(contactValue))
+        {
+            throw new ArgumentException("ContactValue is required.", nameof(contactValue));
+        }
+
+        ContactType = contactType;
+        ContactValue = contactValue.Trim();
+        Comments = comments?.Trim();
+    }
+
+    // --- Domain Behavior ---
+
+    /// <summary>
+    /// Marks this contact as the primary for its <see cref="ContactType"/>.
+    /// Only active, non-deleted contacts can be set as primary.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when the contact is not active.</exception>
+    public void SetAsPrimary()
+    {
+        if (!CanBePrimary)
+        {
+            throw new InvalidOperationException("Only an active contact can be marked as primary.");
+        }
+
+        IsPrimary = true;
+    }
+
+    /// <summary>
+    /// Clears the primary flag for this contact.
+    /// </summary>
+    public void RemovePrimary()
+    {
+        if (!IsPrimary)
+        {
+            return;
+        }
+
+        IsPrimary = false;
+    }
+
+    /// <summary>
+    /// Deactivates the contact and clears its primary flag.
     /// This action is heavily restricted at the Application layer.
     /// </summary>
     public void Deactivate()
     {
-        if (!IsActive) return;
+        if (!IsActive)
+        {
+            return;
+        }
+
         IsActive = false;
-        IsPrimary = false; // Regla: Una dirección inactiva no puede ser la predeterminada
+        RemovePrimary();
     }
 
     /// <summary>
-    /// Indicates that the address is active in the system.
+    /// Reactivates the contact in the system.
     /// This action is heavily restricted at the Application layer.
     /// </summary>
     public void Reactivate()
     {
-        if (IsActive) return;
+        if (IsActive)
+        {
+            return;
+        }
+
         IsActive = true;
     }
-
 }

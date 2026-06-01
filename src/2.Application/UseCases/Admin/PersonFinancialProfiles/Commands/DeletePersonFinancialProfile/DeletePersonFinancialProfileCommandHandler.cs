@@ -1,6 +1,7 @@
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.UseCases.Admin.PersonFinancialProfiles;
 using JOIN.Domain.Admin;
 using MediatR;
 
@@ -9,20 +10,11 @@ namespace JOIN.Application.UseCases.Admin.PersonFinancialProfiles.Commands;
 /// <summary>
 /// Handles soft delete operations for person financial profiles using Entity Framework Core.
 /// </summary>
-/// <param name="unitOfWork">Unit of work used to coordinate persistence.</param>
-/// <param name="currentUserService">Service that exposes the active tenant identifier.</param>
 public sealed class DeletePersonFinancialProfileCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService) : IRequestHandler<DeletePersonFinancialProfileCommand, Response<bool>>
+    ICurrentUserService currentUserService,
+    PersonFinancialProfileCurrentCoordinator currentCoordinator) : IRequestHandler<DeletePersonFinancialProfileCommand, Response<bool>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-
-    /// <summary>
-    /// Marks the person financial profile as logically deleted for the current tenant.
-    /// </summary>
-    /// <param name="request">The delete command.</param>
-    /// <param name="cancellationToken">Token used to cancel the operation.</param>
-    /// <returns>A response indicating whether the soft delete succeeded.</returns>
     public async Task<Response<bool>> Handle(DeletePersonFinancialProfileCommand request, CancellationToken cancellationToken)
     {
         if (currentUserService.CompanyId == Guid.Empty)
@@ -32,12 +24,9 @@ public sealed class DeletePersonFinancialProfileCommandHandler(
                 ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        var repository = _unitOfWork.GetRepository<PersonFinancialProfile>();
-        var profiles = await repository.GetAllAsync();
-
-        var entity = profiles.FirstOrDefault(profile =>
-            profile.Id == request.Id &&
-            profile.CompanyId == currentUserService.CompanyId);
+        var companyId = currentUserService.CompanyId;
+        var repository = unitOfWork.PersonFinancialProfiles;
+        var entity = await repository.GetActiveByIdAsync(request.Id, companyId, cancellationToken);
 
         if (entity is null)
         {
@@ -46,11 +35,31 @@ public sealed class DeletePersonFinancialProfileCommandHandler(
                 ["No active financial profile was found for the current tenant."]);
         }
 
+        var wasCurrent = entity.IsCurrent;
+        var personId = entity.PersonId;
+
+        entity.Deactivate();
         entity.MarkAsDeleted();
 
         await repository.UpdateAsync(entity);
 
-        var affected = await _unitOfWork.SaveChangesAsync(cancellationToken);
+        if (wasCurrent)
+        {
+            try
+            {
+                await currentCoordinator.PromoteNextCurrentAsync(
+                    companyId,
+                    personId,
+                    entity.Id,
+                    cancellationToken);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Response<bool>.Error("INVALID_FINANCIAL_PROFILE_CURRENT", [ex.Message]);
+            }
+        }
+
+        var affected = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         if (affected <= 0)
         {

@@ -176,7 +176,7 @@ public class CreatePersonCommandHandler(
                 ["A customer with the same identification number already exists for this company."]);
         }
 
-        // 1. Map command payload to aggregate root with nested collections.
+        // 1. Map command payload to aggregate root (contacts are attached separately via domain factory).
         var customerEntity = _customerMapper.ToEntity(request);
         customerEntity.CompanyId = currentUserService.CompanyId;
 
@@ -191,10 +191,37 @@ public class CreatePersonCommandHandler(
             address.PersonId = customerEntity.Id;
         }
 
-        foreach (var contact in customerEntity.Contacts)
+        if (request.Contacts is { Count: > 0 })
         {
-            contact.CompanyId = currentUserService.CompanyId;
-            contact.PersonId = customerEntity.Id;
+            var primariesByType = new Dictionary<ContactType, PersonContact>();
+
+            foreach (var contactDto in request.Contacts)
+            {
+                if (!Enum.TryParse<ContactType>(contactDto.ContactType, true, out var contactType))
+                {
+                    continue;
+                }
+
+                var contact = PersonContact.Create(
+                    currentUserService.CompanyId,
+                    customerEntity.Id,
+                    contactType,
+                    contactDto.ContactValue,
+                    contactDto.Comments);
+
+                if (contactDto.IsPrimary)
+                {
+                    if (primariesByType.TryGetValue(contactType, out var existingPrimary))
+                    {
+                        existingPrimary.RemovePrimary();
+                    }
+
+                    contact.SetAsPrimary();
+                    primariesByType[contactType] = contact;
+                }
+
+                customerEntity.Contacts.Add(contact);
+            }
         }
 
         // 2. Insert the aggregate so EF Core persists Person + child collections atomically.

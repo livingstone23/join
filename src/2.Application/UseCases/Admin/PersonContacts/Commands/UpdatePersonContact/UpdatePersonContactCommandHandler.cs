@@ -2,6 +2,7 @@ using JOIN.Application.Common;
 using JOIN.Application.Exceptions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.UseCases.Admin.PersonContacts;
 using JOIN.Domain.Admin;
 using MediatR;
 
@@ -12,16 +13,12 @@ namespace JOIN.Application.UseCases.Admin.PersonContacts.Commands;
 /// </summary>
 public sealed class UpdatePersonContactCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService) : IRequestHandler<UpdatePersonContactCommand, Response<Guid>>
+    ICurrentUserService currentUserService,
+    PersonContactPrimaryCoordinator primaryCoordinator) : IRequestHandler<UpdatePersonContactCommand, Response<Guid>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-
     /// <summary>
     /// Updates a customer contact for the current tenant.
     /// </summary>
-    /// <param name="request">The update-contact command.</param>
-    /// <param name="cancellationToken">A cancellation token for the asynchronous workflow.</param>
-    /// <returns>A response containing the updated contact identifier.</returns>
     public async Task<Response<Guid>> Handle(UpdatePersonContactCommand request, CancellationToken cancellationToken)
     {
         if (currentUserService.CompanyId == Guid.Empty)
@@ -31,12 +28,9 @@ public sealed class UpdatePersonContactCommandHandler(
                 ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        var contactRepository = _unitOfWork.GetRepository<PersonContact>();
-        var contacts = await contactRepository.GetAllAsync();
-
-        var entity = contacts.FirstOrDefault(contact =>
-            contact.Id == request.Id &&
-            contact.CompanyId == currentUserService.CompanyId);
+        var companyId = currentUserService.CompanyId;
+        var contactRepository = unitOfWork.PersonContacts;
+        var entity = await contactRepository.GetActiveByIdAsync(request.Id, companyId, cancellationToken);
 
         if (entity is null)
         {
@@ -54,14 +48,50 @@ public sealed class UpdatePersonContactCommandHandler(
                 "Person contact not found for the requested customer.");
         }
 
-        entity.ContactType = request.ContactType;
-        entity.ContactValue = request.ContactValue.Trim();
-        entity.IsPrimary = request.IsPrimary;
-        entity.Comments = request.Comments?.Trim();
+        var previousContactType = entity.ContactType;
+        var wasPrimary = entity.IsPrimary;
+
+        try
+        {
+            entity.Update(request.ContactType, request.ContactValue, request.Comments);
+
+            if (previousContactType != request.ContactType && wasPrimary)
+            {
+                await primaryCoordinator.PromoteNextPrimaryAsync(
+                    companyId,
+                    request.PersonId,
+                    previousContactType,
+                    entity.Id,
+                    cancellationToken);
+            }
+
+            if (request.IsPrimary)
+            {
+                await primaryCoordinator.ClearOtherPrimariesAsync(
+                    companyId,
+                    request.PersonId,
+                    request.ContactType,
+                    entity.Id,
+                    cancellationToken);
+                entity.SetAsPrimary();
+            }
+            else
+            {
+                entity.RemovePrimary();
+            }
+        }
+        catch (ArgumentException ex)
+        {
+            return Response<Guid>.Error("INVALID_CONTACT_DATA", [ex.Message]);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Response<Guid>.Error("INVALID_CONTACT_PRIMARY", [ex.Message]);
+        }
 
         await contactRepository.UpdateAsync(entity);
 
-        var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
+        var result = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         if (result <= 0)
         {

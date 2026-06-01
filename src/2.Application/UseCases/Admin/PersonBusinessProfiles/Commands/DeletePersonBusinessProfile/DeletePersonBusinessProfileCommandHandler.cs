@@ -9,20 +9,13 @@ namespace JOIN.Application.UseCases.Admin.PersonBusinessProfiles.Commands;
 /// <summary>
 /// Handles soft delete operations for person business profiles using Entity Framework Core.
 /// </summary>
-/// <param name="unitOfWork">Unit of work used to coordinate persistence.</param>
-/// <param name="currentUserService">Service that exposes the active tenant identifier.</param>
 public sealed class DeletePersonBusinessProfileCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService) : IRequestHandler<DeletePersonBusinessProfileCommand, Response<bool>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-
     /// <summary>
     /// Marks the person business profile as logically deleted for the current tenant.
     /// </summary>
-    /// <param name="request">The delete command.</param>
-    /// <param name="cancellationToken">Token used to cancel the operation.</param>
-    /// <returns>A response indicating whether the soft delete succeeded.</returns>
     public async Task<Response<bool>> Handle(DeletePersonBusinessProfileCommand request, CancellationToken cancellationToken)
     {
         if (currentUserService.CompanyId == Guid.Empty)
@@ -32,12 +25,9 @@ public sealed class DeletePersonBusinessProfileCommandHandler(
                 ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        var repository = _unitOfWork.GetRepository<PersonBusinessProfile>();
-        var profiles = await repository.GetAllAsync();
-
-        var entity = profiles.FirstOrDefault(profile =>
-            profile.Id == request.Id &&
-            profile.CompanyId == currentUserService.CompanyId);
+        var companyId = currentUserService.CompanyId;
+        var repository = unitOfWork.PersonBusinessProfiles;
+        var entity = await repository.GetActiveByIdAsync(request.Id, companyId, cancellationToken);
 
         if (entity is null)
         {
@@ -50,7 +40,7 @@ public sealed class DeletePersonBusinessProfileCommandHandler(
 
         await repository.UpdateAsync(entity);
 
-        var affected = await _unitOfWork.SaveChangesAsync(cancellationToken);
+        var affected = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         if (affected <= 0)
         {

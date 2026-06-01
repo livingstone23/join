@@ -1,6 +1,7 @@
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.UseCases.Admin.PersonEmployments;
 using JOIN.Domain.Admin;
 using MediatR;
 
@@ -11,16 +12,12 @@ namespace JOIN.Application.UseCases.Admin.PersonEmployments.Commands;
 /// </summary>
 public sealed class CreatePersonEmploymentCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService) : IRequestHandler<CreatePersonEmploymentCommand, Response<Guid>>
+    ICurrentUserService currentUserService,
+    PersonEmploymentCurrentCoordinator currentCoordinator) : IRequestHandler<CreatePersonEmploymentCommand, Response<Guid>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-
     /// <summary>
     /// Creates a person employment record associated with the authenticated tenant company.
     /// </summary>
-    /// <param name="request">The create-employment command.</param>
-    /// <param name="cancellationToken">A cancellation token for the asynchronous workflow.</param>
-    /// <returns>A response containing the created employment identifier.</returns>
     public async Task<Response<Guid>> Handle(CreatePersonEmploymentCommand request, CancellationToken cancellationToken)
     {
         if (currentUserService.CompanyId == Guid.Empty)
@@ -28,37 +25,59 @@ public sealed class CreatePersonEmploymentCommandHandler(
             return Response<Guid>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        var personRepository = _unitOfWork.GetRepository<Person>();
-        var person = await personRepository.GetAsync(request.PersonId);
+        var companyId = currentUserService.CompanyId;
+        var person = await unitOfWork.GetRepository<Person>().GetAsync(request.PersonId);
 
-        if (person is null || person.CompanyId != currentUserService.CompanyId || person.GcRecord != 0)
+        if (person is null || person.CompanyId != companyId || person.GcRecord != 0)
         {
             return Response<Guid>.Error("PERSON_NOT_FOUND", ["The requested person does not exist in the current tenant."]);
         }
 
-        var entity = new PersonEmployment
+        PersonEmployment entity;
+        try
         {
-            PersonId = request.PersonId,
-            EmployerName = request.EmployerName.Trim(),
-            JobTitle = request.JobTitle.Trim(),
-            StartDate = request.StartDate.Date,
-            CompanyId = currentUserService.CompanyId
-        };
+            entity = PersonEmployment.Create(
+                companyId,
+                request.PersonId,
+                request.EmployerName,
+                request.JobTitle,
+                request.StartDate);
 
-        if (request.EndDate.HasValue || request.IsCurrent == false)
+            if (request.EndDate.HasValue)
+            {
+                entity.MarkAsEnded(request.EndDate.Value);
+            }
+            else if (request.IsCurrent == true)
+            {
+                await currentCoordinator.ClearOtherCurrentAsync(
+                    companyId,
+                    request.PersonId,
+                    null,
+                    cancellationToken);
+                entity.SetAsCurrent();
+            }
+            else
+            {
+                entity.RemoveCurrent();
+            }
+
+            if (request.IsActive == false)
+            {
+                entity.Deactivate();
+            }
+        }
+        catch (ArgumentException ex)
         {
-            entity.MarkAsEnded(request.EndDate!.Value.Date);
+            return Response<Guid>.Error("INVALID_EMPLOYMENT_DATA", [ex.Message]);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Response<Guid>.Error("INVALID_EMPLOYMENT_CURRENT", [ex.Message]);
         }
 
-        if (request.IsActive == false)
-        {
-            entity.Deactivate();
-        }
+        await unitOfWork.PersonEmployments.InsertAsync(entity);
 
-        var employmentRepository = _unitOfWork.GetRepository<PersonEmployment>();
-        await employmentRepository.InsertAsync(entity);
-
-        var result = await _unitOfWork.SaveAsync(cancellationToken);
+        var result = await unitOfWork.SaveAsync(cancellationToken);
         if (result <= 0)
         {
             return Response<Guid>.Error("EMPLOYMENT_CREATE_FAILED", ["The person employment could not be created due to a persistence error."]);

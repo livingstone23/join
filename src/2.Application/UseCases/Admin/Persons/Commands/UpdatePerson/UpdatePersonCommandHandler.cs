@@ -2,6 +2,7 @@ using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Mappings;
+using JOIN.Application.UseCases.Admin.PersonContacts;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
 using JOIN.Domain.Enums;
@@ -22,7 +23,8 @@ namespace JOIN.Application.UseCases.Admin.Persons.Commands;
 public class UpdatePersonCommandHandler(
     IUnitOfWork unitOfWork,
     IPersonMapper customerMapper,
-    ICurrentUserService currentUserService) : IRequestHandler<UpdatePersonCommand, Response<Guid>>
+    ICurrentUserService currentUserService,
+    PersonContactPrimaryCoordinator contactPrimaryCoordinator) : IRequestHandler<UpdatePersonCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
     private readonly IPersonMapper _customerMapper = customerMapper;
@@ -295,12 +297,41 @@ public class UpdatePersonCommandHandler(
 
         foreach (var incomingContact in incomingContacts)
         {
+            if (!Enum.TryParse<ContactType>(incomingContact.ContactType, true, out var contactType))
+            {
+                errors.Add($"Invalid ContactType in contacts section: {incomingContact.ContactType}.");
+                continue;
+            }
+
             if (!incomingContact.Id.HasValue || incomingContact.Id.Value == Guid.Empty)
             {
-                var newContact = _customerMapper.ToContactEntity(incomingContact);
-                newContact.CompanyId = companyId;
-                newContact.PersonId = customerEntity.Id;
-                await _unitOfWork.GetRepository<PersonContact>().InsertAsync(newContact);
+                try
+                {
+                    var newContact = PersonContact.Create(
+                        companyId,
+                        customerEntity.Id,
+                        contactType,
+                        incomingContact.ContactValue,
+                        incomingContact.Comments);
+
+                    if (incomingContact.IsPrimary)
+                    {
+                        await contactPrimaryCoordinator.ClearOtherPrimariesAsync(
+                            companyId,
+                            customerEntity.Id,
+                            contactType,
+                            null,
+                            cancellationToken);
+                        newContact.SetAsPrimary();
+                    }
+
+                    await _unitOfWork.PersonContacts.InsertAsync(newContact);
+                }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+                {
+                    errors.Add(ex.Message);
+                }
+
                 continue;
             }
 
@@ -313,10 +344,43 @@ public class UpdatePersonCommandHandler(
                 continue;
             }
 
-            _customerMapper.ApplyUpdate(incomingContact, existingContact);
-            existingContact.CompanyId = companyId;
-            existingContact.PersonId = customerEntity.Id;
-            existingContact.GcRecord = 0;
+            var previousContactType = existingContact.ContactType;
+            var wasPrimary = existingContact.IsPrimary;
+
+            try
+            {
+                existingContact.Update(contactType, incomingContact.ContactValue, incomingContact.Comments);
+                existingContact.GcRecord = 0;
+
+                if (previousContactType != contactType && wasPrimary)
+                {
+                    await contactPrimaryCoordinator.PromoteNextPrimaryAsync(
+                        companyId,
+                        customerEntity.Id,
+                        previousContactType,
+                        existingContact.Id,
+                        cancellationToken);
+                }
+
+                if (incomingContact.IsPrimary)
+                {
+                    await contactPrimaryCoordinator.ClearOtherPrimariesAsync(
+                        companyId,
+                        customerEntity.Id,
+                        contactType,
+                        existingContact.Id,
+                        cancellationToken);
+                    existingContact.SetAsPrimary();
+                }
+                else
+                {
+                    existingContact.RemovePrimary();
+                }
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                errors.Add(ex.Message);
+            }
         }
     }
 }

@@ -5,6 +5,10 @@ using System.Reflection;
 using FluentValidation;
 using JOIN.Application.Interface.Admin;
 using JOIN.Application.UseCases.Admin.PersonAddresses;
+using JOIN.Application.UseCases.Admin.PersonContacts;
+using JOIN.Application.UseCases.Admin.PersonEmployments;
+using JOIN.Application.UseCases.Admin.PersonBusinessProfiles;
+using JOIN.Application.UseCases.Admin.PersonFinancialProfiles;
 using JOIN.Application.Mappings;
 using JOIN.Application.Services.Admin;
 using JOIN.Application.Mappings.Security;
@@ -51,6 +55,10 @@ public static class ConfigureServices
         services.AddScoped<IRoleSystemOptionMapper, RoleSystemOptionMapper>();
         services.AddScoped<ICustomerCodeGenerator, CustomerCodeGenerator>();
         services.AddScoped<PersonAddressDefaultCoordinator>();
+        services.AddScoped<PersonContactPrimaryCoordinator>();
+        services.AddScoped<PersonEmploymentCurrentCoordinator>();
+        services.AddScoped<PersonBusinessProfileActiveCoordinator>();
+        services.AddScoped<PersonFinancialProfileCurrentCoordinator>();
 
         return services;
     

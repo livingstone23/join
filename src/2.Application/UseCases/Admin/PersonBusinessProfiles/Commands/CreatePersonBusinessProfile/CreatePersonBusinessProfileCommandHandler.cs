@@ -1,6 +1,7 @@
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.UseCases.Admin.PersonBusinessProfiles;
 using JOIN.Domain.Admin;
 using MediatR;
 
@@ -11,16 +12,12 @@ namespace JOIN.Application.UseCases.Admin.PersonBusinessProfiles.Commands;
 /// </summary>
 public sealed class CreatePersonBusinessProfileCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService) : IRequestHandler<CreatePersonBusinessProfileCommand, Response<Guid>>
+    ICurrentUserService currentUserService,
+    PersonBusinessProfileActiveCoordinator activeCoordinator) : IRequestHandler<CreatePersonBusinessProfileCommand, Response<Guid>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-
     /// <summary>
     /// Creates a person business profile associated with the authenticated tenant company.
     /// </summary>
-    /// <param name="request">The create-business-profile command.</param>
-    /// <param name="cancellationToken">A cancellation token for the asynchronous workflow.</param>
-    /// <returns>A response containing the created business profile identifier.</returns>
     public async Task<Response<Guid>> Handle(CreatePersonBusinessProfileCommand request, CancellationToken cancellationToken)
     {
         if (currentUserService.CompanyId == Guid.Empty)
@@ -29,9 +26,7 @@ public sealed class CreatePersonBusinessProfileCommandHandler(
         }
 
         var companyId = currentUserService.CompanyId;
-
-        var personRepository = _unitOfWork.GetRepository<Person>();
-        var person = await personRepository.GetAsync(request.PersonId);
+        var person = await unitOfWork.GetRepository<Person>().GetAsync(request.PersonId);
 
         if (person is null || person.CompanyId != companyId || person.GcRecord != 0)
         {
@@ -44,25 +39,38 @@ public sealed class CreatePersonBusinessProfileCommandHandler(
             return Response<Guid>.Error("INVALID_REFERENCES", referenceErrors);
         }
 
-        var entity = new PersonBusinessProfile
+        PersonBusinessProfile entity;
+        try
         {
-            PersonId = request.PersonId,
-            IndustryId = request.IndustryId,
-            TaxRegimeId = request.TaxRegimeId,
-            Website = request.Website?.Trim(),
-            FoundationDate = request.FoundationDate?.Date,
-            CompanyId = companyId
-        };
+            entity = PersonBusinessProfile.Create(
+                companyId,
+                request.PersonId,
+                request.IndustryId,
+                request.TaxRegimeId,
+                request.Website,
+                request.FoundationDate);
 
-        if (request.IsActive == false)
+            if (request.IsActive == false)
+            {
+                entity.Deactivate();
+            }
+            else
+            {
+                await activeCoordinator.DeactivateOtherActiveProfilesAsync(
+                    companyId,
+                    request.PersonId,
+                    null,
+                    cancellationToken);
+            }
+        }
+        catch (ArgumentException ex)
         {
-            entity.Deactivate();
+            return Response<Guid>.Error("INVALID_BUSINESS_PROFILE_DATA", [ex.Message]);
         }
 
-        var profileRepository = _unitOfWork.GetRepository<PersonBusinessProfile>();
-        await profileRepository.InsertAsync(entity);
+        await unitOfWork.PersonBusinessProfiles.InsertAsync(entity);
 
-        var result = await _unitOfWork.SaveAsync(cancellationToken);
+        var result = await unitOfWork.SaveAsync(cancellationToken);
         if (result <= 0)
         {
             return Response<Guid>.Error("BUSINESS_PROFILE_CREATE_FAILED", ["The person business profile could not be created due to a persistence error."]);
@@ -80,13 +88,13 @@ public sealed class CreatePersonBusinessProfileCommandHandler(
     {
         var referenceErrors = new List<string>();
 
-        var industry = await _unitOfWork.GetRepository<Industry>().GetAsync(industryId);
+        var industry = await unitOfWork.GetRepository<Industry>().GetAsync(industryId);
         if (industry is null || industry.CompanyId != companyId || industry.GcRecord != 0)
         {
             referenceErrors.Add($"IndustryId '{industryId}' does not exist in the current tenant.");
         }
 
-        var taxRegime = await _unitOfWork.GetRepository<TaxRegime>().GetAsync(taxRegimeId);
+        var taxRegime = await unitOfWork.GetRepository<TaxRegime>().GetAsync(taxRegimeId);
         if (taxRegime is null || taxRegime.CompanyId != companyId || taxRegime.GcRecord != 0)
         {
             referenceErrors.Add($"TaxRegimeId '{taxRegimeId}' does not exist in the current tenant.");

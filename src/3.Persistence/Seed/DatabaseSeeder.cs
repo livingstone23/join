@@ -1008,19 +1008,18 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                     _ => $"+504220{i + 1:D2}{j + 1:D2}"
                 };
 
-                var contact = new PersonContact
+                var contact = PersonContact.Create(
+                    companyId,
+                    customer.Id,
+                    contactType,
+                    contactValue,
+                    "Seed generated contact");
+                contact.Created = DateTime.UtcNow;
+                contact.CreatedBy = "System_Seeder";
+                if (j == 0)
                 {
-                    CompanyId = companyId,
-                    PersonId = customer.Id,
-                    ContactType = contactType,
-                    ContactValue = contactValue,
-                    IsPrimary = j == 0,
-                    Comments = "Seed generated contact",
-                    Created = DateTime.UtcNow,
-                    CreatedBy = "System_Seeder",
-                    GcRecord = 0
-                };
-                contact.Reactivate();
+                    contact.SetAsPrimary();
+                }
                 _context.PersonContacts.Add(contact);
 
                 insertedContacts++;

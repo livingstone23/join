@@ -14,6 +14,10 @@ public interface IUnitOfWork : IDisposable
     // Keep this for repositories that have custom logic (non-generic)
     IPersonsRepository Persons { get; }
     IPersonAddressRepository PersonAddresses { get; }
+    IPersonContactRepository PersonContacts { get; }
+    IPersonEmploymentRepository PersonEmployments { get; }
+    IPersonBusinessProfileRepository PersonBusinessProfiles { get; }
+    IPersonFinancialProfileRepository PersonFinancialProfiles { get; }
     IRoleSystemOptionsRepository RoleSystemOptions { get; }
 
     // --- 2. Scalable Access ---

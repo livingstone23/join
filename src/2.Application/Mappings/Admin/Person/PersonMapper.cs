@@ -81,6 +81,7 @@ public partial class PersonMapper : IPersonMapper
     [MapperIgnoreTarget(nameof(Person.IdentificationType))]
     [MapperIgnoreTarget(nameof(Person.Gender))]
     [MapperIgnoreTarget(nameof(Person.Tickets))]
+    [MapperIgnoreTarget(nameof(Person.Contacts))]
     public partial Person ToEntity(CreatePersonCommand command);
 
 
@@ -122,6 +123,11 @@ public partial class PersonMapper : IPersonMapper
     [MapperIgnoreTarget(nameof(PersonContact.GcRecord))]
     [MapperIgnoreTarget(nameof(PersonContact.Company))]
     [MapperIgnoreTarget(nameof(PersonContact.Person))]
+    [MapperIgnoreTarget(nameof(PersonContact.ContactType))]
+    [MapperIgnoreTarget(nameof(PersonContact.ContactValue))]
+    [MapperIgnoreTarget(nameof(PersonContact.IsPrimary))]
+    [MapperIgnoreTarget(nameof(PersonContact.Comments))]
+    [MapperIgnoreTarget(nameof(PersonContact.IsActive))]
     public partial PersonContact ToContactEntity(CreatePersonCommand.CreatePersonContactDto contactDto);
 
 
@@ -165,6 +171,11 @@ public partial class PersonMapper : IPersonMapper
     [MapperIgnoreTarget(nameof(PersonContact.Company))]
     [MapperIgnoreTarget(nameof(PersonContact.Person))]
     [MapperIgnoreSource(nameof(UpdatePersonCommand.UpdatePersonContactDto.Id))]
+    [MapperIgnoreTarget(nameof(PersonContact.ContactType))]
+    [MapperIgnoreTarget(nameof(PersonContact.ContactValue))]
+    [MapperIgnoreTarget(nameof(PersonContact.IsPrimary))]
+    [MapperIgnoreTarget(nameof(PersonContact.Comments))]
+    [MapperIgnoreTarget(nameof(PersonContact.IsActive))]
     public partial PersonContact ToContactEntity(UpdatePersonCommand.UpdatePersonContactDto contactDto);
 
 
@@ -235,6 +246,10 @@ public partial class PersonMapper : IPersonMapper
     [MapperIgnoreTarget(nameof(PersonContact.Company))]
     [MapperIgnoreTarget(nameof(PersonContact.Person))]
     [MapperIgnoreSource(nameof(UpdatePersonCommand.UpdatePersonContactDto.Id))]
+    [MapperIgnoreSource(nameof(UpdatePersonCommand.UpdatePersonContactDto.ContactType))]
+    [MapperIgnoreSource(nameof(UpdatePersonCommand.UpdatePersonContactDto.ContactValue))]
+    [MapperIgnoreSource(nameof(UpdatePersonCommand.UpdatePersonContactDto.IsPrimary))]
+    [MapperIgnoreSource(nameof(UpdatePersonCommand.UpdatePersonContactDto.Comments))]
     public partial void ApplyUpdate(UpdatePersonCommand.UpdatePersonContactDto source, PersonContact target);
 
     

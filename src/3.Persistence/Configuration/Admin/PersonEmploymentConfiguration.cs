@@ -56,7 +56,7 @@ public class PersonEmploymentConfiguration : IEntityTypeConfiguration<PersonEmpl
         // State flags
         builder.Property(pe => pe.IsCurrent)
             .IsRequired()
-            .HasDefaultValue(true);
+            .HasDefaultValue(false);
 
         builder.Property(pe => pe.IsActive)
             .IsRequired()

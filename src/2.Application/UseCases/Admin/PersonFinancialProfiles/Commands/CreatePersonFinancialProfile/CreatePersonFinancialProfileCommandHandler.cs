@@ -1,6 +1,7 @@
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.UseCases.Admin.PersonFinancialProfiles;
 using JOIN.Domain.Admin;
 using MediatR;
 
@@ -11,16 +12,9 @@ namespace JOIN.Application.UseCases.Admin.PersonFinancialProfiles.Commands;
 /// </summary>
 public sealed class CreatePersonFinancialProfileCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService) : IRequestHandler<CreatePersonFinancialProfileCommand, Response<Guid>>
+    ICurrentUserService currentUserService,
+    PersonFinancialProfileCurrentCoordinator currentCoordinator) : IRequestHandler<CreatePersonFinancialProfileCommand, Response<Guid>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-
-    /// <summary>
-    /// Creates a person financial profile associated with the authenticated tenant company.
-    /// </summary>
-    /// <param name="request">The create-financial-profile command.</param>
-    /// <param name="cancellationToken">A cancellation token for the asynchronous workflow.</param>
-    /// <returns>A response containing the created financial profile identifier.</returns>
     public async Task<Response<Guid>> Handle(CreatePersonFinancialProfileCommand request, CancellationToken cancellationToken)
     {
         if (currentUserService.CompanyId == Guid.Empty)
@@ -29,16 +23,14 @@ public sealed class CreatePersonFinancialProfileCommandHandler(
         }
 
         var companyId = currentUserService.CompanyId;
-
-        var personRepository = _unitOfWork.GetRepository<Person>();
-        var person = await personRepository.GetAsync(request.PersonId);
+        var person = await unitOfWork.GetRepository<Person>().GetAsync(request.PersonId);
 
         if (person is null || person.CompanyId != companyId || person.GcRecord != 0)
         {
             return Response<Guid>.Error("PERSON_NOT_FOUND", ["The requested person does not exist in the current tenant."]);
         }
 
-        var incomeRange = await _unitOfWork.GetRepository<IncomeRange>().GetAsync(request.IncomeRangeId);
+        var incomeRange = await unitOfWork.GetRepository<IncomeRange>().GetAsync(request.IncomeRangeId);
         if (incomeRange is null || incomeRange.CompanyId != companyId || incomeRange.GcRecord != 0)
         {
             return Response<Guid>.Error(
@@ -46,29 +38,47 @@ public sealed class CreatePersonFinancialProfileCommandHandler(
                 [$"IncomeRangeId '{request.IncomeRangeId}' does not exist in the current tenant."]);
         }
 
-        var entity = new PersonFinancialProfile
+        PersonFinancialProfile entity;
+        try
         {
-            PersonId = request.PersonId,
-            IncomeRangeId = request.IncomeRangeId,
-            SourceOfFunds = request.SourceOfFunds.Trim(),
-            DeclaredDate = request.DeclaredDate,
-            CompanyId = companyId
-        };
+            entity = PersonFinancialProfile.Create(
+                companyId,
+                request.PersonId,
+                request.IncomeRangeId,
+                request.SourceOfFunds,
+                request.DeclaredDate);
 
-        if (request.IsCurrent == false)
+            if (request.IsCurrent == false)
+            {
+                entity.Archive();
+            }
+            else
+            {
+                await currentCoordinator.ArchiveOtherCurrentAsync(
+                    companyId,
+                    request.PersonId,
+                    null,
+                    cancellationToken);
+                entity.SetAsCurrent();
+            }
+
+            if (request.IsActive == false)
+            {
+                entity.Deactivate();
+            }
+        }
+        catch (ArgumentException ex)
         {
-            entity.Archive();
+            return Response<Guid>.Error("INVALID_FINANCIAL_PROFILE_DATA", [ex.Message]);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Response<Guid>.Error("INVALID_FINANCIAL_PROFILE_CURRENT", [ex.Message]);
         }
 
-        if (request.IsActive == false)
-        {
-            entity.Deactivate();
-        }
+        await unitOfWork.PersonFinancialProfiles.InsertAsync(entity);
 
-        var profileRepository = _unitOfWork.GetRepository<PersonFinancialProfile>();
-        await profileRepository.InsertAsync(entity);
-
-        var result = await _unitOfWork.SaveAsync(cancellationToken);
+        var result = await unitOfWork.SaveAsync(cancellationToken);
         if (result <= 0)
         {
             return Response<Guid>.Error("FINANCIAL_PROFILE_CREATE_FAILED", ["The person financial profile could not be created due to a persistence error."]);

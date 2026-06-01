@@ -2,6 +2,7 @@ using JOIN.Application.Common;
 using JOIN.Application.Exceptions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.UseCases.Admin.PersonBusinessProfiles;
 using JOIN.Domain.Admin;
 using MediatR;
 
@@ -12,16 +13,12 @@ namespace JOIN.Application.UseCases.Admin.PersonBusinessProfiles.Commands;
 /// </summary>
 public sealed class UpdatePersonBusinessProfileCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService) : IRequestHandler<UpdatePersonBusinessProfileCommand, Response<Guid>>
+    ICurrentUserService currentUserService,
+    PersonBusinessProfileActiveCoordinator activeCoordinator) : IRequestHandler<UpdatePersonBusinessProfileCommand, Response<Guid>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-
     /// <summary>
     /// Updates a person business profile for the current tenant.
     /// </summary>
-    /// <param name="request">The update-business-profile command.</param>
-    /// <param name="cancellationToken">A cancellation token for the asynchronous workflow.</param>
-    /// <returns>A response containing the updated business profile identifier.</returns>
     public async Task<Response<Guid>> Handle(UpdatePersonBusinessProfileCommand request, CancellationToken cancellationToken)
     {
         if (currentUserService.CompanyId == Guid.Empty)
@@ -32,13 +29,8 @@ public sealed class UpdatePersonBusinessProfileCommandHandler(
         }
 
         var companyId = currentUserService.CompanyId;
-
-        var profileRepository = _unitOfWork.GetRepository<PersonBusinessProfile>();
-        var profiles = await profileRepository.GetAllAsync();
-
-        var entity = profiles.FirstOrDefault(profile =>
-            profile.Id == request.Id &&
-            profile.CompanyId == companyId);
+        var profileRepository = unitOfWork.PersonBusinessProfiles;
+        var entity = await profileRepository.GetActiveByIdAsync(request.Id, companyId, cancellationToken);
 
         if (entity is null)
         {
@@ -62,26 +54,36 @@ public sealed class UpdatePersonBusinessProfileCommandHandler(
             return Response<Guid>.Error("INVALID_REFERENCES", referenceErrors);
         }
 
-        entity.IndustryId = request.IndustryId;
-        entity.TaxRegimeId = request.TaxRegimeId;
-        entity.Website = request.Website?.Trim();
-        entity.FoundationDate = request.FoundationDate?.Date;
-
-        if (request.IsActive.HasValue)
+        try
         {
-            if (request.IsActive.Value)
+            entity.Update(
+                request.IndustryId,
+                request.TaxRegimeId,
+                request.Website,
+                request.FoundationDate);
+
+            if (request.IsActive == true)
             {
+                await activeCoordinator.DeactivateOtherActiveProfilesAsync(
+                    companyId,
+                    request.PersonId,
+                    entity.Id,
+                    cancellationToken);
                 entity.Reactivate();
             }
-            else
+            else if (request.IsActive == false)
             {
                 entity.Deactivate();
             }
         }
+        catch (ArgumentException ex)
+        {
+            return Response<Guid>.Error("INVALID_BUSINESS_PROFILE_DATA", [ex.Message]);
+        }
 
         await profileRepository.UpdateAsync(entity);
 
-        var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
+        var result = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         if (result <= 0)
         {
@@ -102,13 +104,13 @@ public sealed class UpdatePersonBusinessProfileCommandHandler(
     {
         var referenceErrors = new List<string>();
 
-        var industry = await _unitOfWork.GetRepository<Industry>().GetAsync(industryId);
+        var industry = await unitOfWork.GetRepository<Industry>().GetAsync(industryId);
         if (industry is null || industry.CompanyId != companyId || industry.GcRecord != 0)
         {
             referenceErrors.Add($"IndustryId '{industryId}' does not exist in the current tenant.");
         }
 
-        var taxRegime = await _unitOfWork.GetRepository<TaxRegime>().GetAsync(taxRegimeId);
+        var taxRegime = await unitOfWork.GetRepository<TaxRegime>().GetAsync(taxRegimeId);
         if (taxRegime is null || taxRegime.CompanyId != companyId || taxRegime.GcRecord != 0)
         {
             referenceErrors.Add($"TaxRegimeId '{taxRegimeId}' does not exist in the current tenant.");

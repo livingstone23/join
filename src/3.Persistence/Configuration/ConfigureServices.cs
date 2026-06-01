@@ -66,6 +66,10 @@ public static class ConfigureServices
         // Registramos el repositorio de clientes explícitamente para permitir lógica personalizada.
         services.AddScoped<IPersonsRepository, PersonsRepository>();
         services.AddScoped<IPersonAddressRepository, PersonAddressRepository>();
+        services.AddScoped<IPersonContactRepository, PersonContactRepository>();
+        services.AddScoped<IPersonEmploymentRepository, PersonEmploymentRepository>();
+        services.AddScoped<IPersonBusinessProfileRepository, PersonBusinessProfileRepository>();
+        services.AddScoped<IPersonFinancialProfileRepository, PersonFinancialProfileRepository>();
         services.AddScoped<IRoleSystemOptionsRepository, RoleSystemOptionsRepository>();
         
         // El UnitOfWork ahora es híbrido y manejará el resto de los módulos dinámicamente.

@@ -45,7 +45,7 @@ public class PersonFinancialProfileConfiguration : IEntityTypeConfiguration<Pers
         // State flags
         builder.Property(pfp => pfp.IsCurrent)
             .IsRequired()
-            .HasDefaultValue(true);
+            .HasDefaultValue(false);
 
         builder.Property(pfp => pfp.IsActive)
             .IsRequired()

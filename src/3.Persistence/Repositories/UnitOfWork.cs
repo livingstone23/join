@@ -43,6 +43,10 @@ public class UnitOfWork : IUnitOfWork
     // This explicit cast will now succeed because GetRepository returns the specific class type
     public IPersonsRepository Persons => (IPersonsRepository)GetRepository<Person>();
     public IPersonAddressRepository PersonAddresses => (IPersonAddressRepository)GetRepository<PersonAddress>();
+    public IPersonContactRepository PersonContacts => (IPersonContactRepository)GetRepository<PersonContact>();
+    public IPersonEmploymentRepository PersonEmployments => (IPersonEmploymentRepository)GetRepository<PersonEmployment>();
+    public IPersonBusinessProfileRepository PersonBusinessProfiles => (IPersonBusinessProfileRepository)GetRepository<PersonBusinessProfile>();
+    public IPersonFinancialProfileRepository PersonFinancialProfiles => (IPersonFinancialProfileRepository)GetRepository<PersonFinancialProfile>();
     public IRoleSystemOptionsRepository RoleSystemOptions => (IRoleSystemOptionsRepository)GetRepository<RoleSystemOption>();
 
     // --- 2. DYNAMIC REPOSITORY FACTORY ---
@@ -65,6 +69,22 @@ public class UnitOfWork : IUnitOfWork
             else if (typeof(TEntity) == typeof(PersonAddress))
             {
                 repositoryInstance = new PersonAddressRepository(_dbContext);
+            }
+            else if (typeof(TEntity) == typeof(PersonContact))
+            {
+                repositoryInstance = new PersonContactRepository(_dbContext);
+            }
+            else if (typeof(TEntity) == typeof(PersonEmployment))
+            {
+                repositoryInstance = new PersonEmploymentRepository(_dbContext);
+            }
+            else if (typeof(TEntity) == typeof(PersonBusinessProfile))
+            {
+                repositoryInstance = new PersonBusinessProfileRepository(_dbContext);
+            }
+            else if (typeof(TEntity) == typeof(PersonFinancialProfile))
+            {
+                repositoryInstance = new PersonFinancialProfileRepository(_dbContext);
             }
             else if (typeof(TEntity) == typeof(RoleSystemOption))
             {

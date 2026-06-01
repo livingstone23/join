@@ -2,6 +2,7 @@ using JOIN.Application.Common;
 using JOIN.Application.Exceptions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.UseCases.Admin.PersonEmployments;
 using JOIN.Domain.Admin;
 using MediatR;
 
@@ -12,16 +13,12 @@ namespace JOIN.Application.UseCases.Admin.PersonEmployments.Commands;
 /// </summary>
 public sealed class UpdatePersonEmploymentCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService) : IRequestHandler<UpdatePersonEmploymentCommand, Response<Guid>>
+    ICurrentUserService currentUserService,
+    PersonEmploymentCurrentCoordinator currentCoordinator) : IRequestHandler<UpdatePersonEmploymentCommand, Response<Guid>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-
     /// <summary>
     /// Updates a person employment record for the current tenant.
     /// </summary>
-    /// <param name="request">The update-employment command.</param>
-    /// <param name="cancellationToken">A cancellation token for the asynchronous workflow.</param>
-    /// <returns>A response containing the updated employment identifier.</returns>
     public async Task<Response<Guid>> Handle(UpdatePersonEmploymentCommand request, CancellationToken cancellationToken)
     {
         if (currentUserService.CompanyId == Guid.Empty)
@@ -31,12 +28,9 @@ public sealed class UpdatePersonEmploymentCommandHandler(
                 ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        var employmentRepository = _unitOfWork.GetRepository<PersonEmployment>();
-        var employments = await employmentRepository.GetAllAsync();
-
-        var entity = employments.FirstOrDefault(employment =>
-            employment.Id == request.Id &&
-            employment.CompanyId == currentUserService.CompanyId);
+        var companyId = currentUserService.CompanyId;
+        var employmentRepository = unitOfWork.PersonEmployments;
+        var entity = await employmentRepository.GetActiveByIdAsync(request.Id, companyId, cancellationToken);
 
         if (entity is null)
         {
@@ -54,30 +48,52 @@ public sealed class UpdatePersonEmploymentCommandHandler(
                 "Person employment not found for the requested person.");
         }
 
-        entity.EmployerName = request.EmployerName.Trim();
-        entity.JobTitle = request.JobTitle.Trim();
-        entity.StartDate = request.StartDate.Date;
-
-        if (request.IsActive.HasValue)
+        try
         {
-            if (request.IsActive.Value)
+            entity.Update(
+                request.EmployerName,
+                request.JobTitle,
+                request.StartDate,
+                request.EndDate);
+
+            if (request.IsActive.HasValue)
             {
-                entity.Reactivate();
+                if (request.IsActive.Value)
+                {
+                    entity.Reactivate();
+                }
+                else
+                {
+                    entity.Deactivate();
+                }
             }
-            else
+
+            if (request.IsCurrent == true)
             {
-                entity.Deactivate();
+                await currentCoordinator.ClearOtherCurrentAsync(
+                    companyId,
+                    request.PersonId,
+                    entity.Id,
+                    cancellationToken);
+                entity.SetAsCurrent();
+            }
+            else if (request.IsCurrent == false)
+            {
+                entity.RemoveCurrent();
             }
         }
-
-        if (request.EndDate.HasValue)
+        catch (ArgumentException ex)
         {
-            entity.MarkAsEnded(request.EndDate.Value.Date);
+            return Response<Guid>.Error("INVALID_EMPLOYMENT_DATA", [ex.Message]);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Response<Guid>.Error("INVALID_EMPLOYMENT_CURRENT", [ex.Message]);
         }
 
         await employmentRepository.UpdateAsync(entity);
 
-        var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
+        var result = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         if (result <= 0)
         {
