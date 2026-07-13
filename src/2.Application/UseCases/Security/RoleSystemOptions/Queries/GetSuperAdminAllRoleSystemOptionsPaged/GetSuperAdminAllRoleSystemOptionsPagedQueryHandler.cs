@@ -1,7 +1,7 @@
+using Dapper;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
-using JOIN.Application.Interface.Persistence.Security;
-using JOIN.Application.Mappings.Security.RoleSystemOption;
+using JOIN.Application.Interface;
 using MediatR;
 using Microsoft.Extensions.Options;
 
@@ -11,28 +11,24 @@ namespace JOIN.Application.UseCases.Security.RoleSystemOptions.Queries;
 /// Handles SuperAdmin paged retrieval of RoleSystemOption rules across companies.
 /// </summary>
 public sealed class GetSuperAdminAllRoleSystemOptionsPagedQueryHandler(
-    IRoleSystemOptionsRepository repository,
-    IRoleSystemOptionMapper mapper,
+    ISqlConnectionFactory connectionFactory,
     IOptions<PaginationSettings> paginationOptions)
     : IRequestHandler<GetSuperAdminAllRoleSystemOptionsPagedQuery, Response<PagedResult<RoleSystemOptionListItemDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
 
-    public async Task<Response<PagedResult<RoleSystemOptionListItemDto>>> Handle(GetSuperAdminAllRoleSystemOptionsPagedQuery request, CancellationToken cancellationToken)
+    public async Task<Response<PagedResult<RoleSystemOptionListItemDto>>> Handle(
+        GetSuperAdminAllRoleSystemOptionsPagedQuery request,
+        CancellationToken cancellationToken)
     {
-        var defaultPageNumber = _paginationSettings.DefaultPageNumber < 1 ? 1 : _paginationSettings.DefaultPageNumber;
-        var defaultPageSize = _paginationSettings.DefaultPageSize < 1 ? 10 : _paginationSettings.DefaultPageSize;
-        var maxPageSize = _paginationSettings.MaxPageSize < defaultPageSize ? defaultPageSize : _paginationSettings.MaxPageSize;
+        var (sanitizedPageNumber, sanitizedPageSize, offset) = RoleSystemOptionQuerySql.SanitizePagination(
+            request.PageNumber,
+            request.PageSize,
+            _paginationSettings);
 
-        var sanitizedPageNumber = request.PageNumber.GetValueOrDefault(defaultPageNumber);
-        sanitizedPageNumber = sanitizedPageNumber < 1 ? defaultPageNumber : sanitizedPageNumber;
-
-        var requestedPageSize = request.PageSize.GetValueOrDefault(defaultPageSize);
-        var sanitizedPageSize = requestedPageSize < 1 ? defaultPageSize : Math.Min(requestedPageSize, maxPageSize);
-        var offset = (sanitizedPageNumber - 1) * sanitizedPageSize;
-
-        var filter = new RoleSystemOptionQueryFilter(
+        var (whereClause, parameters) = RoleSystemOptionQuerySql.BuildWhereClause(new RoleSystemOptionQueryFilters(
             CompanyId: request.CompanyId,
+            RequireCompanyFilter: request.CompanyId.HasValue,
             RoleId: request.RoleId,
             SystemOptionId: request.SystemOptionId,
             RoleName: request.RoleName,
@@ -41,25 +37,34 @@ public sealed class GetSuperAdminAllRoleSystemOptionsPagedQueryHandler(
             CanRead: request.CanRead,
             CanCreate: request.CanCreate,
             CanUpdate: request.CanUpdate,
-            CanDelete: request.CanDelete,
-            Offset: offset,
-            PageSize: sanitizedPageSize);
+            CanDelete: request.CanDelete));
 
-        var (items, totalCount) = await repository.GetPagedWithNamesAsync(filter, true, cancellationToken);
-        var data = new PagedResult<RoleSystemOptionListItemDto>
-        {
-            Items = items.Select(mapper.ToListItemDto).ToList(),
-            PageNumber = sanitizedPageNumber,
-            PageSize = sanitizedPageSize,
-            TotalCount = totalCount,
-            TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)sanitizedPageSize)
-        };
+        parameters.Add("Offset", offset);
+        parameters.Add("PageSize", sanitizedPageSize);
+
+        using var connection = connectionFactory.CreateConnection();
+
+        using var multi = await connection.QueryMultipleAsync(
+            new CommandDefinition(
+                RoleSystemOptionQuerySql.BuildPagedSql(whereClause),
+                parameters,
+                cancellationToken: cancellationToken));
+
+        var items = (await multi.ReadAsync<RoleSystemOptionListItemDto>()).AsList();
+        var totalCount = await multi.ReadSingleAsync<int>();
 
         return new Response<PagedResult<RoleSystemOptionListItemDto>>
         {
             IsSuccess = true,
             Message = "Role system options retrieved successfully.",
-            Data = data
+            Data = new PagedResult<RoleSystemOptionListItemDto>
+            {
+                Items = items,
+                PageNumber = sanitizedPageNumber,
+                PageSize = sanitizedPageSize,
+                TotalCount = totalCount,
+                TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)sanitizedPageSize)
+            }
         };
     }
 }

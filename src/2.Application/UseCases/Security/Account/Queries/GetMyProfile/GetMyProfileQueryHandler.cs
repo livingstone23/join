@@ -1,8 +1,7 @@
+using Dapper;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Security.Account;
-using JOIN.Application.Interface.Persistence;
-using JOIN.Domain.Admin;
-using JOIN.Domain.Common;
+using JOIN.Application.Interface;
 using JOIN.Domain.Security;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
@@ -11,7 +10,7 @@ namespace JOIN.Application.UseCases.Security.Account.Queries.GetMyProfile;
 
 public sealed class GetMyProfileQueryHandler(
     UserManager<ApplicationUser> userManager,
-    IUnitOfWork unitOfWork)
+    ISqlConnectionFactory connectionFactory)
     : IRequestHandler<GetMyProfileQuery, Response<AccountProfileResponseDto>>
 {
     public async Task<Response<AccountProfileResponseDto>> Handle(GetMyProfileQuery request, CancellationToken cancellationToken)
@@ -22,13 +21,26 @@ public sealed class GetMyProfileQueryHandler(
             return Response<AccountProfileResponseDto>.Error("ACCOUNT_NOT_FOUND", ["Authenticated account was not found."]);
         }
 
-        var allUserChannels = await unitOfWork.GetRepository<UserCommunicationChannel>().GetAllAsync();
-        var userChannels = allUserChannels
-            .Where(channel => channel.UserId == request.UserId)
-            .ToList();
+        using var connection = connectionFactory.CreateConnection();
 
-        var allCatalogChannels = await unitOfWork.GetRepository<CommunicationChannel>().GetAllAsync();
-        var catalogById = allCatalogChannels.ToDictionary(channel => channel.Id, channel => channel.Name);
+        const string channelsSql = """
+            SELECT
+                cc.Name AS Type,
+                ucc.ChannelIdentifier AS Value,
+                ucc.IsPreferred
+            FROM Admin.UserCommunicationChannels ucc
+            INNER JOIN Common.CommunicationChannels cc
+                ON cc.Id = ucc.CommunicationChannelId
+            WHERE ucc.UserId = @UserId
+              AND ucc.GcRecord = 0
+              AND cc.GcRecord = 0;
+            """;
+
+        var channels = (await connection.QueryAsync<CommunicationChannelDto>(
+            new CommandDefinition(
+                channelsSql,
+                new { request.UserId },
+                cancellationToken: cancellationToken))).AsList();
 
         var dto = new AccountProfileResponseDto
         {
@@ -44,16 +56,7 @@ public sealed class GetMyProfileQueryHandler(
             IsSuperAdmin = user.IsSuperAdmin,
             IsSuperAdminCompany = user.IsSuperAdminCompany,
             Created = user.Created,
-            CommunicationChannels = userChannels
-                .Select(channel => new CommunicationChannelDto
-                {
-                    Type = catalogById.TryGetValue(channel.CommunicationChannelId, out var typeName)
-                        ? typeName
-                        : string.Empty,
-                    Value = channel.ChannelIdentifier,
-                    IsPreferred = channel.IsPreferred
-                })
-                .ToArray()
+            CommunicationChannels = channels
         };
 
         return new Response<AccountProfileResponseDto>

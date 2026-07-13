@@ -17,7 +17,6 @@ public interface IRoleSystemOptionMapper
 
     RoleSystemOptionDto ToDto(JOIN.Domain.Security.RoleSystemOption entity);
     RoleSystemOptionDto ToDto(RoleSystemOptionReadModel model);
-    RoleSystemOptionListItemDto ToListItemDto(RoleSystemOptionReadModel model);
     JOIN.Domain.Security.RoleSystemOption ToEntity(CreateRoleSystemOptionCommand command);
     void ApplyUpdate(UpdateRoleSystemOptionCommand command, JOIN.Domain.Security.RoleSystemOption entity);
 

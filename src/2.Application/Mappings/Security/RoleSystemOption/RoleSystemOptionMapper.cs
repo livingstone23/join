@@ -28,8 +28,6 @@ public partial class RoleSystemOptionMapper : IRoleSystemOptionMapper
 
     public partial RoleSystemOptionDto ToDto(RoleSystemOptionReadModel model);
 
-    public partial RoleSystemOptionListItemDto ToListItemDto(RoleSystemOptionReadModel model);
-
     [MapperIgnoreTarget(nameof(JOIN.Domain.Security.RoleSystemOption.Id))]
     [MapperIgnoreTarget(nameof(JOIN.Domain.Security.RoleSystemOption.Created))]
     [MapperIgnoreTarget(nameof(JOIN.Domain.Security.RoleSystemOption.CreatedBy))]

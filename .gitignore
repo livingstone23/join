@@ -183,3 +183,18 @@ coveragereport/
 # Coverage tool temporary files
 .sonarqube/
 .utp/
+
+# ===================================================
+# 🤖 AGENTES DE IA Y HERRAMIENTAS LOCALES
+# ===================================================
+# Claude Code (Estado local y memoria)
+.claude/
+.claude.json
+*.claude_history
+
+# Cursor IDE (Si llegas a usarlo)
+.cursor/
+workspace.json
+
+# Nota: NO excluyas CLAUDE.md, ya que ese archivo debe subirse 
+# para que las instrucciones del agente se compartan en el repo.

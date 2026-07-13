@@ -22,32 +22,7 @@ public interface IRoleSystemOptionsRepository : IGenericRepository<RoleSystemOpt
     /// Retrieves a single permission rule with role and system option names.
     /// </summary>
     Task<RoleSystemOptionReadModel?> GetWithNamesAsync(Guid id, Guid? companyId = null);
-
-    /// <summary>
-    /// Retrieves a paged permission list with optional filters.
-    /// </summary>
-    Task<(IReadOnlyList<RoleSystemOptionReadModel> Items, int TotalCount)> GetPagedWithNamesAsync(
-        RoleSystemOptionQueryFilter filter,
-        bool ignoreCompanyFilter = false,
-        CancellationToken cancellationToken = default);
 }
-
-/// <summary>
-/// Filter parameters for paged RoleSystemOption queries.
-/// </summary>
-public sealed record RoleSystemOptionQueryFilter(
-    Guid? CompanyId,
-    Guid? RoleId,
-    Guid? SystemOptionId,
-    string? RoleName,
-    string? SystemOptionName,
-    string? CompanyName,
-    bool? CanRead,
-    bool? CanCreate,
-    bool? CanUpdate,
-    bool? CanDelete,
-    int Offset,
-    int PageSize);
 
 /// <summary>
 /// Read model for RoleSystemOption with role and option names.
