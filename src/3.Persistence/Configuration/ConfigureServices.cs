@@ -57,9 +57,15 @@ public static class ConfigureServices
             var interceptor = sp.GetRequiredService<AuditableEntitySaveChangesInterceptor>();
             options.AddInterceptors(interceptor);
 
-            // Configuración predeterminada para SQL Server
-            options.UseSqlServer(connectionString, 
-                builder => builder.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
+            // Configuración predeterminada para SQL Server.
+            // CommandTimeout(30) (seconds) is set explicitly per SPEC 05 so the value
+            // is visible at the infrastructure layer rather than relying on the
+            // SQL Server driver's implicit default. Applies to every EF Core command
+            // issued through ApplicationDbContext (Commands).
+            options.UseSqlServer(connectionString,
+                builder => builder
+                    .MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
+                    .CommandTimeout(30));
         });
 
         // 5. REPOSITORIOS ESPECÍFICOS Y UNIT OF WORK

@@ -1,3 +1,4 @@
+using System.Net.Http;
 using JOIN.Application.Interface;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,14 +13,17 @@ namespace JOIN.Infrastructure.Messaging.SendGrid;
 /// completely provider-agnostic (Adapter Pattern — Architecture Pillar 4).
 /// </summary>
 /// <remarks>
-/// Registered as <c>Transient</c> because <see cref="SendGridClient"/> is stateless
-/// and safe to instantiate per request. Inject <see cref="IEmailService"/> in your
-/// handlers; never reference this class directly from the Application layer.
+/// Registered as a Typed Client via <c>AddHttpClient&lt;IEmailService, SendGridEmailAdapter&gt;()</c>
+/// so the framework-provided <see cref="HttpClient"/> is the one used to reach SendGrid.
+/// This is required by the resilience pipeline configured in
+/// <c>DependencyInjection.AddInfrastructureServices</c> (Polly v8 standard handler).
 /// </remarks>
 public sealed class SendGridEmailAdapter(
+    HttpClient httpClient,
     IOptions<SendGridOptions> options,
     ILogger<SendGridEmailAdapter> logger) : IEmailService
 {
+    private readonly HttpClient _httpClient = httpClient;
     private readonly SendGridOptions _options = options.Value;
 
     /// <inheritdoc />
@@ -81,9 +85,11 @@ public sealed class SendGridEmailAdapter(
                 htmlContent: htmlContent);
 
             // -----------------------------------------------------------------
-            // 4. Send via the official SendGrid client
+            // 4. Send via the official SendGrid client, reusing the injected
+            //    HttpClient so the resilience pipeline (retry / circuit-breaker)
+            //    wired in DependencyInjection wraps the actual HTTP traffic.
             // -----------------------------------------------------------------
-            var client = new SendGridClient(_options.ApiKey);
+            var client = new SendGridClient(_httpClient, _options.ApiKey);
             Response response = await client.SendEmailAsync(message);
 
             if (response.IsSuccessStatusCode)

@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http;
 using JOIN.Application.Interface;
 using JOIN.Infrastructure.HealthChecks;
 using JOIN.Infrastructure.Messaging.SendGrid;
@@ -7,6 +9,8 @@ using JOIN.Infrastructure.Security.Jwt;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Http.Resilience;
+using Polly;
 
 
 
@@ -43,10 +47,23 @@ public static class DependencyInjection
         // ------------------------------------------------------------------
         // Messaging: SendGrid email adapter (Adapter Pattern — Pillar 4)
         // Bind strongly-typed options from the "SendGrid" configuration section,
-        // then register the adapter as Transient (stateless, safe per-request).
+        // then register the adapter as a Typed Client wrapped in a Polly v8
+        // standard resilience pipeline (retry + circuit-breaker + attempt /
+        // total timeouts). Only the retry predicate and MaxRetryAttempts are
+        // customized per SPEC 05; the rest stays on the Microsoft preset defaults.
         // ------------------------------------------------------------------
         services.Configure<SendGridOptions>(configuration.GetSection("SendGrid"));
-        services.AddTransient<IEmailService, SendGridEmailAdapter>();
+        services.AddHttpClient<IEmailService, SendGridEmailAdapter>()
+            .AddStandardResilienceHandler(options =>
+            {
+                options.Retry.MaxRetryAttempts = 3;
+                options.Retry.ShouldHandle = args => ValueTask.FromResult(
+                    args.Outcome.Result?.StatusCode is HttpStatusCode.RequestTimeout
+                        or HttpStatusCode.TooManyRequests
+                        or >= HttpStatusCode.InternalServerError
+                    || args.Outcome.Exception is HttpRequestException);
+                // CircuitBreaker, AttemptTimeout, TotalRequestTimeout: preset defaults.
+            });
 
         return services;
     }

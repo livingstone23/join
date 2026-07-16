@@ -1,6 +1,6 @@
 # SPEC 05 — Resiliencia HTTP (Polly v8) y CommandTimeout de EF Core
 
-> **Status:** Draft
+> **Status:** Aprobado
 > **Depends on:** Ninguna
 > **Date:** 2026-07-13
 > **Objective:** Configurar Microsoft.Extensions.Http.Resilience (Polly v8) sobre un HttpClient tipado para SendGrid con retry/circuit-breaker/timeout estándar, y establecer explícitamente el CommandTimeout de EF Core en SQL Server, sin modificar lógica de dominio.
