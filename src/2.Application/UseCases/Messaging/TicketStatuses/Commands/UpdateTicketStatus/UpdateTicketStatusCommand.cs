@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Messaging.TicketStatuses.Commands;
 /// <summary>
 /// Command to update an existing ticket status catalog item.
 /// </summary>
-public record UpdateTicketStatusCommand : IRequest<Response<TicketStatusDto>>
+public record UpdateTicketStatusCommand : ITransactionalCommand<Response<TicketStatusDto>>
 {
     /// <summary>
     /// Gets the ticket status identifier to update.

@@ -1,3 +1,4 @@
+using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
 using MediatR;
 
@@ -7,7 +8,7 @@ namespace JOIN.Application.UseCases.Security.Auth.Login;
 /// Represents the authentication command used to validate user credentials and resolve the effective company context for the resulting session.
 /// This request is the main entry point for opening a JWT-backed session in the security module.
 /// </summary>
-public record LoginCommand : IRequest<LoginResponse>
+public record LoginCommand : ITransactionalCommand<LoginResponse>
 {
     /// <summary>
     /// Gets or sets the email address supplied by the client as the login identifier.

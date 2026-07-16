@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Messaging.TicketCompanyDefaults.Commands;
 /// <summary>
 /// Command used to create the tenant ticket default configuration.
 /// </summary>
-public record CreateTicketCompanyDefaultCommand : IRequest<Response<TicketCompanyDefaultDto>>
+public record CreateTicketCompanyDefaultCommand : ITransactionalCommand<Response<TicketCompanyDefaultDto>>
 {
     /// <summary>
     /// Gets the ticket code prefix.

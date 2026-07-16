@@ -7,4 +7,4 @@ namespace JOIN.Application.UseCases.Admin.Genders.Commands;
 /// Command used to delete an existing tenant-scoped gender catalog entry.
 /// </summary>
 /// <param name="Id">The unique identifier of the gender to delete.</param>
-public sealed record DeleteGenderCommand(Guid Id) : IRequest<Response<Guid>>;
+public sealed record DeleteGenderCommand(Guid Id) : ITransactionalCommand<Response<Guid>>;

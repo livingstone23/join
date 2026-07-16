@@ -4,7 +4,7 @@ using MediatR;
 
 namespace JOIN.Application.UseCases.Admin.TaxRegimes.Commands;
 
-public sealed record UpdateTaxRegimeCommand : IRequest<Response<TaxRegimeDto>>
+public sealed record UpdateTaxRegimeCommand : ITransactionalCommand<Response<TaxRegimeDto>>
 {
     public Guid Id { get; init; }
     public string Code { get; init; } = string.Empty;

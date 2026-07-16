@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Common.Provinces.Commands;
 /// <summary>
 /// Command to update an existing province catalog item.
 /// </summary>
-public record UpdateProvinceCommand : IRequest<Response<ProvinceDto>>
+public record UpdateProvinceCommand : ITransactionalCommand<Response<ProvinceDto>>
 {
     /// <summary>
     /// Gets the province identifier to update.

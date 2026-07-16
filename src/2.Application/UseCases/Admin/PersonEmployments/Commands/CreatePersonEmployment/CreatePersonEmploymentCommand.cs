@@ -6,7 +6,7 @@ namespace JOIN.Application.UseCases.Admin.PersonEmployments.Commands;
 /// <summary>
 /// Command that creates a new employment record for an existing person in the current tenant context.
 /// </summary>
-public sealed record CreatePersonEmploymentCommand : IRequest<Response<Guid>>
+public sealed record CreatePersonEmploymentCommand : ITransactionalCommand<Response<Guid>>
 {
     /// <summary>
     /// Gets the identifier of the person owner.

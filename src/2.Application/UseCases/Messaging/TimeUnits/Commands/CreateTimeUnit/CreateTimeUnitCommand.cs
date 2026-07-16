@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Messaging.TimeUnits.Commands;
 /// <summary>
 /// Command to register a new time unit in the messaging catalog.
 /// </summary>
-public record CreateTimeUnitCommand : IRequest<Response<TimeUnitDto>>
+public record CreateTimeUnitCommand : ITransactionalCommand<Response<TimeUnitDto>>
 {
     /// <summary>
     /// Gets or sets the display name of the time unit.

@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Common.Provinces.Commands;
 /// <summary>
 /// Command to register a new province in the geographic catalog.
 /// </summary>
-public record CreateProvinceCommand : IRequest<Response<ProvinceDto>>
+public record CreateProvinceCommand : ITransactionalCommand<Response<ProvinceDto>>
 {
     /// <summary>
     /// Gets or sets the province display name.

@@ -10,4 +10,4 @@ namespace JOIN.Application.UseCases.Security.UserCompanies.Commands.SetDefaultCo
 /// <param name="UserId">The unique identifier of the user whose default company should be updated.</param>
 /// <param name="CompanyId">The unique identifier of the company that must become the new default context.</param>
 public sealed record SetDefaultCompanyCommand(Guid UserId, Guid CompanyId)
-    : IRequest<Response<Guid>>;
+    : ITransactionalCommand<Response<Guid>>;

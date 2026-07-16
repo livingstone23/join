@@ -7,4 +7,4 @@ namespace JOIN.Application.UseCases.Common.Countries.Commands;
 /// Command to perform a soft delete for a country catalog item.
 /// </summary>
 /// <param name="Id">The country identifier to delete.</param>
-public record DeleteCountryCommand(Guid Id) : IRequest<Response<Guid>>;
+public record DeleteCountryCommand(Guid Id) : ITransactionalCommand<Response<Guid>>;

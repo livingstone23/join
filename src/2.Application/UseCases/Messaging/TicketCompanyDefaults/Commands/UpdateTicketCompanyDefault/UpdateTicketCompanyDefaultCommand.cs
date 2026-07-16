@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Messaging.TicketCompanyDefaults.Commands;
 /// <summary>
 /// Command used to update the tenant ticket default configuration.
 /// </summary>
-public record UpdateTicketCompanyDefaultCommand : IRequest<Response<TicketCompanyDefaultDto>>
+public record UpdateTicketCompanyDefaultCommand : ITransactionalCommand<Response<TicketCompanyDefaultDto>>
 {
     /// <summary>
     /// Gets the configuration identifier.

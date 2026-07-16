@@ -4,7 +4,7 @@ using MediatR;
 
 namespace JOIN.Application.UseCases.Admin.IncomeRanges.Commands;
 
-public sealed record CreateIncomeRangeCommand : IRequest<Response<IncomeRangeDto>>
+public sealed record CreateIncomeRangeCommand : ITransactionalCommand<Response<IncomeRangeDto>>
 {
     public string DisplayName { get; init; } = string.Empty;
     public decimal MinimumValue { get; init; }

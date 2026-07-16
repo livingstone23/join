@@ -7,4 +7,4 @@ namespace JOIN.Application.UseCases.Messaging.TicketComplexities.Commands;
 /// Command to perform a soft delete for a ticket complexity catalog item.
 /// </summary>
 /// <param name="Id">The ticket complexity identifier to delete.</param>
-public sealed record DeleteTicketComplexityCommand(Guid Id) : IRequest<Response<Guid>>;
+public sealed record DeleteTicketComplexityCommand(Guid Id) : ITransactionalCommand<Response<Guid>>;

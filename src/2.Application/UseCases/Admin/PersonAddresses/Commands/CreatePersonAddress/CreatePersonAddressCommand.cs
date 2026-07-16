@@ -6,7 +6,7 @@ namespace JOIN.Application.UseCases.Admin.PersonAddresses.Commands;
 /// <summary>
 /// Command that creates a new address for an existing customer in the current tenant context.
 /// </summary>
-public sealed record CreatePersonAddressCommand : IRequest<Response<Guid>>
+public sealed record CreatePersonAddressCommand : ITransactionalCommand<Response<Guid>>
 {
     /// <summary>
     /// Gets the identifier of the customer owner.

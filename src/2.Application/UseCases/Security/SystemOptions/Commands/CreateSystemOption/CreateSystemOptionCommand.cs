@@ -18,4 +18,4 @@ public sealed record CreateSystemOptionCommand(
     bool CanCreate = true,
     bool CanUpdate = true,
     bool CanDelete = true)
-    : IRequest<Response<SystemOptionDto>>;
+    : ITransactionalCommand<Response<SystemOptionDto>>;

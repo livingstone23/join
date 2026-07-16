@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Admin.Industries.Commands;
 /// <summary>
 /// Command used to update an existing tenant-scoped industry catalog entry.
 /// </summary>
-public sealed record UpdateIndustryCommand : IRequest<Response<IndustryDto>>
+public sealed record UpdateIndustryCommand : ITransactionalCommand<Response<IndustryDto>>
 {
     /// <summary>
     /// Gets or sets the unique identifier of the target industry.

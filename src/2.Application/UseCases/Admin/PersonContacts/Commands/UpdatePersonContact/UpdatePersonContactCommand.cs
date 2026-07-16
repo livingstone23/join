@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Admin.PersonContacts.Commands;
 /// <summary>
 /// Command that updates an existing customer contact in the current tenant context.
 /// </summary>
-public sealed record UpdatePersonContactCommand : IRequest<Response<Guid>>
+public sealed record UpdatePersonContactCommand : ITransactionalCommand<Response<Guid>>
 {
     /// <summary>
     /// Gets the unique identifier of the contact to update.

@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Common.Municipalities.Commands;
 /// <summary>
 /// Command to register a new municipality in the geographic catalog.
 /// </summary>
-public record CreateMunicipalityCommand : IRequest<Response<MunicipalityDto>>
+public record CreateMunicipalityCommand : ITransactionalCommand<Response<MunicipalityDto>>
 {
     /// <summary>
     /// Gets or sets the municipality display name.

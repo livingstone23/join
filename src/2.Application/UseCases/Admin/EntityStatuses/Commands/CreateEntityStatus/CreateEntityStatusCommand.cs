@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Admin.EntityStatuses.Commands;
 /// <summary>
 /// Command used to create a new administrative entity status.
 /// </summary>
-public sealed record CreateEntityStatusCommand : IRequest<Response<EntityStatusDto>>
+public sealed record CreateEntityStatusCommand : ITransactionalCommand<Response<EntityStatusDto>>
 {
     /// <summary>
     /// Gets or sets the tenant identifier extracted from the <c>X-Company-Id</c> header.

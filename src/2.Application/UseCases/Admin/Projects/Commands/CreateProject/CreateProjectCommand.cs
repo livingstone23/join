@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Admin.Projects.Commands;
 /// <summary>
 /// Command used to create a new tenant-scoped project.
 /// </summary>
-public sealed record CreateProjectCommand : IRequest<Response<ProjectDto>>
+public sealed record CreateProjectCommand : ITransactionalCommand<Response<ProjectDto>>
 {
     /// <summary>
     /// Gets or sets the tenant identifier extracted from the <c>X-Company-Id</c> header.

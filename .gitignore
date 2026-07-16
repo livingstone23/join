@@ -196,5 +196,16 @@ coveragereport/
 .cursor/
 workspace.json
 
-# Nota: NO excluyas CLAUDE.md, ya que ese archivo debe subirse 
+# Skills / marketplaces de agentes instalados localmente (npx ctx7, skill installers, etc.)
+.agents/
+agent/
+.clinerules/
+.opencode/
+.windsurf/
+AGENTS.md
+package.json
+package-lock.json
+skills-lock.json
+
+# Nota: NO excluyas CLAUDE.md, ya que ese archivo debe subirse
 # para que las instrucciones del agente se compartan en el repo.

@@ -11,7 +11,7 @@ namespace JOIN.Application.UseCases.Admin.Persons.Commands;
 /// <summary>
 /// Command to update an existing Person aggregate, including addresses and contacts.
 /// </summary>
-public record UpdatePersonCommand : IRequest<Response<Guid>>
+public record UpdatePersonCommand : ITransactionalCommand<Response<Guid>>
 {
     /// <summary>
     /// Gets the customer identifier to update.

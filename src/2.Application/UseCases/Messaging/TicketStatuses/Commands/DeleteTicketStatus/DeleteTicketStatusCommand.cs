@@ -7,4 +7,4 @@ namespace JOIN.Application.UseCases.Messaging.TicketStatuses.Commands;
 /// Command to perform a soft delete for a ticket status catalog item.
 /// </summary>
 /// <param name="Id">The ticket status identifier to delete.</param>
-public sealed record DeleteTicketStatusCommand(Guid Id) : IRequest<Response<Guid>>;
+public sealed record DeleteTicketStatusCommand(Guid Id) : ITransactionalCommand<Response<Guid>>;

@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Common.Companies.Commands;
 /// <summary>
 /// Command to update an existing company.
 /// </summary>
-public record UpdateCompanyCommand : IRequest<Response<CompanyDto>>
+public record UpdateCompanyCommand : ITransactionalCommand<Response<CompanyDto>>
 {
     /// <summary>
     /// Gets the company identifier to update.

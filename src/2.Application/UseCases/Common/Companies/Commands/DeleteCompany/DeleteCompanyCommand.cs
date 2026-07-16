@@ -7,4 +7,4 @@ namespace JOIN.Application.UseCases.Common.Companies.Commands;
 /// Command to perform a soft delete for a company.
 /// </summary>
 /// <param name="Id">The company identifier to delete.</param>
-public record DeleteCompanyCommand(Guid Id) : IRequest<Response<Guid>>;
+public record DeleteCompanyCommand(Guid Id) : ITransactionalCommand<Response<Guid>>;

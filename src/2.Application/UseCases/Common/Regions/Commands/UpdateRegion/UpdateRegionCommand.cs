@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Common.Regions.Commands;
 /// <summary>
 /// Command to update an existing region catalog item.
 /// </summary>
-public record UpdateRegionCommand : IRequest<Response<RegionDto>>
+public record UpdateRegionCommand : ITransactionalCommand<Response<RegionDto>>
 {
     /// <summary>
     /// Gets the region identifier to update.

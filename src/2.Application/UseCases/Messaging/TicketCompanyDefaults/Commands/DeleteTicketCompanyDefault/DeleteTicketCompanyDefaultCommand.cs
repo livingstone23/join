@@ -7,4 +7,4 @@ namespace JOIN.Application.UseCases.Messaging.TicketCompanyDefaults.Commands;
 /// Command used to perform a logical delete of a tenant ticket default configuration.
 /// </summary>
 /// <param name="Id">Configuration identifier.</param>
-public record DeleteTicketCompanyDefaultCommand(Guid Id) : IRequest<Response<Guid>>;
+public record DeleteTicketCompanyDefaultCommand(Guid Id) : ITransactionalCommand<Response<Guid>>;

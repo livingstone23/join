@@ -7,4 +7,4 @@ namespace JOIN.Application.UseCases.Common.StreetTypes.Commands;
 /// Command to perform a soft delete for a street type.
 /// </summary>
 /// <param name="Id">The street type identifier to delete.</param>
-public record DeleteStreetTypeCommand(Guid Id) : IRequest<Response<Guid>>;
+public record DeleteStreetTypeCommand(Guid Id) : ITransactionalCommand<Response<Guid>>;

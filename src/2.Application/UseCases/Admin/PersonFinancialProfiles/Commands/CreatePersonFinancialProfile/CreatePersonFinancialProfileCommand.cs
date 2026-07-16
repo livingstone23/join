@@ -6,7 +6,7 @@ namespace JOIN.Application.UseCases.Admin.PersonFinancialProfiles.Commands;
 /// <summary>
 /// Command that creates a new financial profile for an existing person in the current tenant context.
 /// </summary>
-public sealed record CreatePersonFinancialProfileCommand : IRequest<Response<Guid>>
+public sealed record CreatePersonFinancialProfileCommand : ITransactionalCommand<Response<Guid>>
 {
     /// <summary>
     /// Gets the identifier of the person owner.

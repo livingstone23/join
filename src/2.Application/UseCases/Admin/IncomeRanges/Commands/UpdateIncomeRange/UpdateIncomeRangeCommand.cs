@@ -4,7 +4,7 @@ using MediatR;
 
 namespace JOIN.Application.UseCases.Admin.IncomeRanges.Commands;
 
-public sealed record UpdateIncomeRangeCommand : IRequest<Response<IncomeRangeDto>>
+public sealed record UpdateIncomeRangeCommand : ITransactionalCommand<Response<IncomeRangeDto>>
 {
     public Guid Id { get; init; }
     public string DisplayName { get; init; } = string.Empty;

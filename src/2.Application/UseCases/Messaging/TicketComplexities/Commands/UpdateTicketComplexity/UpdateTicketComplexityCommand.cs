@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Messaging.TicketComplexities.Commands;
 /// <summary>
 /// Command to update an existing ticket complexity catalog item.
 /// </summary>
-public record UpdateTicketComplexityCommand : IRequest<Response<TicketComplexityDto>>
+public record UpdateTicketComplexityCommand : ITransactionalCommand<Response<TicketComplexityDto>>
 {
     /// <summary>
     /// Gets the ticket complexity identifier to update.

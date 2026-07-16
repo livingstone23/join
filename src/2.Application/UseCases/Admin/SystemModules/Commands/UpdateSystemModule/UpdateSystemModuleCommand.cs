@@ -12,7 +12,7 @@ namespace JOIN.Application.UseCases.Admin.SystemModules.Commands;
 /// <summary>
 /// Command used to update an existing system module.
 /// </summary>
-public sealed record UpdateSystemModuleCommand : IRequest<Response<SystemModuleDto>>
+public sealed record UpdateSystemModuleCommand : ITransactionalCommand<Response<SystemModuleDto>>
 {
     /// <summary>
     /// Gets or sets the unique identifier of the target system module.

@@ -6,7 +6,7 @@ namespace JOIN.Application.UseCases.Admin.PersonFinancialProfiles.Commands;
 /// <summary>
 /// Command that updates an existing person financial profile in the current tenant context.
 /// </summary>
-public sealed record UpdatePersonFinancialProfileCommand : IRequest<Response<Guid>>
+public sealed record UpdatePersonFinancialProfileCommand : ITransactionalCommand<Response<Guid>>
 {
     /// <summary>
     /// Gets the unique identifier of the financial profile record to update.

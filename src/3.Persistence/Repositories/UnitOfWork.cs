@@ -11,6 +11,7 @@ using JOIN.Domain.Security;
 using JOIN.Persistence.Contexts;
 using JOIN.Persistence.Repositories.Admin;
 using JOIN.Persistence.Repositories.Security;
+using Microsoft.EntityFrameworkCore.Storage;
 
 
 
@@ -28,6 +29,7 @@ public class UnitOfWork : IUnitOfWork
     private readonly DapperContext _dapperContext;
     private readonly ISqlConnectionFactory _sqlConnectionFactory;
     private Hashtable? _repositories;
+    private IDbContextTransaction? _transaction;
 
     public UnitOfWork(
         ApplicationDbContext dbContext,
@@ -112,6 +114,43 @@ public class UnitOfWork : IUnitOfWork
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    // --- 4. EXPLICIT TRANSACTION CONTROL ---
+    // Invoked only by TransactionBehavior. Nested transactions on the same DbContext
+    // are not supported in this spec; calling Begin a second time would throw.
+    public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        if (_transaction is not null)
+        {
+            throw new InvalidOperationException("A transaction is already active on this UnitOfWork. Nested transactions are not supported.");
+        }
+
+        _transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+    }
+
+    public async Task CommitAsync(CancellationToken cancellationToken = default)
+    {
+        if (_transaction is null)
+        {
+            throw new InvalidOperationException("No active transaction to commit.");
+        }
+
+        await _transaction.CommitAsync(cancellationToken);
+        await _transaction.DisposeAsync();
+        _transaction = null;
+    }
+
+    public async Task RollbackAsync(CancellationToken cancellationToken = default)
+    {
+        if (_transaction is null)
+        {
+            throw new InvalidOperationException("No active transaction to rollback.");
+        }
+
+        await _transaction.RollbackAsync(cancellationToken);
+        await _transaction.DisposeAsync();
+        _transaction = null;
     }
 
     public void Dispose()

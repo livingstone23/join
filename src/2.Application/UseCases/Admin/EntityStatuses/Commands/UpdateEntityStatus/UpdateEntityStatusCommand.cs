@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Admin.EntityStatuses.Commands;
 /// <summary>
 /// Command used to update an existing administrative entity status.
 /// </summary>
-public sealed record UpdateEntityStatusCommand : IRequest<Response<EntityStatusDto>>
+public sealed record UpdateEntityStatusCommand : ITransactionalCommand<Response<EntityStatusDto>>
 {
     /// <summary>
     /// Gets or sets the unique identifier of the target entity status.

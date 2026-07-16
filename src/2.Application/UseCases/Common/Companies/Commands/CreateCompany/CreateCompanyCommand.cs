@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Common.Companies.Commands;
 /// <summary>
 /// Command to register a new company.
 /// </summary>
-public record CreateCompanyCommand : IRequest<Response<CompanyDto>>
+public record CreateCompanyCommand : ITransactionalCommand<Response<CompanyDto>>
 {
     /// <summary>
     /// Gets or sets the legal company name.

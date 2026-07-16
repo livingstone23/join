@@ -11,4 +11,4 @@ namespace JOIN.Application.UseCases.Admin.PersonContacts.Commands;
 /// Command that performs a soft delete for a person contact in the current tenant.
 /// </summary>
 /// <param name="Id">The unique identifier of the person contact to delete.</param>
-public sealed record DeletePersonContactCommand(Guid Id) : IRequest<Response<bool>>;
+public sealed record DeletePersonContactCommand(Guid Id) : ITransactionalCommand<Response<bool>>;

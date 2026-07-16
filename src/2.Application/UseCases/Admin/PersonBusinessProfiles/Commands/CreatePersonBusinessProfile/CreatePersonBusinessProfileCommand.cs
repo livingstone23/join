@@ -6,7 +6,7 @@ namespace JOIN.Application.UseCases.Admin.PersonBusinessProfiles.Commands;
 /// <summary>
 /// Command that creates a new business profile for an existing person in the current tenant context.
 /// </summary>
-public sealed record CreatePersonBusinessProfileCommand : IRequest<Response<Guid>>
+public sealed record CreatePersonBusinessProfileCommand : ITransactionalCommand<Response<Guid>>
 {
     /// <summary>
     /// Gets the identifier of the person owner.

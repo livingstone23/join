@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Messaging.TicketStatuses.Commands;
 /// <summary>
 /// Command to register a new ticket status in the messaging catalog.
 /// </summary>
-public record CreateTicketStatusCommand : IRequest<Response<TicketStatusDto>>
+public record CreateTicketStatusCommand : ITransactionalCommand<Response<TicketStatusDto>>
 {
     /// <summary>
     /// Gets or sets the display name of the ticket status.

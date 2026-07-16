@@ -15,4 +15,4 @@ public sealed record CreateRoleSystemOptionCommand(
     bool CanCreate,
     bool CanUpdate,
     bool CanDelete)
-    : IRequest<Response<RoleSystemOptionDto>>;
+    : ITransactionalCommand<Response<RoleSystemOptionDto>>;

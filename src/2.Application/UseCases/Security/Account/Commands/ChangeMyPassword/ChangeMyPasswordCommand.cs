@@ -10,7 +10,7 @@ namespace JOIN.Application.UseCases.Security.Account.Commands.ChangeMyPassword;
 /// <summary>
 /// Represents the command used by the authenticated user to change the account password.
 /// </summary>
-public sealed record ChangeMyPasswordCommand : IRequest<Response<bool>>
+public sealed record ChangeMyPasswordCommand : ITransactionalCommand<Response<bool>>
 {
     /// <summary>
     /// Gets the unique identifier of the authenticated user extracted from claims.

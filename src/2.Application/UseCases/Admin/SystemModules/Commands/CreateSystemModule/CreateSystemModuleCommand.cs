@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Admin.SystemModules.Commands;
 /// <summary>
 /// Command used to create a new system module.
 /// </summary>
-public sealed record CreateSystemModuleCommand : IRequest<Response<SystemModuleDto>>
+public sealed record CreateSystemModuleCommand : ITransactionalCommand<Response<SystemModuleDto>>
 {
     /// <summary>
     /// Gets or sets the display name of the system module.

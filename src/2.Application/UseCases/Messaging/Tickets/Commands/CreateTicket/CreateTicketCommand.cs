@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Messaging.Tickets.Commands;
 /// <summary>
 /// Command used to create a ticket in the current tenant context.
 /// </summary>
-public record CreateTicketCommand : IRequest<Response<TicketDto>>
+public record CreateTicketCommand : ITransactionalCommand<Response<TicketDto>>
 {
     /// <summary>
     /// Gets or sets the ticket title.

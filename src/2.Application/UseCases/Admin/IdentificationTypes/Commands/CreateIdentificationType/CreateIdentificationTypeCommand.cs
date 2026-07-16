@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Admin.IdentificationTypes.Commands;
 /// <summary>
 /// Command used to create a new identification type.
 /// </summary>
-public sealed record CreateIdentificationTypeCommand : IRequest<Response<IdentificationTypeDto>>
+public sealed record CreateIdentificationTypeCommand : ITransactionalCommand<Response<IdentificationTypeDto>>
 {
     /// <summary>
     /// Gets or sets the display name of the identification type.

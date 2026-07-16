@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 /// <summary>
 /// Command used to update an existing tenant-scoped company module assignment.
 /// </summary>
-public sealed record UpdateCompanyModulesCommand : IRequest<Response<CompanyModuleDto>>
+public sealed record UpdateCompanyModulesCommand : ITransactionalCommand<Response<CompanyModuleDto>>
 {
     /// <summary>
     /// Gets or sets the unique identifier of the target assignment.
