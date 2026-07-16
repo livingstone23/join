@@ -19,8 +19,26 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore; // <-- New using for modern API UI
+using Serilog;
+
+// ============================================================================
+// SERILOG BOOTSTRAP LOGGER
+// Captures host startup errors before the real logger (built from configuration)
+// exists. Replaced by UseSerilog(...) below once the WebApplicationBuilder is up.
+// ============================================================================
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
+
+try
+{
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Replace the default Microsoft.Extensions.Logging factory with Serilog,
+// configured entirely from the "Serilog" section of appsettings.{env}.json.
+builder.Host.UseSerilog((context, services, configuration) =>
+    configuration.ReadFrom.Configuration(context.Configuration));
 
 // ============================================================================
 // 1. ADD CORE SERVICES (Dependency Injection)
@@ -208,3 +226,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.Run();
+
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "JOIN host terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

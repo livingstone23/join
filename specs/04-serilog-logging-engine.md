@@ -1,6 +1,6 @@
 # SPEC 04 — Serilog como motor de logging definitivo
 
-> **Status:** Draft
+> **Status:** Aprobado
 > **Depends on:** SPEC 01, SPEC 02, SPEC 03 (referencia informativa únicamente — este spec no modifica ninguno de los tres; les provee el motor de infraestructura de logging que sus mensajes estructurados ya estaban preparados para usar)
 > **Date:** 2026-07-13
 > **Objective:** Instalar y configurar Serilog.AspNetCore como motor de logging definitivo de la aplicación, con sink de consola en texto legible en Development y JSON compacto en Production, sin modificar ninguna abstracción `ILogger<T>` existente en handlers, controllers o behaviors.
