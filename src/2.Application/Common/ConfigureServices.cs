@@ -40,15 +40,29 @@ public static class ConfigureServices
         {
             config.RegisterServicesFromAssembly(assembly);
 
-            // Register PerformanceBehavior as the FIRST behavior in the pipeline so it measures
-            // the total elapsed time as experienced by the HTTP client (including ValidationBehavior
-            // and TransactionBehavior overhead such as BeginTransactionAsync/CommitAsync).
+            // Register UnhandledExceptionBehavior FIRST (outermost) so it can capture any
+            // exception thrown anywhere in the pipeline below — including from ValidationBehavior,
+            // PerformanceBehavior, LoggingBehavior, TransactionBehavior, or the handler itself.
+            // Business-expected exceptions (ValidationException, NotFoundException, DomainException)
+            // are rethrown untouched and intentionally NOT logged here (GlobalExceptionHandler already
+            // maps them to standard HTTP responses).
+            config.AddBehavior(typeof(IPipelineBehavior<,>), typeof(UnhandledExceptionBehavior<,>));
+
+            // Register PerformanceBehavior as the SECOND behavior in the pipeline so it measures
+            // the total elapsed time as experienced by the HTTP client (including ValidationBehavior,
+            // LoggingBehavior, and TransactionBehavior overhead such as BeginTransactionAsync/CommitAsync).
             config.AddBehavior(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
 
             // Register the validation pipeline behavior
             config.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
-            // Register the transaction pipeline behavior immediately AFTER ValidationBehavior.
+            // Register LoggingBehavior AFTER validation so "Started" only fires for requests that
+            // actually pass validation, and BEFORE the transaction so "Finished" includes the
+            // transaction commit latency. No try/catch — the "Finished" log is simply skipped
+            // when the downstream throws.
+            config.AddBehavior(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+
+            // Register the transaction pipeline behavior immediately AFTER LoggingBehavior.
             // It uses a runtime interface check, so requests that do NOT implement
             // ITransactionalCommand<TResponse> bypass it with zero overhead.
             config.AddBehavior(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));

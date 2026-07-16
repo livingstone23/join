@@ -1,6 +1,6 @@
 # SPEC 02 — PerformanceBehavior para medición de latencia en MediatR
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 01 (referencia informativa únicamente — este spec no modifica SPEC 01 ni TransactionBehavior.cs)
 > **Date:** 2026-07-13
 > **Objective:** Implementar PerformanceBehavior, un pipeline behavior de MediatR que mida con Stopwatch la duración de todo IRequest (Commands y Queries) y emita un warning estructurado cuando supere un umbral configurable vía appsettings (default 200ms).

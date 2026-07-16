@@ -1,6 +1,6 @@
 # SPEC 03 — UnhandledExceptionBehavior y LoggingBehavior para observabilidad de excepciones y ciclo de vida
 
-> **Status:** Draft
+> **Status:** Aprobado
 > **Depends on:** SPEC 01, SPEC 02 (referencia informativa únicamente — este spec no modifica ninguno de los dos)
 > **Date:** 2026-07-13
 > **Objective:** Implementar UnhandledExceptionBehavior y LoggingBehavior, dos pipeline behaviors independientes de MediatR que registren excepciones genuinamente inesperadas y el ciclo de vida (inicio y finalización exitosa) de cada Command/Query, sin loguear el payload del request.
