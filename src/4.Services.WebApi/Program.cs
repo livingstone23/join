@@ -67,6 +67,8 @@ var passwordPolicySettings = passwordPolicySection.Get<PasswordPolicySettings>()
 var areaPaginationSection = builder.Configuration.GetSection("AreaPagination");
 builder.Services.Configure<PaginationSettings>(areaPaginationSection);
 
+builder.Services.Configure<PerformanceSettings>(builder.Configuration.GetSection("Performance"));
+
 // Application Layer (MediatR, FluentValidation Pipeline)
 builder.Services.AddApplicationServices();
 

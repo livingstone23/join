@@ -40,6 +40,11 @@ public static class ConfigureServices
         {
             config.RegisterServicesFromAssembly(assembly);
 
+            // Register PerformanceBehavior as the FIRST behavior in the pipeline so it measures
+            // the total elapsed time as experienced by the HTTP client (including ValidationBehavior
+            // and TransactionBehavior overhead such as BeginTransactionAsync/CommitAsync).
+            config.AddBehavior(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
+
             // Register the validation pipeline behavior
             config.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
