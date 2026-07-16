@@ -9,4 +9,4 @@ namespace JOIN.Application.UseCases.Admin.Areas.Commands;
 /// <param name="Id">The unique identifier of the area to delete.</param>
 /// <param name="CompanyId">The tenant identifier used to validate the deletion scope.</param>
 public sealed record DeleteAreaCommand(Guid Id, Guid CompanyId)
-    : IRequest<Response<Guid>>;
+    : ITransactionalCommand<Response<Guid>>;

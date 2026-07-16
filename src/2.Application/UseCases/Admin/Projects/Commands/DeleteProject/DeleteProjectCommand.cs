@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Admin.Projects.Commands;
 /// </summary>
 /// <param name="Id">The unique identifier of the project to delete.</param>
 /// <param name="CompanyId">The tenant identifier used to scope the delete operation.</param>
-public sealed record DeleteProjectCommand(Guid Id, Guid CompanyId) : IRequest<Response<Guid>>;
+public sealed record DeleteProjectCommand(Guid Id, Guid CompanyId) : ITransactionalCommand<Response<Guid>>;

@@ -7,4 +7,4 @@ namespace JOIN.Application.UseCases.Messaging.Tickets.Commands;
 /// Command used to soft-delete a ticket.
 /// </summary>
 /// <param name="Id">Ticket identifier.</param>
-public record DeleteTicketCommand(Guid Id) : IRequest<Response<Guid>>;
+public record DeleteTicketCommand(Guid Id) : ITransactionalCommand<Response<Guid>>;

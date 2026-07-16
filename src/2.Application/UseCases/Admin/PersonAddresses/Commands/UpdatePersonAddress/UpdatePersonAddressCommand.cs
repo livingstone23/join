@@ -6,7 +6,7 @@ namespace JOIN.Application.UseCases.Admin.PersonAddresses.Commands;
 /// <summary>
 /// Command that updates an existing customer address in the current tenant context.
 /// </summary>
-public sealed record UpdatePersonAddressCommand : IRequest<Response<Guid>>
+public sealed record UpdatePersonAddressCommand : ITransactionalCommand<Response<Guid>>
 {
     /// <summary>
     /// Gets the unique identifier of the address to update.

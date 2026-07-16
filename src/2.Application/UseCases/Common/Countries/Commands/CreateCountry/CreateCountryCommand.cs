@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Common.Countries.Commands;
 /// <summary>
 /// Command to register a new country in the catalog.
 /// </summary>
-public record CreateCountryCommand : IRequest<Response<CountryDto>>
+public record CreateCountryCommand : ITransactionalCommand<Response<CountryDto>>
 {
     /// <summary>
     /// Gets or sets the country name.

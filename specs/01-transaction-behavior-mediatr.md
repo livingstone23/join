@@ -1,6 +1,6 @@
 # SPEC 01 — TransactionBehavior para Commands en MediatR
 
-> **Status:** Draft
+> **Status:** Aprobado
 > **Depends on:** Ninguna (primer spec del repositorio)
 > **Date:** 2026-07-13
 > **Objective:** Envolver automáticamente en una transacción explícita de EF Core (Begin/Commit/Rollback) a todo Command 100% de base de datos, vía un `IPipelineBehavior` de MediatR que se activa con una interfaz marcadora opt-in, migrando de forma total los Commands existentes que califiquen y dejando intactas las Queries y los Commands con I/O externo.

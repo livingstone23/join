@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Messaging.TicketComplexities.Commands;
 /// <summary>
 /// Command to register a new ticket complexity in the messaging catalog.
 /// </summary>
-public record CreateTicketComplexityCommand : IRequest<Response<TicketComplexityDto>>
+public record CreateTicketComplexityCommand : ITransactionalCommand<Response<TicketComplexityDto>>
 {
     /// <summary>
     /// Gets or sets the display name of the ticket complexity.

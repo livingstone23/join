@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Common.CommunicationChannels.Commands;
 /// <summary>
 /// Command to register a new communication channel.
 /// </summary>
-public record CreateCommunicationChannelCommand : IRequest<Response<CommunicationChannelDto>>
+public record CreateCommunicationChannelCommand : ITransactionalCommand<Response<CommunicationChannelDto>>
 {
     /// <summary>
     /// Gets or sets the channel name.

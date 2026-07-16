@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Common.Countries.Commands;
 /// <summary>
 /// Command to update an existing country catalog item.
 /// </summary>
-public record UpdateCountryCommand : IRequest<Response<CountryDto>>
+public record UpdateCountryCommand : ITransactionalCommand<Response<CountryDto>>
 {
     /// <summary>
     /// Gets the country identifier to update.

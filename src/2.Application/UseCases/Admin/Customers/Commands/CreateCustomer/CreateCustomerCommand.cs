@@ -15,4 +15,4 @@ namespace JOIN.Application.UseCases.Admin.Customers.Commands;
 public sealed record CreateCustomerCommand(
     Guid PersonId,
     Guid UserId,
-    PersonLifecycleStage PersonLifecycleStage) : IRequest<Response<CustomerResponseDto>>;
+    PersonLifecycleStage PersonLifecycleStage) : ITransactionalCommand<Response<CustomerResponseDto>>;

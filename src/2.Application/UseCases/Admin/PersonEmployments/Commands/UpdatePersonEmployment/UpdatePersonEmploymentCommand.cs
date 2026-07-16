@@ -6,7 +6,7 @@ namespace JOIN.Application.UseCases.Admin.PersonEmployments.Commands;
 /// <summary>
 /// Command that updates an existing person employment record in the current tenant context.
 /// </summary>
-public sealed record UpdatePersonEmploymentCommand : IRequest<Response<Guid>>
+public sealed record UpdatePersonEmploymentCommand : ITransactionalCommand<Response<Guid>>
 {
     /// <summary>
     /// Gets the unique identifier of the employment record to update.

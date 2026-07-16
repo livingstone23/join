@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 /// </summary>
 /// <param name="Id">The unique identifier of the assignment to delete.</param>
 public sealed record DeleteCompanyModulesCommand(Guid Id)
-    : IRequest<Response<Guid>>;
+    : ITransactionalCommand<Response<Guid>>;

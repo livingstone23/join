@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Admin.Genders.Commands;
 /// <summary>
 /// Command used to update an existing tenant-scoped gender catalog entry.
 /// </summary>
-public sealed record UpdateGenderCommand : IRequest<Response<GenderDto>>
+public sealed record UpdateGenderCommand : ITransactionalCommand<Response<GenderDto>>
 {
     /// <summary>
     /// Gets or sets the unique identifier of the target gender.

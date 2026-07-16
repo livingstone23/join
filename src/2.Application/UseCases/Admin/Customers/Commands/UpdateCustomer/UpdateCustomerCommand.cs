@@ -11,4 +11,4 @@ namespace JOIN.Application.UseCases.Admin.Customers.Commands;
 public sealed record UpdateCustomerCommand(
     Guid Id,
     PersonLifecycleStage PersonLifecycleStage,
-    bool IsActive) : IRequest<Response<CustomerResponseDto>>;
+    bool IsActive) : ITransactionalCommand<Response<CustomerResponseDto>>;

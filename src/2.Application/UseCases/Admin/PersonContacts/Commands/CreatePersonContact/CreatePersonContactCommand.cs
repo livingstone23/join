@@ -11,7 +11,7 @@ namespace JOIN.Application.UseCases.Admin.PersonContacts.Commands;
 /// <summary>
 /// Command that creates a new contact for an existing person in the current tenant context.
 /// </summary>
-public sealed record CreatePersonContactCommand : IRequest<Response<Guid>>
+public sealed record CreatePersonContactCommand : ITransactionalCommand<Response<Guid>>
 {
     /// <summary>
     /// Gets the identifier of the person owner.

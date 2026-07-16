@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Admin.Areas.Commands;
 /// <summary>
 /// Command used to create a tenant-scoped functional area.
 /// </summary>
-public sealed record CreateAreaCommand : IRequest<Response<AreaDto>>
+public sealed record CreateAreaCommand : ITransactionalCommand<Response<AreaDto>>
 {
     /// <summary>
     /// Gets or sets the unique identifier of the company that owns the area.

@@ -7,4 +7,4 @@ namespace JOIN.Application.UseCases.Admin.PersonAddresses.Commands;
 /// Command that performs a soft delete for a customer address in the current tenant.
 /// </summary>
 /// <param name="Id">The unique identifier of the customer address to delete.</param>
-public sealed record DeletePersonAddressCommand(Guid Id) : IRequest<Response<bool>>;
+public sealed record DeletePersonAddressCommand(Guid Id) : ITransactionalCommand<Response<bool>>;

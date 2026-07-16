@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Admin.Areas.Commands;
 /// <summary>
 /// Command used to update an existing tenant-scoped functional area.
 /// </summary>
-public sealed record UpdateAreaCommand : IRequest<Response<AreaDto>>
+public sealed record UpdateAreaCommand : ITransactionalCommand<Response<AreaDto>>
 {
     /// <summary>
     /// Gets or sets the unique identifier of the target area.

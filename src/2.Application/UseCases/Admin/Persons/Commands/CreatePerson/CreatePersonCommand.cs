@@ -15,7 +15,7 @@ namespace JOIN.Application.UseCases.Admin.Persons.Commands;
 /// Command to register a new Person in the system.
 /// Carries the complete hierarchical payload, including addresses and contacts.
 /// </summary>
-public record CreatePersonCommand : IRequest<Response<Guid>>
+public record CreatePersonCommand : ITransactionalCommand<Response<Guid>>
 {
 	/// <summary>
 	/// Categorizes the customer as Physical (Natural Person) or Legal (Company/Organization).

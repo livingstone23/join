@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Messaging.Tickets.Commands;
 /// <summary>
 /// Command used to update an existing ticket.
 /// </summary>
-public record UpdateTicketCommand : IRequest<Response<TicketDto>>
+public record UpdateTicketCommand : ITransactionalCommand<Response<TicketDto>>
 {
     /// <summary>
     /// Gets the ticket identifier to update.

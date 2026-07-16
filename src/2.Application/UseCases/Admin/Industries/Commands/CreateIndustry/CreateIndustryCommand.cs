@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Admin.Industries.Commands;
 /// <summary>
 /// Command used to create a new tenant-scoped industry catalog entry.
 /// </summary>
-public sealed record CreateIndustryCommand : IRequest<Response<IndustryDto>>
+public sealed record CreateIndustryCommand : ITransactionalCommand<Response<IndustryDto>>
 {
     /// <summary>
     /// Gets or sets the standard or internal code for the industry.

@@ -39,9 +39,14 @@ public static class ConfigureServices
         services.AddMediatR(config =>
         {
             config.RegisterServicesFromAssembly(assembly);
-            
+
             // Register the validation pipeline behavior
             config.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+
+            // Register the transaction pipeline behavior immediately AFTER ValidationBehavior.
+            // It uses a runtime interface check, so requests that do NOT implement
+            // ITransactionalCommand<TResponse> bypass it with zero overhead.
+            config.AddBehavior(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
         });
 
         // Register FluentValidation and automatically discover all Validators

@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Admin.Genders.Commands;
 /// <summary>
 /// Command used to create a new tenant-scoped gender catalog entry.
 /// </summary>
-public sealed record CreateGenderCommand : IRequest<Response<GenderDto>>
+public sealed record CreateGenderCommand : ITransactionalCommand<Response<GenderDto>>
 {
     /// <summary>
     /// Gets or sets the standard or internal code for the gender.

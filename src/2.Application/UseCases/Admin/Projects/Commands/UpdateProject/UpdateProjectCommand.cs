@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Admin.Projects.Commands;
 /// <summary>
 /// Command used to update an existing tenant-scoped project.
 /// </summary>
-public sealed record UpdateProjectCommand : IRequest<Response<ProjectDto>>
+public sealed record UpdateProjectCommand : ITransactionalCommand<Response<ProjectDto>>
 {
     /// <summary>
     /// Gets or sets the unique identifier of the target project.

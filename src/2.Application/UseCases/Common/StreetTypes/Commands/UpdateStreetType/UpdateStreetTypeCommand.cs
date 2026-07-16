@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Common.StreetTypes.Commands;
 /// <summary>
 /// Command to update an existing street type.
 /// </summary>
-public record UpdateStreetTypeCommand : IRequest<Response<StreetTypeDto>>
+public record UpdateStreetTypeCommand : ITransactionalCommand<Response<StreetTypeDto>>
 {
     /// <summary>
     /// Gets the street type identifier to update.

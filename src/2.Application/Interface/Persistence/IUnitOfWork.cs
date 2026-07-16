@@ -34,4 +34,10 @@ public interface IUnitOfWork : IDisposable
     /// <returns>The number of state entries written to the database.</returns>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
+    // --- 4. Explicit Transaction Control ---
+    // Intended to be invoked only by TransactionBehavior. Handlers must not call these directly.
+    Task BeginTransactionAsync(CancellationToken cancellationToken = default);
+    Task CommitAsync(CancellationToken cancellationToken = default);
+    Task RollbackAsync(CancellationToken cancellationToken = default);
+
 }

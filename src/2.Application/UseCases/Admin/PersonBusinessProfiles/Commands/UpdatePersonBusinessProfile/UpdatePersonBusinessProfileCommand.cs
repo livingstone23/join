@@ -6,7 +6,7 @@ namespace JOIN.Application.UseCases.Admin.PersonBusinessProfiles.Commands;
 /// <summary>
 /// Command that updates an existing person business profile in the current tenant context.
 /// </summary>
-public sealed record UpdatePersonBusinessProfileCommand : IRequest<Response<Guid>>
+public sealed record UpdatePersonBusinessProfileCommand : ITransactionalCommand<Response<Guid>>
 {
     /// <summary>
     /// Gets the unique identifier of the business profile record to update.

@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Common.Municipalities.Commands;
 /// <summary>
 /// Command to update an existing municipality catalog item.
 /// </summary>
-public record UpdateMunicipalityCommand : IRequest<Response<MunicipalityDto>>
+public record UpdateMunicipalityCommand : ITransactionalCommand<Response<MunicipalityDto>>
 {
     /// <summary>
     /// Gets the municipality identifier to update.

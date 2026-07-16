@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Common.CommunicationChannels.Commands;
 /// <summary>
 /// Command to update an existing communication channel.
 /// </summary>
-public record UpdateCommunicationChannelCommand : IRequest<Response<CommunicationChannelDto>>
+public record UpdateCommunicationChannelCommand : ITransactionalCommand<Response<CommunicationChannelDto>>
 {
     /// <summary>
     /// Gets the communication channel identifier to update.

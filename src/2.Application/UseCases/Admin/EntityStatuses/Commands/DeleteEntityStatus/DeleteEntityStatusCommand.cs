@@ -9,4 +9,4 @@ namespace JOIN.Application.UseCases.Admin.EntityStatuses.Commands;
 /// <param name="Id">The unique identifier of the entity status to delete.</param>
 /// <param name="CompanyId">The tenant identifier used to validate the request scope.</param>
 public sealed record DeleteEntityStatusCommand(Guid Id, Guid CompanyId)
-    : IRequest<Response<Guid>>;
+    : ITransactionalCommand<Response<Guid>>;

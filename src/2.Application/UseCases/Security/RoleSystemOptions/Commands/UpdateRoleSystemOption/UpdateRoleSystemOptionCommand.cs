@@ -16,4 +16,4 @@ public sealed record UpdateRoleSystemOptionCommand(
     bool CanCreate,
     bool CanUpdate,
     bool CanDelete)
-    : IRequest<Response<RoleSystemOptionDto>>;
+    : ITransactionalCommand<Response<RoleSystemOptionDto>>;

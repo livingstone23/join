@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Common.Regions.Commands;
 /// <summary>
 /// Command to register a new region in the geographic catalog.
 /// </summary>
-public record CreateRegionCommand : IRequest<Response<RegionDto>>
+public record CreateRegionCommand : ITransactionalCommand<Response<RegionDto>>
 {
     /// <summary>
     /// Gets or sets the region display name.

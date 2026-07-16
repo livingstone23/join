@@ -11,4 +11,4 @@ namespace JOIN.Application.UseCases.Security.Users.Commands.ReplaceUserRoles;
 /// <param name="UserId">The unique identifier of the user whose role assignments should be replaced.</param>
 /// <param name="Roles">The final list of roles that must remain assigned to the target user after processing.</param>
 public sealed record ReplaceUserRolesCommand(Guid UserId, IReadOnlyCollection<string> Roles)
-    : IRequest<Response<UserWithRolesDto>>;
+    : ITransactionalCommand<Response<UserWithRolesDto>>;

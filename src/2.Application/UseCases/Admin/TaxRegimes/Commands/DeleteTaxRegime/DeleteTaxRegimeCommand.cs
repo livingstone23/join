@@ -3,4 +3,4 @@ using MediatR;
 
 namespace JOIN.Application.UseCases.Admin.TaxRegimes.Commands;
 
-public sealed record DeleteTaxRegimeCommand(Guid Id) : IRequest<Response<Guid>>;
+public sealed record DeleteTaxRegimeCommand(Guid Id) : ITransactionalCommand<Response<Guid>>;

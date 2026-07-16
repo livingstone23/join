@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Messaging.TimeUnits.Commands;
 /// <summary>
 /// Command to update an existing time unit catalog item.
 /// </summary>
-public record UpdateTimeUnitCommand : IRequest<Response<TimeUnitDto>>
+public record UpdateTimeUnitCommand : ITransactionalCommand<Response<TimeUnitDto>>
 {
     /// <summary>
     /// Gets the time unit identifier to update.

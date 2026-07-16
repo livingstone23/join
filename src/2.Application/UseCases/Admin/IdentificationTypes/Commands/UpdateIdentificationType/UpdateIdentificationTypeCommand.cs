@@ -8,7 +8,7 @@ namespace JOIN.Application.UseCases.Admin.IdentificationTypes.Commands;
 /// <summary>
 /// Command used to update an existing identification type.
 /// </summary>
-public sealed record UpdateIdentificationTypeCommand : IRequest<Response<IdentificationTypeDto>>
+public sealed record UpdateIdentificationTypeCommand : ITransactionalCommand<Response<IdentificationTypeDto>>
 {
     /// <summary>
     /// Gets or sets the unique identifier of the target identification type.

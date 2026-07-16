@@ -7,7 +7,7 @@ namespace JOIN.Application.UseCases.Common.StreetTypes.Commands;
 /// <summary>
 /// Command to register a new street type.
 /// </summary>
-public record CreateStreetTypeCommand : IRequest<Response<StreetTypeDto>>
+public record CreateStreetTypeCommand : ITransactionalCommand<Response<StreetTypeDto>>
 {
     /// <summary>
     /// Gets or sets the street type name.

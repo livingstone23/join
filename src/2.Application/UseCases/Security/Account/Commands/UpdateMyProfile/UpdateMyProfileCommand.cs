@@ -11,7 +11,7 @@ namespace JOIN.Application.UseCases.Security.Account.Commands.UpdateMyProfile;
 /// <summary>
 /// Represents the command used to update profile data for the current authenticated user.
 /// </summary>
-public sealed record UpdateMyProfileCommand : IRequest<Response<AccountProfileResponseDto>>
+public sealed record UpdateMyProfileCommand : ITransactionalCommand<Response<AccountProfileResponseDto>>
 {
     /// <summary>
     /// Gets the unique identifier of the authenticated user extracted from claims.
