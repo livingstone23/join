@@ -1,6 +1,6 @@
 # SPEC 07 — Contenedorización de la API y entorno local mínimo (Docker)
 
-> **Status:** Draft
+> **Status:** Implementado
 > **Depends on:** Ninguna
 > **Date:** 2026-07-14
 > **Objective:** Contenedorizar la API de JOIN con un Dockerfile multi-stage sobre imágenes Alpine de .NET 10, y levantar un entorno local mínimo vía docker-compose (solo el servicio de la API) que inyecta credenciales desde un `.env` gitignored apuntando a la base de datos externa ya existente.
@@ -14,7 +14,7 @@
 - `Dockerfile` en la raíz del repo (build context necesita ver todos los proyectos `src/*` referenciados por la API — no solo `4.Services.WebApi`). Multi-stage:
   - `build`: `mcr.microsoft.com/dotnet/sdk:10.0-alpine` — restore + build de `src/4.Services.WebApi/JOIN.Services.WebApi.csproj`.
   - `publish`: mismo stage o siguiente — `dotnet publish -c Release -o /app/publish`.
-  - `final`: `mcr.microsoft.com/dotnet/aspnet:10.0-alpine` — copia `/app/publish`, define `ENTRYPOINT`.
+  - `final`: `mcr.microsoft.com/dotnet/aspnet:10.0-alpine` — copia `/app/publish`, define `ENTRYPOINT`. **Requisito runtime sobre Alpine:** el stage final debe instalar `icu-libs` (`apk add --no-cache icu-libs`) y fijar `ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false`, porque la imagen base activa Invariant Mode por default y `Microsoft.Data.SqlClient` requiere ICU para parsear connection strings culture-aware.
 - `.dockerignore` en la raíz: excluye `**/bin/`, `**/obj/`, `.git/`, `tests/`, `.github/`, `specs/`, `.env`, `docker-compose.yml`, `*.user`, archivos de IDE (`.vscode/`, `.idea/`).
 - `docker-compose.yml` en la raíz: **un único servicio** `api` — build desde el `Dockerfile` local, `env_file: .env`, mapeo de puerto explícito.
 - `.env.example` committeado (plantilla con placeholders, sin valores reales) documentando las 3 claves requeridas: `ConnectionStrings__DefaultConnection`, `Jwt__Key`, `SendGrid__ApiKey`.
