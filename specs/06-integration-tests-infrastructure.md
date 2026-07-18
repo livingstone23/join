@@ -1,6 +1,6 @@
 # SPEC 06 — Infraestructura base de pruebas de integración
 
-> **Status:** Draft
+> **Status:** Implementado
 > **Depends on:** SPEC 01 (referencia informativa — el piloto ejercita indirectamente TransactionBehavior, ya que RegisterCommand implementa ITransactionalCommand desde SPEC 01)
 > **Date:** 2026-07-14
 > **Objective:** Establecer la infraestructura base de pruebas de integración (xUnit + WebApplicationFactory + Testcontainers.MsSql) con una prueba piloto sobre RegisterCommand que demuestre el pipeline completo contra una base de datos SQL Server efímera, ejecutada en un job de CI separado del gate de cobertura de unitarias.

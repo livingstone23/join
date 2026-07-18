@@ -28,13 +28,23 @@ jobs:
       run: dotnet build --no-restore --configuration Release
 
     - name: 🧪 Run Unit Tests & Enforce Coverage
-      # Genera el archivo cobertura.xml y falla si baja del 90%
+      # Scope explícito al proyecto de unitarias: el gate del 90% aplica
+      # exclusivamente a JOIN.Application.UnitTest. Si se omitiera el project
+      # path, `dotnet test` correría también IntegrationTests e inflaría la
+      # métrica con cobertura de Controllers, Behaviors, EF Core, etc.
       run: >
-        dotnet test --no-build --configuration Release --verbosity normal 
-        /p:CollectCoverage=true 
-        /p:CoverletOutputFormat=cobertura 
-        /p:Threshold=90 
+        dotnet test tests/UnitTests/JOIN.Application.UnitTest/JOIN.Application.UnitTest.csproj
+        --no-build --configuration Release --verbosity normal
+        /p:CollectCoverage=true
+        /p:CoverletOutputFormat=cobertura
+        /p:Threshold=90
         /p:ThresholdType=line
+
+    - name: 🐳 Run Integration Tests (Testcontainers)
+      # Sin flags de Coverlet/Threshold: las pruebas de integración no entran
+      # en el gate de cobertura del 90% (separación deliberada por spec).
+      # El runner ubuntu-latest trae Docker preinstalado.
+      run: dotnet test tests/IntegrationTests/JOIN.IntegrationTests.csproj --no-build --configuration Release --verbosity normal
 
     # --- LOS SIGUIENTES PASOS GENERAN EL COMENTARIO VISUAL EN EL PR ---
     - name: 📊 Generate Code Coverage Report
