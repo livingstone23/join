@@ -236,3 +236,8 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+// Make the implicit Program class visible to integration tests (WebApplicationFactory<Program>).
+// Required because top-level statements generate an internal sealed Program class by default.
+// Partial so it merges cleanly with the compiler-generated one — no runtime impact in production.
+public partial class Program { }
