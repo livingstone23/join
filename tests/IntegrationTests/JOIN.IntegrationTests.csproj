@@ -27,8 +27,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\src\4.Services.WebApi\appsettings.json" Link="appsettings\appsettings.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\src\4.Services.WebApi\appsettings.Development.json" Link="appsettings\appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\4.Services.WebApi\appsettings.json" Link="appsettings\appsettings.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\..\src\4.Services.WebApi\appsettings.json')" />
+    <None Include="..\..\src\4.Services.WebApi\appsettings.Development.json" Link="appsettings\appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\..\src\4.Services.WebApi\appsettings.Development.json')" />
   </ItemGroup>
 
 </Project>

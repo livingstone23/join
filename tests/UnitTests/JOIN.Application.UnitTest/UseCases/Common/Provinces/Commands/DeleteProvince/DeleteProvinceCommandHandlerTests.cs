@@ -80,22 +80,20 @@ public sealed class DeleteProvinceCommandHandlerTests
 
         context.ProvinceRepositoryMock.Setup(x => x.GetAsync(provinceId)).ReturnsAsync(entity);
         context.MunicipalityRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<Municipality>());
-        context.PersonAddressRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(new[]
+        var address = new PersonAddress
         {
-            new PersonAddress
-            {
-                CompanyId = Guid.NewGuid(),
-                PersonId = Guid.NewGuid(),
-                AddressLine1 = "Main street",
-                ZipCode = "12001",
-                StreetTypeId = Guid.NewGuid(),
-                CountryId = Guid.NewGuid(),
-                ProvinceId = provinceId,
-                MunicipalityId = Guid.NewGuid(),
-                IsDefault = true,
-                GcRecord = 0
-            }
-        });
+            CompanyId = Guid.NewGuid(),
+            PersonId = Guid.NewGuid(),
+            AddressLine1 = "Main street",
+            ZipCode = "12001",
+            StreetTypeId = Guid.NewGuid(),
+            CountryId = Guid.NewGuid(),
+            ProvinceId = provinceId,
+            MunicipalityId = Guid.NewGuid(),
+            GcRecord = 0
+        };
+        address.SetAsDefault();
+        context.PersonAddressRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(new[] { address });
 
         var handler = context.CreateHandler();
 

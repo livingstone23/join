@@ -184,29 +184,11 @@ public sealed class DeletePersonCommandHandlerTests
             IdentificationNumber = "CUST-123",
             Addresses =
             [
-                new PersonAddress
-                {
-                    CompanyId = companyId,
-                    PersonId = customerId,
-                    AddressLine1 = "Main street",
-                    ZipCode = "11001",
-                    StreetTypeId = Guid.NewGuid(),
-                    CountryId = Guid.NewGuid(),
-                    ProvinceId = Guid.NewGuid(),
-                    MunicipalityId = Guid.NewGuid(),
-                    IsDefault = true
-                }
+                CreateCustomerAddress(companyId, customerId)
             ],
             Contacts =
             [
-                new PersonContact
-                {
-                    CompanyId = companyId,
-                    PersonId = customerId,
-                    ContactType = ContactType.PrimaryEmail,
-                    ContactValue = "customer@contoso.com",
-                    IsPrimary = true
-                }
+                CreateCustomerContact(companyId, customerId)
             ]
         };
 
@@ -215,6 +197,34 @@ public sealed class DeletePersonCommandHandlerTests
             .SetValue(customer, customerId);
 
         return customer;
+    }
+
+    private static PersonContact CreateCustomerContact(Guid companyId, Guid customerId)
+    {
+        var contact = PersonContact.Create(
+            companyId,
+            customerId,
+            ContactType.PrimaryEmail,
+            "customer@contoso.com");
+        contact.SetAsPrimary();
+        return contact;
+    }
+
+    private static PersonAddress CreateCustomerAddress(Guid companyId, Guid customerId)
+    {
+        var address = new PersonAddress
+        {
+            CompanyId = companyId,
+            PersonId = customerId,
+            AddressLine1 = "Main street",
+            ZipCode = "11001",
+            StreetTypeId = Guid.NewGuid(),
+            CountryId = Guid.NewGuid(),
+            ProvinceId = Guid.NewGuid(),
+            MunicipalityId = Guid.NewGuid()
+        };
+        address.SetAsDefault();
+        return address;
     }
 
     /// <summary>

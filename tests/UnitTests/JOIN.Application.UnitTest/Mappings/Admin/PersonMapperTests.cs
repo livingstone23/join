@@ -730,7 +730,6 @@ public sealed class PersonMapperTests
             RegionId = Guid.NewGuid(),
             ProvinceId = Guid.NewGuid(),
             MunicipalityId = Guid.NewGuid(),
-            IsDefault = true,
             StreetType = new StreetType { Name = "Avenue" },
             Country = new Country { Name = "Nicaragua" },
             Region = new Region { Name = "Pacific" },
@@ -738,21 +737,22 @@ public sealed class PersonMapperTests
             Municipality = new Municipality { Name = "Managua" }
         };
 
+        address.SetAsDefault();
         SetEntityId(address, Guid.NewGuid());
         return address;
     }
 
     private static PersonContact CreateValidContact()
     {
-        var contact = new PersonContact
-        {
-            PersonId = Guid.NewGuid(),
-            CompanyId = Guid.NewGuid(),
-            ContactType = ContactType.PrimaryEmail,
-            ContactValue = "jane@example.com",
-            IsPrimary = true,
-            Comments = "Main email"
-        };
+        var personId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var contact = PersonContact.Create(
+            companyId,
+            personId,
+            ContactType.PrimaryEmail,
+            "jane@example.com",
+            "Main email");
+        contact.SetAsPrimary();
 
         SetEntityId(contact, Guid.NewGuid());
         return contact;

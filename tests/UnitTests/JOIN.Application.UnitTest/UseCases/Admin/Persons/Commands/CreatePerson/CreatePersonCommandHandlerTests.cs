@@ -454,29 +454,39 @@ public sealed class CreatePersonCommandHandlerTests
             CommercialName = request.CommercialName,
             IdentificationTypeId = request.IdentificationTypeId,
             IdentificationNumber = request.IdentificationNumber,
-            Addresses = request.Addresses?.Select(address => new PersonAddress
+            Addresses = request.Addresses?.Select(address =>
             {
-                AddressLine1 = address.AddressLine1,
-                AddressLine2 = address.AddressLine2,
-                ZipCode = address.ZipCode,
-                StreetTypeId = address.StreetTypeId,
-                CountryId = address.CountryId,
-                RegionId = address.RegionId,
-                ProvinceId = address.ProvinceId,
-                MunicipalityId = address.MunicipalityId,
-                IsDefault = address.IsDefault
+                var personAddress = new PersonAddress
+                {
+                    AddressLine1 = address.AddressLine1,
+                    AddressLine2 = address.AddressLine2,
+                    ZipCode = address.ZipCode,
+                    StreetTypeId = address.StreetTypeId,
+                    CountryId = address.CountryId,
+                    RegionId = address.RegionId,
+                    ProvinceId = address.ProvinceId,
+                    MunicipalityId = address.MunicipalityId
+                };
+                if (address.IsDefault)
+                {
+                    personAddress.SetAsDefault();
+                }
+                return personAddress;
             }).ToList() ?? new List<PersonAddress>(),
             Contacts = request.Contacts?.Select(contact =>
             {
                 Enum.TryParse<ContactType>(contact.ContactType, true, out var parsedContactType);
-
-                return new PersonContact
+                var personContact = PersonContact.Create(
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    parsedContactType,
+                    contact.ContactValue,
+                    contact.Comments);
+                if (contact.IsPrimary)
                 {
-                    ContactType = parsedContactType,
-                    ContactValue = contact.ContactValue,
-                    IsPrimary = contact.IsPrimary,
-                    Comments = contact.Comments
-                };
+                    personContact.SetAsPrimary();
+                }
+                return personContact;
             }).ToList() ?? new List<PersonContact>()
         };
     }

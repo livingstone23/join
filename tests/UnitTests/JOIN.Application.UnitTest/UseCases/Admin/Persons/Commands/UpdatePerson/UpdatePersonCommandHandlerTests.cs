@@ -4,6 +4,7 @@ using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Admin;
 using JOIN.Application.Mappings;
+using JOIN.Application.UseCases.Admin.PersonContacts;
 using JOIN.Application.UseCases.Admin.Persons.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
@@ -71,17 +72,24 @@ public sealed class UpdatePersonCommandHandlerTests
 
         context.MapperMock
             .Setup(x => x.ToAddressEntity(It.IsAny<UpdatePersonCommand.UpdatePersonAddressDto>()))
-            .Returns<UpdatePersonCommand.UpdatePersonAddressDto>(address => new PersonAddress
+            .Returns<UpdatePersonCommand.UpdatePersonAddressDto>(address =>
             {
-                AddressLine1 = address.AddressLine1,
-                AddressLine2 = address.AddressLine2,
-                ZipCode = address.ZipCode,
-                StreetTypeId = address.StreetTypeId,
-                CountryId = address.CountryId,
-                RegionId = address.RegionId,
-                ProvinceId = address.ProvinceId,
-                MunicipalityId = address.MunicipalityId,
-                IsDefault = address.IsDefault
+                var personAddress = new PersonAddress
+                {
+                    AddressLine1 = address.AddressLine1,
+                    AddressLine2 = address.AddressLine2,
+                    ZipCode = address.ZipCode,
+                    StreetTypeId = address.StreetTypeId,
+                    CountryId = address.CountryId,
+                    RegionId = address.RegionId,
+                    ProvinceId = address.ProvinceId,
+                    MunicipalityId = address.MunicipalityId
+                };
+                if (address.IsDefault)
+                {
+                    personAddress.SetAsDefault();
+                }
+                return personAddress;
             });
 
         context.MapperMock
@@ -89,13 +97,17 @@ public sealed class UpdatePersonCommandHandlerTests
             .Returns<UpdatePersonCommand.UpdatePersonContactDto>(contact =>
             {
                 Enum.TryParse<ContactType>(contact.ContactType, true, out var parsedType);
-                return new PersonContact
+                var personContact = PersonContact.Create(
+                    companyId,
+                    customerId,
+                    parsedType,
+                    contact.ContactValue,
+                    contact.Comments);
+                if (contact.IsPrimary)
                 {
-                    ContactType = parsedType,
-                    ContactValue = contact.ContactValue,
-                    IsPrimary = contact.IsPrimary,
-                    Comments = contact.Comments
-                };
+                    personContact.SetAsPrimary();
+                }
+                return personContact;
             });
 
         context.MapperMock
@@ -110,7 +122,14 @@ public sealed class UpdatePersonCommandHandlerTests
                 target.RegionId = source.RegionId;
                 target.ProvinceId = source.ProvinceId;
                 target.MunicipalityId = source.MunicipalityId;
-                target.IsDefault = source.IsDefault;
+                if (source.IsDefault)
+                {
+                    target.SetAsDefault();
+                }
+                else
+                {
+                    target.RemoveDefault();
+                }
             });
 
         context.MapperMock
@@ -118,10 +137,15 @@ public sealed class UpdatePersonCommandHandlerTests
             .Callback<UpdatePersonCommand.UpdatePersonContactDto, PersonContact>((source, target) =>
             {
                 Enum.TryParse<ContactType>(source.ContactType, true, out var parsedType);
-                target.ContactType = parsedType;
-                target.ContactValue = source.ContactValue;
-                target.IsPrimary = source.IsPrimary;
-                target.Comments = source.Comments;
+                target.Update(parsedType, source.ContactValue, source.Comments);
+                if (source.IsPrimary)
+                {
+                    target.SetAsPrimary();
+                }
+                else
+                {
+                    target.RemovePrimary();
+                }
             });
 
         context.PersonsRepositoryMock
@@ -315,17 +339,24 @@ public sealed class UpdatePersonCommandHandlerTests
 
         context.MapperMock
             .Setup(x => x.ToAddressEntity(It.IsAny<UpdatePersonCommand.UpdatePersonAddressDto>()))
-            .Returns<UpdatePersonCommand.UpdatePersonAddressDto>(address => new PersonAddress
+            .Returns<UpdatePersonCommand.UpdatePersonAddressDto>(address =>
             {
-                AddressLine1 = address.AddressLine1,
-                AddressLine2 = address.AddressLine2,
-                ZipCode = address.ZipCode,
-                StreetTypeId = address.StreetTypeId,
-                CountryId = address.CountryId,
-                RegionId = address.RegionId,
-                ProvinceId = address.ProvinceId,
-                MunicipalityId = address.MunicipalityId,
-                IsDefault = address.IsDefault
+                var personAddress = new PersonAddress
+                {
+                    AddressLine1 = address.AddressLine1,
+                    AddressLine2 = address.AddressLine2,
+                    ZipCode = address.ZipCode,
+                    StreetTypeId = address.StreetTypeId,
+                    CountryId = address.CountryId,
+                    RegionId = address.RegionId,
+                    ProvinceId = address.ProvinceId,
+                    MunicipalityId = address.MunicipalityId
+                };
+                if (address.IsDefault)
+                {
+                    personAddress.SetAsDefault();
+                }
+                return personAddress;
             });
 
         context.MapperMock
@@ -333,13 +364,17 @@ public sealed class UpdatePersonCommandHandlerTests
             .Returns<UpdatePersonCommand.UpdatePersonContactDto>(contact =>
             {
                 Enum.TryParse<ContactType>(contact.ContactType, true, out var parsedType);
-                return new PersonContact
+                var personContact = PersonContact.Create(
+                    companyId,
+                    customerId,
+                    parsedType,
+                    contact.ContactValue,
+                    contact.Comments);
+                if (contact.IsPrimary)
                 {
-                    ContactType = parsedType,
-                    ContactValue = contact.ContactValue,
-                    IsPrimary = contact.IsPrimary,
-                    Comments = contact.Comments
-                };
+                    personContact.SetAsPrimary();
+                }
+                return personContact;
             });
 
         context.PersonsRepositoryMock
@@ -537,9 +572,9 @@ public sealed class UpdatePersonCommandHandlerTests
             StreetTypeId = Guid.NewGuid(),
             CountryId = Guid.NewGuid(),
             ProvinceId = Guid.NewGuid(),
-            MunicipalityId = Guid.NewGuid(),
-            IsDefault = true
+            MunicipalityId = Guid.NewGuid()
         };
+        address.SetAsDefault();
 
         typeof(JOIN.Domain.Audit.BaseEntity)
             .GetProperty("Id")!
@@ -553,14 +588,8 @@ public sealed class UpdatePersonCommandHandlerTests
     /// </summary>
     private static PersonContact CreateContact(Guid id, Guid companyId, Guid customerId, ContactType type, string value)
     {
-        var contact = new PersonContact
-        {
-            CompanyId = companyId,
-            PersonId = customerId,
-            ContactType = type,
-            ContactValue = value,
-            IsPrimary = true
-        };
+        var contact = PersonContact.Create(companyId, customerId, type, value);
+        contact.SetAsPrimary();
 
         typeof(JOIN.Domain.Audit.BaseEntity)
             .GetProperty("Id")!
@@ -610,6 +639,7 @@ public sealed class UpdatePersonCommandHandlerTests
             CurrentUserServiceMock.SetupGet(x => x.IsAuthenticated).Returns(true);
 
             UnitOfWorkMock.SetupGet(x => x.Persons).Returns(PersonsRepositoryMock.Object);
+            UnitOfWorkMock.SetupGet(x => x.PersonContacts).Returns(PersonContactRepoForCoordinatorMock.Object);
 
             SetupRepository(UnitOfWorkMock, CompanyRepositoryMock);
             SetupRepository(UnitOfWorkMock, IdentificationTypeRepositoryMock);
@@ -624,12 +654,24 @@ public sealed class UpdatePersonCommandHandlerTests
 
             PersonAddressRepositoryMock.Setup(x => x.InsertAsync(It.IsAny<PersonAddress>())).ReturnsAsync(true);
             PersonContactRepositoryMock.Setup(x => x.InsertAsync(It.IsAny<PersonContact>())).ReturnsAsync(true);
+            PersonContactRepoForCoordinatorMock.Setup(x => x.InsertAsync(It.IsAny<PersonContact>())).ReturnsAsync(true);
+            PersonContactRepoForCoordinatorMock
+                .Setup(x => x.GetActiveWithPrimaryByTypeAsync(
+                    It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<ContactType>(),
+                    It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Array.Empty<PersonContact>());
+            PersonContactRepoForCoordinatorMock
+                .Setup(x => x.GetMostRecentActiveByTypeAsync(
+                    It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<ContactType>(),
+                    It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((PersonContact?)null);
         }
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
         public Mock<IPersonMapper> MapperMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IPersonsRepository> PersonsRepositoryMock { get; } = new();
+        public Mock<IPersonContactRepository> PersonContactRepoForCoordinatorMock { get; } = new();
         public Mock<IGenericRepository<Company>> CompanyRepositoryMock { get; } = CreateRepositoryMock<Company>();
         public Mock<IGenericRepository<IdentificationType>> IdentificationTypeRepositoryMock { get; } = CreateRepositoryMock<IdentificationType>();
         public Mock<IGenericRepository<Gender>> GenderRepositoryMock { get; } = CreateRepositoryMock<Gender>();
@@ -643,10 +685,12 @@ public sealed class UpdatePersonCommandHandlerTests
 
         public UpdatePersonCommandHandler CreateHandler()
         {
+            var coordinator = new PersonContactPrimaryCoordinator(PersonContactRepoForCoordinatorMock.Object);
             return new UpdatePersonCommandHandler(
                 UnitOfWorkMock.Object,
                 MapperMock.Object,
-                CurrentUserServiceMock.Object);
+                CurrentUserServiceMock.Object,
+                coordinator);
         }
     }
 }
