@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Admin.Areas.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 namespace JOIN.Services.WebApi.Controllers.Admin;
 
@@ -13,7 +14,8 @@ namespace JOIN.Services.WebApi.Controllers.Admin;
 /// The controller remains intentionally thin and delegates all business rules and persistence concerns to the Application layer through MediatR.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Areas")]
 public class AreaController(ISender sender) : ControllerBase

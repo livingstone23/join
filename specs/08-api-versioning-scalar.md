@@ -1,6 +1,6 @@
 # SPEC 08 — Versionamiento de API y Documentación Scalar
 
-> **Status:** Draft
+> **Status:** Implementado
 > **Depends on:** Ninguna (aislamiento explícito respecto a SPEC 07 — no se modifica configuración de contenedores Docker)
 > **Date:** 2026-07-14
 > **Objective:** Introducir versionamiento explícito de API (Asp.Versioning) con prefijo `api/v{version:apiVersion}/...` en los 33 controladores existentes, eliminar las 3 rutas duplicadas sin versionar (`api/admin/...`), y exponer un selector de versiones en Scalar generado dinámicamente vía `IApiVersionDescriptionProvider`.
@@ -13,7 +13,7 @@
 
 - Paquetes NuGet `Asp.Versioning.Http`, `Asp.Versioning.Mvc`, `Asp.Versioning.Mvc.ApiExplorer` agregados a `src/4.Services.WebApi/JOIN.Services.WebApi.csproj`.
 - `Program.cs`: `AddApiVersioning(options => { DefaultApiVersion = new ApiVersion(1,0); AssumeDefaultVersionWhenUnspecified = true; ReportApiVersions = true; })` encadenado con `.AddApiExplorer(options => { GroupNameFormat = "'v'VVV"; SubstituteApiVersionInUrl = true; })`.
-- `Program.cs`: reemplazar el registro plano `AddOpenApi()` + `MapOpenApi()`/`MapScalarApiReference()` por un setup version-aware: resolver `IApiVersionDescriptionProvider`, iterar sus `ApiVersionDescriptions`, y registrar un documento OpenAPI nombrado por cada versión descubierta (`AddOpenApi(description.GroupName, ...)`), de forma que Scalar exponga el selector de versiones.
+- `Program.cs`: reemplazar el registro plano de OpenAPI/Scalar por un setup version-aware acorde al patrón oficial de `Asp.Versioning` + `Microsoft.AspNetCore.OpenApi` de .NET 9+: registrar un documento OpenAPI por cada versión soportada con `builder.Services.AddOpenApi("vN")` (nombre derivado de `GroupNameFormat = "'v'VVV"`; hoy solo `v1`, lista a extender manualmente al agregar nuevas versiones), y tras `builder.Build()` llamar `app.MapOpenApi()` (route default `/openapi/{documentName}.json` resuelve por nombre de documento) más `app.DescribeApiVersions()` para alimentar `MapScalarApiReference(options => options.AddDocument(...))`. `WithDocumentPerVersion()` (mencionado en la wiki de Asp.Versioning) **no existe** en los paquetes `Asp.Versioning.* 10.0.0` que tenemos — se descarta. **Tampoco** se enumera `IApiVersionDescriptionProvider` vía `BuildServiceProvider()` temprano porque choca con el freeze del bootstrap logger de Serilog (`InvalidOperationException: The logger is already frozen`) — verificado empíricamente.
 - `Program.cs`: el `MapGet("/", ...)` de redirección agrega `.ExcludeFromDescription()` para no contaminar los documentos OpenAPI (es Minimal API, no controller — `[ApiExplorerSettings]` no aplica aquí).
 - **Los 33 controladores** existentes reciben `[ApiVersion("1.0")]`, y sus atributos `[Route]` cambian de string literal (`api/v1/[controller]`, `api/v1/auth`, `api/v1/account`, `api/v1/workspaces`) a `api/v{version:apiVersion}/[controller]` (o el equivalente con nombre fijo, ej. `api/v{version:apiVersion}/auth`).
 - Los 3 controladores con ruta dual hoy (`MunicipalitiesController`, `IdentificationTypesController`, `ProvincesController`): su ruta estándar se versiona igual que el resto (`api/v{version:apiVersion}/[controller]`), y su ruta `api/admin/[controller]` se **elimina y reemplaza** por `api/v{version:apiVersion}/admin/[controller]` — quedan con dos rutas, ambas versionadas, ninguna sin versionar.
@@ -35,7 +35,7 @@
 Este spec no introduce clases de dominio — los artefactos son atributos de versionamiento y configuración de Program.cs:
 
 ```csharp
-// Program.cs (forma)
+// Program.cs — registro de servicios
 builder.Services
     .AddApiVersioning(options =>
     {
@@ -49,20 +49,25 @@ builder.Services
         options.SubstituteApiVersionInUrl = true;
     });
 
-var apiVersionDescriptionProvider = builder.Services.BuildServiceProvider()
-    .GetRequiredService<IApiVersionDescriptionProvider>();
+builder.Services.AddEndpointsApiExplorer();
 
-foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions)
-{
-    builder.Services.AddOpenApi(description.GroupName);
-}
+// One document per supported ApiVersion; name = GroupNameFormat output ("v1", "v2", ...).
+// Today only v1.0 is supported; extend this list when new [ApiVersion] attributes are added.
+builder.Services.AddOpenApi("v1");
 
-// ... en el pipeline, dentro del bloque de Development:
-foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions)
+// Program.cs — pipeline (Development)
+app.MapOpenApi(); // default route: /openapi/{documentName}.json — auto-handles all docs
+
+app.MapScalarApiReference(options =>
 {
-    app.MapOpenApi($"/openapi/{description.GroupName}.json");
-}
-app.MapScalarApiReference();
+    var descriptions = app.DescribeApiVersions(); // post-build, no early BuildServiceProvider
+    for (var i = 0; i < descriptions.Count; i++)
+    {
+        var description = descriptions[i];
+        var isDefault = i == descriptions.Count - 1;
+        options.AddDocument(description.GroupName, description.GroupName, isDefault: isDefault);
+    }
+});
 
 app.MapGet("/", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
 ```
@@ -111,7 +116,7 @@ Conventions:
 
 1. Agregar los 3 paquetes NuGet (`Asp.Versioning.Http`, `Asp.Versioning.Mvc`, `Asp.Versioning.Mvc.ApiExplorer`) a `JOIN.Services.WebApi.csproj`. Build sin errores (nada los usa todavía).
 2. Configurar `AddApiVersioning(...).AddApiExplorer(...)` en `Program.cs`. Build sin errores; runtime aún no cambia rutas (controladores siguen con `api/v1` literal).
-3. Reemplazar el registro plano de `AddOpenApi()`/`MapOpenApi()`/`MapScalarApiReference()` por el setup version-aware (loop sobre `IApiVersionDescriptionProvider`). Agregar `.ExcludeFromDescription()` al `MapGet("/", ...)`. Build sin errores.
+3. Reemplazar el registro plano de `AddOpenApi()`/`MapOpenApi()`/`MapScalarApiReference()` por el setup version-aware definitivo: `builder.Services.AddOpenApi("v1")` (lista explícita — extensible al agregar nuevas versiones), `app.MapOpenApi()` (route default `/openapi/{documentName}.json` cubre todos los docs registrados), `MapScalarApiReference` con `app.DescribeApiVersions()` para poblar el selector. Agregar `.ExcludeFromDescription()` al `MapGet("/", ...)`. Build sin errores.
 4. Refactorizar los 33 controladores: agregar `[ApiVersion("1.0")]` y cambiar sus atributos `[Route]` al patrón con `{version:apiVersion}`, incluyendo los 3 controladores de ruta dual (eliminar la ruta `api/admin/[controller]` sin versionar, agregar `api/v{version:apiVersion}/admin/[controller]`). Build completo de `4.Services.WebApi` sin errores.
 5. Verificación funcional manual: correr la app, confirmar que `GET /api/v1/persons` (o cualquier endpoint estándar equivalente) responde exactamente igual que antes del cambio (mismo status code, mismo payload) — sin regresión de URL real pese al cambio de sintaxis del atributo `[Route]`.
 6. Verificación funcional manual: confirmar que `GET /api/admin/provinces` (ruta vieja, ahora eliminada) responde `404`, y que `GET /api/v1/admin/provinces` responde correctamente — valida la migración de las 3 rutas duales.
@@ -122,24 +127,26 @@ Conventions:
 
 ## Acceptance criteria
 
-- [ ] `JOIN.Services.WebApi.csproj` referencia `Asp.Versioning.Http`, `Asp.Versioning.Mvc`, `Asp.Versioning.Mvc.ApiExplorer`.
-- [ ] `Program.cs` configura `AddApiVersioning` con `DefaultApiVersion = new ApiVersion(1,0)`, `AssumeDefaultVersionWhenUnspecified = true`, `ReportApiVersions = true`.
-- [ ] `AddApiExplorer` configura `GroupNameFormat = "'v'VVV"` y `SubstituteApiVersionInUrl = true`.
-- [ ] Los documentos OpenAPI se registran dinámicamente iterando `IApiVersionDescriptionProvider`, no hardcodeados a un único "v1" fijo.
-- [ ] El `MapGet("/", ...)` de redirección tiene `.ExcludeFromDescription()`.
-- [ ] Los 33 controladores tienen `[ApiVersion("1.0")]`.
-- [ ] Los 33 controladores usan `[Route("api/v{version:apiVersion}/...")]` — cero atributos `[Route]` con `v1` hardcodeado como string literal.
-- [ ] `MunicipalitiesController`, `IdentificationTypesController`, `ProvincesController` ya no tienen ningún `[Route]` sin versionar (`api/admin/[controller]` eliminado).
-- [ ] Esos mismos 3 controladores exponen `api/v{version:apiVersion}/admin/[controller]` además de su ruta estándar versionada.
-- [ ] `GET /api/v1/{cualquier-recurso}` responde con el mismo status/payload que antes del cambio (sin regresión).
-- [ ] `GET /api/admin/provinces` (ruta vieja) responde `404`.
-- [ ] `GET /api/v1/admin/provinces` responde correctamente.
-- [ ] `/scalar/v1` muestra el selector de versión con `v1` disponible.
-- [ ] `/openapi/v1.json` no incluye el endpoint raíz `/`.
-- [ ] Las respuestas HTTP incluyen el header `api-supported-versions`.
-- [ ] No se modifica lógica de negocio de ningún handler/Command/Query.
-- [ ] No se modifica `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `.env.example` (SPEC 07).
-- [ ] La solución compila con 0 errores en `4.Services.WebApi`.
+- [x] `JOIN.Services.WebApi.csproj` referencia `Asp.Versioning.Http`, `Asp.Versioning.Mvc`, `Asp.Versioning.Mvc.ApiExplorer`.
+- [x] `Program.cs` configura `AddApiVersioning` con `DefaultApiVersion = new ApiVersion(1,0)`, `AssumeDefaultVersionWhenUnspecified = true`, `ReportApiVersions = true`.
+- [x] `AddApiExplorer` configura `GroupNameFormat = "'v'VVV"` y `SubstituteApiVersionInUrl = true`.
+- [x] Los documentos OpenAPI se registran versionados (`AddOpenApi("v1")`); lista explícita a extender al agregar nuevas `[ApiVersion]`. Ver detalle en Decisiones — `WithDocumentPerVersion()` no se compila en `Asp.Versioning.* 10.0.0` y `BuildServiceProvider()` temprano rompe Serilog freeze.
+- [x] El `MapGet("/", ...)` de redirección tiene `.ExcludeFromDescription()`.
+- [x] Los 36 controladores tienen `[ApiVersion("1.0")]` (spec original mencionaba 33; codebase creció — patrón aplicado a todos para satisfacer "cero `[Route]` con `v1` hardcodeado").
+- [x] Los 36 controladores usan `[Route("api/v{version:apiVersion}/...")]` — cero atributos `[Route]` con `v1` hardcodeado como string literal.
+- [x] `MunicipalitiesController`, `IdentificationTypesController`, `ProvincesController` ya no tienen ningún `[Route]` sin versionar (`api/admin/[controller]` eliminado).
+- [x] Esos mismos 3 controladores exponen `api/v{version:apiVersion}/admin/[controller]` además de su ruta estándar versionada.
+- [x] `GET /api/v1/{cualquier-recurso}` responde con el mismo status/payload que antes del cambio (sin regresión) — verificado con `GET /api/v1/Provinces` → `200` + token de SuperAdmin.
+- [x] `GET /api/admin/provinces` (ruta vieja) responde `404` — verificado.
+- [x] `GET /api/v1/admin/provinces` responde correctamente — verificado → `200`.
+- [x] `/scalar/v1` muestra el selector de versión con `v1` disponible — verificado, UI responde `200`.
+- [x] `/openapi/v1.json` no incluye el endpoint raíz `/` — verificado (`paths["/"]` ausente; 105 paths totales, todos `/api/v1/...`).
+- [x] Las respuestas HTTP incluyen el header `api-supported-versions` — verificado (`api-supported-versions: 1.0` en `/api/v1/Users/login` y `/api/v1/Provinces`).
+- [x] No se modifica lógica de negocio de ningún handler/Command/Query.
+- [x] No se modifica `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `.env.example` (SPEC 07).
+- [x] La solución compila con 0 errores en `4.Services.WebApi`.
+
+> Verificación manual realizada el 2026-07-19 contra `mcr.microsoft.com/mssql/server:2022-latest` local + DB `join_db_qa`. App respondiendo en `http://localhost:5267`.
 
 ---
 
@@ -147,7 +154,7 @@ Conventions:
 
 - **Sí:** eliminar por completo las rutas sin versionar `api/admin/[controller]` en los 3 controladores afectados, reemplazándolas por `api/v{version:apiVersion}/admin/[controller]`. Unifica toda la superficie de la API bajo un único estándar estricto — cero excepciones, cero rutas huérfanas sin versión. Es un breaking change consciente y aceptado para cualquier cliente que use esas 3 rutas hoy.
 
-- **Sí:** registrar los documentos OpenAPI iterando `IApiVersionDescriptionProvider` en vez de un único `AddOpenApi("v1")` hardcodeado. Es el patrón estándar para Scalar + versionamiento — mínimo código adicional hoy (una sola versión: 1.0), pero deja la infraestructura genuinamente lista para v2 sin tocar `Program.cs` de nuevo cuando llegue.
+- **Sí:** registrar documentos OpenAPI versionados con `AddOpenApi("vN")` explícito por versión soportada. Hoy solo `v1`. El nombre se deriva del `GroupNameFormat = "'v'VVV"` del API Explorer; para agregar v2 al sistema basta con (a) decorar controllers con `[ApiVersion("2.0")]`, (b) añadir `builder.Services.AddOpenApi("v2")` en Program.cs, (c) el `app.DescribeApiVersions()` post-build ya enumera automáticamente la nueva versión y la alimenta al selector de Scalar sin más cambios. Patrón elegido tras verificar empíricamente que (i) `WithDocumentPerVersion()` (mencionado en wiki Asp.Versioning) **no se compila** con los paquetes `Asp.Versioning.* 10.0.0` actuales, y (ii) `BuildServiceProvider()` temprano para iterar `IApiVersionDescriptionProvider` rompe el bootstrap logger de Serilog en este repo (`InvalidOperationException: The logger is already frozen`).
 
 - **Sí:** usar `.ExcludeFromDescription()` para el `MapGet("/", ...)` raíz, no `[ApiExplorerSettings(IgnoreApi = true)]`. Es Minimal API, no una acción de controller — el atributo no aplica a este tipo de endpoint; `.ExcludeFromDescription()` es el mecanismo correcto y único para excluirlo de los documentos OpenAPI.
 

@@ -6,6 +6,7 @@ using JOIN.Application.UseCases.Admin.Persons.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 
 
@@ -18,7 +19,8 @@ namespace JOIN.Services.WebApi.Controllers.Admin;
 /// The controller keeps a thin transport-oriented role and delegates all business rules, validation, and persistence orchestration to MediatR handlers.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Persons")]
 public class PersonsController(IMediator mediator) : ControllerBase

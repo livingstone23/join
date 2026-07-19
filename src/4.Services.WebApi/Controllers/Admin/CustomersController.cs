@@ -6,6 +6,7 @@ using JOIN.Application.UseCases.Admin.Customers.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 namespace JOIN.Services.WebApi.Controllers.Admin;
 
@@ -13,7 +14,8 @@ namespace JOIN.Services.WebApi.Controllers.Admin;
 /// Exposes REST endpoints for managing tenant-scoped customers.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Customers")]
 public class CustomersController(IMediator mediator) : ControllerBase

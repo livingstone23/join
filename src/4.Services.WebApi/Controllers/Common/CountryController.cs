@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Common.Countries.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 
 
@@ -17,7 +18,8 @@ namespace JOIN.Services.WebApi.Controllers.Common;
 /// The controller only coordinates transport-level concerns while the Application layer handles validation and persistence rules.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Countries")]
 public class CountryController(IMediator mediator) : ControllerBase

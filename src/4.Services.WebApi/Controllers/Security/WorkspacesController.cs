@@ -8,6 +8,7 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 
 
@@ -20,7 +21,8 @@ namespace JOIN.Services.WebApi.Controllers.Security;
 /// The controller keeps an HTTP-only role and delegates processing to MediatR handlers in the Application layer.
 /// </summary>
 [ApiController]
-[Route("api/v1/workspaces")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/workspaces")]
 [Produces("application/json")]
 [Authorize]
 [PermissionResource("Users")]

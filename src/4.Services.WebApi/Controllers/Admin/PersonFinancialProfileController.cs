@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Admin.PersonFinancialProfiles.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 using DeletePersonFinancialProfileCommand = JOIN.Application.UseCases.Admin.PersonFinancialProfiles.Commands.DeletePersonFinancialProfileCommand;
 using UpdatePersonFinancialProfileCommand = JOIN.Application.UseCases.Admin.PersonFinancialProfiles.Commands.UpdatePersonFinancialProfileCommand;
 
@@ -19,7 +20,8 @@ namespace JOIN.Services.WebApi.Controllers.Admin;
 /// The controller remains thin and delegates business rules to MediatR handlers.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Persons")]
 public class PersonFinancialProfileController(IMediator mediator) : ControllerBase

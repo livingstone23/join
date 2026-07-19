@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Admin.Genders.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 
 
@@ -17,7 +18,8 @@ namespace JOIN.Presentation.Controllers.Admin;
 /// Tenant scope is resolved from the authenticated user's JWT in the Application layer handlers.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Genders")]
 public class GendersController(ISender sender) : ControllerBase

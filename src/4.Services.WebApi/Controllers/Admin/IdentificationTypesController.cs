@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Admin.IdentificationTypes.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 namespace JOIN.Services.WebApi.Controllers.Admin;
 
@@ -13,8 +14,9 @@ namespace JOIN.Services.WebApi.Controllers.Admin;
 /// The controller remains intentionally thin and delegates all business rules and persistence concerns to the Application layer through MediatR.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
-[Route("api/admin/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
+[Route("api/v{version:apiVersion}/admin/[controller]")]
 [Produces("application/json")]
 [PermissionResource("IdentificationTypes")]
 public class IdentificationTypesController(ISender sender) : ControllerBase

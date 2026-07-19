@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Admin.TaxRegimes.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 
 
@@ -13,7 +14,8 @@ namespace JOIN.Presentation.Controllers.Admin;
 
 
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("TaxRegimes")]
 public class TaxRegimesController(ISender sender) : ControllerBase

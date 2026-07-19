@@ -7,6 +7,7 @@ using JOIN.Application.UseCases.Security.SystemOptions.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 namespace JOIN.Services.WebApi.Controllers.Security;
 
@@ -16,7 +17,8 @@ namespace JOIN.Services.WebApi.Controllers.Security;
 /// Endpoints support paginated listing, retrieval, creation, update, and logical deletion (soft delete) of system options.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Authorize(Roles = "SuperAdmin")]
 public class SystemOptionsController(IMediator mediator) : ControllerBase
 {

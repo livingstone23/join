@@ -20,6 +20,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore; // <-- New using for modern API UI
 using Serilog;
+using Asp.Versioning;
+using Asp.Versioning.ApiExplorer;
 
 // ============================================================================
 // SERILOG BOOTSTRAP LOGGER
@@ -48,8 +50,32 @@ builder.Services.AddScoped<DynamicAuthorizationFilter>();
 builder.Services.AddControllers(options => options.Filters.AddService<DynamicAuthorizationFilter>());
 
 // .NET 10 Native OpenAPI generation (Replaces AddSwaggerGen)
-builder.Services.AddOpenApi(); 
+// API versioning + explorer wired first so IApiVersionDescriptionProvider is available
+// before OpenAPI document registration iterates over discovered versions.
+builder.Services
+    .AddApiVersioning(options =>
+    {
+        options.DefaultApiVersion = new ApiVersion(1, 0);
+        options.AssumeDefaultVersionWhenUnspecified = true;
+        options.ReportApiVersions = true;
+    })
+    .AddApiExplorer(options =>
+    {
+        options.GroupNameFormat = "'v'VVV";
+        options.SubstituteApiVersionInUrl = true;
+    });
+
 builder.Services.AddEndpointsApiExplorer();
+
+// Register one OpenAPI document per supported API version, named to match
+// GroupNameFormat = "'v'VVV" (e.g. ApiVersion(1,0) -> "v1").
+// Today only v1.0 is supported (per SPEC 08 scope). When new ApiVersion
+// attributes are added to controllers, add a matching AddOpenApi("vN") here.
+// Enumerating versions via IApiVersionDescriptionProvider at this point
+// requires BuildServiceProvider() which conflicts with Serilog's bootstrap
+// logger freeze in this repo (InvalidOperationException: The logger is
+// already frozen). Document name list stays explicit for that reason.
+builder.Services.AddOpenApi("v1");
 
 // Register the global exception handler and native RFC 7807 ProblemDetails services.
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -202,8 +228,27 @@ app.UseMiddleware<DynamicStrictRateLimitingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi(); // Generates the JSON document at /openapi/v1.json
-    app.MapScalarApiReference(); // The modern UI at /scalar/v1
+    // MapOpenApi default route is /openapi/{documentName}.json — auto-handles
+    // every document registered above. WithDocumentPerVersion() extension is
+    // not shipped in Asp.Versioning 10.0.0 packages, so this is the canonical
+    // equivalent for the OpenAPI surface.
+    app.MapOpenApi();
+
+    app.MapScalarApiReference(options =>
+    {
+        // DescribeApiVersions() reads IApiVersionDescriptionProvider from the
+        // built app's service provider (post-build, no early BuildServiceProvider
+        // needed). Drives Scalar's version selector. New ApiVersion attributes
+        // require updating the AddOpenApi("vN") list above to keep both
+        // /openapi/vN.json and the Scalar selector in sync.
+        var descriptions = app.DescribeApiVersions();
+        for (var i = 0; i < descriptions.Count; i++)
+        {
+            var description = descriptions[i];
+            var isDefault = i == descriptions.Count - 1;
+            options.AddDocument(description.GroupName, description.GroupName, isDefault: isDefault);
+        }
+    });
 }
 
 app.UseHttpsRedirection();
@@ -222,7 +267,8 @@ app.MapHealthChecksUI(options => options.UIPath = "/health-ui");
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapGet("/", () => Results.Redirect("/scalar/v1"));
+    app.MapGet("/", () => Results.Redirect("/scalar/v1"))
+        .ExcludeFromDescription();
 }
 
 app.Run();
