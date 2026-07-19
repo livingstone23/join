@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Admin.PersonAddresses.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 using DeletePersonAddressCommand = JOIN.Application.UseCases.Admin.PersonAddresses.Commands.DeletePersonAddressCommand;
 using UpdatePersonAddressCommand = JOIN.Application.UseCases.Admin.PersonAddresses.Commands.UpdatePersonAddressCommand;
 
@@ -19,7 +20,8 @@ namespace JOIN.Services.WebApi.Controllers.Admin;
 /// The controller remains thin and delegates business rules to MediatR handlers.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Persons")]
 public class PersonAddressController(IMediator mediator) : ControllerBase

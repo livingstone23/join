@@ -10,6 +10,7 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 
 
@@ -22,7 +23,8 @@ namespace JOIN.Services.WebApi.Controllers.Security;
 /// The controller remains thin and delegates all business logic to the Application layer via MediatR.
 /// </summary>
 [ApiController]
-[Route("api/v1/account")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/account")]
 [Produces("application/json")]
 [Authorize]
 [PermissionResource("Users")]

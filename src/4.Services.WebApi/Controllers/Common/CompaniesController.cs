@@ -7,6 +7,7 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 
 
@@ -19,7 +20,8 @@ namespace JOIN.Services.WebApi.Controllers.Common;
 /// The controller is intentionally limited to HTTP orchestration concerns and delegates validation and business rules to MediatR handlers.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Companies")]
 [Authorize]

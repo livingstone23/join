@@ -3,6 +3,7 @@ using JOIN.Domain.Security;
 using JOIN.Services.WebApi.Filters;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 using Microsoft.EntityFrameworkCore;
 
 
@@ -16,7 +17,8 @@ namespace JOIN.Services.WebApi.Controllers.Security;
 /// The controller returns the available Identity role names so clients can populate assignment and permission-management screens.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Roles")]
 public class RolesController(RoleManager<ApplicationRole> roleManager) : ControllerBase

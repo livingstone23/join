@@ -7,6 +7,7 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 
 
@@ -19,7 +20,8 @@ namespace JOIN.Services.WebApi.Controllers.Security;
 /// The controller is intentionally thin and delegates all processing to the Application layer through MediatR.
 /// </summary>
 [ApiController]
-[Route("api/v1/auth")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/auth")]
 [Produces("application/json")]
 [PermissionResource("Users")]
 public class AuthController(ISender sender) : ControllerBase
@@ -28,9 +30,9 @@ public class AuthController(ISender sender) : ControllerBase
 
     // Existing endpoints are intentionally not regenerated here.
     // Mapping to current implementation:
-    // - POST api/v1/users/login
-    // - POST api/v1/users/refresh
-    // - POST api/v1/users/logout
+    // - POST api/v{version:apiVersion}/users/login
+    // - POST api/v{version:apiVersion}/users/refresh
+    // - POST api/v{version:apiVersion}/users/logout
 
     /// <summary>
     /// Completes first-time account activation by setting the initial password through a valid setup token.

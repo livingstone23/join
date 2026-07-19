@@ -6,6 +6,7 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 
 
@@ -17,7 +18,8 @@ namespace JOIN.Services.WebApi.Controllers.Messaging;
 /// Exposes REST endpoints for tenant ticket default configuration management.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("TicketCompanyDefaults")]
 public class TicketCompanyDefaultsController(ISender sender) : ControllerBase

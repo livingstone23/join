@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Common.Provinces.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 namespace JOIN.Services.WebApi.Controllers.Common;
 
@@ -13,8 +14,9 @@ namespace JOIN.Services.WebApi.Controllers.Common;
 /// The controller only coordinates transport-level concerns while the Application layer handles validation and persistence rules.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
-[Route("api/admin/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
+[Route("api/v{version:apiVersion}/admin/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Provinces")]
 public class ProvincesController(ISender sender) : ControllerBase

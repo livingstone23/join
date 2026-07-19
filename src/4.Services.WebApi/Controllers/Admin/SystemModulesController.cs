@@ -6,6 +6,7 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 
 
@@ -18,8 +19,9 @@ namespace JOIN.Presentation.Controllers.Admin;
 /// Access is restricted to SuperAdmin users only.
 /// </summary>
 [ApiController]
+[ApiVersion("1.0")]
 [Authorize(Roles = "SuperAdmin")]
-[Route("api/v1/[controller]")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("SystemModules")]
 public class SystemModulesController(ISender sender) : ControllerBase

@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Common.CommunicationChannels.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 
 
@@ -17,7 +18,8 @@ namespace JOIN.Services.WebApi.Controllers.Common;
 /// The controller remains a thin transport layer and delegates all command/query execution to MediatR handlers.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("CommunicationChannels")]
 public class CommunicationChannelsController(IMediator mediator) : ControllerBase

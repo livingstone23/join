@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Common.Regions.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 namespace JOIN.Services.WebApi.Controllers.Common;
 
@@ -13,7 +14,8 @@ namespace JOIN.Services.WebApi.Controllers.Common;
 /// The controller only coordinates transport-level concerns while the Application layer handles validation and persistence rules.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Regions")]
 public class RegionsController(ISender sender) : ControllerBase

@@ -6,6 +6,7 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 namespace JOIN.Services.WebApi.Controllers.Messaging;
 
@@ -13,7 +14,8 @@ namespace JOIN.Services.WebApi.Controllers.Messaging;
 /// Exposes REST endpoints for ticket management.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Tickets")]
 public class TicketsController(ISender sender) : ControllerBase

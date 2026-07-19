@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Common.StreetTypes.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 
 
@@ -17,7 +18,8 @@ namespace JOIN.Services.WebApi.Controllers.Common;
 /// The controller handles routing and response translation while the Application layer enforces the business rules.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("StreetTypes")]
 public class StreetTypesController(IMediator mediator) : ControllerBase

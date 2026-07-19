@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Admin.PersonBusinessProfiles.Queries;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 using DeletePersonBusinessProfileCommand = JOIN.Application.UseCases.Admin.PersonBusinessProfiles.Commands.DeletePersonBusinessProfileCommand;
 using UpdatePersonBusinessProfileCommand = JOIN.Application.UseCases.Admin.PersonBusinessProfiles.Commands.UpdatePersonBusinessProfileCommand;
 
@@ -19,7 +20,8 @@ namespace JOIN.Services.WebApi.Controllers.Admin;
 /// The controller remains thin and delegates business rules to MediatR handlers.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("Persons")]
 public class PersonBusinessProfileController(IMediator mediator) : ControllerBase
