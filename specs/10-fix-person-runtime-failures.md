@@ -1,6 +1,6 @@
 # SPEC 10 — Corregir fallas runtime post-SPEC 09: mapper de Person, Gender nulo y IsDefault de direcciones
 
-> **Status:** Draft
+> **Status:** Aprobado
 > **Depends on:** SPEC 09 (dejó el build compilando pero con 19 fallas en runtime; este spec resuelve las 15 que caen en los 3 archivos que SPEC 09 tocó); referencia informativa a SPEC 01 (`ITransactionalCommand`, ya cubre `CreatePersonCommand`/`UpdatePersonCommand`) y SPEC 06 (gate de cobertura).
 > **Date:** 2026-07-19
 > **Objective:** Completar el objetivo de SPEC 09 ("CI en verde") corrigiendo 15 fallas de test en `PersonMapperTests.cs`/`CreatePersonCommandHandlerTests.cs`/`UpdatePersonCommandHandlerTests.cs`, y en el camino corregir dos bugs de producción reales que esas fallas destaparon: `Person.Gender` no-nullable causando `NullReferenceException` en personas Legal, y `PersonAddress.IsDefault` nunca aplicado porque `PersonAddressDefaultCoordinator` no está inyectado en los handlers de creación/actualización de `Person`.
