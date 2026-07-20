@@ -2,6 +2,7 @@ using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Mappings;
+using JOIN.Application.UseCases.Admin.PersonAddresses;
 using JOIN.Application.UseCases.Admin.PersonContacts;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
@@ -24,10 +25,12 @@ public class UpdatePersonCommandHandler(
     IUnitOfWork unitOfWork,
     IPersonMapper customerMapper,
     ICurrentUserService currentUserService,
-    PersonContactPrimaryCoordinator contactPrimaryCoordinator) : IRequestHandler<UpdatePersonCommand, Response<Guid>>
+    PersonContactPrimaryCoordinator contactPrimaryCoordinator,
+    PersonAddressDefaultCoordinator addressDefaultCoordinator) : IRequestHandler<UpdatePersonCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
     private readonly IPersonMapper _customerMapper = customerMapper;
+    private readonly PersonAddressDefaultCoordinator _addressDefaultCoordinator = addressDefaultCoordinator;
 
     /// <summary>
     /// Updates a customer aggregate and synchronizes addresses and contacts atomically.
@@ -246,6 +249,17 @@ public class UpdatePersonCommandHandler(
                 var newAddress = _customerMapper.ToAddressEntity(incomingAddress);
                 newAddress.CompanyId = companyId;
                 newAddress.PersonId = customerEntity.Id;
+
+                if (incomingAddress.IsDefault)
+                {
+                    await _addressDefaultCoordinator.ClearOtherDefaultsAsync(
+                        companyId,
+                        customerEntity.Id,
+                        newAddress.Id,
+                        cancellationToken);
+                    newAddress.SetAsDefault();
+                }
+
                 await _unitOfWork.GetRepository<PersonAddress>().InsertAsync(newAddress);
                 continue;
             }
@@ -263,6 +277,20 @@ public class UpdatePersonCommandHandler(
             existingAddress.CompanyId = companyId;
             existingAddress.PersonId = customerEntity.Id;
             existingAddress.GcRecord = 0;
+
+            if (incomingAddress.IsDefault)
+            {
+                await _addressDefaultCoordinator.ClearOtherDefaultsAsync(
+                    companyId,
+                    customerEntity.Id,
+                    existingAddress.Id,
+                    cancellationToken);
+                existingAddress.SetAsDefault();
+            }
+            else
+            {
+                existingAddress.RemoveDefault();
+            }
         }
     }
 

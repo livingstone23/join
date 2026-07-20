@@ -52,9 +52,11 @@ public sealed class PersonMapperTests
         entity.Addresses.Should().HaveCount(1);
         AssertAddressEntityMatchesCreateAddress(command.Addresses!.Single(), entity.Addresses.Single());
 
+        // The CreatePerson mapper ignores nested Contacts ([MapperIgnoreTarget]) — the
+        // CreatePersonCommandHandler populates them itself via PersonContact.Create(...).
+        // Asserting the mapper contract means Contacts stays empty here.
         entity.Contacts.Should().NotBeNull();
-        entity.Contacts.Should().HaveCount(1);
-        AssertContactEntityMatchesCreateContact(command.Contacts!.Single(), entity.Contacts.Single());
+        entity.Contacts.Should().BeEmpty();
     }
 
     /// <summary>
@@ -464,7 +466,8 @@ public sealed class PersonMapperTests
         entity.RegionId.Should().Be(addressDto.RegionId);
         entity.ProvinceId.Should().Be(addressDto.ProvinceId);
         entity.MunicipalityId.Should().Be(addressDto.MunicipalityId);
-        entity.IsDefault.Should().Be(addressDto.IsDefault);
+        // Mapper ignores IsDefault on the update path — handled by the handler.
+        entity.IsDefault.Should().BeFalse();
         entity.PersonId.Should().Be(Guid.Empty);
         entity.CompanyId.Should().Be(Guid.Empty);
     }
@@ -503,7 +506,11 @@ public sealed class PersonMapperTests
         target.RegionId.Should().Be(source.RegionId);
         target.ProvinceId.Should().Be(source.ProvinceId);
         target.MunicipalityId.Should().Be(source.MunicipalityId);
-        target.IsDefault.Should().Be(source.IsDefault);
+        // Mapper does not propagate IsDefault on update — that's the handler's job
+        // through PersonAddressDefaultCoordinator. The pre-existing target.IsDefault
+        // (whatever it was, set up via SetAsDefault in CreateValidAddress) must be
+        // preserved untouched by ApplyUpdate.
+        target.IsDefault.Should().BeTrue();
         target.Created.Should().Be(originalCreated);
         target.Country.Should().BeSameAs(originalCountry);
         target.Region.Should().BeSameAs(originalRegion);
@@ -527,10 +534,13 @@ public sealed class PersonMapperTests
         // Assert
         entity.Id.Should().NotBeEmpty();
         entity.Id.Should().NotBe(contactDto.Id!.Value);
-        entity.ContactType.Should().Be(ContactType.WhatsApp);
-        entity.ContactValue.Should().Be(contactDto.ContactValue);
-        entity.IsPrimary.Should().Be(contactDto.IsPrimary);
-        entity.Comments.Should().Be(contactDto.Comments);
+        // ContactType/ContactValue/IsPrimary/Comments are private set on PersonContact
+        // and are deliberately ignored by the mapper on the update path. They are
+        // populated by the handler via PersonContact.Update(...) + SetAsPrimary/RemovePrimary.
+        entity.ContactType.Should().Be(default(ContactType));
+        entity.ContactValue.Should().Be(string.Empty);
+        entity.IsPrimary.Should().BeFalse();
+        entity.Comments.Should().BeNull();
         entity.PersonId.Should().Be(Guid.Empty);
         entity.CompanyId.Should().Be(Guid.Empty);
     }
@@ -556,10 +566,12 @@ public sealed class PersonMapperTests
         target.Id.Should().Be(originalId);
         target.PersonId.Should().Be(originalPersonId);
         target.CompanyId.Should().Be(originalCompanyId);
-        target.ContactType.Should().Be(ContactType.WhatsApp);
-        target.ContactValue.Should().Be(source.ContactValue);
-        target.IsPrimary.Should().Be(source.IsPrimary);
-        target.Comments.Should().Be(source.Comments);
+        // Mapper does not propagate ContactType/ContactValue/IsPrimary/Comments on update —
+        // that's the handler's job. The pre-existing target values stay untouched.
+        target.ContactType.Should().Be(ContactType.PrimaryEmail);
+        target.ContactValue.Should().Be("jane@example.com");
+        target.IsPrimary.Should().BeTrue();
+        target.Comments.Should().Be("Main email");
         target.Created.Should().Be(originalCreated);
     }
 
@@ -773,7 +785,10 @@ public sealed class PersonMapperTests
         target.RegionId.Should().Be(source.RegionId);
         target.ProvinceId.Should().Be(source.ProvinceId);
         target.MunicipalityId.Should().Be(source.MunicipalityId);
-        target.IsDefault.Should().Be(source.IsDefault);
+        // IsDefault has private set on PersonAddress — mapper does not populate it.
+        // The CreatePersonCommandHandler applies SetAsDefault/RemoveDefault via the
+        // PersonAddressDefaultCoordinator; we only assert the mapper contract here.
+        target.IsDefault.Should().BeFalse();
         target.Id.Should().NotBeEmpty();
         target.PersonId.Should().Be(Guid.Empty);
         target.CompanyId.Should().Be(Guid.Empty);
@@ -784,10 +799,14 @@ public sealed class PersonMapperTests
         CreatePersonCommand.CreatePersonContactDto source,
         PersonContact target)
     {
-        target.ContactType.Should().Be(ContactType.PrimaryEmail);
-        target.ContactValue.Should().Be(source.ContactValue);
-        target.IsPrimary.Should().Be(source.IsPrimary);
-        target.Comments.Should().Be(source.Comments);
+        // ContactType, ContactValue, IsPrimary and Comments are all private set on
+        // PersonContact — the mapper cannot populate them (see [MapperIgnoreTarget]).
+        // They are populated by the handler via PersonContact.Create(...). Asserting
+        // the mapper contract means these defaults stay at zero.
+        target.ContactType.Should().Be(default(ContactType));
+        target.ContactValue.Should().Be(string.Empty);
+        target.IsPrimary.Should().BeFalse();
+        target.Comments.Should().BeNull();
         target.Id.Should().NotBeEmpty();
         target.PersonId.Should().Be(Guid.Empty);
         target.CompanyId.Should().Be(Guid.Empty);

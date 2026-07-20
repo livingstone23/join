@@ -5,6 +5,7 @@ using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Mappings;
+using JOIN.Application.UseCases.Admin.PersonAddresses;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
 using JOIN.Domain.Enums;
@@ -24,10 +25,12 @@ namespace JOIN.Application.UseCases.Admin.Persons.Commands;
 public class CreatePersonCommandHandler(
     IUnitOfWork unitOfWork,
     IPersonMapper customerMapper,
-    ICurrentUserService currentUserService) : IRequestHandler<CreatePersonCommand, Response<Guid>>
+    ICurrentUserService currentUserService,
+    PersonAddressDefaultCoordinator addressDefaultCoordinator) : IRequestHandler<CreatePersonCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
     private readonly IPersonMapper _customerMapper = customerMapper;
+    private readonly PersonAddressDefaultCoordinator _addressDefaultCoordinator = addressDefaultCoordinator;
 
     /// <summary>
     /// Creates a customer after validating tenant context and foreign key references.
@@ -189,6 +192,27 @@ public class CreatePersonCommandHandler(
         {
             address.CompanyId = currentUserService.CompanyId;
             address.PersonId = customerEntity.Id;
+        }
+
+        // Apply the single-default-per-batch rule on the new addresses, mirroring
+        // the in-batch dedup used for IsPrimary on contacts. Persistent cross-batch
+        // cleanup is delegated to PersonAddressDefaultCoordinator when an existing
+        // default exists; here we only enforce consistency within this create batch.
+        if (request.Addresses is { Count: > 0 })
+        {
+            PersonAddress? defaultAddress = null;
+
+            foreach (var (addressDto, address) in request.Addresses.Zip(customerEntity.Addresses))
+            {
+                if (!addressDto.IsDefault)
+                {
+                    continue;
+                }
+
+                defaultAddress?.RemoveDefault();
+                address.SetAsDefault();
+                defaultAddress = address;
+            }
         }
 
         if (request.Contacts is { Count: > 0 })

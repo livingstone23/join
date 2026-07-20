@@ -80,7 +80,7 @@ public class Person : BaseTenantEntity
     /// <summary>
     /// Reference to the specific Gender catalog entry.
     /// </summary>
-    public virtual Gender Gender { get; set; } = null!;
+    public virtual Gender? Gender { get; set; }
 
     /// <summary>
     /// Reference to the specific Identification Type catalog entry.

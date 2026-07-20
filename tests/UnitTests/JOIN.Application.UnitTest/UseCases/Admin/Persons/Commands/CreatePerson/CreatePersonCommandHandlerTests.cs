@@ -4,6 +4,7 @@ using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Admin;
 using JOIN.Application.Mappings;
+using JOIN.Application.UseCases.Admin.PersonAddresses;
 using JOIN.Application.UseCases.Admin.Persons.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
@@ -32,7 +33,7 @@ public sealed class CreatePersonCommandHandlerTests
         // Arrange
         var companyId = _fixture.Create<Guid>();
         var request = CreateValidCommand(includeAddresses: true, includeContacts: true);
-        var customerEntity = CreateMappedPerson(request);
+        var customerEntity = CreateMappedPerson(request, companyId);
 
         var context = CreateContext(companyId);
 
@@ -83,6 +84,9 @@ public sealed class CreatePersonCommandHandlerTests
             x.CompanyId == companyId && x.PersonId == customerEntity.Id);
         customerEntity.Contacts.Should().OnlyContain(x =>
             x.CompanyId == companyId && x.PersonId == customerEntity.Id);
+
+        // SPEC 10: IsDefault flows end-to-end from the DTO through the handler.
+        customerEntity.Addresses.Should().ContainSingle(x => x.IsDefault);
 
         context.MapperMock.Verify(x => x.ToEntity(request), Times.Once);
         context.PersonsRepositoryMock.Verify(x => x.InsertAsync(customerEntity), Times.Once);
@@ -202,6 +206,10 @@ public sealed class CreatePersonCommandHandlerTests
             .Setup(x => x.GetAsync(request.IdentificationTypeId))
             .ReturnsAsync(new IdentificationType { Name = "Passport" });
 
+        context.GenderRepositoryMock
+            .Setup(x => x.GetAsync(request.GenderId!.Value))
+            .ReturnsAsync(Gender.Create(companyId, "M", "Masculino"));
+
         context.StreetTypeRepositoryMock
             .Setup(x => x.GetAsync(address.StreetTypeId))
             .ReturnsAsync((StreetType?)null);
@@ -266,6 +274,10 @@ public sealed class CreatePersonCommandHandlerTests
             .Setup(x => x.GetAsync(request.IdentificationTypeId))
             .ReturnsAsync(new IdentificationType { Name = "Passport" });
 
+        context.GenderRepositoryMock
+            .Setup(x => x.GetAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(Gender.Create(companyId, "M", "Masculino"));
+
         var handler = context.CreateHandler();
 
         // Act
@@ -305,6 +317,10 @@ public sealed class CreatePersonCommandHandlerTests
             .Setup(x => x.GetAsync(request.IdentificationTypeId))
             .ReturnsAsync(new IdentificationType { Name = "Passport" });
 
+        context.GenderRepositoryMock
+            .Setup(x => x.GetAsync(request.GenderId!.Value))
+            .ReturnsAsync(Gender.Create(companyId, "M", "Masculino"));
+
         context.PersonsRepositoryMock
             .Setup(x => x.ExistsByCompanyAndIdentificationAsync(companyId, request.IdentificationNumber))
             .ReturnsAsync(true);
@@ -335,7 +351,7 @@ public sealed class CreatePersonCommandHandlerTests
         var companyId = _fixture.Create<Guid>();
         var context = CreateContext(companyId);
         var request = CreateValidCommand(includeAddresses: false, includeContacts: false);
-        var customerEntity = CreateMappedPerson(request);
+        var customerEntity = CreateMappedPerson(request, companyId);
 
         context.CompanyRepositoryMock
             .Setup(x => x.GetAsync(companyId))
@@ -344,6 +360,10 @@ public sealed class CreatePersonCommandHandlerTests
         context.IdentificationTypeRepositoryMock
             .Setup(x => x.GetAsync(request.IdentificationTypeId))
             .ReturnsAsync(new IdentificationType { Name = "Passport" });
+
+        context.GenderRepositoryMock
+            .Setup(x => x.GetAsync(request.GenderId!.Value))
+            .ReturnsAsync(Gender.Create(companyId, "M", "Masculino"));
 
         context.PersonsRepositoryMock
             .Setup(x => x.ExistsByCompanyAndIdentificationAsync(companyId, request.IdentificationNumber))
@@ -440,10 +460,14 @@ public sealed class CreatePersonCommandHandlerTests
     /// <summary>
     /// Creates the mapped customer aggregate returned by the mocked mapper.
     /// This keeps the tests focused on the handler rather than on the mapping engine.
+    /// Addresses are pre-populated with the correct tenant keys so the handler's
+    /// IsDefault Zip-loop has matching entries; Contacts are intentionally left empty
+    /// so the handler creates them via PersonContact.Create (which would otherwise
+    /// duplicate the ones the mapper already produced).
     /// </summary>
-    private static Person CreateMappedPerson(CreatePersonCommand request)
+    private static Person CreateMappedPerson(CreatePersonCommand request, Guid companyId)
     {
-        return new Person
+        var entity = new Person
         {
             PersonType = request.PersonType,
             GenderId = request.GenderId,
@@ -454,10 +478,18 @@ public sealed class CreatePersonCommandHandlerTests
             CommercialName = request.CommercialName,
             IdentificationTypeId = request.IdentificationTypeId,
             IdentificationNumber = request.IdentificationNumber,
-            Addresses = request.Addresses?.Select(address =>
+            Contacts = new List<PersonContact>()
+        };
+        entity.CompanyId = companyId;
+
+        if (request.Addresses is { Count: > 0 })
+        {
+            entity.Addresses = request.Addresses.Select(address =>
             {
                 var personAddress = new PersonAddress
                 {
+                    CompanyId = companyId,
+                    PersonId = entity.Id,
                     AddressLine1 = address.AddressLine1,
                     AddressLine2 = address.AddressLine2,
                     ZipCode = address.ZipCode,
@@ -472,23 +504,10 @@ public sealed class CreatePersonCommandHandlerTests
                     personAddress.SetAsDefault();
                 }
                 return personAddress;
-            }).ToList() ?? new List<PersonAddress>(),
-            Contacts = request.Contacts?.Select(contact =>
-            {
-                Enum.TryParse<ContactType>(contact.ContactType, true, out var parsedContactType);
-                var personContact = PersonContact.Create(
-                    Guid.NewGuid(),
-                    Guid.NewGuid(),
-                    parsedContactType,
-                    contact.ContactValue,
-                    contact.Comments);
-                if (contact.IsPrimary)
-                {
-                    personContact.SetAsPrimary();
-                }
-                return personContact;
-            }).ToList() ?? new List<PersonContact>()
-        };
+            }).ToList();
+        }
+
+        return entity;
     }
 
     /// <summary>
@@ -570,6 +589,7 @@ public sealed class CreatePersonCommandHandlerTests
             CurrentUserServiceMock.SetupGet(x => x.IsAuthenticated).Returns(true);
 
             UnitOfWorkMock.SetupGet(x => x.Persons).Returns(PersonsRepositoryMock.Object);
+            UnitOfWorkMock.SetupGet(x => x.PersonAddresses).Returns(PersonAddressRepositoryMock.Object);
 
             SetupRepository(UnitOfWorkMock, CompanyRepositoryMock);
             SetupRepository(UnitOfWorkMock, IdentificationTypeRepositoryMock);
@@ -585,6 +605,7 @@ public sealed class CreatePersonCommandHandlerTests
         public Mock<IPersonMapper> MapperMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IPersonsRepository> PersonsRepositoryMock { get; } = new();
+        public Mock<IPersonAddressRepository> PersonAddressRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Company>> CompanyRepositoryMock { get; } = CreateRepositoryMock<Company>();
         public Mock<IGenericRepository<IdentificationType>> IdentificationTypeRepositoryMock { get; } = CreateRepositoryMock<IdentificationType>();
         public Mock<IGenericRepository<StreetType>> StreetTypeRepositoryMock { get; } = CreateRepositoryMock<StreetType>();
@@ -596,10 +617,12 @@ public sealed class CreatePersonCommandHandlerTests
 
         public CreatePersonCommandHandler CreateHandler()
         {
+            var addressDefaultCoordinator = new PersonAddressDefaultCoordinator(PersonAddressRepositoryMock.Object);
             return new CreatePersonCommandHandler(
                 UnitOfWorkMock.Object,
                 MapperMock.Object,
-                CurrentUserServiceMock.Object);
+                CurrentUserServiceMock.Object,
+                addressDefaultCoordinator);
         }
     }
 }

@@ -4,6 +4,7 @@ using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Admin;
 using JOIN.Application.Mappings;
+using JOIN.Application.UseCases.Admin.PersonAddresses;
 using JOIN.Application.UseCases.Admin.PersonContacts;
 using JOIN.Application.UseCases.Admin.Persons.Commands;
 using JOIN.Domain.Admin;
@@ -179,11 +180,13 @@ public sealed class UpdatePersonCommandHandlerTests
         customer.Contacts.Should().Contain(x => x.Id == existingContactId && x.GcRecord == 0);
         customer.Contacts.Should().Contain(x => x.Id == removedContactId && x.GcRecord > 0);
 
-        // New address and contact are inserted via repository, not added to the in-memory collection.
+        // Address is inserted via the generic PersonAddress repository (GetRepository<PersonAddress>),
+        // while the new contact is inserted via the named IPersonContactRepository — so each
+        // verification targets the same channel the handler actually uses.
         context.PersonAddressRepositoryMock.Verify(
             x => x.InsertAsync(It.Is<PersonAddress>(a => a.PersonId == customerId && a.CompanyId == companyId)),
             Times.Once);
-        context.PersonContactRepositoryMock.Verify(
+        context.PersonContactRepoForCoordinatorMock.Verify(
             x => x.InsertAsync(It.Is<PersonContact>(c => c.PersonId == customerId && c.CompanyId == companyId)),
             Times.Once);
 
@@ -640,6 +643,7 @@ public sealed class UpdatePersonCommandHandlerTests
 
             UnitOfWorkMock.SetupGet(x => x.Persons).Returns(PersonsRepositoryMock.Object);
             UnitOfWorkMock.SetupGet(x => x.PersonContacts).Returns(PersonContactRepoForCoordinatorMock.Object);
+            UnitOfWorkMock.SetupGet(x => x.PersonAddresses).Returns(PersonAddressRepoForCoordinatorMock.Object);
 
             SetupRepository(UnitOfWorkMock, CompanyRepositoryMock);
             SetupRepository(UnitOfWorkMock, IdentificationTypeRepositoryMock);
@@ -655,6 +659,7 @@ public sealed class UpdatePersonCommandHandlerTests
             PersonAddressRepositoryMock.Setup(x => x.InsertAsync(It.IsAny<PersonAddress>())).ReturnsAsync(true);
             PersonContactRepositoryMock.Setup(x => x.InsertAsync(It.IsAny<PersonContact>())).ReturnsAsync(true);
             PersonContactRepoForCoordinatorMock.Setup(x => x.InsertAsync(It.IsAny<PersonContact>())).ReturnsAsync(true);
+            PersonAddressRepoForCoordinatorMock.Setup(x => x.InsertAsync(It.IsAny<PersonAddress>())).ReturnsAsync(true);
             PersonContactRepoForCoordinatorMock
                 .Setup(x => x.GetActiveWithPrimaryByTypeAsync(
                     It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<ContactType>(),
@@ -665,6 +670,14 @@ public sealed class UpdatePersonCommandHandlerTests
                     It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<ContactType>(),
                     It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((PersonContact?)null);
+            PersonAddressRepoForCoordinatorMock
+                .Setup(x => x.GetActiveWithDefaultAsync(
+                    It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Array.Empty<PersonAddress>());
+            PersonAddressRepoForCoordinatorMock
+                .Setup(x => x.GetMostRecentActiveAsync(
+                    It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((PersonAddress?)null);
         }
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
@@ -672,6 +685,7 @@ public sealed class UpdatePersonCommandHandlerTests
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IPersonsRepository> PersonsRepositoryMock { get; } = new();
         public Mock<IPersonContactRepository> PersonContactRepoForCoordinatorMock { get; } = new();
+        public Mock<IPersonAddressRepository> PersonAddressRepoForCoordinatorMock { get; } = new();
         public Mock<IGenericRepository<Company>> CompanyRepositoryMock { get; } = CreateRepositoryMock<Company>();
         public Mock<IGenericRepository<IdentificationType>> IdentificationTypeRepositoryMock { get; } = CreateRepositoryMock<IdentificationType>();
         public Mock<IGenericRepository<Gender>> GenderRepositoryMock { get; } = CreateRepositoryMock<Gender>();
@@ -686,11 +700,13 @@ public sealed class UpdatePersonCommandHandlerTests
         public UpdatePersonCommandHandler CreateHandler()
         {
             var coordinator = new PersonContactPrimaryCoordinator(PersonContactRepoForCoordinatorMock.Object);
+            var addressDefaultCoordinator = new PersonAddressDefaultCoordinator(PersonAddressRepoForCoordinatorMock.Object);
             return new UpdatePersonCommandHandler(
                 UnitOfWorkMock.Object,
                 MapperMock.Object,
                 CurrentUserServiceMock.Object,
-                coordinator);
+                coordinator,
+                addressDefaultCoordinator);
         }
     }
 }
