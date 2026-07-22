@@ -176,4 +176,5 @@ Cada uno de estos, si se necesita, va en su propio spec.
 - `tests/UnitTests/JOIN.Application.UnitTest/UseCases/Admin/CompanyModules/Commands/CreateCompanyModules/CreateCompanyModulesCommandHandlerTests.cs`
 - `tests/UnitTests/JOIN.Application.UnitTest/UseCases/Admin/CompanyModules/Commands/UpdateCompanyModules/UpdateCompanyModulesCommandHandlerTests.cs`
 
-**Producción sin tocar (confirmado):** `GetCompanyModulesQueryHandler.cs`, `CreateCompanyModulesCommandValidator.cs`, `UpdateCompanyModulesCommandValidator.cs`, `CreateCompanyModulesCommandHandler.cs`, `UpdateCompanyModulesCommandHandler.cs`, ningún handler, ningún validador.
+**Producción sin tocar (confirmado):** `GetCompanyModulesQueryHandler.cs`, `CreateCompanyModulesCommandValidator.cs`, `UpdateCompanyModulesCommandValidator.cs`, `CreateCompanyModulesCommandHandler.cs`, `UpdateCompanyModulesCommandHandler.cs`, ningún handler, ningún validador. 
+Revisando
