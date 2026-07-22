@@ -19,14 +19,26 @@ public sealed class GetCompanyModulesQueryHandlerTests
     private readonly Fixture _fixture = new();
 
     /// <summary>
-    /// Verifies the early exit when the tenant company identifier is missing.
-    /// This prevents the handler from executing any SQL without a valid company scope.
+    /// Verifies that an empty <see cref="Guid"/> is treated as a valid filter
+    /// (the query accepts an optional CompanyId scope) and returns an empty paged
+    /// result instead of an error.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenCompanyIdIsEmpty_ShouldReturnInvalidCompanyIdError()
+    public async Task Handle_WhenCompanyIdIsEmptyGuid_ShouldReturnEmptyPagedResult()
     {
         // Arrange
         var context = new GetCompanyModulesQueryTestContext(useNpgsqlConnection: false);
+        context.Connection.SetResults(
+            FakeResultSet.Empty(
+                "Id",
+                "CompanyId",
+                "CompanyName",
+                "ModuleId",
+                "ModuleName",
+                "IsActive",
+                "CreatedAt"),
+            FakeResultSet.FromScalar(0));
+
         var query = new GetCompanyModulesQuery(Guid.Empty);
         var handler = context.CreateHandler();
 
@@ -34,10 +46,10 @@ public sealed class GetCompanyModulesQueryHandlerTests
         var response = await handler.Handle(query, CancellationToken.None);
 
         // Assert
-        response.IsSuccess.Should().BeFalse();
-        response.Message.Should().Be("INVALID_COMPANY_ID");
-        response.Errors.Should().Contain("The X-Company-Id header is required.");
-        context.ConnectionFactoryMock.Verify(x => x.CreateConnection(), Times.Never);
+        response.IsSuccess.Should().BeTrue();
+        response.Data.Should().NotBeNull();
+        response.Data!.Items.Should().BeEmpty();
+        context.ConnectionFactoryMock.Verify(x => x.CreateConnection(), Times.Once);
     }
 
     /// <summary>
@@ -89,7 +101,8 @@ public sealed class GetCompanyModulesQueryHandlerTests
         item.IsActive.Should().BeTrue();
         item.CreatedAt.Should().Be(createdAt);
 
-        context.Connection.LastCommandText.Should().Contain("WHERE cm.CompanyId = @CompanyId AND cm.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain("cm.CompanyId = @CompanyId");
+        context.Connection.LastCommandText.Should().Contain("cm.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("c.Name LIKE @CompanyName");
         context.Connection.LastCommandText.Should().Contain("sm.Name LIKE @ModuleName");
         context.Connection.LastCommandText.Should().Contain("cm.Created >= @CreatedFrom");

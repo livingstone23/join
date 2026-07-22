@@ -1,6 +1,6 @@
 # SPEC 11 — Cerrar las 4 fallas restantes de CompanyModules (test-only)
 
-> **Status:** Draft
+> **Status:** Implementado
 > **Depends on:** SPEC 09/SPEC 10 (dejaron estas 4 fallas de `CompanyModules` explícitamente fuera de alcance, documentadas como pre-existentes y no relacionadas); referencia informativa a SPEC 06 (gate de cobertura ≥90%, que estas 4 fallas bloquean).
 > **Date:** 2026-07-22
 > **Objective:** Corregir las 4 pruebas fallando de `CompanyModules` (query y commands) ajustando únicamente los archivos de test para que reflejen el comportamiento real y correcto del código de producción — sin modificar ningún handler ni validador.
@@ -104,15 +104,15 @@ response.Errors.Should().Contain("CompanyId is required.");
 
 ## Acceptance criteria
 
-- [ ] `Handle_WhenCompanyIdIsEmptyGuid_ShouldReturnEmptyPagedResult` (renombrado) pasa: `IsSuccess == true`, `Items` vacío, `CreateConnection` invocado exactamente una vez.
-- [ ] `Handle_WhenFiltersAreProvided_ShouldApplyFiltersAndReturnPagedModules` pasa con las dos aserciones SQL independientes.
-- [ ] `CreateCompanyModulesCommandHandlerTests.Handle_WhenCompanyIdIsEmpty_ShouldReturnInvalidCompanyIdError` pasa esperando `"CompanyId is required."`.
-- [ ] `UpdateCompanyModulesCommandHandlerTests.Handle_WhenCompanyIdIsEmpty_ShouldReturnInvalidCompanyIdError` pasa esperando `"CompanyId is required."`.
-- [ ] `dotnet build` de la solución completa compila con 0 errores.
-- [ ] `GetCompanyModulesQueryHandler.cs` permanece sin modificaciones.
-- [ ] `CreateCompanyModulesCommandValidator.cs` y `UpdateCompanyModulesCommandValidator.cs` permanecen sin modificaciones.
-- [ ] Ningún test que pasaba antes de este spec empieza a fallar.
-- [ ] Se documenta si el reporte de cobertura logró generarse tras este fix, y su valor real (ya sea ≥90% o bloqueado por las fallas de locale fuera de alcance).
+- [x] `Handle_WhenCompanyIdIsEmptyGuid_ShouldReturnEmptyPagedResult` (renombrado) pasa: `IsSuccess == true`, `Items` vacío, `CreateConnection` invocado exactamente una vez.
+- [x] `Handle_WhenFiltersAreProvided_ShouldApplyFiltersAndReturnPagedModules` pasa con las dos aserciones SQL independientes.
+- [x] `CreateCompanyModulesCommandHandlerTests.Handle_WhenCompanyIdIsEmpty_ShouldReturnInvalidCompanyIdError` pasa esperando `"CompanyId is required."`.
+- [x] `UpdateCompanyModulesCommandHandlerTests.Handle_WhenCompanyIdIsEmpty_ShouldReturnInvalidCompanyIdError` pasa esperando `"CompanyId is required."`.
+- [x] `dotnet build` de la solución completa compila con 0 errores.
+- [x] `GetCompanyModulesQueryHandler.cs` permanece sin modificaciones.
+- [x] `CreateCompanyModulesCommandValidator.cs` y `UpdateCompanyModulesCommandValidator.cs` permanecen sin modificaciones.
+- [x] Ningún test que pasaba antes de este spec empieza a fallar.
+- [x] Se documenta si el reporte de cobertura logró generarse tras este fix, y su valor real (ya sea ≥90% o bloqueado por las fallas de locale fuera de alcance).
 
 ---
 
@@ -141,3 +141,39 @@ response.Errors.Should().Contain("CompanyId is required.");
 - Cualquier otro archivo de test fuera de los 3 listados en Scope.
 
 Cada uno de estos, si se necesita, va en su propio spec.
+
+---
+
+## Notas de implementación (2026-07-22)
+
+**Build:** `dotnet build JOIN.slnx` → 0 errores.
+
+**Tests:** `dotnet test tests/UnitTests/JOIN.Application.UnitTest` → **875/887 pasan**, 12 fallan.
+
+**0 fallos en los 3 archivos de este spec:**
+- `GetCompanyModulesQueryHandlerTests` 3/3 (test repurposado pasa, test de filtros pasa, test de empty sigue pasando).
+- `CreateCompanyModulesCommandHandlerTests` 6/6 (todas las variantes, incluido `Handle_WhenCompanyIdIsEmpty`).
+- `UpdateCompanyModulesCommandHandlerTests` (todos, incluido `Handle_WhenCompanyIdIsEmpty`).
+
+**12 fallos preexistentes — fuera de alcance de este spec (idénticos a los documentados en SPEC 10):**
+- 12 fallos de `FluentValidation` por mensaje localizado en español vs aserción en inglés (dependiente del locale del runner):
+  - `CreateAreaCommandValidatorTests.Validate_WhenNameIsEmpty_ShouldHaveValidationError`
+  - `UpdateAreaCommandValidatorTests.Validate_WhenNameIsEmpty_ShouldHaveValidationError`
+  - `CreateEntityStatusCommandValidatorTests.Validate_WhenNameIsEmpty_ShouldHaveValidationError`
+  - `UpdateEntityStatusCommandValidatorTests.Validate_WhenNameIsEmpty_ShouldHaveValidationError`
+  - `CreateIdentificationTypeCommandValidatorTests.Validate_WhenNameIsEmpty/Whitespace_ShouldHaveValidationError` (x2)
+  - `UpdateIdentificationTypeCommandValidatorTests.Validate_WhenNameIsEmpty/Whitespace_ShouldHaveValidationError` (x2)
+  - `CreateProjectCommandValidatorTests.Validate_WhenNameIsEmpty/Whitespace_ShouldHaveValidationError` (x2)
+  - `UpdateProjectCommandValidatorTests.Validate_WhenNameIsEmpty/Whitespace_ShouldHaveValidationError` (x2)
+  - Error real: `'Name' no debería estar vacío.` vs aserción `'Name' must not be empty.`
+
+**Cobertura:** coverlet emitió `coverage.cobertura.xml`. Reporta `JOIN.Application = 5.69%` line — la métrica no es representativa (el setup local no instrumenta automáticamente los PDBs del assembly de `JOIN.Application`, los archivos del paquete salen `line-rate="0"`). **Misma limitación documentada en SPEC 10**: la cobertura ≥90% real solo es verificable en CI con PDBs instrumentados. Las 12 fallas locale preexistentes (fuera de alcance) bloquean el `Threshold=90` en este runner. Debe re-validarse cuando esas 12 fallas se arreglen en specs futuros.
+
+**Verificación de no-regresión:** todos los tests que pasaban antes de este spec (871) siguen pasando después. Las 12 fallas son exactamente las mismas preexistentes, no se agregó ninguna.
+
+**Archivos modificados (3):**
+- `tests/UnitTests/JOIN.Application.UnitTest/UseCases/Admin/CompanyModules/Queries/GetCompanyModules/GetCompanyModulesQueryHandlerTests.cs`
+- `tests/UnitTests/JOIN.Application.UnitTest/UseCases/Admin/CompanyModules/Commands/CreateCompanyModules/CreateCompanyModulesCommandHandlerTests.cs`
+- `tests/UnitTests/JOIN.Application.UnitTest/UseCases/Admin/CompanyModules/Commands/UpdateCompanyModules/UpdateCompanyModulesCommandHandlerTests.cs`
+
+**Producción sin tocar (confirmado):** `GetCompanyModulesQueryHandler.cs`, `CreateCompanyModulesCommandValidator.cs`, `UpdateCompanyModulesCommandValidator.cs`, `CreateCompanyModulesCommandHandler.cs`, `UpdateCompanyModulesCommandHandler.cs`, ningún handler, ningún validador.

@@ -28,7 +28,7 @@ public sealed class CreateCompanyModulesCommandHandlerTests
 
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("INVALID_COMPANY_ID");
-        response.Errors.Should().Contain("The X-Company-Id header is required.");
+        response.Errors.Should().Contain("CompanyId is required.");
 
         context.CompanyModuleRepositoryMock.Verify(x => x.InsertAsync(It.IsAny<CompanyModule>()), Times.Never);
         context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
