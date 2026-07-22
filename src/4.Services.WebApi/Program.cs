@@ -16,6 +16,7 @@ using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore; // <-- New using for modern API UI
@@ -186,7 +187,17 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
-        var pendingMigrations = (await context.Database.GetPendingMigrationsAsync()).ToList();
+
+        // Retry the first DB touch a few times before giving up. Some SQL Server
+        // instances (notably an ephemeral Testcontainers container on shared/constrained
+        // CI runners) can report themselves "ready" moments before the exposed port is
+        // actually reachable from this process, causing SqlException error 35 (connection
+        // timeout) here. This retry is scoped to the startup check only, before any
+        // transaction exists, so it does not interact with TransactionBehavior's explicit
+        // transactions (SPEC 01) the way EF Core's built-in EnableRetryOnFailure would —
+        // that execution strategy is incompatible with user-initiated transactions and was
+        // deliberately not used for that reason (SPEC 05).
+        var pendingMigrations = (await GetPendingMigrationsWithRetryAsync(context, logger)).ToList();
 
         await context.Database.MigrateAsync();
 
@@ -214,8 +225,35 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         logger.LogError(ex, "An error occurred while migrating the database.");
-        throw; 
+        throw;
     }
+}
+
+// Retries the initial connectivity check a fixed number of times on SqlException,
+// with a short delay between attempts. See the call site above for why this exists
+// instead of EF Core's EnableRetryOnFailure.
+static async Task<IEnumerable<string>> GetPendingMigrationsWithRetryAsync(ApplicationDbContext context, Microsoft.Extensions.Logging.ILogger<Program> logger)
+{
+    const int maxAttempts = 5;
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        try
+        {
+            return await context.Database.GetPendingMigrationsAsync();
+        }
+        catch (SqlException ex) when (attempt < maxAttempts)
+        {
+            logger.LogWarning(
+                ex,
+                "Database not reachable yet (attempt {Attempt}/{MaxAttempts}); retrying in 3s.",
+                attempt,
+                maxAttempts);
+            await Task.Delay(TimeSpan.FromSeconds(3));
+        }
+    }
+
+    return await context.Database.GetPendingMigrationsAsync();
 }
 
 // ============================================================================
