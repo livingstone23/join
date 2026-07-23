@@ -56,14 +56,15 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         await _dbContainer.StartAsync();
 
         // Testcontainers' built-in wait strategy runs "sqlcmd -Q SELECT 1" INSIDE the
-        // container network namespace, which only proves SQL Server is ready internally.
-        // Observed on GitHub Actions ubuntu-latest runners: connection attempts fail
-        // inconsistently — some fail fast (~3s), others hang the full connect timeout
-        // (~15s) — the classic signature of Microsoft.Data.SqlClient's ManagedSni
-        // resolving "localhost" to ::1 (IPv6) first on some attempts, where Docker's
-        // published port isn't bound, instead of 127.0.0.1 (IPv4) where it is. Force
-        // IPv4First so every attempt resolves consistently, and bump ConnectTimeout as
-        // a secondary safety margin.
+        // container network namespace, which only proves SQL Server accepts a login —
+        // not that it has finished its own startup (tempdb/model/msdb creation). On
+        // GitHub Actions runners the app can keep failing to query for 40-60+ seconds
+        // after the container reports "ready", with a login-succeeds-but-query-fails
+        // pattern. ConnectTimeout/IPv4First were tried and ruled out — the failure
+        // pattern was byte-for-byte identical with and without them. So this probe
+        // runs a real query (not just Open()), with a long budget, before handing the
+        // connection string to the app — Program.cs has its own matching retry loop
+        // around the startup migration check for the same reason.
         var builder = new SqlConnectionStringBuilder(_dbContainer.GetConnectionString())
         {
             ConnectTimeout = 30,
@@ -71,12 +72,13 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         };
         _connectionString = builder.ConnectionString;
 
-        await WaitUntilReachableAsync();
+        await WaitUntilQueryableAsync();
     }
 
-    private async Task WaitUntilReachableAsync()
+    private async Task WaitUntilQueryableAsync()
     {
-        const int maxAttempts = 10;
+        const int maxAttempts = 20;
+        var delay = TimeSpan.FromSeconds(5);
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -84,11 +86,14 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             {
                 await using var connection = new SqlConnection(_connectionString);
                 await connection.OpenAsync();
+                await using var command = connection.CreateCommand();
+                command.CommandText = "SELECT 1;";
+                await command.ExecuteScalarAsync();
                 return;
             }
             catch (SqlException) when (attempt < maxAttempts)
             {
-                await Task.Delay(TimeSpan.FromSeconds(2));
+                await Task.Delay(delay);
             }
         }
     }

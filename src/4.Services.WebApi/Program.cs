@@ -231,10 +231,17 @@ using (var scope = app.Services.CreateScope())
 
 // Retries the initial connectivity check a fixed number of times on SqlException,
 // with a short delay between attempts. See the call site above for why this exists
-// instead of EF Core's EnableRetryOnFailure.
+// instead of EF Core's EnableRetryOnFailure. The generous budget (up to ~100s) is
+// deliberate: observed CI failures kept failing identically regardless of connect
+// timeout or IPv4-vs-IPv6 tweaks, with a login-capable-but-query-fails pattern that
+// points to SQL Server still finishing its own startup (tempdb/model/msdb creation)
+// under a resource-constrained runner, well after it starts accepting connections —
+// not a network-reachability problem, so more attempts over a longer window is the
+// correct lever here, not a shorter/smarter connection string.
 static async Task<IEnumerable<string>> GetPendingMigrationsWithRetryAsync(ApplicationDbContext context, Microsoft.Extensions.Logging.ILogger<Program> logger)
 {
-    const int maxAttempts = 5;
+    const int maxAttempts = 20;
+    var delay = TimeSpan.FromSeconds(5);
 
     for (var attempt = 1; attempt <= maxAttempts; attempt++)
     {
@@ -246,10 +253,11 @@ static async Task<IEnumerable<string>> GetPendingMigrationsWithRetryAsync(Applic
         {
             logger.LogWarning(
                 ex,
-                "Database not reachable yet (attempt {Attempt}/{MaxAttempts}); retrying in 3s.",
+                "Database not reachable yet (attempt {Attempt}/{MaxAttempts}); retrying in {DelaySeconds}s.",
                 attempt,
-                maxAttempts);
-            await Task.Delay(TimeSpan.FromSeconds(3));
+                maxAttempts,
+                delay.TotalSeconds);
+            await Task.Delay(delay);
         }
     }
 
