@@ -57,15 +57,17 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         // Testcontainers' built-in wait strategy runs "sqlcmd -Q SELECT 1" INSIDE the
         // container network namespace, which only proves SQL Server is ready internally.
-        // On shared/constrained CI runners there can be a lag before the mapped port is
-        // actually reachable from the test-runner host, causing the app's first login
-        // attempt (via Program.cs migrations) to time out with SqlException error 35
-        // even though the container reports "ready". Bump the connect timeout and poll
-        // with a real login from the host's network path before handing the connection
-        // string to the app, closing that internal-ready-vs-externally-reachable gap.
+        // Observed on GitHub Actions ubuntu-latest runners: connection attempts fail
+        // inconsistently — some fail fast (~3s), others hang the full connect timeout
+        // (~15s) — the classic signature of Microsoft.Data.SqlClient's ManagedSni
+        // resolving "localhost" to ::1 (IPv6) first on some attempts, where Docker's
+        // published port isn't bound, instead of 127.0.0.1 (IPv4) where it is. Force
+        // IPv4First so every attempt resolves consistently, and bump ConnectTimeout as
+        // a secondary safety margin.
         var builder = new SqlConnectionStringBuilder(_dbContainer.GetConnectionString())
         {
-            ConnectTimeout = 30
+            ConnectTimeout = 30,
+            IPAddressPreference = SqlConnectionIPAddressPreference.IPv4First
         };
         _connectionString = builder.ConnectionString;
 
