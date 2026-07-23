@@ -50,12 +50,21 @@ public static class ConfigureServices
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
 
         // 4. CONFIGURACIÓN DE BASE DE DATOS (EF CORE)
-        var connectionString = configuration.GetConnectionString("DefaultConnection");
-
         services.AddDbContext<ApplicationDbContext>((sp, options) =>
         {
             var interceptor = sp.GetRequiredService<AuditableEntitySaveChangesInterceptor>();
             options.AddInterceptors(interceptor);
+
+            // Resolved from IConfiguration via the ServiceProvider (not captured from
+            // the outer `configuration` parameter) so this reflects the fully-built
+            // configuration, including any overrides applied after this method runs —
+            // e.g. WebApplicationFactory's ConfigureAppConfiguration in integration
+            // tests, which is only merged in by the time the host finishes building,
+            // well after Program.cs calls AddPersistenceServices(builder.Configuration).
+            // Capturing the connection string eagerly here silently locked every
+            // DbContext to appsettings.json's DefaultConnection, ignoring the
+            // Testcontainers connection string entirely.
+            var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection");
 
             // Configuración predeterminada para SQL Server.
             // CommandTimeout(30) (seconds) is set explicitly per SPEC 05 so the value
