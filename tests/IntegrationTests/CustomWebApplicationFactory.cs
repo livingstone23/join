@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using JOIN.Application.Interface;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -55,16 +56,23 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     {
         await _dbContainer.StartAsync();
 
-        // Testcontainers' built-in wait strategy runs "sqlcmd -Q SELECT 1" INSIDE the
-        // container network namespace, which only proves SQL Server accepts a login —
-        // not that it has finished its own startup (tempdb/model/msdb creation). On
-        // GitHub Actions runners the app can keep failing to query for 40-60+ seconds
-        // after the container reports "ready", with a login-succeeds-but-query-fails
-        // pattern. ConnectTimeout/IPv4First were tried and ruled out — the failure
-        // pattern was byte-for-byte identical with and without them. So this probe
-        // runs a real query (not just Open()), with a long budget, before handing the
-        // connection string to the app — Program.cs has its own matching retry loop
-        // around the startup migration check for the same reason.
+        // DIAGNOSTIC (temporary): four separate fixes (ConnectTimeout, IPv4First, a
+        // startup-check retry budget up to ~100s, then ~3min) all failed to change the
+        // outcome — every single connection attempt times out for the container's
+        // entire lifetime, even though Testcontainers' internal "docker exec sqlcmd"
+        // check succeeds. That rules out DNS/address-family and "still starting up";
+        // it points at the published port not being reachable at all from wherever
+        // `dotnet test` runs on this specific CI runner. Log exactly what Testcontainers
+        // resolved, and do a raw TCP-only probe (no SQL protocol involved) so the next
+        // CI log tells us definitively whether this is a Docker/network problem outside
+        // of anything SqlClient-related, instead of guessing at more connection-string
+        // tweaks.
+        var mappedPort = _dbContainer.GetMappedPublicPort(1433);
+        Console.WriteLine($"[DIAG] Testcontainers hostname={_dbContainer.Hostname} mappedPort={mappedPort}");
+
+        var rawTcpReachable = await TryRawTcpConnectAsync(_dbContainer.Hostname, mappedPort);
+        Console.WriteLine($"[DIAG] raw TCP connect to {_dbContainer.Hostname}:{mappedPort} succeeded={rawTcpReachable}");
+
         var builder = new SqlConnectionStringBuilder(_dbContainer.GetConnectionString())
         {
             ConnectTimeout = 30,
@@ -73,6 +81,21 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         _connectionString = builder.ConnectionString;
 
         await WaitUntilQueryableAsync();
+    }
+
+    private static async Task<bool> TryRawTcpConnectAsync(string host, int port)
+    {
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(host, port).WaitAsync(TimeSpan.FromSeconds(10));
+            return client.Connected;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DIAG] raw TCP connect failed: {ex.GetType().Name}: {ex.Message}");
+            return false;
+        }
     }
 
     private async Task WaitUntilQueryableAsync()
@@ -89,10 +112,12 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 await using var command = connection.CreateCommand();
                 command.CommandText = "SELECT 1;";
                 await command.ExecuteScalarAsync();
+                Console.WriteLine($"[DIAG] WaitUntilQueryableAsync succeeded on attempt {attempt}/{maxAttempts}");
                 return;
             }
-            catch (SqlException) when (attempt < maxAttempts)
+            catch (SqlException ex) when (attempt < maxAttempts)
             {
+                Console.WriteLine($"[DIAG] WaitUntilQueryableAsync attempt {attempt}/{maxAttempts} failed: {ex.Message}");
                 await Task.Delay(delay);
             }
         }
