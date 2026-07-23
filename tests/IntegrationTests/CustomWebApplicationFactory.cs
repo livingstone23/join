@@ -1,4 +1,3 @@
-using System.Net.Sockets;
 using JOIN.Application.Interface;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -56,22 +55,8 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     {
         await _dbContainer.StartAsync();
 
-        // DIAGNOSTIC (temporary): four separate fixes (ConnectTimeout, IPv4First, a
-        // startup-check retry budget up to ~100s, then ~3min) all failed to change the
-        // outcome — every single connection attempt times out for the container's
-        // entire lifetime, even though Testcontainers' internal "docker exec sqlcmd"
-        // check succeeds. That rules out DNS/address-family and "still starting up";
-        // it points at the published port not being reachable at all from wherever
-        // `dotnet test` runs on this specific CI runner. Log exactly what Testcontainers
-        // resolved, and do a raw TCP-only probe (no SQL protocol involved) so the next
-        // CI log tells us definitively whether this is a Docker/network problem outside
-        // of anything SqlClient-related, instead of guessing at more connection-string
-        // tweaks.
         var mappedPort = _dbContainer.GetMappedPublicPort(1433);
         Console.WriteLine($"[DIAG] Testcontainers hostname={_dbContainer.Hostname} mappedPort={mappedPort}");
-
-        var rawTcpReachable = await TryRawTcpConnectAsync(_dbContainer.Hostname, mappedPort);
-        Console.WriteLine($"[DIAG] raw TCP connect to {_dbContainer.Hostname}:{mappedPort} succeeded={rawTcpReachable}");
 
         var builder = new SqlConnectionStringBuilder(_dbContainer.GetConnectionString())
         {
@@ -80,28 +65,27 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         };
         _connectionString = builder.ConnectionString;
 
-        await WaitUntilQueryableAsync();
+        await WaitUntilStablyQueryableAsync();
     }
 
-    private static async Task<bool> TryRawTcpConnectAsync(string host, int port)
+    // The official mssql-server image can briefly accept connections right after
+    // Testcontainers' own "docker exec sqlcmd" readiness check succeeds, then go
+    // dark for minutes while the engine finishes first-boot setup (service master
+    // key / certificate generation, possible internal restart). CI evidence: our
+    // own probe succeeded on the very first attempt, then every connection attempt
+    // from the app's own startup retry loop — using a fresh DbContext/connection
+    // each time — failed for the next ~2.5 minutes straight. A single successful
+    // SELECT 1 is therefore not a reliable readiness signal for this image; require
+    // several CONSECUTIVE successes, spaced apart, before declaring the container
+    // ready, so the host is never started against a server that's about to
+    // disappear.
+    private async Task WaitUntilStablyQueryableAsync()
     {
-        try
-        {
-            using var client = new TcpClient();
-            await client.ConnectAsync(host, port).WaitAsync(TimeSpan.FromSeconds(10));
-            return client.Connected;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[DIAG] raw TCP connect failed: {ex.GetType().Name}: {ex.Message}");
-            return false;
-        }
-    }
-
-    private async Task WaitUntilQueryableAsync()
-    {
-        const int maxAttempts = 20;
+        const int requiredConsecutiveSuccesses = 3;
+        const int maxAttempts = 60;
         var delay = TimeSpan.FromSeconds(5);
+
+        var consecutiveSuccesses = 0;
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -112,14 +96,30 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 await using var command = connection.CreateCommand();
                 command.CommandText = "SELECT 1;";
                 await command.ExecuteScalarAsync();
-                Console.WriteLine($"[DIAG] WaitUntilQueryableAsync succeeded on attempt {attempt}/{maxAttempts}");
-                return;
+
+                consecutiveSuccesses++;
+                Console.WriteLine($"[DIAG] stability check succeeded ({consecutiveSuccesses}/{requiredConsecutiveSuccesses}) on attempt {attempt}/{maxAttempts}");
+
+                if (consecutiveSuccesses >= requiredConsecutiveSuccesses)
+                {
+                    return;
+                }
             }
-            catch (SqlException ex) when (attempt < maxAttempts)
+            catch (SqlException ex)
             {
-                Console.WriteLine($"[DIAG] WaitUntilQueryableAsync attempt {attempt}/{maxAttempts} failed: {ex.Message}");
-                await Task.Delay(delay);
+                Console.WriteLine(consecutiveSuccesses > 0
+                    ? $"[DIAG] stability check regressed after {consecutiveSuccesses} consecutive successes on attempt {attempt}/{maxAttempts}: {ex.Message}"
+                    : $"[DIAG] attempt {attempt}/{maxAttempts} failed: {ex.Message}");
+
+                consecutiveSuccesses = 0;
+
+                if (attempt == maxAttempts)
+                {
+                    throw;
+                }
             }
+
+            await Task.Delay(delay);
         }
     }
 
