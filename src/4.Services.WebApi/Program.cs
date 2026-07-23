@@ -188,16 +188,22 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
 
-        // Retry the first DB touch a few times before giving up. Some SQL Server
-        // instances (notably an ephemeral Testcontainers container on shared/constrained
-        // CI runners) can report themselves "ready" moments before the exposed port is
-        // actually reachable from this process, causing SqlException error 35 (connection
-        // timeout) here. This retry is scoped to the startup check only, before any
-        // transaction exists, so it does not interact with TransactionBehavior's explicit
-        // transactions (SPEC 01) the way EF Core's built-in EnableRetryOnFailure would —
-        // that execution strategy is incompatible with user-initiated transactions and was
+        // Retry the first DB touch a few times before giving up, using a FRESH
+        // ApplicationDbContext (hence a fresh underlying SqlConnection) on every
+        // attempt — not the same reused context/connection object. Diagnostics
+        // showed a brand-new SqlConnection against this exact connection string
+        // succeeds on the very first try even when this loop was failing, because
+        // reusing one context/connection across retries meant a single early
+        // connection-level fault left that object "permanently" broken: every
+        // later attempt on it failed identically regardless of whether the
+        // network path itself had already recovered. This retry is scoped to the
+        // startup check only, before any transaction exists, so it does not
+        // interact with TransactionBehavior's explicit transactions (SPEC 01) the
+        // way EF Core's built-in EnableRetryOnFailure would — that execution
+        // strategy is incompatible with user-initiated transactions and was
         // deliberately not used for that reason (SPEC 05).
-        var pendingMigrations = (await GetPendingMigrationsWithRetryAsync(context, logger)).ToList();
+        var scopeFactory = app.Services.GetRequiredService<IServiceScopeFactory>();
+        var pendingMigrations = (await GetPendingMigrationsWithRetryAsync(scopeFactory, logger)).ToList();
 
         await context.Database.MigrateAsync();
 
@@ -230,24 +236,23 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Retries the initial connectivity check a fixed number of times on SqlException,
-// with a short delay between attempts. See the call site above for why this exists
-// instead of EF Core's EnableRetryOnFailure. The generous budget (up to ~100s) is
-// deliberate: observed CI failures kept failing identically regardless of connect
-// timeout or IPv4-vs-IPv6 tweaks, with a login-capable-but-query-fails pattern that
-// points to SQL Server still finishing its own startup (tempdb/model/msdb creation)
-// under a resource-constrained runner, well after it starts accepting connections —
-// not a network-reachability problem, so more attempts over a longer window is the
-// correct lever here, not a shorter/smarter connection string.
-static async Task<IEnumerable<string>> GetPendingMigrationsWithRetryAsync(ApplicationDbContext context, Microsoft.Extensions.Logging.ILogger<Program> logger)
+// with a short delay between attempts, using a FRESH scope (and thus a fresh
+// ApplicationDbContext + underlying SqlConnection) on every attempt. See the call
+// site above for why reusing one context across retries was the actual bug, and
+// why this doesn't use EF Core's EnableRetryOnFailure.
+static async Task<IEnumerable<string>> GetPendingMigrationsWithRetryAsync(IServiceScopeFactory scopeFactory, Microsoft.Extensions.Logging.ILogger<Program> logger)
 {
     const int maxAttempts = 20;
     var delay = TimeSpan.FromSeconds(5);
 
     for (var attempt = 1; attempt <= maxAttempts; attempt++)
     {
+        using var attemptScope = scopeFactory.CreateScope();
+        var attemptContext = attemptScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
         try
         {
-            return await context.Database.GetPendingMigrationsAsync();
+            return await attemptContext.Database.GetPendingMigrationsAsync();
         }
         catch (SqlException ex) when (attempt < maxAttempts)
         {
@@ -261,7 +266,8 @@ static async Task<IEnumerable<string>> GetPendingMigrationsWithRetryAsync(Applic
         }
     }
 
-    return await context.Database.GetPendingMigrationsAsync();
+    using var finalScope = scopeFactory.CreateScope();
+    return await finalScope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.GetPendingMigrationsAsync();
 }
 
 // ============================================================================
