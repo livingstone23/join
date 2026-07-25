@@ -48,15 +48,15 @@ No aplica — este spec no introduce ni modifica entidades, tablas ni estructura
 
 ## Acceptance criteria
 
-- [ ] `JOIN.Services.WebApi.csproj` tiene `<PackageReference Include="IdentityModel.OidcClient" Version="5.2.1" />`.
-- [ ] `dotnet restore` resuelve `IdentityModel.OidcClient 5.2.1` e `IdentityModel 5.2.0` sin conflictos.
-- [ ] `dotnet build` en Release compila con 0 errores y sin `NU1902`/`NU1903`.
-- [ ] `dotnet list package --vulnerable --include-transitive` no reporta vulnerabilidades nuevas tras el cambio.
-- [ ] Al arrancar la API en Development y esperar 2+ ciclos de recolección de healthchecks, el log **no** muestra `FileNotFoundException` para `IdentityModel`.
-- [ ] `/health-ui` renderiza correctamente el estado del healthcheck `JOIN CRM - Database`.
-- [ ] `KubernetesClient` sigue resuelto en `18.0.13` (no se revirtió el parche de SPEC 13).
-- [ ] `dotnet test` sigue pasando sin cambios.
-- [ ] No se modificó ningún archivo `.cs` — el diff se limita al `.csproj` (y opcionalmente `obj/project.assets.json`/lock files regenerados por restore).
+- [x] `JOIN.Services.WebApi.csproj` tiene `<PackageReference Include="IdentityModel.OidcClient" Version="5.2.1" />`.
+- [x] `dotnet restore` resuelve `IdentityModel.OidcClient 5.2.1` e `IdentityModel 5.2.0` sin conflictos.
+- [x] `dotnet build` en Release compila con 0 errores y sin `NU1902`/`NU1903`.
+- [x] `dotnet list package --vulnerable --include-transitive` no reporta vulnerabilidades nuevas tras el cambio.
+- [x] Al arrancar la API en Development y esperar 2+ ciclos de recolección de healthchecks, el log **no** muestra `FileNotFoundException` para `IdentityModel`.
+- [x] `/health-ui` renderiza correctamente el estado del healthcheck `JOIN CRM - Database`.
+- [x] `KubernetesClient` sigue resuelto en `18.0.13` (no se revirtió el parche de SPEC 13).
+- [x] `dotnet test` sigue pasando sin cambios.
+- [x] No se modificó ningún archivo `.cs` — el diff se limita al `.csproj` (y opcionalmente `obj/project.assets.json`/lock files regenerados por restore).
 
 ---
 
