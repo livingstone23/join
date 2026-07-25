@@ -1,6 +1,6 @@
 # SPEC 15 — Fix FileNotFoundException de IdentityModel en HealthChecks.UI collector
 
-> **Status:** Draft
+> **Status:** Implementado
 > **Depends on:** [[13-fix-nuget-vulnerabilities-and-ef-warnings]] (introdujo el override de `KubernetesClient` que causó esta regresión).
 > **Date:** 2026-07-25
 > **Objective:** Agregar `IdentityModel.OidcClient` como `PackageReference` directo en `JOIN.Services.WebApi.csproj` para restaurar el ensamblado `IdentityModel.dll` que `HealthChecks.UI.Core` necesita en runtime, eliminando el `FileNotFoundException` recurrente del `HealthCheckCollectorHostedService` sin revertir el parche de `KubernetesClient` (CVE/NU1902).

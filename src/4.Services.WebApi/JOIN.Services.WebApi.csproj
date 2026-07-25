@@ -25,6 +25,8 @@
     <PackageReference Include="AspNetCore.HealthChecks.UI.InMemory.Storage" Version="9.0.0" />
     <!-- Direct override to pull the patched KubernetesClient over the vulnerable 15.0.1 that AspNetCore.HealthChecks.UI 9.0.0 brings transitively (NU1902). -->
     <PackageReference Include="KubernetesClient" Version="18.0.13" />
+    <!-- Restores IdentityModel.dll transitively. HealthChecks.UI.Core binds against the IdentityModel surface that KubernetesClient 15.0.1 used to bring; the override above drops it. -->
+    <PackageReference Include="IdentityModel.OidcClient" Version="5.2.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
     <!-- Direct override to pull the patched Microsoft.OpenApi over the vulnerable 2.0.0 that Microsoft.AspNetCore.OpenApi 10.0.2 brings transitively (NU1903). -->
