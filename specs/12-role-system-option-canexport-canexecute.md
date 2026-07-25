@@ -1,6 +1,6 @@
 # SPEC 12 — Permisos CanExport y CanExecute en RoleSystemOption
 
-> **Status:** Draft
+> **Status:** Implementado
 > **Depends on:** Ninguno (extiende el modelo de permisos existente introducido junto con CanRead/CanCreate/CanUpdate/CanDelete/CanDownload/IsVisibleMenu).
 > **Date:** 2026-07-25
 > **Objective:** Agregar las columnas `CanExport` y `CanExecute` a `RoleSystemOption`, poblarlas junto con `CanDownload` en `true` para los roles SuperAdmin, Admin, Manager y SuperAdminCompany (y en `false` para UsuarioSimple) en el seed del tenant maestro, y aplicar la migración de EF Core correspondiente.
@@ -125,16 +125,16 @@ new RoleSystemOptionSeed(roleName, option.Name, true, true, true, true,
 
 ## Acceptance criteria
 
-- [ ] `RoleSystemOption.cs` expone `CanExport` y `CanExecute` como `bool` públicos.
-- [ ] `RoleSystemOptionConfiguration.cs` define `HasDefaultValue(false)` para ambas columnas nuevas.
-- [ ] `dotnet build` en Release compila sin errores ni warnings nuevos.
-- [ ] Existe una migración de EF Core cuyo `Up()` agrega `CanExport` y `CanExecute` (`bool NOT NULL DEFAULT false`) a `Security.RoleSystemOptions`, y cuyo `Down()` las elimina.
-- [ ] La migración se aplicó correctamente contra la base local (`dotnet ef database update` sin errores, o arranque exitoso de la API con `MigrateAsync()`).
-- [ ] Tras correr el seed sobre la company `JOIN-001`: toda fila de `RoleSystemOptions` cuyo rol sea `SuperAdmin`, `Admin` o `Manager` tiene `CanExport = true`, `CanExecute = true`, `CanDownload = true`.
-- [ ] Tras correr el seed: toda fila de `RoleSystemOptions` cuyo rol sea `UsuarioSimple` tiene `CanExport = false`, `CanExecute = false`, `CanDownload = false`.
-- [ ] Las filas de `Supervisor` no fueron modificadas más allá del fallback automático (`CanExport`/`CanExecute` igual a su `CanRead` por fila).
-- [ ] Correr el seeder una segunda vez (idempotencia) no inserta filas duplicadas ni deja `hasChanges` en `true` innecesariamente (no genera updates en el segundo pase).
-- [ ] `dotnet test` sigue pasando (no se rompen pruebas existentes de `DatabaseSeeder`/`RoleSystemOption` si las hay).
+- [x] `RoleSystemOption.cs` expone `CanExport` y `CanExecute` como `bool` públicos.
+- [x] `RoleSystemOptionConfiguration.cs` define `HasDefaultValue(false)` para ambas columnas nuevas.
+- [x] `dotnet build` en Release compila sin errores ni warnings nuevos.
+- [x] Existe una migración de EF Core cuyo `Up()` agrega `CanExport` y `CanExecute` (`bool NOT NULL DEFAULT false`) a `Security.RoleSystemOptions`, y cuyo `Down()` las elimina.
+- [x] La migración se aplicó correctamente contra la base local (`dotnet ef database update` sin errores, o arranque exitoso de la API con `MigrateAsync()`).
+- [x] Tras correr el seed sobre la company `JOIN-001`: toda fila de `RoleSystemOptions` cuyo rol sea `SuperAdmin`, `Admin` o `Manager` tiene `CanExport = true`, `CanExecute = true`, `CanDownload = true`.
+- [x] Tras correr el seed: toda fila de `RoleSystemOptions` cuyo rol sea `UsuarioSimple` tiene `CanExport = false`, `CanExecute = false`, `CanDownload = false`.
+- [x] Las filas de `Supervisor` no fueron modificadas más allá del fallback automático (`CanExport`/`CanExecute` igual a su `CanRead` por fila).
+- [x] Correr el seeder una segunda vez (idempotencia) no inserta filas duplicadas ni deja `hasChanges` en `true` innecesariamente (no genera updates en el segundo pase).
+- [x] `dotnet test` sigue pasando (no se rompen pruebas existentes de `DatabaseSeeder`/`RoleSystemOption` si las hay). *(12 fallos preexistentes de localización FluentValidation, iguales en `main` limpio; ninguno de `DatabaseSeeder`/`RoleSystemOption`.)*
 
 ---
 

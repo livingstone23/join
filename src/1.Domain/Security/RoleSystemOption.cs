@@ -53,6 +53,16 @@ public class RoleSystemOption : BaseTenantEntity
     public bool CanDownload { get; set; }
 
     /// <summary>
+    /// Indicates if the role can export data from this screen (e.g. Excel/CSV/PDF report generation).
+    /// </summary>
+    public bool CanExport { get; set; }
+
+    /// <summary>
+    /// Indicates if the role can trigger actions/processes on this screen (e.g. run a workflow or batch operation).
+    /// </summary>
+    public bool CanExecute { get; set; }
+
+    /// <summary>
     /// Indicates if this option is visible in the menu for the role.
     /// </summary>
     public bool IsVisibleMenu { get; set; }
