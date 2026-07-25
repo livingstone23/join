@@ -61,6 +61,16 @@ public class SystemOption : BaseAuditableEntity
     public bool CanDownload { get; set; } = true;
 
     /// <summary>
+    /// Indicates if the role can export data from this screen (e.g. Excel/CSV/PDF report generation).
+    /// </summary>
+    public bool CanExport { get; set; } = true;
+
+    /// <summary>
+    /// Indicates if the role can trigger actions/processes on this screen (e.g. run a workflow or batch operation).
+    /// </summary>
+    public bool CanExecute { get; set; } = true;
+
+    /// <summary>
     /// Indicates if the option is visible in the menu.
     /// </summary>
     public bool IsVisibleMenu { get; set; } = true;

@@ -2041,6 +2041,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             menuOrder += 10;
             var orderMenu = seed.OrderMenu ?? menuOrder;
             var canDownload = seed.CanDownload ?? seed.CanRead;
+            var canExport = seed.CanExport ?? true;
+            var canExecute = seed.CanExecute ?? true;
             var isVisibleMenu = seed.IsVisibleMenu ?? true;
 
             if (!optionsByName.TryGetValue(seed.Name, out var option))
@@ -2066,6 +2068,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                         CanUpdate = seed.CanUpdate,
                         CanDelete = seed.CanDelete,
                         CanDownload = canDownload,
+                        CanExport = canExport,
+                        CanExecute = canExecute,
                         IsVisibleMenu = isVisibleMenu,
                         OrderMenu = orderMenu,
                         Created = now,
@@ -2096,6 +2100,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 || option.CanUpdate != seed.CanUpdate
                 || option.CanDelete != seed.CanDelete
                 || option.CanDownload != canDownload
+                || option.CanExport != canExport
+                || option.CanExecute != canExecute
                 || option.IsVisibleMenu != isVisibleMenu
                 || option.OrderMenu != orderMenu
                 || option.GcRecord != 0;
@@ -2115,6 +2121,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             option.CanUpdate = seed.CanUpdate;
             option.CanDelete = seed.CanDelete;
             option.CanDownload = canDownload;
+            option.CanExport = canExport;
+            option.CanExecute = canExecute;
             option.IsVisibleMenu = isVisibleMenu;
             option.OrderMenu = orderMenu;
             option.GcRecord = 0;
@@ -2729,6 +2737,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         bool CanUpdate,
         bool CanDelete,
         bool? CanDownload = null,
+        bool? CanExport = null,
+        bool? CanExecute = null,
         bool? IsVisibleMenu = null,
         int? OrderMenu = null);
     private sealed record RoleSystemOptionSeed(

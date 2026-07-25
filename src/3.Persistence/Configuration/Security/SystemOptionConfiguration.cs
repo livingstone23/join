@@ -42,6 +42,8 @@ public class SystemOptionConfiguration : IEntityTypeConfiguration<SystemOption>
         builder.Property(o => o.CanUpdate).HasDefaultValue(true);
         builder.Property(o => o.CanDelete).HasDefaultValue(true);
         builder.Property(o => o.CanDownload).HasDefaultValue(true);
+        builder.Property(o => o.CanExport).HasDefaultValue(true);
+        builder.Property(o => o.CanExecute).HasDefaultValue(true);
         builder.Property(o => o.IsVisibleMenu).HasDefaultValue(true);
         builder.Property(o => o.OrderMenu).HasDefaultValue(0);
 
