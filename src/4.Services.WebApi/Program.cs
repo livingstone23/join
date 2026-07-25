@@ -224,7 +224,8 @@ using (var scope = app.Services.CreateScope())
         else if (app.Environment.IsDevelopment())
         {
             logger.LogInformation("Running idempotent menu and permissions seed (Development).");
-            await seeder.SeedMenuAndPermissionsAsync();
+            var forceReseed = builder.Configuration.GetValue<bool>("Seeding:ForceMenuPermissionsReseed");
+            await seeder.SeedMenuAndPermissionsAsync(forceReseed);
         }
 
     }

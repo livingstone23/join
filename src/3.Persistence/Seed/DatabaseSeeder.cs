@@ -1,4 +1,7 @@
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using JOIN.Application.Interface;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
@@ -64,8 +67,15 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
     /// <summary>
     /// Re-runs system option and role permission seeds idempotently for the master tenant.
+    /// Skipped when <paramref name="forceReseed"/> is <c>false</c> and the checksum of the
+    /// in-code seed definitions still matches the one stored in <c>Security.SeedState</c>.
     /// </summary>
-    public async Task SeedMenuAndPermissionsAsync(CancellationToken cancellationToken = default)
+    /// <param name="forceReseed">
+    /// When <c>true</c>, ignores any cached checksum and always runs the full seed pipeline.
+    /// Wired from <c>Seeding:ForceMenuPermissionsReseed</c> in configuration.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token propagated to EF Core calls.</param>
+    public async Task SeedMenuAndPermissionsAsync(bool forceReseed = false, CancellationToken cancellationToken = default)
     {
         var joinCompanyId = await _context.Companies
             .IgnoreQueryFilters()
@@ -79,12 +89,97 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             return;
         }
 
+        var currentChecksum = ComputeMenuPermissionsSeedChecksum();
+
+        if (!forceReseed)
+        {
+            var existingState = await _context.SeedStates
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(s => s.CompanyId == joinCompanyId, cancellationToken);
+
+            if (existingState is not null && existingState.Checksum == currentChecksum)
+            {
+                _logger.LogInformation("Menu and permissions seed skipped for company {CompanyId}: no changes detected.", joinCompanyId);
+                return;
+            }
+        }
+
         await SeedRolesAsync();
         await SeedDefaultUsersAsync();
         await SeedUserAccessAsync(joinCompanyId);
         await SeedSystemOptionsAsync();
         await SeedRoleSystemOptionsAsync(joinCompanyId);
+
+        await UpsertSeedStateAsync(joinCompanyId, currentChecksum, cancellationToken);
+
         _logger.LogInformation("Menu and permissions seed completed for company {CompanyId}.", joinCompanyId);
+    }
+
+    /// <summary>
+    /// Computes a deterministic SHA-256 checksum over the static in-code definitions that feed
+    /// <see cref="SeedMenuAndPermissionsAsync"/>. Used to skip the reseed when nothing changed.
+    /// </summary>
+    /// <remarks>
+    /// Determinism rules: only ordered collections (arrays / <see cref="List{T}"/>) are used;
+    /// records are serialized with default <see cref="JsonSerializerOptions"/> which preserves
+    /// declared property order. Never replace any input collection here with a <c>Dictionary</c>
+    /// or <c>HashSet</c> or the checksum will drift between runs.
+    /// </remarks>
+    private static string ComputeMenuPermissionsSeedChecksum()
+    {
+        var roles = new[]
+        {
+            "SuperAdmin", "SuperAdminCompany", "Admin", "Agent", "Person",
+            "Manager", "Supervisor", "Coordinador", "UsuarioSimple"
+        };
+        var privilegedRoleNames = new[] { "Admin", "SuperAdminCompany" };
+
+        var snapshot = new
+        {
+            Roles = roles,
+            DefaultUsers = GetDefaultUserSeeds(),
+            AdministrativeSystemOptions = GetAdministrativeSystemOptionSeeds(),
+            RoleSystemOptions = GetRoleSystemOptionSeeds(),
+            AdminFullSystemOptionPermissions = GetAdminFullSystemOptionPermissionSeeds(),
+            PrivilegedRoleNames = privilegedRoleNames
+        };
+
+        // Compact, no whitespace, no BOM — same payload byte-for-byte every run.
+        var jsonOptions = new JsonSerializerOptions { WriteIndented = false };
+        var payload = JsonSerializer.SerializeToUtf8Bytes(snapshot, jsonOptions);
+
+        var hash = SHA256.HashData(payload);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Inserts or updates the <see cref="SeedState"/> row for the given company, recording the
+    /// checksum that was just applied and the time at which it was applied.
+    /// </summary>
+    private async Task UpsertSeedStateAsync(Guid companyId, string checksum, CancellationToken cancellationToken)
+    {
+        var existing = await _context.SeedStates
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(s => s.CompanyId == companyId, cancellationToken);
+
+        var now = DateTime.UtcNow;
+
+        if (existing is null)
+        {
+            _context.SeedStates.Add(new SeedState
+            {
+                CompanyId = companyId,
+                Checksum = checksum,
+                LastAppliedAt = now
+            });
+        }
+        else
+        {
+            existing.Checksum = checksum;
+            existing.LastAppliedAt = now;
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task SeedAsync()

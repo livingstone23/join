@@ -88,6 +88,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<UserPerson> UserPersons => Set<UserPerson>();
     public DbSet<UserRefreshToken> UserRefreshTokens => Set<UserRefreshToken>();
     public DbSet<UserRoleCompany> UserRoleCompanies => Set<UserRoleCompany>();
+    public DbSet<SeedState> SeedStates => Set<SeedState>();
     public DbSet<SystemOption> SystemOptions => Set<SystemOption>();
     public DbSet<RoleSystemOption> RoleSystemOptions => Set<RoleSystemOption>();
     public DbSet<SystemModule> SystemModules => Set<SystemModule>();
