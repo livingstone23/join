@@ -2076,6 +2076,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 true,
                 true,
                 CanDownload: true,
+                CanExport: true,
+                CanExecute: true,
                 IsVisibleMenu: true,
                 OrderMenu: option.OrderMenu)))
             .ToList();
@@ -2115,6 +2117,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             }
 
             var canDownload = seed.CanDownload ?? seed.CanRead;
+            var canExport = seed.CanExport ?? seed.CanRead;
+            var canExecute = seed.CanExecute ?? seed.CanRead;
             var isVisibleMenu = seed.IsVisibleMenu ?? seed.CanRead;
 
             if (!permissionByKey.TryGetValue((role.Id, option.Id), out var permission))
@@ -2129,6 +2133,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                     CanUpdate = seed.CanUpdate,
                     CanDelete = seed.CanDelete,
                     CanDownload = canDownload,
+                    CanExport = canExport,
+                    CanExecute = canExecute,
                     IsVisibleMenu = isVisibleMenu,
                     OrderMenu = seed.OrderMenu,
                     Created = now,
@@ -2146,6 +2152,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 || permission.CanUpdate != seed.CanUpdate
                 || permission.CanDelete != seed.CanDelete
                 || permission.CanDownload != canDownload
+                || permission.CanExport != canExport
+                || permission.CanExecute != canExecute
                 || permission.IsVisibleMenu != isVisibleMenu
                 || permission.OrderMenu != seed.OrderMenu
                 || permission.GcRecord != 0;
@@ -2161,6 +2169,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             permission.CanUpdate = seed.CanUpdate;
             permission.CanDelete = seed.CanDelete;
             permission.CanDownload = canDownload;
+            permission.CanExport = canExport;
+            permission.CanExecute = canExecute;
             permission.IsVisibleMenu = isVisibleMenu;
             permission.OrderMenu = seed.OrderMenu;
             permission.GcRecord = 0;
@@ -2410,6 +2420,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 true,
                 true,
                 CanDownload: true,
+                CanExport: true,
+                CanExecute: true,
                 IsVisibleMenu: true,
                 OrderMenu: index + 1))
             .ToList();
@@ -2463,57 +2475,57 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
     private static List<RoleSystemOptionSeed> GetRoleSystemOptionSeeds() =>
     [
-        new("SuperAdmin", "SystemModules", true, true, true, true),
-        new("SuperAdmin", "TimeUnits", true, true, true, true),
-        new("SuperAdmin", "TicketComplexities", true, true, true, true),
-        new("SuperAdmin", "TicketStatuses", true, true, true, true),
-        new("SuperAdmin", "TicketCompanyDefaults", true, true, true, true),
-        new("SuperAdmin", "Customers", true, true, true, true),
-        new("SuperAdmin", "Compañias", true, true, true, true),
+        new("SuperAdmin", "SystemModules", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "TimeUnits", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "TicketComplexities", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "TicketStatuses", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "TicketCompanyDefaults", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "Customers", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "Compañias", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
-        
-        new("Admin", "Administracion", false, false, false, false),
-        new("Admin", "TimeUnits", true, true, true, true),
-        new("Admin", "TicketComplexities", true, true, true, true),
-        new("Admin", "TicketStatuses", true, true, true, true),
-        new("Admin", "TicketCompanyDefaults", true, true, true, true),
-        new("Admin", "Customers", true, true, true, true),
 
-        new("Manager", "Administracion", false, false, false, false),
-        new("Manager", "Paises", true, true, true, true),
-        new("Manager", "Regions", true, true, true, true),
-        new("Manager", "Provinces", true, true, true, true),
-        new("Manager", "Municipalities", true, true, true, true),
-        new("Manager", "IdentificationTypes", true, true, true, true),
-        new("Manager", "StreetTypes", true, true, true, true),
-        new("Manager", "Areas", true, true, true, true),
-        new("Manager", "Projects", true, true, true, true),
-        new("Manager", "Genero", true, true, true, true),
-        new("Manager", "Industria", true, true, true, true),
-        new("Manager", "Rango Ingreso", true, true, true, true),
-        new("Manager", "Regimen Tributario", true, true, true, true),
-        new("Manager", "EntityStatuses", true, true, true, true),
-        new("Manager", "CompanyModules", true, true, true, true),
-        new("Manager", "CommunicationChannels", true, true, true, true),
+        new("Admin", "Administracion", false, false, false, false, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Admin", "TimeUnits", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Admin", "TicketComplexities", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Admin", "TicketStatuses", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Admin", "TicketCompanyDefaults", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Admin", "Customers", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
-        new("Manager", "Persons", true, true, true, true),
-        new("Manager", "Clientes", true, true, true, true),
-        new("Manager", "Customers", true, true, true, true),
-        
-        new("Manager", "Compañias", true, true, true, true),
-        new("Manager", "ManejoTickets", true, true, true, true),
-        new("Manager", "Tickets", true, true, true, true),
-        new("Manager", "TimeUnits", true, true, true, true),
-        new("Manager", "TicketComplexities", true, true, true, true),
-        new("Manager", "TicketStatuses", true, true, true, true),
-        new("Manager", "TicketCompanyDefaults", true, true, true, true),
-        new("Manager", "Seguridad", true, true, true, true),
-        new("Manager", "Usuarios", true, true, true, true),
-        new("Manager", "Roles", true, true, true, true),
-        new("Manager", "SystemOption", true, true, true, true),
-        new("Manager", "RoleSystemOption", true, true, true, true),
+        new("Manager", "Administracion", false, false, false, false, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Paises", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Regions", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Provinces", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Municipalities", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "IdentificationTypes", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "StreetTypes", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Areas", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Projects", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Genero", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Industria", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Rango Ingreso", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Regimen Tributario", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "EntityStatuses", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "CompanyModules", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "CommunicationChannels", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
-        
+        new("Manager", "Persons", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Clientes", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Customers", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+
+        new("Manager", "Compañias", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "ManejoTickets", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Tickets", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "TimeUnits", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "TicketComplexities", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "TicketStatuses", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "TicketCompanyDefaults", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Seguridad", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Usuarios", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Roles", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "SystemOption", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "RoleSystemOption", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+
+
         new("Supervisor", "Administracion", false, false, false, false),
         new("Supervisor", "Paises", true, true, true, false),
         new("Supervisor", "Regions", true, true, true, false),
@@ -2541,28 +2553,28 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "TicketStatuses", true, true, true, false),
 
         // `UsuarioSimple` receives read-only access to selected administrative options while the remaining entries stay restricted by default.
-        new("UsuarioSimple", "Administracion", false, false, false, false),
-        new("UsuarioSimple", "Paises", false, false, false, false),
-        new("UsuarioSimple", "Regions", false, false, false, false),
-        new("UsuarioSimple", "Provinces", false, false, false, false),
-        new("UsuarioSimple", "Municipalities", false, false, false, false),
-        new("UsuarioSimple", "IdentificationTypes", true, false, false, false),
-        new("UsuarioSimple", "StreetTypes", true, true, true, true),
-        new("UsuarioSimple", "Areas", true, false, false, false),
-        new("UsuarioSimple", "Projects", true, false, false, false),
-        new("UsuarioSimple", "Genero", true, false, false, false),
-        new("UsuarioSimple", "Industria", true, false, false, false),
-        new("UsuarioSimple", "Rango Ingreso", true, false, false, false),
-        new("UsuarioSimple", "Regimen Tributario", true, false, false, false),
-        new("UsuarioSimple", "EntityStatuses", true, false, false, false),
-        new("UsuarioSimple", "CompanyModules", true, false, false, false),
-        new("UsuarioSimple", "CommunicationChannels", false, false, false, false),
-        new("UsuarioSimple", "Compañias", false, false, false, false),
-        new("UsuarioSimple", "ManejoTickets", true, true, true, true),
-        new("UsuarioSimple", "Tickets", true, true, true, true),
-        new("UsuarioSimple", "TimeUnits", false, false, false, false),
-        new("UsuarioSimple", "TicketComplexities", true, false, false, false),
-        new("UsuarioSimple", "TicketStatuses", true, false, false, false)
+        new("UsuarioSimple", "Administracion", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Paises", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Regions", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Provinces", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Municipalities", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "IdentificationTypes", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "StreetTypes", true, true, true, true, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Areas", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Projects", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Genero", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Industria", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Rango Ingreso", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Regimen Tributario", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "EntityStatuses", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "CompanyModules", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "CommunicationChannels", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Compañias", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "ManejoTickets", true, true, true, true, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Tickets", true, true, true, true, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "TimeUnits", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "TicketComplexities", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "TicketStatuses", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false)
 
     ];
 
@@ -2628,6 +2640,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         bool CanUpdate,
         bool CanDelete,
         bool? CanDownload = null,
+        bool? CanExport = null,
+        bool? CanExecute = null,
         bool? IsVisibleMenu = null,
         int? OrderMenu = null);
 
