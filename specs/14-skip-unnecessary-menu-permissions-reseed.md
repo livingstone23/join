@@ -1,6 +1,6 @@
 # SPEC 14 — Saltar el reseed de menú/permisos en startup cuando no es necesario
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** Ninguno.
 > **Date:** 2026-07-25
 > **Objective:** Evitar que `SeedMenuAndPermissionsAsync()` se ejecute en cada arranque de Development cuando los datos de seed no cambiaron, comparando un checksum de las definiciones de seed contra uno guardado en una tabla nueva (`Security.SeedState`), con un flag de configuración para forzar el reseed manualmente cuando haga falta.

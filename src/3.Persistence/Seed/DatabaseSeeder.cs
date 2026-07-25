@@ -40,6 +40,20 @@ namespace JOIN.Persistence;
 /// </remarks>
 public class DatabaseSeeder : ICompanyCatalogSeeder
 {
+    /// <summary>
+    /// System roles created by <see cref="SeedRolesAsync"/>. Also read by
+    /// <see cref="ComputeMenuPermissionsSeedChecksum"/> so the checksum stays in sync with the
+    /// actual seed source — do not duplicate this list elsewhere.
+    /// </summary>
+    private static readonly string[] SystemRoleNames =
+        { "SuperAdmin", "SuperAdminCompany", "Admin", "Agent", "Person", "Manager", "Supervisor", "Coordinador", "UsuarioSimple" };
+
+    /// <summary>
+    /// Roles granted full access to every system option by <see cref="SeedRoleSystemOptionsAsync"/>.
+    /// Also read by <see cref="ComputeMenuPermissionsSeedChecksum"/> — do not duplicate this list elsewhere.
+    /// </summary>
+    private static readonly string[] PrivilegedRoleNames = { "Admin", "SuperAdminCompany" };
+
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
@@ -127,21 +141,14 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     /// </remarks>
     private static string ComputeMenuPermissionsSeedChecksum()
     {
-        var roles = new[]
-        {
-            "SuperAdmin", "SuperAdminCompany", "Admin", "Agent", "Person",
-            "Manager", "Supervisor", "Coordinador", "UsuarioSimple"
-        };
-        var privilegedRoleNames = new[] { "Admin", "SuperAdminCompany" };
-
         var snapshot = new
         {
-            Roles = roles,
+            Roles = SystemRoleNames,
             DefaultUsers = GetDefaultUserSeeds(),
             AdministrativeSystemOptions = GetAdministrativeSystemOptionSeeds(),
             RoleSystemOptions = GetRoleSystemOptionSeeds(),
             AdminFullSystemOptionPermissions = GetAdminFullSystemOptionPermissionSeeds(),
-            PrivilegedRoleNames = privilegedRoleNames
+            PrivilegedRoleNames
         };
 
         // Compact, no whitespace, no BOM — same payload byte-for-byte every run.
@@ -244,9 +251,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
     private async Task SeedRolesAsync()
     {
-        string[] roles = { "SuperAdmin", "SuperAdminCompany", "Admin", "Agent", "Person", "Manager", "Supervisor", "Coordinador", "UsuarioSimple" };
-
-        foreach (var roleName in roles)
+        foreach (var roleName in SystemRoleNames)
         {
             var role = await _roleManager.FindByNameAsync(roleName);
             if (role is null)
@@ -2145,10 +2150,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     private async Task SeedRoleSystemOptionsAsync(Guid joinCompanyId)
     {
         var baseSeeds = GetRoleSystemOptionSeeds();
-        var privilegedRoleNames = new[] { "Admin", "SuperAdminCompany" };
         var roleNames = baseSeeds
             .Select(x => x.RoleName)
-            .Concat(privilegedRoleNames)
+            .Concat(PrivilegedRoleNames)
             .Distinct()
             .ToList();
 
@@ -2163,7 +2167,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             .ToListAsync();
 
         var privilegedAllOptionSeeds = systemOptions
-            .SelectMany(option => privilegedRoleNames.Select(roleName => new RoleSystemOptionSeed(
+            .SelectMany(option => PrivilegedRoleNames.Select(roleName => new RoleSystemOptionSeed(
                 roleName,
                 option.Name,
                 true,
