@@ -13,9 +13,9 @@ namespace JOIN.Domain.Security;
 public class UserConnectionLog : BaseEntity // Hereda solo de BaseEntity para tener el Guid Id
 {
     /// <summary>
-    /// Foreign key to the ApplicationUser.
+    /// Foreign key to the ApplicationUser. Nullable so the connection audit log survives if the user is deleted.
     /// </summary>
-    public Guid UserId { get; set; }
+    public Guid? UserId { get; set; }
 
     /// <summary>
     /// The IP address from which the connection originated.
@@ -48,6 +48,6 @@ public class UserConnectionLog : BaseEntity // Hereda solo de BaseEntity para te
     public DateTime? DisconnectionDate { get; set; }
 
     // --- Navigation Properties ---
-    public virtual ApplicationUser User { get; set; } = null!;
+    public virtual ApplicationUser? User { get; set; }
     
 }

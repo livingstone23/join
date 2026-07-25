@@ -23,8 +23,12 @@
     <PackageReference Include="AspNetCore.HealthChecks.UI" Version="9.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.UI.InMemory.Storage" Version="9.0.0" />
+    <!-- Direct override to pull the patched KubernetesClient over the vulnerable 15.0.1 that AspNetCore.HealthChecks.UI 9.0.0 brings transitively (NU1902). -->
+    <PackageReference Include="KubernetesClient" Version="18.0.13" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
+    <!-- Direct override to pull the patched Microsoft.OpenApi over the vulnerable 2.0.0 that Microsoft.AspNetCore.OpenApi 10.0.2 brings transitively (NU1903). -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.10.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.5" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

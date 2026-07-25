@@ -1,6 +1,6 @@
 # SPEC 13 — Corrección de warnings de build y runtime (NuGet + EF Core)
 
-> **Status:** Draft
+> **Status:** Aprobado
 > **Depends on:** Ninguno.
 > **Date:** 2026-07-25
 > **Objective:** Fijar versiones parchadas para las 2 vulnerabilidades NuGet transitivas (KubernetesClient → 18.0.13, Microsoft.OpenApi → 2.10.0), hacer opcional la relación `ApplicationUser`→`UserConnectionLog` para eliminar el warning de filtro global no coincidente, y restringir `EnableSensitiveDataLogging()` a Development.

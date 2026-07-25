@@ -44,12 +44,12 @@ public class UserConnectionLogConfiguration : IEntityTypeConfiguration<UserConne
 
         // --- Relationships ---
 
-        // Required relationship with ApplicationUser
-        // A log entry belongs to one user.
+        // Optional relationship with ApplicationUser.
+        // A log entry belongs to at most one user; the FK is nullable so the audit log survives user deletion.
         builder.HasOne(log => log.User)
             .WithMany() // A user can have many connection logs.
             .HasForeignKey(log => log.UserId)
-            .OnDelete(DeleteBehavior.Cascade); // If the user is deleted, their logs are also deleted.
+            .OnDelete(DeleteBehavior.SetNull); // If the user is deleted, keep the log but null out the FK.
 
         // --- Indexes ---
 

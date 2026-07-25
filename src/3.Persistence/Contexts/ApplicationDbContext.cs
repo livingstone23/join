@@ -295,10 +295,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     {
         // Add the Auditing Interceptor injected via constructor
         optionsBuilder.AddInterceptors(_auditableInterceptor);
-        
-        // Useful for debugging in development environment
-        optionsBuilder.EnableSensitiveDataLogging();
-        
+
+        // EnableSensitiveDataLogging is applied in ConfigureServices, gated to Development only.
         base.OnConfiguring(optionsBuilder);
     }
 }

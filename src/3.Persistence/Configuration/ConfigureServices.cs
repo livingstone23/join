@@ -15,6 +15,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 
 
 
@@ -75,6 +76,13 @@ public static class ConfigureServices
                 builder => builder
                     .MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
                     .CommandTimeout(30));
+
+            // Sensitive data logging must never run outside Development (leaks parameter values into logs).
+            var env = sp.GetRequiredService<IHostEnvironment>();
+            if (env.IsDevelopment())
+            {
+                options.EnableSensitiveDataLogging();
+            }
         });
 
         // 5. REPOSITORIOS ESPECÍFICOS Y UNIT OF WORK
