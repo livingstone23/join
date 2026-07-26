@@ -58,6 +58,17 @@ Every use case lives at `src/2.Application/UseCases/<Area>/<Feature>/{Commands|Q
 
 ASP.NET Core Identity (`ApplicationUser`/`ApplicationRole`, GUID keys) + JWT bearer auth, with a custom `DynamicAuthorizationFilter` applied globally to all controllers rather than per-endpoint `[Authorize]` policies. Authorization is claims/policy-based, not role-based. Global exception handling goes through `GlobalExceptionHandler` + RFC 7807 `ProblemDetails`.
 
+**Permission resolution (SPEC 17):**
+
+- `[PermissionResource("X")]` (with literal) — explicit resource name. Precedence: action-level → class-level.
+- `[PermissionResource]` (no args) — resource name inferred from the controller class with the `Controller` suffix stripped (e.g. `PersonsController` → `"Persons"`). For values that diverge (sub-resources like `PersonContactController` → `"Persons"`), keep the literal.
+- `[RequirePermission(PermissionFlags.*)]` — per-action flag override for endpoints whose semantic flag differs from the HTTP verb default (e.g. `GET /export` → `CanExport` instead of `CanRead`). Flags live in `src/1.Domain/Security/PermissionFlags.cs` as a `[Flags]` enum: `CanRead / CanCreate / CanUpdate / CanDelete / CanDownload / CanExport / CanExecute` + `None`.
+- HTTP-verb default mapping (when no `[RequirePermission]`): `GET/HEAD` → `CanRead`, `POST` → `CanCreate`, `PUT/PATCH` → `CanUpdate`, `DELETE` → `CanDelete`.
+- Bypass attributes: `[AllowAnonymous]` (no auth), `[SkipDynamicAuthorization]` (auth required, but skip the controller-resource check), SuperAdmin role (always allowed).
+- Status codes: `401 Unauthorized` for missing/invalid token or missing `CompanyId`; `403 ForbidResult` when the token is valid but the required flag is `false`. RFC 7235 semantics — do not collapse.
+- Resource resolution precedence: action-level attribute → class-level attribute → `descriptor.ControllerName` (stripped) → fail-closed (`403`). Fail-closed ensures an unannotated controller with an unstripped class name does not silently open access.
+- The `PermissionService` cache key was bumped to `permissions:v2:{companyId}:{userId}` when the cached snapshot shape changed from 4 to 7 flags; older cache entries are ignored. See `specs/17-permissionresource-optional-and-flag-override-drift-audit.csv` for the controller ↔ seed `ControllerName` audit.
+
 ## API surface
 
 Controllers live under `src/4.Services.WebApi/Controllers/{Admin|Security|Messaging}`. In Development, OpenAPI JSON is at `/openapi/v1.json` and the Scalar UI at `/scalar/v1` (root `/` redirects there). Health checks: `/health/ready` (JSON UI-formatted) and `/health-ui`. See `CURL_REQUESTS.md` / `POSTMAN_CURL.txt` for example requests against each endpoint, including the required `X-Company-Id` header.

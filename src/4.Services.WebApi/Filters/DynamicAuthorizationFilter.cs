@@ -1,28 +1,28 @@
-
 using JOIN.Application.Interface;
+using JOIN.Domain.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
 using System.Security.Claims;
 
-
-
 namespace JOIN.Services.WebApi.Filters;
-
-
 
 /// <summary>
 /// Global authorization filter that intercepts HTTP requests and validates user permissions
-/// dynamically based on the requested controller and HTTP method.
+/// dynamically based on the requested controller, HTTP method, and any explicit flag overrides.
 /// </summary>
 public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
 {
     private readonly IPermissionService _permissionService;
 
-    // Constant role name for SuperAdmin users who bypass all permission checks. 
+    // Constant role name for SuperAdmin users who bypass all permission checks.
     // This is a simple string comparison, so it should be kept in sync with the actual role name used in the system.
-    private const string SuperAdminRoleName = "SuperAdmin"; 
+    private const string SuperAdminRoleName = "SuperAdmin";
+
+    // Suffix stripped from the controller class name when inferring the resource name
+    // (e.g. "PersonsController" → "Persons") to match the seed `SystemOption.ControllerName`.
+    private const string ControllerSuffix = "Controller";
 
     public DynamicAuthorizationFilter(IPermissionService permissionService)
     {
@@ -42,8 +42,20 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
         // 2. Ensure the request is mapped to a Controller action.
         if (context.ActionDescriptor is not ControllerActionDescriptor descriptor) return;
 
-        // Resolve the explicit permission resource first and fall back to the controller name.
+        // Resolve the explicit permission resource, then fall back to the controller name.
         var permissionResource = ResolvePermissionResourceName(descriptor);
+        if (string.IsNullOrWhiteSpace(permissionResource))
+        {
+            // Fail-closed: a controller with no inferable resource name is a bug, not an open door.
+            context.Result = new ForbidResult();
+            return;
+        }
+
+        // Read the explicit flag override (e.g. [RequirePermission(CanExport)] on a GET endpoint).
+        var explicitFlag = context.ActionDescriptor.EndpointMetadata
+            .OfType<RequirePermissionAttribute>()
+            .FirstOrDefault()?.Flag;
+
         string httpMethod = context.HttpContext.Request.Method;
 
         // 3. Extract user identity, ROLES, and tenant context from the JWT Claims.
@@ -75,7 +87,8 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
         }
 
         // 4. Validate permissions against the cache or database via the Application layer service.
-        bool hasAccess = await _permissionService.HasPermissionAsync(userId, companyId, permissionResource, httpMethod);
+        bool hasAccess = await _permissionService.HasPermissionAsync(
+            userId, companyId, permissionResource, httpMethod, explicitFlag);
 
         // If the user lacks the required permission, return a 403 Forbidden response.
         if (!hasAccess)
@@ -85,11 +98,12 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
     }
 
     /// <summary>
-    /// Resolves the permission resource name declared for the current action or controller.
+    /// Resolves the permission resource name for the current action.
+    /// Precedence: action-level attribute → class-level attribute → controller class name (suffix stripped) → null.
     /// </summary>
     /// <param name="descriptor">The MVC action descriptor for the current request.</param>
-    /// <returns>The explicit permission resource name when declared; otherwise the controller name.</returns>
-    private static string ResolvePermissionResourceName(ControllerActionDescriptor descriptor)
+    /// <returns>The resolved resource name, or <c>null</c> when nothing can be inferred.</returns>
+    private static string? ResolvePermissionResourceName(ControllerActionDescriptor descriptor)
     {
         var actionResource = descriptor.MethodInfo
             .GetCustomAttributes(inherit: true)
@@ -106,8 +120,20 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
             .OfType<PermissionResourceAttribute>()
             .FirstOrDefault()?.ResourceName;
 
-        return string.IsNullOrWhiteSpace(controllerResource)
-            ? descriptor.ControllerName
-            : controllerResource;
+        if (!string.IsNullOrWhiteSpace(controllerResource))
+        {
+            return controllerResource;
+        }
+
+        // Fallback: derive from the controller class name, stripping the "Controller" suffix
+        // to match the seed `SystemOption.ControllerName` (e.g. "PersonsController" → "Persons").
+        var controllerName = descriptor.ControllerName;
+        if (!string.IsNullOrWhiteSpace(controllerName) &&
+            controllerName.EndsWith(ControllerSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            controllerName = controllerName[..^ControllerSuffix.Length];
+        }
+
+        return string.IsNullOrWhiteSpace(controllerName) ? null : controllerName;
     }
 }

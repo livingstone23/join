@@ -1,0 +1,36 @@
+controller_class,permission_resource_literal,seed_controllername,status,notes
+AreasController,Areas,Areas,OK,
+RolesController,Roles,Roles,OK,
+UsersController,Users,Users,OK,
+StreetTypesController,StreetTypes,StreetTypes,OK,
+RegionsController,Regions,Regions,OK,
+ProvincesController,Provinces,Provinces,OK,
+MunicipalitiesController,Municipalities,Municipalities,OK,
+CompaniesController,Companies,Companies,OK,
+CommunicationChannelsController,CommunicationChannels,CommunicationChannels,OK,
+TicketsController,Tickets,Tickets,OK,
+TimeUnitsController,TimeUnits,TimeUnits,OK,
+TicketStatusesController,TicketStatuses,TicketStatuses,OK,
+TicketComplexitiesController,TicketComplexities,TicketComplexities,OK,
+TicketCompanyDefaultsController,TicketCompanyDefaults,TicketCompanyDefaults,OK,
+TaxRegimesController,TaxRegimes,TaxRegimes,OK,
+SystemModulesController,SystemModules,SystemModules,OK,
+ProjectsController,Projects,Projects,OK,
+IndustriesController,Industries,Industries,OK,
+CustomersController,Customers,Customers,OK,
+IncomeRangesController,IncomeRanges,IncomeRanges,OK,
+IdentificationTypesController,IdentificationTypes,IdentificationTypes,OK,
+GendersController,Genders,Genders,OK,
+EntityStatusesController,EntityStatuses,EntityStatuses,OK,
+CompanyModulesController,CompanyModules,CompanyModules,OK,
+WorkspacesController,Users,Users,ALIAS,Class stripped="Workspaces"≠seed; literal maps correctly via attribute.
+AuthController,Users,Users,ALIAS,Class stripped="Auth"≠seed; login/refresh endpoints protected by [AllowAnonymous]/[SkipDynamicAuthorization].
+AccountController,Users,Users,ALIAS,Class stripped="Account"≠seed; account-profile endpoints reuse the Users resource.
+CountryController,Countries,Countries,ALIAS,Class is singular "Country" but seed/UI use plural "Countries"; literal aligns with seed.
+PersonFinancialProfileController,Persons,Persons,ALIAS,Sub-resource of Persons; uses same SystemOption row.
+PersonEmploymentController,Persons,Persons,ALIAS,Sub-resource of Persons; uses same SystemOption row.
+PersonContactController,Persons,Persons,ALIAS,Sub-resource of Persons; uses same SystemOption row.
+PersonBusinessProfileController,Persons,Persons,ALIAS,Sub-resource of Persons; uses same SystemOption row.
+PersonAddressController,Persons,Persons,ALIAS,Sub-resource of Persons; uses same SystemOption row.
+AreaController,Areas,Areas,ALIAS,Class is singular "Area"; literal aligns with seed plural.
+RoleSystemOptionsController,RoleSystemOptions,RoleSystemOption,DRIFT,Seed uses singular "RoleSystemOption" (SystemOption.Name="RoleSystemOption", ControllerName="RoleSystemOption"). Controller declares plural "RoleSystemOptions". Authorization still works at runtime through NormalizeControllerNames (Controller→empty/+s) heuristic, but the literal is asymmetric with the seed. Recommend either: (a) align controller literal to singular "RoleSystemOption", or (b) update seed to use plural "RoleSystemOptions". Tracked as TS-17.0 follow-up.
