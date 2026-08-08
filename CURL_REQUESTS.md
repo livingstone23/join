@@ -137,7 +137,51 @@ public class AuthController { ... }
 public class UsersController { ... }
 ```
 
-## Status codes
+## Roles — `/api/v1/Roles`
+
+The Roles controller keeps the legacy `GET /` endpoint (`IEnumerable<string>`) for selectors and adds a detailed CRUD surface. All five new endpoints are gated by the `Roles` permission resource and the HTTP-verb default flag.
+
+```bash
+TOKEN="<jwt-from-login>"
+COMPANY="00000000-0000-0000-0000-000000000001"
+
+# Legacy: list role names (CanRead).
+curl http://localhost:5000/api/v1/Roles \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# Detailed: paged + filtered view (CanRead). Returns Response<PagedResult<RoleDto>>.
+curl "http://localhost:5000/api/v1/Roles/detailed?page=1&pageSize=20&name=ad&isActive=true" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# Get by id (CanRead). 200 with RoleDto or 404 with "Rol no encontrado o inactivo.".
+curl http://localhost:5000/api/v1/Roles/{id} \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# Create (CanCreate). 201 + Location header / 409 on duplicate name.
+curl -X POST http://localhost:5000/api/v1/Roles \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Support","description":"Tier 1 support","isSystemDefault":false}'
+
+# Update (CanUpdate). 200 with RoleDto / 404 / 409 on rename collision.
+# System-default roles reject Name changes and IsSystemDefault demotion.
+curl -X PUT http://localhost:5000/api/v1/Roles/{id} \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Support Lead","description":"Tier 1 lead","isSystemDefault":false}'
+
+# Delete (CanDelete). 204 on success / 403 for IsSystemDefault=true / 404 if missing.
+curl -X DELETE http://localhost:5000/api/v1/Roles/{id} \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+```
+
+
 
 | Scenario | Status |
 |----------|--------|

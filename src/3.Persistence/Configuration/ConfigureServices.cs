@@ -94,6 +94,7 @@ public static class ConfigureServices
         services.AddScoped<IPersonBusinessProfileRepository, PersonBusinessProfileRepository>();
         services.AddScoped<IPersonFinancialProfileRepository, PersonFinancialProfileRepository>();
         services.AddScoped<IRoleSystemOptionsRepository, RoleSystemOptionsRepository>();
+        services.AddScoped<IRoleRepository, RoleRepository>();
         
         // El UnitOfWork ahora es híbrido y manejará el resto de los módulos dinámicamente.
         services.AddScoped<IUnitOfWork, UnitOfWork>();
