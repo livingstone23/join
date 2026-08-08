@@ -33,4 +33,4 @@ PersonContactController,Persons,Persons,ALIAS,Sub-resource of Persons; uses same
 PersonBusinessProfileController,Persons,Persons,ALIAS,Sub-resource of Persons; uses same SystemOption row.
 PersonAddressController,Persons,Persons,ALIAS,Sub-resource of Persons; uses same SystemOption row.
 AreaController,Areas,Areas,ALIAS,Class is singular "Area"; literal aligns with seed plural.
-RoleSystemOptionsController,RoleSystemOptions,RoleSystemOption,DRIFT,Seed uses singular "RoleSystemOption" (SystemOption.Name="RoleSystemOption", ControllerName="RoleSystemOption"). Controller declares plural "RoleSystemOptions". Authorization still works at runtime through NormalizeControllerNames (Controller→empty/+s) heuristic, but the literal is asymmetric with the seed. Recommend either: (a) align controller literal to singular "RoleSystemOption", or (b) update seed to use plural "RoleSystemOptions". Tracked as TS-17.0 follow-up.
+RoleSystemOptionsController,RoleSystemOption,RoleSystemOption,OK,Literal aligned to singular "RoleSystemOption" to match seed ControllerName (was plural "RoleSystemOptions", flagged DRIFT). Fixed post-SPEC 17.

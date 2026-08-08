@@ -19,7 +19,7 @@ namespace JOIN.Services.WebApi.Controllers.Security;
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
-[PermissionResource("RoleSystemOptions")]
+[PermissionResource("RoleSystemOption")]
 public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
 {
     /// <summary>
