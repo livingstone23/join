@@ -1,6 +1,6 @@
 # SPEC 18 — CRUD de Roles con /detailed y soft delete
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 17 (PermissionFlags), convención CQRS de `CLAUDE.md`
 > **Date:** 2026-08-08
 > **Objective:** Exponer el CRUD de `ApplicationRole` mediante endpoints `GET /Roles/detailed` (paginado + filtros), `GET /Roles/{id}`, `POST /Roles`, `PUT /Roles/{id}`, `DELETE /Roles/{id}` (soft delete), respetando arquitectura JOIN (CQRS, validators, mappers, Dapper para reads, UnitOfWork + EF para writes, 90% cobertura).
