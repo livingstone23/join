@@ -6,6 +6,7 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
+using JOIN.Domain.Security;
 
 
 
@@ -38,9 +39,13 @@ public class CountryController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">Token used to cancel the request while the read query is running.</param>
     /// <returns>A standardized response containing the requested country when it exists.</returns>
     [HttpGet("{id:guid}")]
+    [RequirePermission(PermissionFlags.CanRead)]
     [ProducesResponseType(typeof(Response<CountryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
     {
         var response = await _mediator.Send(new GetCountryByIdQuery(id), cancellationToken);
@@ -63,9 +68,13 @@ public class CountryController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">Token used to cancel the request while the paged query executes.</param>
     /// <returns>A standardized paged response containing the matching countries.</returns>
     [HttpGet]
+    [RequirePermission(PermissionFlags.CanRead)]
     [ProducesResponseType(typeof(Response<PagedResult<CountryListItemDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> GetPaged(
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10,
@@ -90,9 +99,12 @@ public class CountryController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">Token used to cancel the request while the create command is being processed.</param>
     /// <returns>A `201 Created` response containing the newly created country resource.</returns>
     [HttpPost]
+    [RequirePermission(PermissionFlags.CanCreate)]
     [ProducesResponseType(typeof(Response<CountryDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateCountryCommand command, CancellationToken cancellationToken = default)
     {
@@ -120,9 +132,11 @@ public class CountryController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">Token used to cancel the request while the update command executes.</param>
     /// <returns>A standardized response containing the updated country.</returns>
     [HttpPut("{id:guid}")]
+    [RequirePermission(PermissionFlags.CanUpdate)]
     [ProducesResponseType(typeof(Response<CountryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCountryCommand command, CancellationToken cancellationToken = default)
@@ -161,10 +175,13 @@ public class CountryController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">Token used to cancel the request while the delete command is running.</param>
     /// <returns>A standardized response containing the identifier of the deleted country.</returns>
     [HttpDelete("{id:guid}")]
+    [RequirePermission(PermissionFlags.CanDelete)]
     [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var response = await _mediator.Send(new DeleteCountryCommand(id), cancellationToken);

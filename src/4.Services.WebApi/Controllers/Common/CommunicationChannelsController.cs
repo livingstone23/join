@@ -6,6 +6,7 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
+using JOIN.Domain.Security;
 
 
 
@@ -38,9 +39,13 @@ public class CommunicationChannelsController(IMediator mediator) : ControllerBas
     /// <param name="cancellationToken">Token used to cancel the request while the query is executing.</param>
     /// <returns>A standardized response containing the requested communication channel.</returns>
     [HttpGet("{id:guid}")]
+    [RequirePermission(PermissionFlags.CanRead)]
     [ProducesResponseType(typeof(Response<CommunicationChannelDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
     {
         var response = await _mediator.Send(new GetCommunicationChannelByIdQuery(id), cancellationToken);
@@ -62,9 +67,13 @@ public class CommunicationChannelsController(IMediator mediator) : ControllerBas
     /// <param name="cancellationToken">Token used to cancel the request while the paged query executes.</param>
     /// <returns>A standardized paged response containing the matching communication channels.</returns>
     [HttpGet]
+    [RequirePermission(PermissionFlags.CanRead)]
     [ProducesResponseType(typeof(Response<PagedResult<CommunicationChannelListItemDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> GetPaged(
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10,
@@ -88,9 +97,12 @@ public class CommunicationChannelsController(IMediator mediator) : ControllerBas
     /// <param name="cancellationToken">Token used to cancel the request while the create command is being processed.</param>
     /// <returns>A `201 Created` response containing the newly persisted communication channel.</returns>
     [HttpPost]
+    [RequirePermission(PermissionFlags.CanCreate)]
     [ProducesResponseType(typeof(Response<CommunicationChannelDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateCommunicationChannelCommand command, CancellationToken cancellationToken = default)
     {
@@ -117,6 +129,7 @@ public class CommunicationChannelsController(IMediator mediator) : ControllerBas
     /// <param name="cancellationToken">Token used to cancel the request while the update command is running.</param>
     /// <returns>A standardized response containing the updated communication channel.</returns>
     [HttpPut("{id:guid}")]
+    [RequirePermission(PermissionFlags.CanUpdate)]
     [ProducesResponseType(typeof(Response<CommunicationChannelDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -153,10 +166,13 @@ public class CommunicationChannelsController(IMediator mediator) : ControllerBas
     /// <param name="cancellationToken">Token used to cancel the request while the delete command executes.</param>
     /// <returns>A standardized response containing the deleted communication channel identifier.</returns>
     [HttpDelete("{id:guid}")]
+    [RequirePermission(PermissionFlags.CanDelete)]
     [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var response = await _mediator.Send(new DeleteCommunicationChannelCommand(id), cancellationToken);

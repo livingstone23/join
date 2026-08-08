@@ -40,7 +40,7 @@ public class CompaniesController(IMediator mediator, ICurrentUserService current
     /// <param name="cancellationToken">Token used to cancel the request while the read operation is in progress.</param>
     /// <returns>A standardized response containing the requested company when it exists.</returns>
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Roles = "SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<CompanyDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
@@ -65,7 +65,7 @@ public class CompaniesController(IMediator mediator, ICurrentUserService current
     /// <param name="cancellationToken">Token used to cancel the request while the paged query executes.</param>
     /// <returns>A standardized paged response containing the requested company slice.</returns>
     [HttpGet]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Roles = "SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<PagedResult<CompanyListItemDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -92,7 +92,7 @@ public class CompaniesController(IMediator mediator, ICurrentUserService current
     /// <param name="cancellationToken">Token used to cancel the request while the creation command is being handled.</param>
     /// <returns>A `201 Created` response containing the newly created company resource.</returns>
     [HttpPost]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Roles = "SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<CompanyDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -122,7 +122,7 @@ public class CompaniesController(IMediator mediator, ICurrentUserService current
     /// <param name="cancellationToken">Token used to cancel the request while the update command is being processed.</param>
     /// <returns>A standardized response containing the updated company data.</returns>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Roles = "SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<CompanyDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -159,7 +159,7 @@ public class CompaniesController(IMediator mediator, ICurrentUserService current
     /// <param name="cancellationToken">Token used to cancel the request while the delete command is executing.</param>
     /// <returns>A standardized response containing the identifier of the deleted company.</returns>
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Roles = "SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
