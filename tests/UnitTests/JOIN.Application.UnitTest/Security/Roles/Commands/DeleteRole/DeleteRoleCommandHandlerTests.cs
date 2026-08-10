@@ -4,6 +4,7 @@ using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.UseCases.Security.Roles.Commands.DeleteRole;
+using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -49,14 +50,14 @@ public sealed class DeleteRoleCommandHandlerTests
 
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("Rol no encontrado o inactivo.");
-        context.RoleRepositoryMock.Verify(x => x.SoftDeleteAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        context.RoleRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<ApplicationRole>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>
     /// System-default role cannot be deleted; descriptive ≥50-char message.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenRoleIsSystemDefault_ShouldReturnForbiddenWithoutSoftDelete()
+    public async Task Handle_WhenRoleIsSystemDefault_ShouldReturnForbiddenWithoutUpdate()
     {
         var roleId = Guid.NewGuid();
         var context = new TestContext();
@@ -78,14 +79,14 @@ public sealed class DeleteRoleCommandHandlerTests
         response.IsSuccess.Should().BeFalse();
         response.Message.Length.Should().BeGreaterThanOrEqualTo(50);
         response.Message.Should().Contain("sistema");
-        context.RoleRepositoryMock.Verify(x => x.SoftDeleteAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        context.RoleRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<ApplicationRole>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>
-    /// Soft delete returns 0 rows (race condition) → 404-flavored error.
+    /// SaveChangesAsync returning 0 (race condition) produces a 404-flavored error.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenSoftDeleteAffectsZeroRows_ShouldReturnNotFoundMessage()
+    public async Task Handle_WhenSaveChangesReturnsZero_ShouldReturnNotFoundMessage()
     {
         var roleId = Guid.NewGuid();
         var context = new TestContext();
@@ -101,8 +102,9 @@ public sealed class DeleteRoleCommandHandlerTests
                 GcRecord = 0
             });
         context.RoleRepositoryMock
-            .Setup(x => x.SoftDeleteAsync(roleId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
+            .Setup(x => x.UpdateAsync(It.IsAny<ApplicationRole>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
 
         var handler = context.CreateHandler();
         var response = await handler.Handle(new DeleteRoleCommand(roleId), CancellationToken.None);
@@ -112,10 +114,10 @@ public sealed class DeleteRoleCommandHandlerTests
     }
 
     /// <summary>
-    /// Happy path: SoftDeleteAsync called with the role id and current user id; response is successful.
+    /// Happy path: handler stamps GcRecord with the yyyyMMdd UTC int and persists through UpdateAsync + SaveChangesAsync.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenRoleIsCustom_ShouldSoftDeleteAndReturnSuccess()
+    public async Task Handle_WhenRoleIsCustom_ShouldStampDeletionStampAndPersist()
     {
         var roleId = Guid.NewGuid();
         var context = new TestContext();
@@ -131,17 +133,36 @@ public sealed class DeleteRoleCommandHandlerTests
                 IsSystemDefault = false,
                 GcRecord = 0
             });
-        context.RoleRepositoryMock
-            .Setup(x => x.SoftDeleteAsync(roleId, "user-1", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
         context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
+        ApplicationRole? captured = null;
+        context.RoleRepositoryMock
+            .Setup(x => x.UpdateAsync(It.IsAny<ApplicationRole>(), It.IsAny<CancellationToken>()))
+            .Callback<ApplicationRole, CancellationToken>((r, _) => captured = r)
+            .Returns(Task.CompletedTask);
+
+        var before = DateTime.UtcNow;
         var handler = context.CreateHandler();
         var response = await handler.Handle(new DeleteRoleCommand(roleId), CancellationToken.None);
+        var after = DateTime.UtcNow;
 
         response.IsSuccess.Should().BeTrue();
         response.Data.Should().BeTrue();
-        context.RoleRepositoryMock.Verify(x => x.SoftDeleteAsync(roleId, "user-1", It.IsAny<CancellationToken>()), Times.Once);
+        captured.Should().NotBeNull();
+        captured!.GcRecord.Should().BeGreaterThan(0);
+        // The stamp must lie between the before/after UTC times the handler saw.
+        var stampDate = ParseStamp(captured.GcRecord);
+        stampDate.Date.Should().BeOnOrAfter(before.Date).And.BeOnOrBefore(after.Date);
+        captured.LastModifiedBy.Should().Be("user-1");
+        captured.LastModified.Should().NotBeNull();
+    }
+
+    private static DateTime ParseStamp(int yyyymmdd)
+    {
+        var s = yyyymmdd.ToString("D8", System.Globalization.CultureInfo.InvariantCulture);
+        return DateTime.SpecifyKind(
+            new DateTime(int.Parse(s[..4]), int.Parse(s[4..6]), int.Parse(s[6..8])),
+            DateTimeKind.Utc);
     }
 
     private sealed class TestContext

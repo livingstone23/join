@@ -32,11 +32,12 @@ public sealed class UpdateRoleCommandHandler(
             return Response<RoleDto>.Error("Rol no encontrado o inactivo.");
         }
 
-        var trimmedName = (request.Name ?? string.Empty).Trim();
-        var newNormalizedName = trimmedName.ToUpperInvariant();
+        var nameChanged = request.Name != null;
+        var trimmedName = nameChanged ? request.Name!.Trim() : existing.Name;
+        var newNormalizedName = nameChanged ? trimmedName.ToUpperInvariant() : existing.NormalizedName;
 
         // System-default role cannot be renamed.
-        if (existing.IsSystemDefault
+        if (existing.IsSystemDefault && nameChanged
             && !string.Equals(existing.NormalizedName, newNormalizedName, StringComparison.Ordinal))
         {
             return Response<RoleDto>.Error("No se puede modificar el nombre de un rol del sistema. Solo es editable su descripcion.");
@@ -54,8 +55,9 @@ public sealed class UpdateRoleCommandHandler(
             return Response<RoleDto>.Error("No se puede ascender un rol personalizado a rol del sistema. Esta operacion requiere un flujo administrativo separado.");
         }
 
-        // Rename collision against another role.
-        if (!string.Equals(existing.NormalizedName, newNormalizedName, StringComparison.Ordinal)
+        // Rename collision against another role (only when the caller actually sent a new name).
+        if (nameChanged
+            && !string.Equals(existing.NormalizedName, newNormalizedName, StringComparison.Ordinal)
             && await roleRepository.ExistsByNameExceptIdAsync(newNormalizedName, existing.Id, cancellationToken))
         {
             return Response<RoleDto>.Error($"Ya existe otro rol con el nombre '{trimmedName}'.");

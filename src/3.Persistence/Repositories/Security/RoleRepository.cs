@@ -114,23 +114,6 @@ public sealed class RoleRepository(
     }
 
     /// <inheritdoc />
-    public async Task<int> SoftDeleteAsync(Guid id, string modifiedBy, CancellationToken cancellationToken = default)
-    {
-        // Raw UPDATE: avoids touching the EF change tracker and Identity's RoleManager in-memory cache.
-        const string sql = """
-            UPDATE [Security].[Roles]
-            SET GcRecord = GcRecord + 1,
-                LastModified = SYSUTCDATETIME(),
-                LastModifiedBy = @ModifiedBy
-            WHERE Id = @Id AND GcRecord = 0;
-            """;
-
-        using var connection = _connectionFactory.CreateConnection();
-        return await connection.ExecuteAsync(
-            new CommandDefinition(sql, new { Id = id, ModifiedBy = modifiedBy }, cancellationToken: cancellationToken));
-    }
-
-    /// <inheritdoc />
     public async Task<bool> ExistsByNameAsync(string normalizedName, CancellationToken cancellationToken = default)
     {
         const string sql = """

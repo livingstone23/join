@@ -2,6 +2,7 @@ using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
+using JOIN.Domain.Audit;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
@@ -37,14 +38,20 @@ public sealed class DeleteRoleCommandHandler(
         }
 
         var modifiedBy = currentUserService.UserId ?? "system";
-        var affected = await roleRepository.SoftDeleteAsync(existing.Id, modifiedBy, cancellationToken);
+
+        // Stamp GcRecord with the yyyyMMdd UTC int, matching the project-wide soft-delete convention
+        // (see BaseAuditableEntity doc + Country/Person/Project/... handlers).
+        existing.GcRecord = BaseAuditableEntity.GetDeletionGcRecordStamp();
+        existing.LastModified = DateTime.UtcNow;
+        existing.LastModifiedBy = modifiedBy;
+
+        await roleRepository.UpdateAsync(existing, cancellationToken);
+        var affected = await unitOfWork.SaveChangesAsync(cancellationToken);
         if (affected == 0)
         {
             logger.LogWarning("Soft delete of role {RoleId} affected 0 rows. Race condition or already deleted.", existing.Id);
             return Response<bool>.Error("Rol no encontrado o inactivo.");
         }
-
-        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new Response<bool>
         {

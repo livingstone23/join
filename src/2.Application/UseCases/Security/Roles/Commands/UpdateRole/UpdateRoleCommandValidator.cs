@@ -10,9 +10,12 @@ public sealed class UpdateRoleCommandValidator : AbstractValidator<UpdateRoleCom
 {
     public UpdateRoleCommandValidator()
     {
+        // Name is optional: omitting it preserves the existing role name (used to edit only the description
+        // of system-default roles). When supplied, it cannot be empty and must fit in 256 chars.
         RuleFor(x => x.Name)
             .NotEmpty()
-            .MaximumLength(256);
+            .MaximumLength(256)
+            .When(x => x.Name != null);
 
         RuleFor(x => x.Description)
             .MaximumLength(500);

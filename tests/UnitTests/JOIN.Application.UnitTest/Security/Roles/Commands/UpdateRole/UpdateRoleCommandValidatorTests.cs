@@ -45,4 +45,15 @@ public sealed class UpdateRoleCommandValidatorTests
         var result = validator.Validate(new UpdateRoleCommand(Guid.NewGuid(), "Admin", "All access", false));
         result.IsValid.Should().BeTrue();
     }
+
+    /// <summary>
+    /// Null Name is accepted so callers can update only the description on system-default roles.
+    /// </summary>
+    [Fact]
+    public void Validate_WhenNameIsNull_ShouldPass()
+    {
+        var validator = new UpdateRoleCommandValidator();
+        var result = validator.Validate(new UpdateRoleCommand(Guid.NewGuid(), null, "Updated description", false));
+        result.IsValid.Should().BeTrue();
+    }
 }

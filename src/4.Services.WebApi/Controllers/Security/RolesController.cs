@@ -202,11 +202,9 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = "SuperAdminCompany")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         var response = await _mediator.Send(new DeleteRoleCommand(id), cancellationToken);

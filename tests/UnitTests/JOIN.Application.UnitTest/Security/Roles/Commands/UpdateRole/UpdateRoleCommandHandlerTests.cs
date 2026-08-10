@@ -243,6 +243,50 @@ public sealed class UpdateRoleCommandHandlerTests
         response.IsSuccess.Should().BeFalse();
     }
 
+    /// <summary>
+    /// Updating only the description on a system-default role succeeds when Name is null.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenOnlyDescriptionProvidedOnSystemDefault_ShouldUpdateWithoutRenaming()
+    {
+        var roleId = Guid.NewGuid();
+        var context = new TestContext();
+        context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.NewGuid());
+        context.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns("user-1");
+        context.RoleRepositoryMock
+            .Setup(x => x.GetByIdForUpdateAsync(roleId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ApplicationRole
+            {
+                Id = roleId,
+                Name = "SuperAdmin",
+                NormalizedName = "SUPERADMIN",
+                IsSystemDefault = true,
+                GcRecord = 0
+            });
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        ApplicationRole? captured = null;
+        context.RoleRepositoryMock
+            .Setup(x => x.UpdateAsync(It.IsAny<ApplicationRole>(), It.IsAny<CancellationToken>()))
+            .Callback<ApplicationRole, CancellationToken>((r, _) => captured = r)
+            .Returns(Task.CompletedTask);
+
+        var dto = new RoleDto(roleId, "SuperAdmin", "SUPERADMIN", "New description", true, "user-1", DateTime.UtcNow);
+        context.RoleMapperMock.Setup(x => x.FromEntity(It.IsAny<ApplicationRole>())).Returns(dto);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(new UpdateRoleCommand(roleId, null, "New description", true), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        captured.Should().NotBeNull();
+        captured!.Name.Should().Be("SuperAdmin");
+        captured.NormalizedName.Should().Be("SUPERADMIN");
+        captured.Description.Should().Be("New description");
+        captured.IsSystemDefault.Should().BeTrue();
+        captured.LastModifiedBy.Should().Be("user-1");
+        context.RoleRepositoryMock.Verify(x => x.ExistsByNameExceptIdAsync(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private sealed class TestContext
     {
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();

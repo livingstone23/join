@@ -37,12 +37,6 @@ public interface IRoleRepository
     Task UpdateAsync(ApplicationRole role, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Marks the role as soft-deleted by incrementing GcRecord and stamping LastModified/LastModifiedBy in a single UPDATE.
-    /// Returns the number of rows affected (0 if the role is missing or already soft-deleted).
-    /// </summary>
-    Task<int> SoftDeleteAsync(Guid id, string modifiedBy, CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Returns true when an active role with the given normalized name exists.
     /// </summary>
     Task<bool> ExistsByNameAsync(string normalizedName, CancellationToken cancellationToken = default);
