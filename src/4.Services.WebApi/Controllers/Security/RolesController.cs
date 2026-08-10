@@ -12,6 +12,7 @@ using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 
 
@@ -41,8 +42,13 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
     /// <param name="cancellationToken">Token used to cancel the request while the role list is being materialized.</param>
     /// <returns>A standardized response containing the role names available to the application.</returns>
     [HttpGet]
+    [Authorize(Roles = "SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<IEnumerable<string>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken = default)
     {
         var roles = await _roleManager.Roles
@@ -69,9 +75,13 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
     /// <param name="cancellationToken">Token used to cancel the request.</param>
     /// <returns>A standardized paged response containing matching role DTOs.</returns>
     [HttpGet("detailed")]
-    [RequirePermission(PermissionFlags.CanRead)]
+    [Authorize(Roles = "SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<PagedResult<RoleDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<Response<PagedResult<RoleDto>>>> GetDetailed(
         [FromQuery] string? name,
         [FromQuery] bool? isActive,
@@ -93,10 +103,13 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
     /// Returns <c>404 Not Found</c> when the role does not exist or has been soft-deleted.
     /// </returns>
     [HttpGet("{id:guid}")]
-    [RequirePermission(PermissionFlags.CanRead)]
+    [Authorize(Roles = "SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<RoleDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<Response<RoleDto>>> GetById(Guid id, CancellationToken cancellationToken)
     {
         var response = await _mediator.Send(new GetRoleByIdQuery(id), cancellationToken);
@@ -118,11 +131,13 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
     /// Returns <c>409 Conflict</c> when another active role already uses the same name.
     /// </returns>
     [HttpPost]
-    [RequirePermission(PermissionFlags.CanCreate)]
+    [Authorize(Roles = "SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<RoleDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<Response<RoleDto>>> Create(
         [FromBody] CreateRoleCommand command,
         CancellationToken cancellationToken)
@@ -153,12 +168,13 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
     /// Returns <c>409 Conflict</c> when the new name collides with another role.
     /// </returns>
     [HttpPut("{id:guid}")]
-    [RequirePermission(PermissionFlags.CanUpdate)]
+    [Authorize(Roles = "SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<RoleDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<Response<RoleDto>>> Update(
         Guid id,
         [FromBody] UpdateRoleCommand command,
@@ -184,11 +200,13 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
     /// <param name="id">Unique identifier of the role to soft-delete.</param>
     /// <param name="cancellationToken">Token used to cancel the request.</param>
     [HttpDelete("{id:guid}")]
-    [RequirePermission(PermissionFlags.CanDelete)]
+    [Authorize(Roles = "SuperAdminCompany")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         var response = await _mediator.Send(new DeleteRoleCommand(id), cancellationToken);
