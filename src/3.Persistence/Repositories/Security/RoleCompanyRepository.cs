@@ -3,6 +3,7 @@
 
 using Dapper;
 using JOIN.Application.DTO.Security.RoleCompany;
+using JOIN.Application.DTO.Security.RoleUsers;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Domain.Security;
@@ -108,6 +109,75 @@ public sealed class RoleCompanyRepository(
             new CommandDefinition(countSql, parameters, cancellationToken: cancellationToken));
 
         var items = await connection.QueryAsync<RoleCompanyListItemDto>(
+            new CommandDefinition(pageSql, parameters, cancellationToken: cancellationToken));
+
+        return (items.AsList(), total);
+    }
+
+    /// <inheritdoc />
+    public async Task<(IReadOnlyList<RoleAffectedUserDto> Items, int Total)> GetUsersByRoleIdPagedAsync(
+        Guid roleId,
+        Guid tenantId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var offset = (page - 1) * pageSize;
+
+        // Cross-DB pagination: SQL Server uses OFFSET/FETCH NEXT, Postgres uses LIMIT/OFFSET.
+        var paginationClause = _dbContext.Database.ProviderName?.Contains("PostgreSQL", StringComparison.OrdinalIgnoreCase) == true
+            ? "LIMIT @pageSize OFFSET @offset"
+            : "OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY";
+
+        // Filter source: Security.UserRoleCompanies is the user<->role<->tenant link.
+        // Both sides apply GcRecord = 0 because Dapper bypasses global EF query filters,
+        // and Security.UserRoleCompanies has no automatic tenant predicate.
+        var whereClause = """
+            WHERE urc.RoleId = @RoleId
+              AND urc.CompanyId = @TenantId
+              AND urc.GcRecord = 0
+              AND u.GcRecord = 0
+            """;
+
+        var countSql = $"""
+            SELECT COUNT(*)
+            FROM [Security].[UserRoleCompanies] urc
+            INNER JOIN [Security].[Users] u ON u.Id = urc.UserId
+            {whereClause};
+            """;
+
+        var pageSql = $"""
+            SELECT
+                u.Id,
+                CONCAT(u.FirstName, ' ', u.LastName) AS FullName,
+                u.IsActive,
+                u.UserName,
+                u.Email,
+                u.PhoneNumber,
+                u.Created,
+                u.IsSuperAdmin,
+                u.IsSuperAdminCompany,
+                u.EmailConfirmed
+            FROM [Security].[UserRoleCompanies] urc
+            INNER JOIN [Security].[Users] u ON u.Id = urc.UserId
+            {whereClause}
+            ORDER BY u.FirstName, u.LastName, u.Id
+            {paginationClause};
+            """;
+
+        var parameters = new
+        {
+            RoleId = roleId,
+            TenantId = tenantId,
+            offset,
+            pageSize
+        };
+
+        using var connection = _connectionFactory.CreateConnection();
+        var total = await connection.ExecuteScalarAsync<int>(
+            new CommandDefinition(countSql, parameters, cancellationToken: cancellationToken));
+
+        var items = await connection.QueryAsync<RoleAffectedUserDto>(
             new CommandDefinition(pageSql, parameters, cancellationToken: cancellationToken));
 
         return (items.AsList(), total);

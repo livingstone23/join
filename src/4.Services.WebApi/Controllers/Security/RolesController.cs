@@ -1,11 +1,13 @@
 using Asp.Versioning;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
+using JOIN.Application.DTO.Security.RoleUsers;
 using JOIN.Application.UseCases.Security.Roles.Commands.CreateRole;
 using JOIN.Application.UseCases.Security.Roles.Commands.DeleteRole;
 using JOIN.Application.UseCases.Security.Roles.Commands.UpdateRole;
 using JOIN.Application.UseCases.Security.Roles.Queries.GetRoleById;
 using JOIN.Application.UseCases.Security.Roles.Queries.GetRolesDetailed;
+using JOIN.Application.UseCases.Security.Roles.Queries.GetUsersByRoleId;
 using JOIN.Domain.Security;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
@@ -119,6 +121,44 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
         }
 
         return response.IsSuccess ? Ok(response) : BadRequest(response);
+    }
+
+    /// <summary>
+    /// Returns a paged list of users currently assigned to the role, scoped to the caller's tenant.
+    /// Powers the "usuarios afectados" preview shown by the UI before saving role changes.
+    /// </summary>
+    /// <param name="id">Unique identifier of the role.</param>
+    /// <param name="page">1-based page number; clamped to &gt;= 1.</param>
+    /// <param name="pageSize">Page size; clamped to [1, 100].</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    /// <returns>
+    /// A standardized paged response containing matching users. <c>404 Not Found</c>
+    /// when the role is missing or soft-deleted; <c>401 Unauthorized</c> when the
+    /// caller's token lacks a CompanyId claim/header.
+    /// </returns>
+    [HttpGet("{id:guid}/users")]
+    [Authorize(Roles = "SuperAdminCompany")]
+    [ProducesResponseType(typeof(Response<PagedResult<RoleAffectedUserDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<Response<PagedResult<RoleAffectedUserDto>>>> GetUsers(
+        Guid id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new GetUsersByRoleIdQuery(id, page, pageSize), cancellationToken);
+
+        if (response.IsSuccess) return Ok(response);
+
+        return response.Message switch
+        {
+            "INVALID_COMPANY_ID" => Unauthorized(response),
+            "Rol no encontrado o inactivo." => NotFound(response),
+            _ => BadRequest(response)
+        };
     }
 
     /// <summary>

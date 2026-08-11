@@ -139,7 +139,7 @@ public class UsersController { ... }
 
 ## Roles — `/api/v1/Roles`
 
-The Roles controller keeps the legacy `GET /` endpoint (`IEnumerable<string>`) for selectors and adds a detailed CRUD surface. All five new endpoints are gated by the `Roles` permission resource and the HTTP-verb default flag.
+The Roles controller keeps the legacy `GET /` endpoint (`IEnumerable<string>`) for selectors and adds a detailed CRUD surface. The detailed endpoints are gated by the `Roles` permission resource and the HTTP-verb default flag. The preview endpoint `GET /{id}/users` is gated by the `Roles` resource and the `SuperAdminCompany` role; it powers the "usuarios afectados" preview before saving role changes (SPEC 20).
 
 ```bash
 TOKEN="<jwt-from-login>"
@@ -157,6 +157,13 @@ curl "http://localhost:5000/api/v1/Roles/detailed?page=1&pageSize=20&name=ad&isA
 
 # Get by id (CanRead). 200 with RoleDto or 404 with "Rol no encontrado o inactivo.".
 curl http://localhost:5000/api/v1/Roles/{id} \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# Users affected by role (CanRead). Paged; pageSize clamped to [1,100]. Requires SuperAdminCompany.
+# 200 with Response<PagedResult<RoleAffectedUserDto>> / 404 if role missing or soft-deleted
+# ("Rol no encontrado o inactivo.") / 401 INVALID_COMPANY_ID if X-Company-Id absent.
+curl "http://localhost:5000/api/v1/Roles/{id}/users?page=1&pageSize=20" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Company-Id: $COMPANY"
 

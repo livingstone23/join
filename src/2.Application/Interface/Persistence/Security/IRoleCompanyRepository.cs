@@ -2,6 +2,7 @@
 // See LICENSE in the project root for license information.
 
 using JOIN.Application.DTO.Security.RoleCompany;
+using JOIN.Application.DTO.Security.RoleUsers;
 using JOIN.Domain.Security;
 
 namespace JOIN.Application.Interface.Persistence.Security;
@@ -30,6 +31,19 @@ public interface IRoleCompanyRepository
         Guid tenantId,
         Guid? roleIdFilter,
         bool? isActive,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads a paged list of users currently assigned to <paramref name="roleId"/> within <paramref name="tenantId"/>,
+    /// joining Security.UserRoleCompanies (filter source) onto Security.Users (projection).
+    /// All filters (GcRecord == 0 on both sides, CompanyId == tenantId) are applied explicitly
+    /// because Dapper bypasses global EF query filters.
+    /// </summary>
+    Task<(IReadOnlyList<RoleAffectedUserDto> Items, int Total)> GetUsersByRoleIdPagedAsync(
+        Guid roleId,
+        Guid tenantId,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default);
