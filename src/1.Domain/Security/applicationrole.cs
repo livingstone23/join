@@ -39,6 +39,11 @@ public class ApplicationRole : IdentityRole<Guid>, IAuditableEntity
     // --- Navigation Properties ---
     public virtual ICollection<UserRoleCompany> UserRoleCompanies { get; set; } = new List<UserRoleCompany>();
 
+    /// <summary>
+    /// Companies where this role is available (catalog of role availability per tenant).
+    /// </summary>
+    public virtual ICollection<RoleCompany> RoleCompanies { get; set; } = new List<RoleCompany>();
+
 
     /// <summary>
     /// Collection of granular permissions assigned to this role across different system options.

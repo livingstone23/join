@@ -1,6 +1,6 @@
 # SPEC 19 — Junction `RoleCompany` con CRUD restringido a SuperAdminCompany
 
-> **Status:** Draft
+> **Status:** Aprobado
 > **Depends on:** SPEC 18 (Roles CRUD), SPEC 17 (PermissionFlags), `CompaniesController` (precedente de `[Authorize(Roles = "SuperAdminCompany")]`)
 > **Date:** 2026-08-08
 > **Objective:** Crear la entidad `RoleCompany` (vínculo `Role` ↔ `Company` con `BaseTenantEntity`) y un controlador `RoleCompaniesController` con endpoints `GET /{id}`, `GET /` (paged), `POST /`, `PUT /{id}`, `DELETE /{id}` (soft delete), donde `CompanyId` se resuelve exclusivamente desde el token del usuario con rol `SuperAdminCompany`, persistido con índice unique `(RoleId, CompanyId)` para evitar duplicados activos.
@@ -17,8 +17,8 @@
 - `src/2.Application.DTO/Security/RoleCompany/RoleCompanyListItemDto.cs` (nuevo): variante ligera `{ Guid Id, Guid RoleId, string RoleName, bool IsSystemDefault, DateTime Created }` para grilla.
 - `src/2.Application.DTO/Security/RoleCompany/CreateRoleCompanyRequestDto.cs` (nuevo): `{ Guid RoleId }` (único input; `CompanyId` viene del token).
 - `src/2.Application.DTO/Security/RoleCompany/UpdateRoleCompanyRequestDto.cs` (nuevo): `{ Guid RoleId }` (re-asignar el rol, manteniendo la `CompanyId` del token).
-- `src/2.Application/Interface/Persistence/Security/IRoleCompanyRepository.cs` (nuevo): `Task<RoleCompanyDto?> GetByIdAsync(Guid id, Guid tenantId, CancellationToken ct)`, `Task<(IReadOnlyList<RoleCompanyListItemDto> Items, int Total)> GetPagedAsync(Guid tenantId, Guid? roleIdFilter, bool? isActive, int page, int pageSize, CancellationToken ct)`, `Task AddAsync(RoleCompany entity, CancellationToken ct)`, `Task UpdateAsync(RoleCompany entity, CancellationToken ct)`, `Task SoftDeleteAsync(Guid id, Guid tenantId, string modifiedBy, CancellationToken ct)`, `Task<bool> ExistsActiveLinkAsync(Guid roleId, Guid companyId, CancellationToken ct)` (excluye `GcRecord > 0`).
-- `src/3.Persistence/Repositories/Security/RoleCompanyRepository.cs` (nuevo): Dapper para reads (con `JOIN Security.Roles r ON rc.RoleId = r.Id AND r.GcRecord = 0` para proyectar `RoleName`), EF para writes. `SoftDeleteAsync` = `UPDATE Security.RoleCompanies SET GcRecord = GcRecord + 1, LastModified = SYSUTCDATETIME(), LastModifiedBy = @modifiedBy WHERE Id = @id AND CompanyId = @tenantId AND GcRecord = 0`.
+- `src/2.Application/Interface/Persistence/Security/IRoleCompanyRepository.cs` (nuevo): `Task<RoleCompanyDto?> GetByIdAsync(Guid id, Guid tenantId, CancellationToken ct)`, `Task<(IReadOnlyList<RoleCompanyListItemDto> Items, int Total)> GetPagedAsync(Guid tenantId, Guid? roleIdFilter, bool? isActive, int page, int pageSize, CancellationToken ct)`, `Task AddAsync(RoleCompany entity, CancellationToken ct)`, `Task UpdateAsync(RoleCompany entity, CancellationToken ct)`, `Task<RoleCompany?> GetByIdForUpdateAsync(Guid id, Guid tenantId, CancellationToken ct)`, `Task<bool> ExistsActiveLinkAsync(Guid roleId, Guid companyId, CancellationToken ct)` (excluye `GcRecord > 0`). Soft delete NO vive en el repo: usa el flujo EF tracked estándar (ver F3.6 y F5.8).
+- `src/3.Persistence/Repositories/Security/RoleCompanyRepository.cs` (nuevo): Dapper para reads (con `JOIN Security.Roles r ON rc.RoleId = r.Id AND r.GcRecord = 0` para proyectar `RoleName`), EF para writes. Sin método `SoftDeleteAsync` — el handler carga la entidad, llama `entity.MarkAsDeleted()` (heredado de `BaseTenantEntity` → `BaseAuditableEntity`, escribe `GcRecord = yyyyMMdd UTC int`), y persiste vía `UpdateAsync` + `IUnitOfWork.SaveChangesAsync()`. Esto alinea con la convención del proyecto (Country, Person, Project, Area, etc.) y con SPEC 18 post-fix.
 - `src/2.Application/UseCases/Security/RoleCompanies/Queries/GetRoleCompanyById/GetRoleCompanyByIdQuery.cs` + `Handler`.
 - `src/2.Application/UseCases/Security/RoleCompanies/Queries/GetRoleCompaniesPaged/GetRoleCompaniesPagedQuery.cs` + `Handler` (clamp `pageSize [1, 100]`, `page >= 1`, filtros `roleId`, `isActive`).
 - `src/2.Application/UseCases/Security/RoleCompanies/Commands/CreateRoleCompany/CreateRoleCompanyCommand.cs` + `Handler` + `Validator` (FluentValidation: `RoleId` `NotEqual(Guid.Empty)`).
@@ -237,7 +237,7 @@ Genera `Security.RoleCompanies` con columnas:
    - JOIN con `Security.Roles` para proyectar `RoleName` e `IsSystemDefault`.
 4. `AddAsync`: `_dbContext.RoleCompanies.AddAsync(entity); SaveChangesAsync`. Auditoría seteada en handler.
 5. `UpdateAsync`: localizar con `FindAsync(id)`, setear `RoleId`, `LastModified = UtcNow`, `LastModifiedBy`, `SaveChangesAsync`. Validar `CompanyId == tenantId` server-side.
-6. `SoftDeleteAsync`: `UPDATE Security.RoleCompanies SET GcRecord = GcRecord + 1, LastModified = SYSUTCDATETIME(), LastModifiedBy = @modifiedBy WHERE Id = @id AND CompanyId = @tenantId AND GcRecord = 0`. Retorna rows affected.
+6. **Sin `SoftDeleteAsync`.** Soft delete sigue la convención del proyecto: el `DeleteRoleCompanyCommandHandler` carga la entidad con `GetByIdForUpdateAsync(id, tenantId)` (filtro `WHERE Id = @id AND CompanyId = @tenantId AND GcRecord = 0`), llama `entity.MarkAsDeleted()` (escribe `GcRecord = yyyyMMdd UTC int` vía `BaseAuditableEntity.GetDeletionGcRecordStamp()`), setea `LastModified` + `LastModifiedBy`, y persiste con `UpdateAsync` + `IUnitOfWork.SaveChangesAsync()`. Si `SaveChangesAsync` retorna 0 (cross-tenant, inexistente o ya soft-deleted) → 404 `ROLE_COMPANY_NOT_FOUND`.
 7. `ExistsActiveLinkAsync`: `SELECT 1 FROM Security.RoleCompanies WHERE RoleId = @roleId AND CompanyId = @companyId AND GcRecord = 0`.
 8. `dotnet build` → 0 errores.
 
@@ -286,8 +286,11 @@ Genera `Security.RoleCompanies` con columnas:
    public sealed record DeleteRoleCompanyCommand(Guid Id) : IRequest<Response<bool>>;
    ```
 8. `DeleteRoleCompanyCommandHandler.cs`:
-   - Valida `CompanyId`.
-   - `SoftDeleteAsync(id, tenantId, userId)`. Si `affected == 0` → 404 `ROLE_COMPANY_NOT_FOUND` (puede ser cross-tenant o inexistente).
+   - Valida `CompanyId != Guid.Empty` → 401 `INVALID_COMPANY_ID` si vacío.
+   - Carga `RoleCompany` por `id` filtrado por `tenantId` y `GcRecord == 0` (`GetByIdForUpdateAsync`). Si null → 404 `ROLE_COMPANY_NOT_FOUND` (cross-tenant, inexistente o ya soft-deleted).
+   - Llama `entity.MarkAsDeleted()` (escribe `GcRecord = yyyyMMdd UTC int`).
+   - Setea `LastModified = UtcNow` y `LastModifiedBy = userId`.
+   - Persiste vía `UpdateAsync` + `IUnitOfWork.SaveChangesAsync()`. Si `affected == 0` → 404 `ROLE_COMPANY_NOT_FOUND`.
    - Loggear warning si hay `UserRoleCompanies` activos que referencien este `RoleCompany` indirectamente (no se bloquea, pero el warning visibiliza el impacto).
 9. `dotnet build` → 0 errores.
 
@@ -342,7 +345,7 @@ Genera `Security.RoleCompanies` con columnas:
 8. `DeleteRoleCompanyCommandHandlerTests`:
    - `CompanyId` vacío → 401.
    - `affected == 0` → 404.
-   - Happy path → 204, `SoftDeleteAsync` llamado con `(id, tenantId, userId)`.
+   - Happy path → 204, `GetByIdForUpdateAsync` retorna la entidad, `entity.MarkAsDeleted()` setea el stamp, `UpdateAsync` + `SaveChangesAsync` persisten.
    - Log warning si hay `UserRoleCompanies` activos.
 9. `dotnet test --filter "FullyQualifiedName~RoleCompanies"` → 0 fallidos. Cobertura ≥ 90% en clases nuevas.
 
@@ -366,8 +369,8 @@ Genera `Security.RoleCompanies` con columnas:
 - [ ] Existe `src/2.Application.DTO/Security/RoleCompany/RoleCompanyDto.cs` con `{ Guid Id, Guid RoleId, string RoleName, bool IsSystemDefault, string? CreatedBy, DateTime Created }`.
 - [ ] Existe `src/2.Application.DTO/Security/RoleCompany/RoleCompanyListItemDto.cs` con la firma del scope.
 - [ ] Existen `CreateRoleCompanyRequestDto` y `UpdateRoleCompanyRequestDto`, ambos con `Guid RoleId` como único campo de payload.
-- [ ] Existe `src/2.Application/Interface/Persistence/Security/IRoleCompanyRepository.cs` con los 6 métodos del scope.
-- [ ] Existe `src/3.Persistence/Repositories/Security/RoleCompanyRepository.cs` con implementación Dapper (reads + JOIN a `Security.Roles`) + EF (writes + `SoftDeleteAsync`).
+- [ ] Existe `src/2.Application/Interface/Persistence/Security/IRoleCompanyRepository.cs` con los 6 métodos del scope (incluido `GetByIdForUpdateAsync` para el path de soft delete; sin `SoftDeleteAsync`).
+- [ ] Existe `src/3.Persistence/Repositories/Security/RoleCompanyRepository.cs` con implementación Dapper (reads + JOIN a `Security.Roles`) + EF (writes; soft delete vía `UpdateAsync` + `SaveChangesAsync`, sin método `SoftDeleteAsync`).
 - [ ] `IRoleCompanyRepository` registrado en `ConfigureServices.cs` de Persistence.
 - [ ] Existe `src/2.Application/Mappings/Security/RoleCompanyMapper.cs` con `IRoleCompanyMapper` Mapperly.
 - [ ] `GetRoleCompanyByIdQueryHandler` retorna 401 `INVALID_COMPANY_ID` si `ICurrentUserService.CompanyId == Guid.Empty`.
@@ -384,8 +387,8 @@ Genera `Security.RoleCompanies` con columnas:
 - [ ] `UpdateRoleCompanyCommandHandler` retorna 404 si el `Id` no pertenece a la `CompanyId` del token.
 - [ ] `UpdateRoleCompanyCommandHandler` retorna 409 `ROLE_COMPANY_DUPLICATE` si el nuevo `RoleId` ya está vinculado a la misma company.
 - [ ] `UpdateRoleCompanyCommandHandler` no cambia `CompanyId` (siempre la del token).
-- [ ] `DeleteRoleCompanyCommandHandler` ejecuta `UPDATE Security.RoleCompanies SET GcRecord = GcRecord + 1, LastModified = SYSUTCDATETIME(), LastModifiedBy = @userId WHERE Id = @id AND CompanyId = @tenantId AND GcRecord = 0`.
-- [ ] `DeleteRoleCompanyCommandHandler` retorna 404 si `affected == 0` (id no existe o es de otra company).
+- [ ] `DeleteRoleCompanyCommandHandler` carga la entidad, llama `entity.MarkAsDeleted()` (setea `GcRecord = yyyyMMdd UTC int` vía `BaseAuditableEntity.GetDeletionGcRecordStamp()`), persiste con `UpdateAsync` + `IUnitOfWork.SaveChangesAsync()`, y setea `LastModified`/`LastModifiedBy`. NO usa un `UPDATE ... SET GcRecord = GcRecord + 1` directo.
+- [ ] `DeleteRoleCompanyCommandHandler` retorna 404 `ROLE_COMPANY_NOT_FOUND` si `GetByIdForUpdateAsync` retorna null (id inexistente, soft-deleted, o cross-tenant con `CompanyId != tenantId`).
 - [ ] `RoleCompaniesController`:
   - `GET /api/v1/RoleCompanies/{id}` → 200 / 404, decorado con `[Authorize(Roles = "SuperAdminCompany")]`.
   - `GET /api/v1/RoleCompanies` → 200, decorado con `[Authorize(Roles = "SuperAdminCompany")]`, query params `page`, `pageSize`, `roleId`, `isActive`.
@@ -412,7 +415,7 @@ Genera `Security.RoleCompanies` con columnas:
 - **`CompanyId` omitido del `RoleCompanyDto`** (elegido) vs. exponerlo. El cliente ya conoce su `CompanyId` (viene de su token); exponerlo en el response es ruido y abre vectores de discrepancia visibles (cliente vs. servidor). Solo `RoleId` + `RoleName` + auditoría.
 - **`PagedResult<T>` reusable del SPEC 18** (elegido) vs. nuevo `RoleCompanyPagedResult`. Reutilizar evita proliferación de tipos paginados.
 - **Índice unique filtrado `(RoleId, CompanyId) WHERE GcRecord = 0`** (elegido) vs. índice unique simple. Permite soft-deleted rows coexistir con reactivaciones futuras del mismo `(RoleId, CompanyId)` sin violar la uniqueness constraint. Coherente con `[PermissionResource]` style de SPEC 17.
-- **`SoftDeleteAsync` requiere `CompanyId` en el WHERE** (elegido) vs. soft delete sin filtrar tenant. Refuerza que un `SuperAdminCompany` no pueda borrar links de otra company desde SQL injection o path manipulation. Defense-in-depth.
+- **Soft delete vía EF tracked update + `MarkAsDeleted()`** (elegido) vs. raw SQL `UPDATE ... SET GcRecord = GcRecord + 1`. Alineado con la convención del proyecto (Country/Person/Project/... usan `MarkAsDeleted()` que escribe `GcRecord = yyyyMMdd UTC int`) y con SPEC 18 post-fix. El filtro de tenant vive en `GetByIdForUpdateAsync` (`WHERE Id = @id AND CompanyId = @tenantId AND GcRecord = 0`) — defense-in-depth contra cross-tenant SQL/path manipulation.
 - **`Update` permite cambiar `RoleId` con `CompanyId` fija** (elegido) vs. bloquear `Update` (solo `Delete` + `Create`). Cambio de `RoleId` es la única mutación semánticamente útil para un junction: garbage in, garbage out. Reasignar equivaldría a `Delete` + `Create` con la ventaja de mantener `Id` estable.
 - **`Update` no valida duplicado si `RoleId` no cambia** (elegido) vs. validar siempre. Skip si `RoleId == current` evita false-positive en updates que solo modifican `LastModified`.
 - **`Create`/`Update` rechazan `RoleId` con `ApplicationRole.GcRecord != 0`** (elegido) vs. permitir links a roles soft-deleted. Roles soft-deleted no son asignables a usuarios; tener un link activo a un rol soft-deleted es estado inconsistente. Validación defensiva.
@@ -437,6 +440,7 @@ Genera `Security.RoleCompanies` con columnas:
 | **Índice unique filtrado `(RoleId, CompanyId) WHERE GcRecord = 0` se traduce distinto en SQL Server vs. Postgres** si no se usa `HasFilter("[GcRecord] = 0")` literal. | Usar sintaxis compatible cross-DB (sin `IS` ni `LOWER`). El filtro parcial funciona en ambos motores. Verificar en `Up()` generado. |
 | **Cross-tenant attack via response manipulation** — un `SuperAdminCompany` de company A lee `Id` de un `RoleCompany` de company B y construye `GET /RoleCompanies/{id}`. | Handler valida `entity.CompanyId == ICurrentUserService.CompanyId` antes de retornar DTO. Si no coincide → 404. Defense-in-depth además del filtro SQL. |
 | **TOCTOU en `Create`/`Update`**: validación de duplicado y `INSERT` no son atómicos. Dos requests concurrentes podrían ambos pasar `ExistsActiveLinkAsync` y solo uno fallaría en el índice unique. | Aceptar la race condition benigna: el segundo request recibe `DbUpdateException` por violation del índice unique, que el handler traduce a 409 `ROLE_COMPANY_DUPLICATE`. El usuario ve el mismo error que si hubiera ganado el race. |
+| **Soft delete vía `MarkAsDeleted()` escribe stamp `yyyyMMdd`** — dos deletes el mismo día colapsan al mismo stamp, pero el segundo no se ejecuta (la entidad ya tiene `GcRecord > 0` y `GetByIdForUpdateAsync` retorna null → 404). No se pueden acumular múltiples deletes en el mismo día. | Aceptable: el modelo soft-delete es binario (activo/inactivo), no histórico. Si negocio pide historial, extender a tabla de eventos en spec aparte. |
 | **`RoleCompany` no expone `LastModified`/`LastModifiedBy`** en el DTO → ocultar auditoría de cambios. | Decisión consciente: el handler setea `LastModified` internamente (defensa contra actualización silenciosa). Si negocio pide, extender DTO. |
 | **Soft delete de `RoleCompany` deja `UserRoleCompany` huérfanos** (asignaciones user-role que referencian un role que sigue activo pero el link de la company ya no). | Warning loggeado en `DeleteRoleCompanyCommandHandler`. Cleanup transaccional de `UserRoleCompany` queda en spec aparte. |
 | **Migración `AddRoleCompanyJunction` con `Restrict` FK** puede fallar si existen `AspNetRoles` o `Companies` referenciados en otra migración que no se aplicó. | Aplicar migraciones en orden, `dotnet ef migrations list` para verificar. Raro en práctica porque `Security.Roles` y `Common.Companies` ya existen. |

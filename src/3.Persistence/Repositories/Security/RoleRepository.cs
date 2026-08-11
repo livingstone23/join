@@ -160,4 +160,23 @@ public sealed class RoleRepository(
         return await _dbContext.ApplicationRoles
             .FirstOrDefaultAsync(r => r.Id == id && r.GcRecord == 0, cancellationToken);
     }
+
+    /// <inheritdoc />
+    public async Task<bool> ExistsAndActiveAsync(Guid roleId, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT CASE
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM [Security].[Roles]
+                    WHERE Id = @RoleId AND GcRecord = 0
+                ) THEN CAST(1 AS bit)
+                ELSE CAST(0 AS bit)
+            END;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        return await connection.ExecuteScalarAsync<bool>(
+            new CommandDefinition(sql, new { RoleId = roleId }, cancellationToken: cancellationToken));
+    }
 }

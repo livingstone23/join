@@ -91,6 +91,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<SeedState> SeedStates => Set<SeedState>();
     public DbSet<SystemOption> SystemOptions => Set<SystemOption>();
     public DbSet<RoleSystemOption> RoleSystemOptions => Set<RoleSystemOption>();
+    public DbSet<RoleCompany> RoleCompanies => Set<RoleCompany>();
     public DbSet<SystemModule> SystemModules => Set<SystemModule>();
 
     
@@ -195,6 +196,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<UserPerson>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<UserRefreshToken>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<UserRoleCompany>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<RoleCompany>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<RoleSystemOption>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<SystemOption>().HasQueryFilter(e => e.GcRecord == 0);
         

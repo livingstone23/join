@@ -50,4 +50,11 @@ public interface IRoleRepository
     /// Loads the tracked role entity for update paths (Update/Delete commands).
     /// </summary>
     Task<ApplicationRole?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns true when the role exists and is active (GcRecord == 0).
+    /// Used by downstream validators (e.g. RoleCompany junction creation) that must reject
+    /// references to missing or soft-deleted roles.
+    /// </summary>
+    Task<bool> ExistsAndActiveAsync(Guid roleId, CancellationToken cancellationToken = default);
 }

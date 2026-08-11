@@ -181,7 +181,54 @@ curl -X DELETE http://localhost:5000/api/v1/Roles/{id} \
   -H "X-Company-Id: $COMPANY"
 ```
 
+## RoleCompanies — `/api/v1/RoleCompanies`
 
+The RoleCompany junction endpoints decide which Roles are available within a tenant. All five endpoints require the `SuperAdminCompany` role and the `RoleCompanies` permission resource; `CompanyId` is resolved exclusively from the caller's JWT (never from the body or query string).
+
+```bash
+TOKEN="<jwt-from-superadmin-company>"
+COMPANY="00000000-0000-0000-0000-000000000001"
+
+# Paged listing (CanRead). roleId/isActive optional. Returns Response<PagedResult<RoleCompanyListItemDto>>.
+# pageSize clamps to [1, 100]; page clamps to >= 1.
+curl "http://localhost:5000/api/v1/RoleCompanies?page=1&pageSize=20&roleId=<guid>&isActive=true" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# Get by id (CanRead). 200 with RoleCompanyDto / 404 if missing, soft-deleted, or cross-tenant.
+curl http://localhost:5000/api/v1/RoleCompanies/{id} \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# Create (CanCreate). 201 + Location header / 400 if RoleId missing/inactive / 409 if active link exists.
+curl -X POST http://localhost:5000/api/v1/RoleCompanies \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY" \
+  -H "Content-Type: application/json" \
+  -d '{"roleId":"<guid>"}'
+
+# Update (CanUpdate). 200 with RoleCompanyDto / 404 if missing/cross-tenant / 409 if new RoleId collides.
+# CompanyId is preserved from the token; only RoleId changes.
+curl -X PUT http://localhost:5000/api/v1/RoleCompanies/{id} \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY" \
+  -H "Content-Type: application/json" \
+  -d '{"roleId":"<new-guid>"}'
+
+# Delete (CanDelete). 204 on success / 404 if missing, soft-deleted, or cross-tenant.
+curl -X DELETE http://localhost:5000/api/v1/RoleCompanies/{id} \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+```
+
+Error message → status mapping (handlers encode outcomes as codes in `Response.Message`):
+
+| Message | Status |
+|---------|--------|
+| `INVALID_COMPANY_ID` | `401 Unauthorized` |
+| `ROLE_COMPANY_NOT_FOUND` | `404 Not Found` |
+| `ROLE_COMPANY_DUPLICATE` | `409 Conflict` |
+| `ROLE_NOT_FOUND` / `ROLE_INACTIVE` | `400 Bad Request` |
 
 | Scenario | Status |
 |----------|--------|

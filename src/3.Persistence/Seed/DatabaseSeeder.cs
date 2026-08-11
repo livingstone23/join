@@ -2575,6 +2575,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Seguridad", "/Seguridad", "@Icons.Material.Filled.Security", null, null, false, false, false, false),
         new("Usuarios", "/Seguridad/Usuarios", "@Icons.Material.Filled.SupervisedUserCircle", null,"Users", false, false, false, false),
         new("Roles", "/Seguridad/Roles", "@Icons.Material.Filled.VerifiedUser", null,"Roles", false, false, false, false),
+        new("RoleCompanies", "/Seguridad/RoleCompanies", "@Icons.Material.Filled.VerifiedUser", null, "RoleCompanies", false, false, false, false),
         new("SystemOption", "/Seguridad/systemOptions", "@Icons.Material.Filled.SystemSecurityUpdateWarning", null,"SystemOptions", false, false, false, false),
         new("RoleSystemOption", "/Seguridad/rolesystemoption", "@Icons.Material.Filled.SystemSecurityUpdateGood", null,"RoleSystemOption", false, false, false, false)
 
