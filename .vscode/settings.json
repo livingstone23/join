@@ -1,3 +1,8 @@
 {
-    "sarif-viewer.connectToGithubCodeScanning": "off"
+    "sarif-viewer.connectToGithubCodeScanning": "off",
+    "dotnet.defaultSolution": "JOIN.slnx",
+    "vssolution.showMode": "activityBar",
+    "vssolution.openSolutions.inRootFolder": true,
+    "vssolution.openSolutions.inSettings": true,
+    "vssolution.openSolutions.inFoldersAndSubfolders": true
 }

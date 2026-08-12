@@ -1,6 +1,6 @@
 # SPEC 21 — SystemOption DTO completeness + ModuleName/ParentName projection
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 16 (CanExport/CanExecute), SPEC 18 (Roles CRUD), `SystemOption` entity actual
 > **Date:** 2026-08-11
 > **Objective:** Completar los DTOs (`SystemOptionDto` + `SystemOptionListItemDto`) y los commands (`Create/Update`) de `SystemOptionsController` con todos los campos del entity (`ModuleName`, `ControllerName`, `OrderMenu`, `Icon`, `CanRead/Create/Update/Delete/Download/Export/Execute`, `IsVisibleMenu`, `Created`), reemplazar las proyecciones hardcodeadas `ModuleName=''` / `ParentName=''` por JOINs reales a `SystemModules` y a `SystemOptions` (parent), y mantener cobertura ≥ 90%.
@@ -10,7 +10,7 @@
 ## Scope
 
 **In:**
-
+si ini
 - `src/2.Application.DTO/Security/SystemOptionDto.cs` (extender): añadir campos faltantes para reflejar el entity completo — `CanDownload`, `CanExport`, `CanExecute`, `IsVisibleMenu`, `OrderMenu`. Reemplazar `ModuleName`/`ParentName` hardcoded por proyección real vía JOIN en SQL. Forma final:
   ```
   Guid Id, Guid ModuleId, string ModuleName,

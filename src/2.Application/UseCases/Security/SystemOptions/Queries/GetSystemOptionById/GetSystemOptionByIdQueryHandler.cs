@@ -28,9 +28,15 @@ public sealed class GetSystemOptionByIdQueryHandler(
         
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = @"SELECT Id, ModuleId, Name, Route, Icon, ParentId, ControllerName, CanRead, CanCreate, CanUpdate, CanDelete, Created, ModuleName = '', ParentName = ''
-                             FROM Security.SystemOptions
-                             WHERE Id = @Id AND GcRecord = 0;";
+        const string sql = @"SELECT o.Id, o.ModuleId, m.Name AS ModuleName, o.Name, o.Route, o.Icon,
+                                    o.ParentId, p.Name AS ParentName, o.ControllerName,
+                                    o.CanRead, o.CanCreate, o.CanUpdate, o.CanDelete,
+                                    o.CanDownload, o.CanExport, o.CanExecute,
+                                    o.IsVisibleMenu, o.OrderMenu, o.Created
+                             FROM Security.SystemOptions o
+                             INNER JOIN [Admin].[SystemModules] m ON m.Id = o.ModuleId
+                             LEFT JOIN Security.SystemOptions p ON p.Id = o.ParentId AND p.GcRecord = 0
+                             WHERE o.Id = @Id AND o.GcRecord = 0;";
 
         var entity = await connection.QuerySingleOrDefaultAsync<SystemOptionDto>(sql, new { request.Id });
         

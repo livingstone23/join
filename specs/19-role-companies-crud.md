@@ -1,6 +1,6 @@
 # SPEC 19 — Junction `RoleCompany` con CRUD restringido a SuperAdminCompany
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 18 (Roles CRUD), SPEC 17 (PermissionFlags), `CompaniesController` (precedente de `[Authorize(Roles = "SuperAdminCompany")]`)
 > **Date:** 2026-08-08
 > **Objective:** Crear la entidad `RoleCompany` (vínculo `Role` ↔ `Company` con `BaseTenantEntity`) y un controlador `RoleCompaniesController` con endpoints `GET /{id}`, `GET /` (paged), `POST /`, `PUT /{id}`, `DELETE /{id}` (soft delete), donde `CompanyId` se resuelve exclusivamente desde el token del usuario con rol `SuperAdminCompany`, persistido con índice unique `(RoleId, CompanyId)` para evitar duplicados activos.

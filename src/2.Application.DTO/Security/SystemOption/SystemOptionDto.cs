@@ -20,5 +20,10 @@ public sealed record SystemOptionDto
     public bool CanCreate { get; init; }
     public bool CanUpdate { get; init; }
     public bool CanDelete { get; init; }
+    public bool CanDownload { get; init; }
+    public bool CanExport { get; init; }
+    public bool CanExecute { get; init; }
+    public bool IsVisibleMenu { get; init; }
+    public int? OrderMenu { get; init; }
     public DateTime Created { get; init; }
 }

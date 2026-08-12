@@ -15,10 +15,14 @@ public sealed class UpdateSystemOptionCommandValidator : AbstractValidator<Updat
             .NotEmpty()
             .MaximumLength(250);
         RuleFor(x => x.ControllerName)
-            .MaximumLength(150)
+            .MaximumLength(250)
             .When(x => !string.IsNullOrWhiteSpace(x.ControllerName));
         RuleFor(x => x.Icon)
             .MaximumLength(100)
             .When(x => !string.IsNullOrWhiteSpace(x.Icon));
+        RuleFor(x => x.OrderMenu)
+            .GreaterThanOrEqualTo(0)
+            .LessThanOrEqualTo(10000)
+            .When(x => x.OrderMenu.HasValue);
     }
 }

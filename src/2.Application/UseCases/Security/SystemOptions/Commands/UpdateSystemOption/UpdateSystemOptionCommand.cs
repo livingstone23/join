@@ -18,5 +18,10 @@ public sealed record UpdateSystemOptionCommand(
     bool CanRead = true,
     bool CanCreate = true,
     bool CanUpdate = true,
-    bool CanDelete = true)
+    bool CanDelete = true,
+    bool CanDownload = true,
+    bool CanExport = true,
+    bool CanExecute = true,
+    bool IsVisibleMenu = true,
+    int? OrderMenu = 0)
     : ITransactionalCommand<Response<SystemOptionDto>>;

@@ -1,6 +1,6 @@
 # SPEC 20 — Preview de usuarios afectados por rol (`GET /api/v1/Roles/{id}/users`)
 
-> **Status:** Borrador
+> **Status:** Implementado
 > **Depends on:** SPEC 18 (Roles CRUD), SPEC 19 (RoleCompany junction), SPEC 17 (PermissionFlags)
 > **Date:** 2026-08-11
 > **Objective:** Exponer un endpoint paginado que liste los usuarios a los que un `ApplicationRole` está actualmente asignado dentro del tenant del caller (`Security.UserRoleCompanies` con `GcRecord = 0` y `CompanyId = token`), alimentando el preview "usuarios afectados" que el UI muestra antes de guardar cambios sobre el rol.

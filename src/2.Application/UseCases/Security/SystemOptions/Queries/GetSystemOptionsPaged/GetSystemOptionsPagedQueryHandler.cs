@@ -46,10 +46,10 @@ public sealed class GetSystemOptionsPagedQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE o.GcRecord = 0");
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND Name LIKE @Name");
+            whereBuilder.Append(" AND o.Name LIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 
@@ -57,20 +57,33 @@ public sealed class GetSystemOptionsPagedQueryHandler(
 
         var sql = $@"
             SELECT
-                Id,
-                ModuleId,
-                Name,
-                Route,
-                ParentId,
-                Created,
-                ModuleName = ''
-            FROM Security.SystemOptions
+                o.Id,
+                o.ModuleId,
+                m.Name AS ModuleName,
+                o.Name,
+                o.Route,
+                o.Icon,
+                o.ControllerName,
+                o.ParentId,
+                o.CanRead,
+                o.CanCreate,
+                o.CanUpdate,
+                o.CanDelete,
+                o.CanDownload,
+                o.CanExport,
+                o.CanExecute,
+                o.IsVisibleMenu,
+                o.OrderMenu,
+                o.Created
+            FROM Security.SystemOptions o
+            INNER JOIN [Admin].[SystemModules] m ON m.Id = o.ModuleId
             {whereClause}
-            ORDER BY Name ASC
+            ORDER BY o.Name ASC
             {GetPaginationClause(connection)};
 
             SELECT COUNT(*)
-            FROM Security.SystemOptions
+            FROM Security.SystemOptions o
+            INNER JOIN [Admin].[SystemModules] m ON m.Id = o.ModuleId
             {whereClause};
         ";
 

@@ -244,3 +244,105 @@ Error message → status mapping (handlers encode outcomes as codes in `Response
 | JWT OK + flag `false` | `403 Forbidden` |
 | Resource name cannot be resolved (fail-closed) | `403 Forbidden` |
 | Resource resolved + flag `true` | `200` / `201` / `204` |
+
+## SystemOptions — `/api/v1/SystemOptions`
+
+Administrative endpoints that expose the screen/menu catalog. After SPEC 21 the DTOs and command bodies carry the full set of flags (`CanRead/Create/Update/Delete/Download/Export/Execute`, `IsVisibleMenu`, `OrderMenu`, `Icon`, `ControllerName`, `ModuleName`, `ParentName`). `ModuleName` and `ParentName` are projected via SQL JOINs to `Security.SystemModules` and `Security.SystemOptions` (parent), not hardcoded. Defaults (`true`/`true`/`true`/`true`/`0`) apply when the client omits the new fields.
+
+```bash
+TOKEN="<jwt-from-superadmin>"
+
+# Paged listing (CanRead). Returns Response<PagedResult<SystemOptionListItemDto>>.
+# Each item carries ModuleName, Icon, ControllerName, all Can* flags, IsVisibleMenu, OrderMenu.
+curl "http://localhost:5000/api/v1/SystemOptions?pageNumber=1&pageSize=20" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get by id (CanRead). Returns SystemOptionDto with ModuleName + ParentName populated via JOIN.
+curl http://localhost:5000/api/v1/SystemOptions/{id} \
+  -H "Authorization: Bearer $TOKEN"
+
+# Create (CanCreate). The five new fields are optional; defaults make the request backwards compatible.
+curl -X POST http://localhost:5000/api/v1/SystemOptions \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "moduleId": "<guid>",
+    "name": "Manage Tickets",
+    "route": "/tickets/manage",
+    "icon": "ticket",
+    "parentId": null,
+    "controllerName": "Tickets",
+    "canRead": true,
+    "canCreate": true,
+    "canUpdate": true,
+    "canDelete": true,
+    "canDownload": true,
+    "canExport": true,
+    "canExecute": true,
+    "isVisibleMenu": true,
+    "orderMenu": 5
+  }'
+
+# Update (CanUpdate). Body shape mirrors Create; Id comes from the URL.
+curl -X PUT http://localhost:5000/api/v1/SystemOptions/{id} \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Manage Tickets v2",
+    "route": "/tickets/v2/manage",
+    "icon": "ticket",
+    "parentId": null,
+    "controllerName": "Tickets",
+    "canRead": true,
+    "canCreate": false,
+    "canUpdate": true,
+    "canDelete": false,
+    "canDownload": true,
+    "canExport": true,
+    "canExecute": false,
+    "isVisibleMenu": true,
+    "orderMenu": 7
+  }'
+
+# Delete (CanDelete). Soft delete; no body.
+curl -X DELETE http://localhost:5000/api/v1/SystemOptions/{id} \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Sample response shape (post-SPEC 21):
+
+```json
+{
+  "isSuccess": true,
+  "message": "System option retrieved successfully.",
+  "data": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "moduleId": "11111111-1111-1111-1111-111111111111",
+    "moduleName": "Security",
+    "name": "Manage Tickets",
+    "route": "/tickets/manage",
+    "icon": "ticket",
+    "parentId": null,
+    "parentName": null,
+    "controllerName": "Tickets",
+    "canRead": true,
+    "canCreate": true,
+    "canUpdate": true,
+    "canDelete": true,
+    "canDownload": true,
+    "canExport": true,
+    "canExecute": true,
+    "isVisibleMenu": true,
+    "orderMenu": 5,
+    "created": "2026-08-11T12:00:00Z"
+  }
+}
+```
+
+Validator rejections (FluentValidation, returned as `400 Bad Request` via the standard pipeline):
+
+| Field | Rule |
+|-------|------|
+| `OrderMenu` | `[0, 10000]` when present |
+| `Icon` | ≤ 100 chars when present |
+| `ControllerName` | ≤ 250 chars when present |
