@@ -69,4 +69,18 @@ public sealed class SecurityEventRepository(ISqlConnectionFactory connectionFact
             new CommandDefinition(sql, new { userId, offset, pageSize }, cancellationToken: ct));
         return rows.AsList();
     }
+
+    /// <inheritdoc />
+    public async Task<int> CountByUserAsync(Guid userId, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT COUNT(*)
+            FROM [Security].[SecurityEventLogs]
+            WHERE UserId = @userId;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        return await connection.ExecuteScalarAsync<int>(
+            new CommandDefinition(sql, new { userId }, cancellationToken: ct));
+    }
 }

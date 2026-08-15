@@ -10,6 +10,20 @@ namespace JOIN.Domain.Security;
 public class SecurityEventLog : BaseEntity
 {
     /// <summary>
+    /// Initializes a new instance with a generated identifier.
+    /// </summary>
+    public SecurityEventLog() { }
+
+    /// <summary>
+    /// Initializes a new instance with the supplied identifier. Used by tests + callers
+    /// that need a stable Id before persistence.
+    /// </summary>
+    public SecurityEventLog(Guid id)
+    {
+        Id = id;
+    }
+
+    /// <summary>
     /// Affected user. Nullable so the row survives user deletion.
     /// </summary>
     public Guid? UserId { get; set; }

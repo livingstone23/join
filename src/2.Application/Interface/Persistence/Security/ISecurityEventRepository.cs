@@ -18,4 +18,10 @@ public interface ISecurityEventRepository
     /// Paginated; the caller is responsible for clamping page numbers and sizes.
     /// </summary>
     Task<IReadOnlyList<SecurityEventLog>> ListByUserPagedAsync(Guid userId, int pageNumber, int pageSize, CancellationToken ct);
+
+    /// <summary>
+    /// Total number of <c>SecurityEventLogs</c> rows for the supplied user. Used to drive
+    /// <c>PagedResult.TotalCount</c> in the activity feed.
+    /// </summary>
+    Task<int> CountByUserAsync(Guid userId, CancellationToken ct);
 }
