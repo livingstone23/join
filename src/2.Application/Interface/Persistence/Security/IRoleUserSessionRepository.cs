@@ -1,3 +1,5 @@
+using JOIN.Application.DTO.Security;
+
 namespace JOIN.Application.Interface.Persistence.Security;
 
 /// <summary>
@@ -61,4 +63,43 @@ public interface IRoleUserSessionRepository
     /// Returns the affected row count (0 or 1).
     /// </summary>
     Task<int> SoftRevokeSingleConnectionAsync(Guid connectionId, DateTime utcNow, CancellationToken ct);
+
+    /// <summary>
+    /// Returns the user's assigned role (id + name) for the supplied tenant. Empty when the
+    /// user has no role assignment in the tenant.
+    /// </summary>
+    Task<IReadOnlyList<UserRoleLookupRow>> ListUserRolesInTenantAsync(Guid userId, Guid companyId, CancellationToken ct);
+
+    /// <summary>
+    /// Returns one row per active <c>Security.SystemOptions</c> in the tenant, with the
+    /// OR of the <c>Security.RoleSystemOptions</c> flags across the supplied role ids
+    /// (per-option). Empty when the tenant has no active options.
+    /// </summary>
+    Task<IReadOnlyList<PermissionFlagGridRow>> GetPermissionFlagGridAsync(
+        IReadOnlyCollection<Guid> roleIds,
+        Guid companyId,
+        CancellationToken ct);
 }
+
+/// <summary>
+/// One role assigned to a user inside a tenant. Returned by
+/// <see cref="IRoleUserSessionRepository.ListUserRolesInTenantAsync"/>.
+/// </summary>
+/// <param name="RoleId">Role identifier.</param>
+/// <param name="RoleName">Display name from <c>Security.Roles.Name</c>.</param>
+public sealed record UserRoleLookupRow(Guid RoleId, string RoleName);
+
+/// <summary>
+/// Raw projection used by <see cref="IRoleUserSessionRepository.GetPermissionFlagGridAsync"/>.
+/// One row per (module, option) inside the tenant, with the per-option supports from
+/// <c>Security.SystemOptions</c> and the per-option granted = OR across supplied roles.
+/// </summary>
+public sealed record PermissionFlagGridRow(
+    Guid ModuleId,
+    string ModuleName,
+    Guid SystemOptionId,
+    string OptionName,
+    string OptionRoute,
+    int DisplayOrder,
+    RoleSystemOptionSupportFlags Supports,
+    RoleSystemOptionGrantedFlags Granted);

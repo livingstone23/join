@@ -2,6 +2,7 @@
 // See LICENSE in the project root for license information.
 
 using Dapper;
+using JOIN.Application.DTO.Security;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence.Security;
 
@@ -142,5 +143,109 @@ public sealed class RoleUserSessionRepository(ISqlConnectionFactory connectionFa
     {
         public Guid Id { get; set; }
         public int Type { get; set; }
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<UserRoleLookupRow>> ListUserRolesInTenantAsync(
+        Guid userId,
+        Guid companyId,
+        CancellationToken ct)
+    {
+        const string sql = """
+            SELECT DISTINCT
+                urc.RoleId AS RoleId,
+                r.Name AS RoleName
+            FROM [Security].[UserRoleCompanies] urc
+            INNER JOIN [Security].[Roles] r
+                ON r.Id = urc.RoleId AND r.GcRecord = 0
+            WHERE urc.UserId = @userId
+              AND urc.CompanyId = @companyId
+              AND urc.GcRecord = 0
+            ORDER BY r.Name;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<(Guid RoleId, string RoleName)>(
+            new CommandDefinition(sql, new { userId, companyId }, cancellationToken: ct));
+        return rows.Select(r => new UserRoleLookupRow(r.RoleId, r.RoleName)).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PermissionFlagGridRow>> GetPermissionFlagGridAsync(
+        IReadOnlyCollection<Guid> roleIds,
+        Guid companyId,
+        CancellationToken ct)
+    {
+        // Single CTE-driven SELECT that joins RoleSystemOptions + SystemOptions + SystemModules
+        // for the supplied role ids inside the tenant. When roleIds is empty the LEFT JOIN
+        // collapses and COALESCE keeps Granted = all-false so the UI still receives every
+        // active option (per F4 acceptance criteria: no-roles case).
+        const string sql = """
+            WITH EffectiveRoles AS (
+                SELECT CAST(LTRIM(RTRIM([value])) AS uniqueidentifier) AS RoleId
+                FROM STRING_SPLIT(@roleIdsCsv, ',')
+                WHERE LTRIM(RTRIM([value])) <> ''
+            ),
+            ModuleOptions AS (
+                SELECT
+                    mo.Id   AS ModuleId,
+                    mo.Name AS ModuleName,
+                    so.Id   AS SystemOptionId,
+                    so.Name AS OptionName,
+                    so.Route AS OptionRoute,
+                    ISNULL(so.OrderMenu, 0) AS DisplayOrder,
+                    CAST(so.CanRead AS bit) AS SupportCanRead,
+                    CAST(so.CanCreate AS bit) AS SupportCanCreate,
+                    CAST(so.CanUpdate AS bit) AS SupportCanUpdate,
+                    CAST(so.CanDelete AS bit) AS SupportCanDelete,
+                    CAST(so.CanDownload AS bit) AS SupportCanDownload,
+                    CAST(so.CanExport AS bit) AS SupportCanExport,
+                    CAST(so.CanExecute AS bit) AS SupportCanExecute
+                FROM [Security].[SystemOptions] so
+                INNER JOIN [Security].[SystemModules] mo
+                    ON mo.Id = so.SystemModuleId AND mo.GcRecord = 0
+                WHERE so.CompanyId = @companyId
+                  AND so.GcRecord = 0
+            )
+            SELECT
+                mo.ModuleId,
+                mo.ModuleName,
+                mo.SystemOptionId,
+                mo.OptionName,
+                mo.OptionRoute,
+                mo.DisplayOrder,
+                mo.SupportCanRead, mo.SupportCanCreate, mo.SupportCanUpdate,
+                mo.SupportCanDelete, mo.SupportCanDownload, mo.SupportCanExport, mo.SupportCanExecute,
+                CAST(COALESCE(MAX(CASE WHEN rso.CanRead = 1     THEN 1 ELSE 0 END), 0) AS bit) AS GrantedCanRead,
+                CAST(COALESCE(MAX(CASE WHEN rso.CanCreate = 1   THEN 1 ELSE 0 END), 0) AS bit) AS GrantedCanCreate,
+                CAST(COALESCE(MAX(CASE WHEN rso.CanUpdate = 1   THEN 1 ELSE 0 END), 0) AS bit) AS GrantedCanUpdate,
+                CAST(COALESCE(MAX(CASE WHEN rso.CanDelete = 1   THEN 1 ELSE 0 END), 0) AS bit) AS GrantedCanDelete,
+                CAST(COALESCE(MAX(CASE WHEN rso.CanDownload = 1 THEN 1 ELSE 0 END), 0) AS bit) AS GrantedCanDownload,
+                CAST(COALESCE(MAX(CASE WHEN rso.CanExport = 1   THEN 1 ELSE 0 END), 0) AS bit) AS GrantedCanExport,
+                CAST(COALESCE(MAX(CASE WHEN rso.CanExecute = 1  THEN 1 ELSE 0 END), 0) AS bit) AS GrantedCanExecute
+            FROM ModuleOptions mo
+            LEFT JOIN [Security].[RoleSystemOptions] rso
+                ON rso.SystemOptionId = mo.SystemOptionId
+               AND rso.CompanyId = @companyId
+               AND rso.GcRecord = 0
+               AND rso.RoleId IN (SELECT RoleId FROM EffectiveRoles)
+            GROUP BY
+                mo.ModuleId, mo.ModuleName,
+                mo.SystemOptionId, mo.OptionName, mo.OptionRoute, mo.DisplayOrder,
+                mo.SupportCanRead, mo.SupportCanCreate, mo.SupportCanUpdate,
+                mo.SupportCanDelete, mo.SupportCanDownload, mo.SupportCanExport, mo.SupportCanExecute
+            ORDER BY mo.ModuleId, mo.DisplayOrder, mo.SystemOptionId;
+            """;
+
+        var parameters = new
+        {
+            companyId,
+            roleIdsCsv = roleIds.Count == 0 ? string.Empty : string.Join(',', roleIds)
+        };
+
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<PermissionFlagGridRow>(
+            new CommandDefinition(sql, parameters, cancellationToken: ct));
+        return rows.AsList();
     }
 }
