@@ -12,17 +12,21 @@ public interface IRoleRepository
 {
     /// <summary>
     /// Returns the active (GcRecord = 0) role matching the given id, projected to <see cref="RoleDto"/>, or null.
+    /// <paramref name="companyId"/> is required because <see cref="RoleDto.PermissionsCount"/> is tenant-scoped
+    /// (counts active RoleSystemOption rows for that CompanyId only).
     /// </summary>
-    Task<RoleDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<RoleDto?> GetByIdAsync(Guid id, Guid companyId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns a page of active roles filtered by optional name substring and active flag, plus the total count.
+    /// <paramref name="companyId"/> is required because each row's <see cref="RoleDto.PermissionsCount"/> is tenant-scoped.
     /// </summary>
     Task<(IReadOnlyList<RoleDto> Items, int Total)> GetPagedAsync(
         string? nameFilter,
         bool? isActive,
         int page,
         int pageSize,
+        Guid companyId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -57,4 +61,15 @@ public interface IRoleRepository
     /// references to missing or soft-deleted roles.
     /// </summary>
     Task<bool> ExistsAndActiveAsync(Guid roleId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Counts active (GcRecord = 0) <see cref="Domain.Security.UserRoleCompany"/> rows
+    /// referencing the given role for the given tenant. Tenant-scoped to avoid cross-company
+    /// leaks: a role with users in another <c>CompanyId</c> returns <c>0</c>.
+    /// Used by the delete path to enforce <c>ROLE_HAS_USERS</c>.
+    /// </summary>
+    Task<int> CountActiveUsersByRoleIdAsync(
+        Guid roleId,
+        Guid companyId,
+        CancellationToken cancellationToken = default);
 }

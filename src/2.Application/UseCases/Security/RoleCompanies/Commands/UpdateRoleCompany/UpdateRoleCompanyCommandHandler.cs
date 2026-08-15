@@ -44,7 +44,7 @@ public sealed class UpdateRoleCompanyCommandHandler(
                 new[] { "No se encontró el vínculo rol-empresa para la compañía del token." });
         }
 
-        var existingRole = await _roleRepository.GetByIdAsync(request.RoleId, cancellationToken);
+        var existingRole = await _roleRepository.GetByIdAsync(request.RoleId, tenantId, cancellationToken);
         if (existingRole is null)
         {
             return Response<RoleCompanyDto>.Error(

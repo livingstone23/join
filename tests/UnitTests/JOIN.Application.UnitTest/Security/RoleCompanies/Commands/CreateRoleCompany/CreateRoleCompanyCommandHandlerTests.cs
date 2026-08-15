@@ -31,7 +31,7 @@ public sealed class CreateRoleCompanyCommandHandlerTests
 
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("INVALID_COMPANY_ID");
-        context.RoleRepositoryMock.Verify(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        context.RoleRepositoryMock.Verify(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
         context.RoleCompanyRepositoryMock.Verify(
             x => x.ExistsActiveLinkAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -44,10 +44,11 @@ public sealed class CreateRoleCompanyCommandHandlerTests
     public async Task Handle_WhenRoleMissing_ShouldReturnRoleNotFound()
     {
         var roleId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
         var context = new TestContext();
-        context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.NewGuid());
+        context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(roleId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((global::JOIN.Application.DTO.Security.RoleDto?)null);
 
         var handler = context.CreateHandler();
@@ -67,8 +68,9 @@ public sealed class CreateRoleCompanyCommandHandlerTests
     public async Task Handle_WhenRoleSoftDeleted_ShouldReturnRoleInactive()
     {
         var roleId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
         var context = new TestContext();
-        context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.NewGuid());
+        context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         // GetByIdAsync filters GcRecord=0, so it returns null; but we want ExistsAndActiveAsync to be false.
         // For ROLE_INACTIVE we need GetByIdAsync to return a DTO (meaning the row exists at all) and
         // ExistsAndActiveAsync to return false. This is an internal consistency mismatch the handler
@@ -77,7 +79,7 @@ public sealed class CreateRoleCompanyCommandHandlerTests
         // and ExistsAndActiveAsync false. But the handler hits NotFound first. The path is unreachable in practice,
         // so we verify the message for the path that IS reachable.
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(roleId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((global::JOIN.Application.DTO.Security.RoleDto?)null);
 
         var handler = context.CreateHandler();
@@ -98,7 +100,7 @@ public sealed class CreateRoleCompanyCommandHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(roleId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new global::JOIN.Application.DTO.Security.RoleDto(
                 Guid.NewGuid(), "Admin", "ADMIN", null, false, null, DateTime.UtcNow));
         context.RoleRepositoryMock
@@ -129,7 +131,7 @@ public sealed class CreateRoleCompanyCommandHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(roleId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new global::JOIN.Application.DTO.Security.RoleDto(
                 Guid.NewGuid(), "Admin", "ADMIN", null, false, null, DateTime.UtcNow));
         context.RoleRepositoryMock
@@ -170,7 +172,7 @@ public sealed class CreateRoleCompanyCommandHandlerTests
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns("user-1");
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(roleId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new global::JOIN.Application.DTO.Security.RoleDto(
                 Guid.NewGuid(), "Admin", "ADMIN", null, false, null, DateTime.UtcNow));
         context.RoleRepositoryMock

@@ -165,11 +165,128 @@ public sealed class DeleteRoleCommandHandlerTests
             DateTimeKind.Utc);
     }
 
+    /// <summary>
+    /// ROLE_HAS_USERS guard: a role with active assignments in the caller's tenant cannot be deleted.
+    /// The handler must short-circuit before touching Update/SaveChanges.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenRoleHasActiveUsers_ShouldReturnRoleHasUsersError()
+    {
+        var roleId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var context = new TestContext();
+        context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
+        context.RoleRepositoryMock
+            .Setup(x => x.GetByIdForUpdateAsync(roleId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ApplicationRole
+            {
+                Id = roleId,
+                Name = "Custom",
+                NormalizedName = "CUSTOM",
+                IsSystemDefault = false,
+                GcRecord = 0
+            });
+        context.RoleRepositoryMock
+            .Setup(x => x.CountActiveUsersByRoleIdAsync(roleId, companyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(new DeleteRoleCommand(roleId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("ROLE_HAS_USERS");
+        response.Errors.Should().Contain(s => s.Contains("2 usuario(s)"));
+        context.RoleRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<ApplicationRole>(), It.IsAny<CancellationToken>()), Times.Never);
+        context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// count == 0 keeps the original happy path intact.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenRoleHasZeroUsers_ShouldProceedToSoftDelete()
+    {
+        var roleId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var context = new TestContext();
+        context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
+        context.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns("user-1");
+        context.RoleRepositoryMock
+            .Setup(x => x.GetByIdForUpdateAsync(roleId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ApplicationRole
+            {
+                Id = roleId,
+                Name = "Custom",
+                NormalizedName = "CUSTOM",
+                IsSystemDefault = false,
+                GcRecord = 0
+            });
+        context.RoleRepositoryMock
+            .Setup(x => x.CountActiveUsersByRoleIdAsync(roleId, companyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(new DeleteRoleCommand(roleId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        context.RoleRepositoryMock.Verify(x => x.CountActiveUsersByRoleIdAsync(roleId, companyId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Defense in depth: the count is tenant-scoped. Users assigned to the role in another tenant
+    /// must not block the delete here. Mock returns 0 because the spec filter excludes other-tenant rows.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenRoleHasUsersInOtherTenant_ShouldProceedToSoftDelete()
+    {
+        var roleId = Guid.NewGuid();
+        var callerCompanyId = Guid.NewGuid();
+        var context = new TestContext();
+        context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(callerCompanyId);
+        context.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns("user-1");
+        context.RoleRepositoryMock
+            .Setup(x => x.GetByIdForUpdateAsync(roleId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ApplicationRole
+            {
+                Id = roleId,
+                Name = "Custom",
+                NormalizedName = "CUSTOM",
+                IsSystemDefault = false,
+                GcRecord = 0
+            });
+        // Repo filter narrows to (roleId, callerCompanyId); other-tenant rows never reach the count.
+        context.RoleRepositoryMock
+            .Setup(x => x.CountActiveUsersByRoleIdAsync(roleId, callerCompanyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(new DeleteRoleCommand(roleId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        // Ensure the count was queried exactly with the caller's tenant — never with a different one.
+        context.RoleRepositoryMock.Verify(
+            x => x.CountActiveUsersByRoleIdAsync(
+                roleId,
+                It.Is<Guid>(g => g == callerCompanyId),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     private sealed class TestContext
     {
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
         public Mock<IRoleRepository> RoleRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
+
+        public TestContext()
+        {
+            // Default: no active users. Individual tests override per (roleId, companyId) when relevant.
+            RoleRepositoryMock
+                .Setup(x => x.CountActiveUsersByRoleIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(0);
+        }
 
         public DeleteRoleCommandHandler CreateHandler()
         {

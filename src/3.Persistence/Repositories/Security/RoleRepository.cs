@@ -21,8 +21,10 @@ public sealed class RoleRepository(
     private readonly ISqlConnectionFactory _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
 
     /// <inheritdoc />
-    public async Task<RoleDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<RoleDto?> GetByIdAsync(Guid id, Guid companyId, CancellationToken cancellationToken = default)
     {
+        // PermissionsCount is a correlated subquery against RoleSystemOptions, scoped to (RoleId, CompanyId, GcRecord = 0).
+        // Tenant isolation: a role with permissions in another CompanyId returns 0 here.
         const string sql = """
             SELECT
                 Id,
@@ -31,14 +33,19 @@ public sealed class RoleRepository(
                 Description,
                 IsSystemDefault,
                 CreatedBy,
-                Created
-            FROM [Security].[Roles]
-            WHERE Id = @Id AND GcRecord = 0
+                Created,
+                (SELECT COUNT(*)
+                 FROM [Security].[RoleSystemOptions] rso
+                 WHERE rso.RoleId = r.Id
+                   AND rso.CompanyId = @CompanyId
+                   AND rso.GcRecord = 0) AS PermissionsCount
+            FROM [Security].[Roles] r
+            WHERE r.Id = @Id AND r.GcRecord = 0
             """;
 
         using var connection = _connectionFactory.CreateConnection();
         return await connection.QuerySingleOrDefaultAsync<RoleDto>(
-            new CommandDefinition(sql, new { Id = id }, cancellationToken: cancellationToken));
+            new CommandDefinition(sql, new { Id = id, CompanyId = companyId }, cancellationToken: cancellationToken));
     }
 
     /// <inheritdoc />
@@ -47,6 +54,7 @@ public sealed class RoleRepository(
         bool? isActive,
         int page,
         int pageSize,
+        Guid companyId,
         CancellationToken cancellationToken = default)
     {
         // Default to SQL Server pagination. The project runs on SQL Server today; when Postgres is wired,
@@ -69,8 +77,13 @@ public sealed class RoleRepository(
                 Description,
                 IsSystemDefault,
                 CreatedBy,
-                Created
-            FROM [Security].[Roles]
+                Created,
+                (SELECT COUNT(*)
+                 FROM [Security].[RoleSystemOptions] rso
+                 WHERE rso.RoleId = r.Id
+                   AND rso.CompanyId = @CompanyId
+                   AND rso.GcRecord = 0) AS PermissionsCount
+            FROM [Security].[Roles] r
             {whereClause}
             ORDER BY Name ASC
             OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
@@ -81,7 +94,8 @@ public sealed class RoleRepository(
             nameFilter,
             isActive,
             offset,
-            pageSize
+            pageSize,
+            CompanyId = companyId
         };
 
         using var connection = _connectionFactory.CreateConnection();
@@ -178,5 +192,29 @@ public sealed class RoleRepository(
         using var connection = _connectionFactory.CreateConnection();
         return await connection.ExecuteScalarAsync<bool>(
             new CommandDefinition(sql, new { RoleId = roleId }, cancellationToken: cancellationToken));
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountActiveUsersByRoleIdAsync(
+        Guid roleId,
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        // Tenant-scoped: a role that has active assignments in another CompanyId counts as 0 here.
+        // Inner join with Roles is redundant with the role existence check the handler already does,
+        // but keeps the count strictly aligned with "the role itself is still active" semantics.
+        const string sql = """
+            SELECT COUNT(*) AS UsersCount
+            FROM [Security].[UserRoleCompanies] urc
+            INNER JOIN [Security].[Roles] r ON r.Id = urc.RoleId
+            WHERE urc.RoleId = @RoleId
+              AND urc.CompanyId = @CompanyId
+              AND urc.GcRecord = 0
+              AND r.GcRecord = 0;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        return await connection.ExecuteScalarAsync<int>(
+            new CommandDefinition(sql, new { RoleId = roleId, CompanyId = companyId }, cancellationToken: cancellationToken));
     }
 }

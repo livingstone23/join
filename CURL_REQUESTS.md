@@ -141,6 +141,8 @@ public class UsersController { ... }
 
 The Roles controller keeps the legacy `GET /` endpoint (`IEnumerable<string>`) for selectors and adds a detailed CRUD surface. The detailed endpoints are gated by the `Roles` permission resource and the HTTP-verb default flag. The preview endpoint `GET /{id}/users` is gated by the `Roles` resource and the `SuperAdminCompany` role; it powers the "usuarios afectados" preview before saving role changes (SPEC 20).
 
+RoleDto responses now carry `permissionsCount` — the number of active `RoleSystemOption` rows the role has in the caller's tenant (always tenant-scoped, never cross-tenant). The same field is returned by both the detailed listing and the by-id endpoint (SPEC 24).
+
 ```bash
 TOKEN="<jwt-from-login>"
 COMPANY="00000000-0000-0000-0000-000000000001"
@@ -151,11 +153,12 @@ curl http://localhost:5000/api/v1/Roles \
   -H "X-Company-Id: $COMPANY"
 
 # Detailed: paged + filtered view (CanRead). Returns Response<PagedResult<RoleDto>>.
+# Each item carries `permissionsCount` for the caller's tenant.
 curl "http://localhost:5000/api/v1/Roles/detailed?page=1&pageSize=20&name=ad&isActive=true" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Company-Id: $COMPANY"
 
-# Get by id (CanRead). 200 with RoleDto or 404 with "Rol no encontrado o inactivo.".
+# Get by id (CanRead). 200 with RoleDto (including `permissionsCount`) or 404 with "Rol no encontrado o inactivo.".
 curl http://localhost:5000/api/v1/Roles/{id} \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Company-Id: $COMPANY"
@@ -168,11 +171,23 @@ curl "http://localhost:5000/api/v1/Roles/{id}/users?page=1&pageSize=20" \
   -H "X-Company-Id: $COMPANY"
 
 # Create (CanCreate). 201 + Location header / 409 on duplicate name.
+# Optional `cloneFromRoleId` (SPEC 24): when present, the new role inherits the origin role's
+# active RoleSystemOption rows for the caller's tenant (same flags, same OrderMenu, same
+# IsVisibleMenu). Atomics via the outer TransactionBehavior — if any clone insert fails the
+# role is rolled back. Returns ROLE_NOT_FOUND (400) if the origin is missing, soft-deleted,
+# or has permissions only in another tenant.
 curl -X POST http://localhost:5000/api/v1/Roles \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Company-Id: $COMPANY" \
   -H "Content-Type: application/json" \
   -d '{"name":"Support","description":"Tier 1 support","isSystemDefault":false}'
+
+# Create by cloning an existing role (cloneFromRoleId).
+curl -X POST http://localhost:5000/api/v1/Roles \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Support v2","description":"Cloned from Support","isSystemDefault":false,"cloneFromRoleId":"<origin-role-guid>"}'
 
 # Update (CanUpdate). 200 with RoleDto / 404 / 409 on rename collision.
 # System-default roles reject Name changes and IsSystemDefault demotion.
@@ -182,7 +197,8 @@ curl -X PUT http://localhost:5000/api/v1/Roles/{id} \
   -H "Content-Type: application/json" \
   -d '{"name":"Support Lead","description":"Tier 1 lead","isSystemDefault":false}'
 
-# Delete (CanDelete). 204 on success / 403 for IsSystemDefault=true / 404 if missing.
+# Delete (CanDelete). 204 on success / 403 for IsSystemDefault=true / 404 if missing /
+# 409 ROLE_HAS_USERS if the role still has active user assignments in the caller's tenant.
 curl -X DELETE http://localhost:5000/api/v1/Roles/{id} \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Company-Id: $COMPANY"
@@ -235,7 +251,9 @@ Error message → status mapping (handlers encode outcomes as codes in `Response
 | `INVALID_COMPANY_ID` | `401 Unauthorized` |
 | `ROLE_COMPANY_NOT_FOUND` | `404 Not Found` |
 | `ROLE_COMPANY_DUPLICATE` | `409 Conflict` |
+| `ROLE_HAS_USERS` | `409 Conflict` (Roles — role still has active assignments in caller's tenant) |
 | `ROLE_NOT_FOUND` / `ROLE_INACTIVE` | `400 Bad Request` |
+| `ROLE_CLONE_FAILED` | `500`-flavored error (Roles — clone inserts persisted 0 rows) |
 
 | Scenario | Status |
 |----------|--------|

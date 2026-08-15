@@ -32,6 +32,19 @@ public interface IRoleSystemOptionsRepository : IGenericRepository<RoleSystemOpt
     /// fires (see SPEC 22 / SPEC 23 readback notes).
     /// </summary>
     Task<RoleSystemOptionNames?> GetNamesByIdAndCompanyAsync(Guid id, Guid companyId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the active (GcRecord = 0) <see cref="RoleSystemOption"/> rows for the given
+    /// role in the given tenant. Used by the role clone path (SPEC 24) to copy the
+    /// origin role's permission catalog onto the newly created role.
+    /// Reads from a separate Dapper connection — safe because this query targets the
+    /// <em>origin</em> role's rows, which are not X-locked by the outer transaction that
+    /// is staging the new role + new RoleSystemOption rows.
+    /// </summary>
+    Task<IReadOnlyList<RoleSystemOption>> GetActiveByRoleAndCompanyAsync(
+        Guid roleId,
+        Guid companyId,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

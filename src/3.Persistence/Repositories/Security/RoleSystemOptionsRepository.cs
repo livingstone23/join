@@ -117,4 +117,46 @@ public sealed class RoleSystemOptionsRepository(
 
         return await query.FirstOrDefaultAsync(cancellationToken);
     }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<RoleSystemOption>> GetActiveByRoleAndCompanyAsync(
+        Guid roleId,
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        // Dapper over a separate connection. Safe because we read the *origin* role's rows,
+        // not the new role's rows that the outer transaction is staging. Returns the full
+        // entity so the clone path can copy every flag (incl. the 5 new ones from SPEC 22:
+        // CanDownload, CanExport, CanExecute, IsVisibleMenu, OrderMenu).
+        const string sql = """
+            SELECT
+                Id,
+                CompanyId,
+                RoleId,
+                SystemOptionId,
+                CanRead,
+                CanCreate,
+                CanUpdate,
+                CanDelete,
+                CanDownload,
+                CanExport,
+                CanExecute,
+                IsVisibleMenu,
+                OrderMenu,
+                Created,
+                CreatedBy,
+                LastModified,
+                LastModifiedBy,
+                GcRecord
+            FROM [Security].[RoleSystemOptions]
+            WHERE RoleId = @RoleId
+              AND CompanyId = @CompanyId
+              AND GcRecord = 0;
+            """;
+
+        using var connection = connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<RoleSystemOption>(
+            new CommandDefinition(sql, new { RoleId = roleId, CompanyId = companyId }, cancellationToken: cancellationToken));
+        return rows.AsList();
+    }
 }

@@ -245,6 +245,7 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         var response = await _mediator.Send(new DeleteRoleCommand(id), cancellationToken);
@@ -261,6 +262,11 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
         if (response.Message.StartsWith("No se puede eliminar un rol del sistema", StringComparison.Ordinal))
         {
             return StatusCode(StatusCodes.Status403Forbidden, response);
+        }
+
+        if (response.Message == "ROLE_HAS_USERS")
+        {
+            return Conflict(response);
         }
 
         return BadRequest(response);

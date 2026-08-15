@@ -54,7 +54,7 @@ public sealed class UpdateRoleCompanyCommandHandlerTests
 
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("ROLE_COMPANY_NOT_FOUND");
-        context.RoleRepositoryMock.Verify(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        context.RoleRepositoryMock.Verify(x => x.GetByIdAsync(It.IsAny<Guid>(), tenantId, It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>
@@ -72,7 +72,7 @@ public sealed class UpdateRoleCompanyCommandHandlerTests
             .Setup(x => x.GetByIdForUpdateAsync(linkId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(RoleCompanyTestFactory.Create(linkId, Guid.NewGuid(), tenantId));
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(newRoleId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(newRoleId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((global::JOIN.Application.DTO.Security.RoleDto?)null);
 
         var handler = context.CreateHandler();
@@ -99,7 +99,7 @@ public sealed class UpdateRoleCompanyCommandHandlerTests
         // GetByIdAsync filters GcRecord=0 so it returns null for inactive roles; ExistsAndActiveAsync false.
         // The handler reaches NotFound first. The path is unreachable with the current repo API.
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(newRoleId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(newRoleId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((global::JOIN.Application.DTO.Security.RoleDto?)null);
 
         var handler = context.CreateHandler();
@@ -125,7 +125,7 @@ public sealed class UpdateRoleCompanyCommandHandlerTests
             .Setup(x => x.GetByIdForUpdateAsync(linkId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(RoleCompanyTestFactory.Create(linkId, oldRoleId, tenantId));
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(newRoleId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(newRoleId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new global::JOIN.Application.DTO.Security.RoleDto(
                 Guid.NewGuid(), "Admin", "ADMIN", null, false, null, DateTime.UtcNow));
         context.RoleRepositoryMock
@@ -159,7 +159,7 @@ public sealed class UpdateRoleCompanyCommandHandlerTests
             .Setup(x => x.GetByIdForUpdateAsync(linkId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(RoleCompanyTestFactory.Create(linkId, roleId, tenantId));
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(roleId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new global::JOIN.Application.DTO.Security.RoleDto(
                 Guid.NewGuid(), "Admin", "ADMIN", null, false, null, DateTime.UtcNow));
         context.RoleRepositoryMock
@@ -196,7 +196,7 @@ public sealed class UpdateRoleCompanyCommandHandlerTests
             .Setup(x => x.GetByIdForUpdateAsync(linkId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(RoleCompanyTestFactory.Create(linkId, oldRoleId, tenantId));
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(newRoleId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(newRoleId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new global::JOIN.Application.DTO.Security.RoleDto(
                 Guid.NewGuid(), "Editor", "EDITOR", null, false, null, DateTime.UtcNow));
         context.RoleRepositoryMock
@@ -253,7 +253,7 @@ public sealed class UpdateRoleCompanyCommandHandlerTests
             .Setup(x => x.GetByIdForUpdateAsync(linkId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(RoleCompanyTestFactory.Create(linkId, roleId, tenantId));
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(roleId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new global::JOIN.Application.DTO.Security.RoleDto(
                 Guid.NewGuid(), "Admin", "ADMIN", null, false, null, DateTime.UtcNow));
         context.RoleRepositoryMock

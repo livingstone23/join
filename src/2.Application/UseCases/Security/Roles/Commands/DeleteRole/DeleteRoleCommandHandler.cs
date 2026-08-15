@@ -37,6 +37,21 @@ public sealed class DeleteRoleCommandHandler(
             return Response<bool>.Error("No se puede eliminar un rol del sistema. Es requerido para el funcionamiento de la aplicacion.");
         }
 
+        // Defense in depth: refuse to delete a role that still has active assignments in the caller's tenant.
+        // The count is CompanyId-scoped (RoleRepository.CountActiveUsersByRoleIdAsync filters by tenant),
+        // so users in other companies do not block the delete here.
+        var usersCount = await roleRepository.CountActiveUsersByRoleIdAsync(
+            existing.Id, currentUserService.CompanyId, cancellationToken);
+        if (usersCount > 0)
+        {
+            logger.LogWarning(
+                "Refusing to delete role {RoleId} for company {CompanyId}: {UsersCount} active assignment(s).",
+                existing.Id, currentUserService.CompanyId, usersCount);
+            return Response<bool>.Error(
+                "ROLE_HAS_USERS",
+                [$"El rol tiene {usersCount} usuario(s) asignado(s). Desasigná antes de eliminar."]);
+        }
+
         var modifiedBy = currentUserService.UserId ?? "system";
 
         // Stamp GcRecord with the yyyyMMdd UTC int, matching the project-wide soft-delete convention
