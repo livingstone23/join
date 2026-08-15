@@ -11,9 +11,14 @@ namespace JOIN.Application.UseCases.Security.RoleSystemOptions.Commands;
 public sealed record UpdateRoleSystemOptionCommand(
     [property: JsonIgnore]
     Guid Id,
-    Guid CompanyId,
     bool CanRead,
     bool CanCreate,
     bool CanUpdate,
-    bool CanDelete)
+    bool CanDelete,
+    bool CanDownload = true,
+    bool CanExport = true,
+    bool CanExecute = true,
+    bool IsVisibleMenu = true,
+    int? OrderMenu = 0,
+    Guid? CompanyId = null)
     : ITransactionalCommand<Response<RoleSystemOptionDto>>;

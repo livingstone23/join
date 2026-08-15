@@ -2,6 +2,7 @@ using System.Text;
 using Dapper;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence.Security;
+using JOIN.Domain.Common;
 using JOIN.Domain.Security;
 using JOIN.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -36,7 +37,7 @@ public sealed class RoleSystemOptionsRepository(
             SELECT CASE
                 WHEN EXISTS (
                     SELECT 1
-                    FROM Admin.RoleSystemOptions rso
+                    FROM Security.RoleSystemOptions rso
                     WHERE rso.CompanyId = @CompanyId
                       AND rso.RoleId = @RoleId
                       AND rso.SystemOptionId = @SystemOptionId
@@ -78,9 +79,9 @@ public sealed class RoleSystemOptionsRepository(
                 rso.CanUpdate,
                 rso.CanDelete,
                 rso.Created
-            FROM Admin.RoleSystemOptions rso
-            INNER JOIN Security.Roles ar ON ar.Id = rso.RoleId
-            INNER JOIN Security.SystemOptions so ON so.Id = rso.SystemOptionId
+            FROM Security.RoleSystemOptions rso
+            INNER JOIN Security.Roles ar ON ar.Id = rso.RoleId AND ar.GcRecord = 0
+            INNER JOIN Security.SystemOptions so ON so.Id = rso.SystemOptionId AND so.GcRecord = 0
             INNER JOIN Common.Companies c ON c.Id = rso.CompanyId AND c.GcRecord = 0
             {whereBuilder};
             """;
@@ -88,5 +89,32 @@ public sealed class RoleSystemOptionsRepository(
         return await connection.QuerySingleOrDefaultAsync<RoleSystemOptionReadModel>(
             sql,
             new { Id = id, CompanyId = companyId });
+    }
+
+    /// <inheritdoc />
+    public async Task<RoleSystemOptionNames?> GetNamesByIdAndCompanyAsync(
+        Guid id,
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        // EF-only readback: same DbContext / same connection as the outer TransactionBehavior
+        // transaction. Avoids the cross-connection X-lock that a Dapper SELECT would trigger
+        // on the row that the just-flushed INSERT/UPDATE is still holding (default SQL Server
+        // isolation level: read committed, no RCSI). Read-your-writes holds inside the same
+        // connection, so the freshly persisted row is visible here.
+        var query =
+            from rso in _context.Set<RoleSystemOption>().IgnoreQueryFilters()
+            join role in _context.Set<ApplicationRole>() on rso.RoleId equals role.Id
+            join option in _context.Set<SystemOption>().IgnoreQueryFilters() on rso.SystemOptionId equals option.Id
+            join company in _context.Set<Company>().IgnoreQueryFilters() on rso.CompanyId equals company.Id
+            where rso.Id == id
+                  && rso.CompanyId == companyId
+                  && rso.GcRecord == 0
+                  && role.GcRecord == 0
+                  && option.GcRecord == 0
+                  && company.GcRecord == 0
+            select new RoleSystemOptionNames(role.Name!, option.Name, company.Name);
+
+        return await query.FirstOrDefaultAsync(cancellationToken);
     }
 }

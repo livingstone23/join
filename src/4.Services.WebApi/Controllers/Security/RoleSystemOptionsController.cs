@@ -60,6 +60,11 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
     /// <param name="canCreate">Optional exact filter by create permission flag.</param>
     /// <param name="canUpdate">Optional exact filter by update permission flag.</param>
     /// <param name="canDelete">Optional exact filter by delete permission flag.</param>
+    /// <param name="canDownload">Optional exact filter by download permission flag.</param>
+    /// <param name="canExport">Optional exact filter by export permission flag.</param>
+    /// <param name="canExecute">Optional exact filter by execute permission flag.</param>
+    /// <param name="isVisibleMenu">Optional exact filter by menu visibility flag.</param>
+    /// <param name="orderMenu">Optional exact filter by menu ordering index.</param>
     /// <param name="cancellationToken">Token used to cancel the request.</param>
     /// <returns>A standardized paged response with matching permission rules.</returns>
     [HttpGet]
@@ -75,6 +80,11 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
         [FromQuery] bool? canCreate = null,
         [FromQuery] bool? canUpdate = null,
         [FromQuery] bool? canDelete = null,
+        [FromQuery] bool? canDownload = null,
+        [FromQuery] bool? canExport = null,
+        [FromQuery] bool? canExecute = null,
+        [FromQuery] bool? isVisibleMenu = null,
+        [FromQuery] int? orderMenu = null,
         CancellationToken cancellationToken = default)
     {
         var query = new GetRoleSystemOptionsPagedQuery(
@@ -88,7 +98,12 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
             canRead,
             canCreate,
             canUpdate,
-            canDelete);
+            canDelete,
+            canDownload,
+            canExport,
+            canExecute,
+            isVisibleMenu,
+            orderMenu);
 
         var response = await mediator.Send(query, cancellationToken);
         return response.IsSuccess ? Ok(response) : BadRequest(response);
@@ -121,15 +136,16 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
 
     /// <summary>
     /// Updates permission flags of an existing rule.
-    /// The route provides the rule identifier, while the body provides the tenant company
-    /// and the updated CRUD flags.
+    /// The route provides the rule identifier; the tenant is always derived from the authenticated
+    /// caller's JWT (via <c>ICurrentUserService</c>). The body may optionally carry <c>companyId</c> for
+    /// backward compatibility — when present it must match the authenticated tenant.
     /// </summary>
     /// <param name="id">Unique identifier of the permission rule to update.</param>
-    /// <param name="command">Payload containing the target company and updated flags.</param>
+    /// <param name="command">Payload with the updated flags. <c>companyId</c> is optional.</param>
     /// <param name="cancellationToken">Token used to cancel the request.</param>
     /// <returns>
     /// A standardized response containing the updated permission rule.
-    /// Returns <c>404 Not Found</c> when the target rule is not found for the provided company.
+    /// Returns <c>404 Not Found</c> when the target rule is not found for the caller's tenant.
     /// </returns>
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<Response<RoleSystemOptionDto>>> Update(
@@ -148,23 +164,20 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
 
     /// <summary>
     /// Performs a soft delete of a permission rule.
-    /// Requires <c>companyId</c> as query input to resolve the rule deterministically by
-    /// rule identifier plus tenant scope.
+    /// The tenant is always derived from the authenticated caller's JWT (via <c>ICurrentUserService</c>).
     /// </summary>
     /// <param name="id">Unique identifier of the permission rule to delete.</param>
-    /// <param name="companyId">Tenant company identifier used to scope the delete operation.</param>
     /// <param name="cancellationToken">Token used to cancel the request.</param>
     /// <returns>
     /// A standardized response containing the deleted rule identifier.
-    /// Returns <c>404 Not Found</c> when the rule does not exist for the provided company.
+    /// Returns <c>404 Not Found</c> when the rule does not exist for the caller's tenant.
     /// </returns>
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult<Response<Guid>>> Delete(
         Guid id,
-        [FromQuery] Guid companyId,
         CancellationToken cancellationToken)
     {
-        var response = await mediator.Send(new DeleteRoleSystemOptionCommand(id, companyId), cancellationToken);
+        var response = await mediator.Send(new DeleteRoleSystemOptionCommand(id), cancellationToken);
         if (!response.IsSuccess && response.Message == "ROLE_SYSTEM_OPTION_NOT_FOUND")
         {
             return NotFound(response);
@@ -189,6 +202,11 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
     /// <param name="canCreate">Optional exact filter by create permission flag.</param>
     /// <param name="canUpdate">Optional exact filter by update permission flag.</param>
     /// <param name="canDelete">Optional exact filter by delete permission flag.</param>
+    /// <param name="canDownload">Optional exact filter by download permission flag.</param>
+    /// <param name="canExport">Optional exact filter by export permission flag.</param>
+    /// <param name="canExecute">Optional exact filter by execute permission flag.</param>
+    /// <param name="isVisibleMenu">Optional exact filter by menu visibility flag.</param>
+    /// <param name="orderMenu">Optional exact filter by menu ordering index.</param>
     /// <param name="companyId">Optional exact filter by company identifier.</param>
     /// <param name="cancellationToken">Token used to cancel the request.</param>
     /// <returns>A standardized paged response containing cross-company permission rules.</returns>
@@ -206,6 +224,11 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
         [FromQuery] bool? canCreate = null,
         [FromQuery] bool? canUpdate = null,
         [FromQuery] bool? canDelete = null,
+        [FromQuery] bool? canDownload = null,
+        [FromQuery] bool? canExport = null,
+        [FromQuery] bool? canExecute = null,
+        [FromQuery] bool? isVisibleMenu = null,
+        [FromQuery] int? orderMenu = null,
         [FromQuery] Guid? companyId = null,
         CancellationToken cancellationToken = default)
     {
@@ -221,6 +244,11 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
             canCreate,
             canUpdate,
             canDelete,
+            canDownload,
+            canExport,
+            canExecute,
+            isVisibleMenu,
+            orderMenu,
             companyId);
 
         var response = await mediator.Send(query, cancellationToken);

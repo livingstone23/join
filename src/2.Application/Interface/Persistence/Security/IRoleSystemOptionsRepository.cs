@@ -22,6 +22,16 @@ public interface IRoleSystemOptionsRepository : IGenericRepository<RoleSystemOpt
     /// Retrieves a single permission rule with role and system option names.
     /// </summary>
     Task<RoleSystemOptionReadModel?> GetWithNamesAsync(Guid id, Guid? companyId = null);
+
+    /// <summary>
+    /// Loads the display names (Role, SystemOption, Company) for a permission rule
+    /// using the same EF Core <c>DbContext</c> / connection as the write path.
+    /// Safe to invoke inside the open <c>TransactionBehavior</c> transaction because it
+    /// does not open a second connection — a fresh Dapper connection would otherwise
+    /// block on the X-lock held by the outer transaction until the command timeout
+    /// fires (see SPEC 22 / SPEC 23 readback notes).
+    /// </summary>
+    Task<RoleSystemOptionNames?> GetNamesByIdAndCompanyAsync(Guid id, Guid companyId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -42,3 +52,11 @@ public sealed record RoleSystemOptionReadModel
     public bool CanDelete { get; init; }
     public DateTime Created { get; init; }
 }
+
+/// <summary>
+/// Projection of the three display names attached to a permission rule.
+/// Returned by the EF-only readback so commands can populate
+/// <c>RoleName</c>, <c>SystemOptionName</c> and <c>CompanyName</c> on the DTO
+/// without opening a second SQL connection (see SPEC 23).
+/// </summary>
+public sealed record RoleSystemOptionNames(string RoleName, string SystemOptionName, string CompanyName);

@@ -65,8 +65,21 @@ public sealed class CreateRoleSystemOptionCommandHandler(
             return Response<RoleSystemOptionDto>.Error("CREATE_FAILED", ["No records were affected while creating the permission rule."]);
         }
 
-        var readModel = await roleOptionRepository.GetWithNamesAsync(entity.Id, companyId);
-        var dto = readModel is null ? mapper.ToDto(entity) : mapper.ToDto(readModel);
+        // EF-only readback to populate the three display names (Role/SystemOption/Company).
+        // Must run on the same DbContext/connection as the INSERT to avoid the cross-connection
+        // X-lock timeout (SQL Server default isolation, no RCSI here) — Dapper's GetWithNamesAsync
+        // would block for 30s against the row the outer TransactionBehavior still holds.
+        var names = await roleOptionRepository.GetNamesByIdAndCompanyAsync(entity.Id, companyId, cancellationToken);
+        var dto = mapper.ToDto(entity);
+        if (names is not null)
+        {
+            dto = dto with
+            {
+                CompanyName = names.CompanyName,
+                RoleName = names.RoleName,
+                SystemOptionName = names.SystemOptionName
+            };
+        }
 
         return new Response<RoleSystemOptionDto>
         {

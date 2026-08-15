@@ -14,5 +14,10 @@ public sealed record CreateRoleSystemOptionCommand(
     bool CanRead,
     bool CanCreate,
     bool CanUpdate,
-    bool CanDelete)
+    bool CanDelete,
+    bool CanDownload = true,
+    bool CanExport = true,
+    bool CanExecute = true,
+    bool IsVisibleMenu = true,
+    int? OrderMenu = 0)
     : ITransactionalCommand<Response<RoleSystemOptionDto>>;

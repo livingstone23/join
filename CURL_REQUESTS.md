@@ -346,3 +346,116 @@ Validator rejections (FluentValidation, returned as `400 Bad Request` via the st
 | `OrderMenu` | `[0, 10000]` when present |
 | `Icon` | ≤ 100 chars when present |
 | `ControllerName` | ≤ 250 chars when present |
+
+## RoleSystemOptions — `/api/v1/RoleSystemOptions`
+
+Granular per-role permission rules over system options. After SPEC 22 the DTOs and command bodies carry the full set of flags (`CanRead/Create/Update/Delete/Download/Export/Execute`, `IsVisibleMenu`, `OrderMenu`) plus `CompanyName`, `RoleName`, `SystemOptionName` projected via SQL JOINs. Defaults (`true`/`true`/`true`/`true`/`0`) apply when the client omits the new fields, keeping older clients working.
+
+After **SPEC 23** the tenant for `PUT` and `DELETE` is always derived from the authenticated caller's JWT (`CompanyId` claim or `X-Company-Id` header). The body may still carry `companyId` for backward compatibility — when present it must match the token tenant or the request is rejected with `COMPANY_MISMATCH`. `Create` keeps `companyId` in the body (the caller picks the tenant for new records); `Get*` already used the token; `GetSuperAdminPaged` keeps `companyId` as an optional cross-tenant filter.
+
+```bash
+TOKEN="<jwt-with-companyId-claim>"
+
+# Get by id (CanRead). Returns RoleSystemOptionDto with CompanyName/RoleName/SystemOptionName populated via JOIN.
+curl http://localhost:5000/api/v1/RoleSystemOptions/{id} \
+  -H "Authorization: Bearer $TOKEN"
+
+# Paged listing (CanRead). Returns Response<PagedResult<RoleSystemOptionListItemDto>>.
+# The 5 new filters are optional and combine with AND against the existing ones.
+curl "http://localhost:5000/api/v1/RoleSystemOptions?pageNumber=1&pageSize=20&canExport=true&orderMenu=0" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Paged listing combining all five new filters.
+curl "http://localhost:5000/api/v1/RoleSystemOptions?canRead=true&canExport=true&orderMenu=0&isVisibleMenu=true&canDownload=true" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Create (CanCreate). Body supplies companyId — the caller decides the tenant for the new record.
+curl -X POST http://localhost:5000/api/v1/RoleSystemOptions \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "companyId": "<guid>",
+    "roleId": "<guid>",
+    "systemOptionId": "<guid>",
+    "canRead": true,
+    "canCreate": true,
+    "canUpdate": true,
+    "canDelete": true,
+    "canDownload": true,
+    "canExport": false,
+    "canExecute": true,
+    "isVisibleMenu": true,
+    "orderMenu": 5
+  }'
+
+# Update (CanUpdate). Tenant comes from the JWT; body companyId is optional.
+# If supplied and different from the token -> 400 COMPANY_MISMATCH.
+curl -X PUT http://localhost:5000/api/v1/RoleSystemOptions/{id} \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "canRead": true,
+    "canCreate": false,
+    "canUpdate": true,
+    "canDelete": false,
+    "canDownload": true,
+    "canExport": true,
+    "canExecute": true,
+    "isVisibleMenu": false,
+    "orderMenu": 7
+  }'
+
+# Delete (CanDelete). Tenant comes from the JWT; no query string required.
+# Sending ?companyId=<guid> equal to the token is accepted; mismatch returns 400 COMPANY_MISMATCH.
+curl -X DELETE http://localhost:5000/api/v1/RoleSystemOptions/{id} \
+  -H "Authorization: Bearer $TOKEN"
+
+# SuperAdmin cross-tenant paged listing (requires SuperAdmin role).
+SA_TOKEN="<jwt-from-superadmin>"
+curl "http://localhost:5000/api/v1/RoleSystemOptions/superadmin/all?canDownload=true" \
+  -H "Authorization: Bearer $SA_TOKEN"
+```
+
+Sample response shape (post-SPEC 22):
+
+```json
+{
+  "isSuccess": true,
+  "message": "Role system option retrieved successfully.",
+  "data": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "companyId": "11111111-1111-1111-1111-111111111111",
+    "companyName": "Acme Corp",
+    "roleId": "22222222-2222-2222-2222-222222222222",
+    "roleName": "Manager",
+    "systemOptionId": "33333333-3333-3333-3333-333333333333",
+    "systemOptionName": "Manage Tickets",
+    "canRead": true,
+    "canCreate": true,
+    "canUpdate": true,
+    "canDelete": true,
+    "canDownload": true,
+    "canExport": false,
+    "canExecute": true,
+    "isVisibleMenu": true,
+    "orderMenu": 5,
+    "created": "2026-08-11T12:00:00Z"
+  }
+}
+```
+
+Validator rejections (FluentValidation, returned as `400 Bad Request` via the standard pipeline):
+
+| Field | Rule |
+|-------|------|
+| `OrderMenu` | `[0, 10000]` when present |
+
+`bool` fields (`CanDownload`, `CanExport`, `CanExecute`, `IsVisibleMenu`) accept any value; defaults cover omission.
+
+Auth failures on PUT/DELETE:
+
+| Cause | Status |
+|-------|--------|
+| JWT missing / `CompanyId` claim empty (`X-Company-Id` not set either) | `400` `INVALID_COMPANY_ID` |
+| Body `companyId` (PUT) or query `companyId` (DELETE) differs from token tenant | `400` `COMPANY_MISMATCH` |
+| Rule not found for the caller's tenant | `404` `ROLE_SYSTEM_OPTION_NOT_FOUND` |

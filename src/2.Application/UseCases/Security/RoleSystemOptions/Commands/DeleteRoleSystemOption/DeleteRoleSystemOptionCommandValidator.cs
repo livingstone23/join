@@ -13,8 +13,8 @@ public sealed class DeleteRoleSystemOptionCommandValidator : AbstractValidator<D
             .NotEmpty()
             .WithMessage("Id is required.");
 
-        RuleFor(x => x.CompanyId)
-            .NotEmpty()
-            .WithMessage("CompanyId is required.");
+        // SPEC 23: CompanyId is optional on DELETE. The handler always derives the tenant
+        // from ICurrentUserService.CompanyId (JWT claim or X-Company-Id header). If the
+        // caller still sends a companyId, the handler rejects a mismatch with COMPANY_MISMATCH.
     }
 }

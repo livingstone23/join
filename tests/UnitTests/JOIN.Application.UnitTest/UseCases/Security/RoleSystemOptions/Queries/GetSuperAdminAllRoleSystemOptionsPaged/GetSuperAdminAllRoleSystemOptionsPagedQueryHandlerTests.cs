@@ -45,7 +45,19 @@ public sealed class GetSuperAdminAllRoleSystemOptionsPagedQueryHandlerTests
 
         // Act
         var response = await handler.Handle(
-            new GetSuperAdminAllRoleSystemOptionsPagedQuery(null, null, null, null, null, null, null, null, null, null, null, null),
+            new GetSuperAdminAllRoleSystemOptionsPagedQuery(
+                PageNumber: null,
+                PageSize: null,
+                RoleId: null,
+                SystemOptionId: null,
+                RoleName: null,
+                SystemOptionName: null,
+                CompanyName: null,
+                CanRead: null,
+                CanCreate: null,
+                CanUpdate: null,
+                CanDelete: null,
+                CompanyId: null),
             CancellationToken.None);
 
         // Assert
@@ -88,7 +100,19 @@ public sealed class GetSuperAdminAllRoleSystemOptionsPagedQueryHandlerTests
 
         // Act
         var response = await handler.Handle(
-            new GetSuperAdminAllRoleSystemOptionsPagedQuery(1, 10, null, null, null, null, null, null, null, null, null, companyId),
+            new GetSuperAdminAllRoleSystemOptionsPagedQuery(
+                PageNumber: 1,
+                PageSize: 10,
+                RoleId: null,
+                SystemOptionId: null,
+                RoleName: null,
+                SystemOptionName: null,
+                CompanyName: null,
+                CanRead: null,
+                CanCreate: null,
+                CanUpdate: null,
+                CanDelete: null,
+                CompanyId: companyId),
             CancellationToken.None);
 
         // Assert

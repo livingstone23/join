@@ -20,5 +20,10 @@ public sealed record GetSuperAdminAllRoleSystemOptionsPagedQuery(
     bool? CanCreate,
     bool? CanUpdate,
     bool? CanDelete,
-    Guid? CompanyId)
+    bool? CanDownload = null,
+    bool? CanExport = null,
+    bool? CanExecute = null,
+    bool? IsVisibleMenu = null,
+    int? OrderMenu = null,
+    Guid? CompanyId = null)
     : IRequest<Response<PagedResult<RoleSystemOptionListItemDto>>>;

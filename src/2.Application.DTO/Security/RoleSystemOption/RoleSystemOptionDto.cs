@@ -63,6 +63,31 @@ public sealed record RoleSystemOptionDto
     public bool CanDelete { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether download permission is granted.
+    /// </summary>
+    public bool CanDownload { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether export permission is granted.
+    /// </summary>
+    public bool CanExport { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether execute permission is granted.
+    /// </summary>
+    public bool CanExecute { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the option is visible in the menu UI.
+    /// </summary>
+    public bool IsVisibleMenu { get; init; }
+
+    /// <summary>
+    /// Gets the menu ordering index. Null when not explicitly set.
+    /// </summary>
+    public int? OrderMenu { get; init; }
+
+    /// <summary>
     /// Gets the UTC timestamp when the rule was created.
     /// </summary>
     public DateTime Created { get; init; }

@@ -22,6 +22,11 @@ internal static class RoleSystemOptionQuerySql
             rso.CanCreate,
             rso.CanUpdate,
             rso.CanDelete,
+            rso.CanDownload,
+            rso.CanExport,
+            rso.CanExecute,
+            rso.IsVisibleMenu,
+            rso.OrderMenu,
             rso.Created
         """;
 
@@ -117,6 +122,36 @@ internal static class RoleSystemOptionQuerySql
             parameters.Add("CanDelete", filters.CanDelete.Value);
         }
 
+        if (filters.CanDownload.HasValue)
+        {
+            whereBuilder.Append(" AND rso.CanDownload = @CanDownload");
+            parameters.Add("CanDownload", filters.CanDownload.Value);
+        }
+
+        if (filters.CanExport.HasValue)
+        {
+            whereBuilder.Append(" AND rso.CanExport = @CanExport");
+            parameters.Add("CanExport", filters.CanExport.Value);
+        }
+
+        if (filters.CanExecute.HasValue)
+        {
+            whereBuilder.Append(" AND rso.CanExecute = @CanExecute");
+            parameters.Add("CanExecute", filters.CanExecute.Value);
+        }
+
+        if (filters.IsVisibleMenu.HasValue)
+        {
+            whereBuilder.Append(" AND rso.IsVisibleMenu = @IsVisibleMenu");
+            parameters.Add("IsVisibleMenu", filters.IsVisibleMenu.Value);
+        }
+
+        if (filters.OrderMenu.HasValue)
+        {
+            whereBuilder.Append(" AND rso.OrderMenu = @OrderMenu");
+            parameters.Add("OrderMenu", filters.OrderMenu.Value);
+        }
+
         return (whereBuilder.ToString(), parameters);
     }
 
@@ -154,4 +189,9 @@ internal sealed record RoleSystemOptionQueryFilters(
     bool? CanRead = null,
     bool? CanCreate = null,
     bool? CanUpdate = null,
-    bool? CanDelete = null);
+    bool? CanDelete = null,
+    bool? CanDownload = null,
+    bool? CanExport = null,
+    bool? CanExecute = null,
+    bool? IsVisibleMenu = null,
+    int? OrderMenu = null);

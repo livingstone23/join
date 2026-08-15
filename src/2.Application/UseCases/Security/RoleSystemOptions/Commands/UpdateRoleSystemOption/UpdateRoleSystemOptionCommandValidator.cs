@@ -13,8 +13,14 @@ public sealed class UpdateRoleSystemOptionCommandValidator : AbstractValidator<U
             .NotEmpty()
             .WithMessage("Id is required.");
 
-        RuleFor(x => x.CompanyId)
-            .NotEmpty()
-            .WithMessage("CompanyId is required.");
+        // SPEC 23: CompanyId is optional on PUT. The handler always derives the tenant
+        // from ICurrentUserService.CompanyId. If the body sends a companyId, the handler
+        // rejects a mismatch with COMPANY_MISMATCH.
+
+        RuleFor(x => x.OrderMenu)
+            .GreaterThanOrEqualTo(0)
+            .LessThanOrEqualTo(10000)
+            .When(x => x.OrderMenu.HasValue)
+            .WithMessage("OrderMenu must be between 0 and 10000.");
     }
 }

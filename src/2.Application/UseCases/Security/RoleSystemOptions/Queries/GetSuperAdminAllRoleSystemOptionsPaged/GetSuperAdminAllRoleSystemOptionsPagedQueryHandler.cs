@@ -37,7 +37,12 @@ public sealed class GetSuperAdminAllRoleSystemOptionsPagedQueryHandler(
             CanRead: request.CanRead,
             CanCreate: request.CanCreate,
             CanUpdate: request.CanUpdate,
-            CanDelete: request.CanDelete));
+            CanDelete: request.CanDelete,
+            CanDownload: request.CanDownload,
+            CanExport: request.CanExport,
+            CanExecute: request.CanExecute,
+            IsVisibleMenu: request.IsVisibleMenu,
+            OrderMenu: request.OrderMenu));
 
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);

@@ -20,5 +20,11 @@ public sealed class CreateRoleSystemOptionCommandValidator : AbstractValidator<C
         RuleFor(x => x.SystemOptionId)
             .NotEmpty()
             .WithMessage("SystemOptionId is required.");
+
+        RuleFor(x => x.OrderMenu)
+            .GreaterThanOrEqualTo(0)
+            .LessThanOrEqualTo(10000)
+            .When(x => x.OrderMenu.HasValue)
+            .WithMessage("OrderMenu must be between 0 and 10000.");
     }
 }

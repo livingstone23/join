@@ -1,6 +1,6 @@
 # SPEC 22 — RoleSystemOption DTO completeness (OrderMenu + CanDownload/Export/Execute + IsVisibleMenu)
 
-> **Status:** Draft
+> **Status:** Implementado
 > **Depends on:** SPEC 12 (CanExport/CanExecute en RoleSystemOption), SPEC 16 (CanExport/CanExecute en SystemOption), SPEC 17 (PermissionFlags), SPEC 21 (template de DTO completeness para SystemOption)
 > **Date:** 2026-08-11
 > **Objective:** Completar los DTOs (`RoleSystemOptionDto` + `RoleSystemOptionListItemDto`), los commands (`Create/Update`), validators, mapper y los handlers de query de `RoleSystemOptionsController` con los campos `OrderMenu`, `CanDownload`, `CanExport`, `CanExecute` e `IsVisibleMenu` ya presentes en el entity, exponer los 5 como filtros opcionales del paged endpoint, mantener cobertura ≥ 90% y no romper clientes existentes que envían el body viejo.
