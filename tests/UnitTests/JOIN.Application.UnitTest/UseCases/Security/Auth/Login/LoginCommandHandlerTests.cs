@@ -637,6 +637,11 @@ public sealed class LoginCommandHandlerTests
             SetupRepository(UnitOfWorkMock, RefreshTokenRepositoryMock);
             SetupRepository(UnitOfWorkMock, RoleRepositoryMock);
             SetupRepository(UnitOfWorkMock, CompanyRepositoryMock);
+
+            // Default caller info for the audit logger (HTTP context without an authenticated user).
+            CurrentUserServiceMock.SetupGet(x => x.UserId).Returns((string?)null);
+            CurrentUserServiceMock.SetupGet(x => x.IpAddress).Returns("127.0.0.1");
+            CurrentUserServiceMock.SetupGet(x => x.UserAgent).Returns("unit-test");
         }
 
         public Mock<UserManager<ApplicationUser>> UserManagerMock { get; } = CreateUserManagerMock();
@@ -647,13 +652,17 @@ public sealed class LoginCommandHandlerTests
         public Mock<IGenericRepository<UserRefreshToken>> RefreshTokenRepositoryMock { get; } = new();
         public Mock<IGenericRepository<ApplicationRole>> RoleRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Company>> CompanyRepositoryMock { get; } = new();
+        public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
+        public Mock<ISecurityEventLogger> SecurityEventLoggerMock { get; } = new();
 
         public LoginCommandHandler CreateHandler()
         {
             return new LoginCommandHandler(
                 UserManagerMock.Object,
                 TokenGeneratorMock.Object,
-                UnitOfWorkMock.Object);
+                UnitOfWorkMock.Object,
+                CurrentUserServiceMock.Object,
+                SecurityEventLoggerMock.Object);
         }
     }
 }

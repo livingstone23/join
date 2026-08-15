@@ -564,6 +564,9 @@ public sealed class RefreshTokenCommandHandlerTests
             SetupRepository(UnitOfWorkMock, UserRoleCompanyRepositoryMock);
             SetupRepository(UnitOfWorkMock, RoleRepositoryMock);
             SetupRepository(UnitOfWorkMock, CompanyRepositoryMock);
+
+            CurrentUserServiceMock.SetupGet(x => x.IpAddress).Returns("127.0.0.1");
+            CurrentUserServiceMock.SetupGet(x => x.UserAgent).Returns("unit-test");
         }
 
         public Mock<UserManager<ApplicationUser>> UserManagerMock { get; } = CreateUserManagerMock();
@@ -574,13 +577,17 @@ public sealed class RefreshTokenCommandHandlerTests
         public Mock<IGenericRepository<UserRoleCompany>> UserRoleCompanyRepositoryMock { get; } = new();
         public Mock<IGenericRepository<ApplicationRole>> RoleRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Company>> CompanyRepositoryMock { get; } = new();
+        public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
+        public Mock<ISecurityEventLogger> SecurityEventLoggerMock { get; } = new();
 
         public RefreshTokenCommandHandler CreateHandler()
         {
             return new RefreshTokenCommandHandler(
                 UserManagerMock.Object,
                 TokenGeneratorMock.Object,
-                UnitOfWorkMock.Object);
+                UnitOfWorkMock.Object,
+                CurrentUserServiceMock.Object,
+                SecurityEventLoggerMock.Object);
         }
     }
 }

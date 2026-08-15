@@ -21,12 +21,16 @@ namespace JOIN.Application.UseCases.Security.Auth.Login;
 public class LoginCommandHandler(
     UserManager<ApplicationUser> userManager,
     IJwtTokenGenerator jwtTokenGenerator,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    ICurrentUserService currentUserService,
+    ISecurityEventLogger securityEventLogger)
     : IRequestHandler<LoginCommand, LoginResponse>
 {
     private readonly UserManager<ApplicationUser> _userManager = userManager;
     private readonly IJwtTokenGenerator _jwtTokenGenerator = jwtTokenGenerator;
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly ICurrentUserService _currentUserService = currentUserService;
+    private readonly ISecurityEventLogger _securityEventLogger = securityEventLogger;
 
     /// <summary>
     /// Authenticates the user and creates the login response payload.
@@ -39,17 +43,23 @@ public class LoginCommandHandler(
     {
         var normalizedEmail = request.Email.Trim();
 
-        var user = await _userManager.FindByEmailAsync(normalizedEmail)
-            ?? throw new UnauthorizedAccessException("Invalid email or password.");
+        var user = await _userManager.FindByEmailAsync(normalizedEmail);
+        if (user is null)
+        {
+            await LogLoginFailureAsync(reason: "user_not_found", userId: null, attemptedEmail: normalizedEmail);
+            throw new UnauthorizedAccessException("Invalid email or password.");
+        }
 
         if (!user.IsActive || user.GcRecord != 0)
         {
+            await LogLoginFailureAsync(reason: "inactive", userId: user.Id, attemptedEmail: normalizedEmail);
             throw new UnauthorizedAccessException("The user account is inactive.");
         }
 
         var passwordIsValid = await _userManager.CheckPasswordAsync(user, request.Password);
         if (!passwordIsValid)
         {
+            await LogLoginFailureAsync(reason: "password_mismatch", userId: user.Id, attemptedEmail: normalizedEmail);
             throw new UnauthorizedAccessException("Invalid email or password.");
         }
 
@@ -102,6 +112,20 @@ public class LoginCommandHandler(
         var (token, refreshToken, expiration, _) =
             _jwtTokenGenerator.GenerateToken(user, effectiveCompanyId, roleNames, refreshTokenId);
 
+        var successMetadata = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            companyId = effectiveCompanyId,
+            roleCount = roleNames.Count
+        });
+        await _securityEventLogger.LogAsync(
+            SecurityEventType.LoginSucceeded,
+            SecurityEventResult.Success,
+            user.Id,
+            _currentUserService.IpAddress,
+            _currentUserService.UserAgent,
+            successMetadata,
+            cancellationToken);
+
         return new LoginResponse
         {
             UserId = user.Id,
@@ -113,6 +137,27 @@ public class LoginCommandHandler(
             RefreshToken = refreshToken,
             Expiration = expiration
         };
+    }
+
+    /// <summary>
+    /// Records a LoginFailed audit row for the supplied rejection reason.
+    /// Best-effort: failures inside <see cref="ISecurityEventLogger"/> are swallowed by
+    /// the logger itself, so this method never throws.
+    /// </summary>
+    private async Task LogLoginFailureAsync(string reason, Guid? userId, string attemptedEmail)
+    {
+        var metadata = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            reason,
+            attemptedEmail
+        });
+        await _securityEventLogger.LogAsync(
+            SecurityEventType.LoginFailed,
+            SecurityEventResult.Failure,
+            userId,
+            _currentUserService.IpAddress,
+            _currentUserService.UserAgent,
+            metadata);
     }
 
     /// <summary>

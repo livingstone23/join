@@ -14,15 +14,21 @@ namespace JOIN.Application.UseCases.Security.Auth.Refresh;
 /// <param name="userManager">ASP.NET Core Identity manager used to resolve the user account.</param>
 /// <param name="jwtTokenGenerator">Token generator used to create the renewed token pair.</param>
 /// <param name="unitOfWork">Unit of work used to query and persist refresh tokens and company assignments.</param>
+/// <param name="currentUserService">HTTP context for IP / User-Agent on audit logs (SPEC 26 / F5).</param>
+/// <param name="securityEventLogger">Audit logger (SPEC 26 / F5).</param>
 public class RefreshTokenCommandHandler(
     UserManager<ApplicationUser> userManager,
     IJwtTokenGenerator jwtTokenGenerator,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    ICurrentUserService currentUserService,
+    ISecurityEventLogger securityEventLogger)
     : IRequestHandler<RefreshTokenCommand, LoginResponse>
 {
     private readonly UserManager<ApplicationUser> _userManager = userManager;
     private readonly IJwtTokenGenerator _jwtTokenGenerator = jwtTokenGenerator;
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly ICurrentUserService _currentUserService = currentUserService;
+    private readonly ISecurityEventLogger _securityEventLogger = securityEventLogger;
 
     /// <summary>
     /// Validates the incoming refresh token, rotates it, and returns a renewed login response.
@@ -99,6 +105,20 @@ public class RefreshTokenCommandHandler(
 
         var (accessToken, newRefreshToken, expiration, _) =
             _jwtTokenGenerator.GenerateToken(user, effectiveCompanyId, roleNames, newRefreshTokenId);
+
+        var refreshMetadata = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            companyId = effectiveCompanyId,
+            roleCount = roleNames.Count
+        });
+        await _securityEventLogger.LogAsync(
+            SecurityEventType.LoginSucceeded,
+            SecurityEventResult.Success,
+            user.Id,
+            _currentUserService.IpAddress,
+            _currentUserService.UserAgent,
+            refreshMetadata,
+            cancellationToken);
 
         return new LoginResponse
         {
