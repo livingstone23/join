@@ -93,6 +93,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<RoleSystemOption> RoleSystemOptions => Set<RoleSystemOption>();
     public DbSet<RoleCompany> RoleCompanies => Set<RoleCompany>();
     public DbSet<SystemModule> SystemModules => Set<SystemModule>();
+    public DbSet<SecurityEventLog> SecurityEventLogs => Set<SecurityEventLog>();
 
     
     

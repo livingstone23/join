@@ -43,6 +43,7 @@ public static class DependencyInjection
         // ------------------------------------------------------------------
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IPermissionService, PermissionService>();
+        services.AddScoped<ISecurityEventLogger, SecurityEventLogger>();
 
         // ------------------------------------------------------------------
         // Messaging: SendGrid email adapter (Adapter Pattern — Pillar 4)
