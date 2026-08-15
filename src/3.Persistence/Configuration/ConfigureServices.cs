@@ -99,6 +99,7 @@ public static class ConfigureServices
         services.AddScoped<ISecurityEventRepository, SecurityEventRepository>();
         services.AddScoped<IRoleUserSessionRepository, RoleUserSessionRepository>();
         services.AddScoped<IUserMfaRecoveryCodeRepository, UserMfaRecoveryCodeRepository>();
+        services.AddScoped<IPhoneVerificationCodeRepository, PhoneVerificationCodeRepository>();
         
         // El UnitOfWork ahora es híbrido y manejará el resto de los módulos dinámicamente.
         services.AddScoped<IUnitOfWork, UnitOfWork>();
