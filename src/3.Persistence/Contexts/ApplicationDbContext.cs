@@ -94,6 +94,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<RoleCompany> RoleCompanies => Set<RoleCompany>();
     public DbSet<SystemModule> SystemModules => Set<SystemModule>();
     public DbSet<SecurityEventLog> SecurityEventLogs => Set<SecurityEventLog>();
+    public DbSet<UserMfaRecoveryCode> UserMfaRecoveryCodes => Set<UserMfaRecoveryCode>();
 
     
     

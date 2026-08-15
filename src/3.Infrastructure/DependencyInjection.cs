@@ -6,6 +6,7 @@ using JOIN.Infrastructure.Messaging.SendGrid;
 using JOIN.Infrastructure.Persistence;
 using JOIN.Infrastructure.Security;
 using JOIN.Infrastructure.Security.Jwt;
+using JOIN.Infrastructure.Security.Mfa;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -44,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<ISecurityEventLogger, SecurityEventLogger>();
+        services.AddScoped<IMfaTotpValidator, MfaTotpValidator>();
 
         // ------------------------------------------------------------------
         // Messaging: SendGrid email adapter (Adapter Pattern — Pillar 4)

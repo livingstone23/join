@@ -53,10 +53,16 @@ public class ApplicationUser : IdentityUser<Guid>, IAuditableEntity
     public bool IsMfaEnabled { get; set; } = false;
 
     /// <summary>
-    /// Stores the Base32 secret seed used to generate Time-based One-Time Password (TOTP) codes 
+    /// Stores the Base32 secret seed used to generate Time-based One-Time Password (TOTP) codes
     /// for authenticator applications (e.g., Google or Microsoft Authenticator).
     /// </summary>
     public string? MfaSecretKey { get; set; }
+
+    /// <summary>
+    /// UTC instant when MFA was last enabled. Null until <c>IsMfaEnabled</c> flips to true.
+    /// Used as audit + clock data for recovery-code re-issue and rotation policies.
+    /// </summary>
+    public DateTime? MfaEnabledAtUtc { get; set; }
 
     /// <summary>
     /// The name of the external identity provider used for authentication (e.g., "Google", "Microsoft"). 
