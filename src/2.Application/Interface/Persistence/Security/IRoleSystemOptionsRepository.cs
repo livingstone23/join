@@ -1,3 +1,4 @@
+using JOIN.Application.DTO.Security;
 using JOIN.Domain.Security;
 
 namespace JOIN.Application.Interface.Persistence.Security;
@@ -45,6 +46,31 @@ public interface IRoleSystemOptionsRepository : IGenericRepository<RoleSystemOpt
         Guid roleId,
         Guid companyId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the full permissions matrix for the given role in the given tenant.
+    /// Result includes every active <c>SystemOption</c> (even those without a
+    /// <c>RoleSystemOption</c> row) so the UI can paint the entire grid.
+    /// Returns <c>null</c> when the role does not exist or is soft-deleted.
+    /// </summary>
+    Task<RoleSystemOptionMatrixDto?> GetMatrixByRoleAsync(
+        Guid roleId,
+        Guid companyId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Applies a "replace set" diff between the current <c>RoleSystemOption</c> rows
+    /// for <c>(roleId, companyId)</c> and the supplied <paramref name="newItems"/> in a
+    /// single SQL transaction (no EF change tracker). Inserts missing rows, updates
+    /// existing rows' flags, soft-deletes rows absent from the set.
+    /// Returns the IDs of the rows that ended up in each bucket.
+    /// </summary>
+    Task<(IReadOnlyList<Guid> Created, IReadOnlyList<Guid> Updated, IReadOnlyList<Guid> Removed)>
+        BulkUpsertAsync(
+            Guid roleId,
+            Guid companyId,
+            IReadOnlyList<RoleSystemOption> newItems,
+            CancellationToken cancellationToken = default);
 }
 
 /// <summary>

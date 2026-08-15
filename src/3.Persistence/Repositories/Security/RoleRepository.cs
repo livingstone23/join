@@ -217,4 +217,29 @@ public sealed class RoleRepository(
         return await connection.ExecuteScalarAsync<int>(
             new CommandDefinition(sql, new { RoleId = roleId, CompanyId = companyId }, cancellationToken: cancellationToken));
     }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Guid>> GetActiveUserIdsByRoleIdAsync(
+        Guid roleId,
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        // Same shape as CountActiveUsersByRoleIdAsync but projects UserId instead of COUNT(*).
+        // DISTINCT guards against the same user having multiple active rows for the same role
+        // (the unique index already prevents duplicates, but be defensive).
+        const string sql = """
+            SELECT DISTINCT urc.UserId
+            FROM [Security].[UserRoleCompanies] urc
+            INNER JOIN [Security].[Roles] r ON r.Id = urc.RoleId
+            WHERE urc.RoleId = @RoleId
+              AND urc.CompanyId = @CompanyId
+              AND urc.GcRecord = 0
+              AND r.GcRecord = 0;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        var ids = await connection.QueryAsync<Guid>(
+            new CommandDefinition(sql, new { RoleId = roleId, CompanyId = companyId }, cancellationToken: cancellationToken));
+        return ids.AsList();
+    }
 }

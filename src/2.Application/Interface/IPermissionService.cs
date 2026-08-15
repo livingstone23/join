@@ -32,4 +32,18 @@ public interface IPermissionService
     /// <param name="explicitFlag">When provided, evaluates this specific flag instead of the HTTP-verb default mapping.</param>
     /// <returns>True if the user has access; otherwise, false.</returns>
     Task<bool> HasPermissionAsync(string userId, string companyId, string resourceName, string actionType, PermissionFlags? explicitFlag);
+
+    /// <summary>
+    /// Drops both the permission snapshot cache (<c>permissions:v2:{companyId}:{userId}</c>)
+    /// and the sidebar menu cache (<c>sidebar:{companyId}:{userId}</c>) for the given
+    /// user in the given tenant. Used after mutating <c>RoleSystemOption</c> rows so the
+    /// next <see cref="HasPermissionAsync"/> call rebuilds the snapshot from scratch.
+    /// </summary>
+    /// <remarks>
+    /// Introduced by SPEC 25 because the legacy <c>InvalidateSidebarCacheCommand</c> writes
+    /// the wrong key for the permissions snapshot (it removes <c>permissions:{companyId}:{userId}</c>,
+    /// not the real <c>permissions:v2:{companyId}:{userId}</c>). A future spec will fix that command;
+    /// in the meantime, callers that need a guaranteed snapshot refresh should invoke this method.
+    /// </remarks>
+    Task InvalidateUserCacheAsync(Guid companyId, Guid userId, CancellationToken cancellationToken = default);
 }

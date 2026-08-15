@@ -133,6 +133,18 @@ public class PermissionService(ApplicationDbContext dbContext, IMemoryCache memo
         return false;
     }
 
+    /// <inheritdoc />
+    public Task InvalidateUserCacheAsync(Guid companyId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        // The keys MUST match what HasPermissionAsync and GetSidebarMenuQueryHandler write:
+        //   - permissions:v2:{companyId}:{userId}  (this service, snapshot of 7 flags)
+        //   - sidebar:{companyId}:{userId}         (sidebar menu query, no version prefix)
+        // Remove is a no-op when the key is absent — safe to call without a prior HasPermissionAsync.
+        _memoryCache.Remove($"{CacheKeyPrefix}:{companyId}:{userId}");
+        _memoryCache.Remove($"sidebar:{companyId}:{userId}");
+        return Task.CompletedTask;
+    }
+
     /// <summary>
     /// Maps a single <see cref="PermissionFlags"/> bit to the corresponding boolean in the snapshot.
     /// </summary>

@@ -1,6 +1,6 @@
 # SPEC 24 — Roles hardening: `permissionsCount`, `ROLE_HAS_USERS`, `cloneFromRoleId`
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 18 (Roles CRUD), SPEC 19 (RoleCompanies), SPEC 22 (RoleSystemOption DTO)
 > **Date:** 2026-08-15
 > **Objective:** Cerrar los tres gaps funcionales del catálogo `ApplicationRole` que dejó pendientes SPEC 18 sin romper el contrato existente: (a) proteger `DELETE` contra borrado de roles con usuarios asignados, devolviendo `ROLE_HAS_USERS` con conteo; (b) exponer `PermissionsCount` en `RoleDto` para que la UI muestre cuántos `RoleSystemOption` activos tiene cada rol; (c) soportar `CloneFromRoleId` en `POST` para que un SuperAdmin cree un nuevo rol copiando los `RoleSystemOption` del rol origen en la misma transacción. Cambios viven solo en `RoleDto`, `CreateRoleCommand`, `DeleteRoleCommandHandler`, repos y Dapper queries existentes. No nuevos endpoints, no migraciones, no DTOs nuevos.

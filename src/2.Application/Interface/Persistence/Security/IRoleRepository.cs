@@ -72,4 +72,15 @@ public interface IRoleRepository
         Guid roleId,
         Guid companyId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the active <see cref="Domain.Security.UserRoleCompany.UserId"/> set for the
+    /// given role in the given tenant. Tenant-scoped (other-tenant assignments are ignored).
+    /// Used by the bulk-upsert path (SPEC 25) to invalidate <see cref="IPermissionService"/>
+    /// caches only for users that actually had the role.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetActiveUserIdsByRoleIdAsync(
+        Guid roleId,
+        Guid companyId,
+        CancellationToken cancellationToken = default);
 }

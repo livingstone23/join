@@ -1,5 +1,6 @@
 using System.Text;
 using Dapper;
+using JOIN.Application.DTO.Security;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Domain.Common;
@@ -158,5 +159,255 @@ public sealed class RoleSystemOptionsRepository(
         var rows = await connection.QueryAsync<RoleSystemOption>(
             new CommandDefinition(sql, new { RoleId = roleId, CompanyId = companyId }, cancellationToken: cancellationToken));
         return rows.AsList();
+    }
+
+    /// <inheritdoc />
+    public async Task<RoleSystemOptionMatrixDto?> GetMatrixByRoleAsync(
+        Guid roleId,
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        // Two-step query on the same connection:
+        //  1. Verify the role exists & is active (returns Name) — defense in depth; the handler
+        //     also calls ExistsAndActiveAsync first. Returns null if not.
+        //  2. Pull every active SystemOption with the granted flags from RoleSystemOptions
+        //     (LEFT JOIN, collapses to all-false when no row exists). Groups by module in C#.
+        using var connection = connectionFactory.CreateConnection();
+
+        const string roleSql = """
+            SELECT Name
+            FROM [Security].[Roles]
+            WHERE Id = @RoleId AND GcRecord = 0;
+            """;
+        var roleName = await connection.QuerySingleOrDefaultAsync<string?>(
+            new CommandDefinition(roleSql, new { RoleId = roleId }, cancellationToken: cancellationToken));
+        if (roleName is null)
+        {
+            return null;
+        }
+
+        const string matrixSql = """
+            SELECT
+                m.Id   AS ModuleId,
+                m.Name AS ModuleName,
+                m.[Order] AS ModuleOrder,
+                o.Id   AS OptionId,
+                o.Name AS OptionName,
+                o.Route AS OptionRoute,
+                o.OrderMenu AS OptionOrderMenu,
+                o.CanRead     AS SupportCanRead,
+                o.CanCreate   AS SupportCanCreate,
+                o.CanUpdate   AS SupportCanUpdate,
+                o.CanDelete   AS SupportCanDelete,
+                o.CanDownload AS SupportCanDownload,
+                o.CanExport   AS SupportCanExport,
+                o.CanExecute  AS SupportCanExecute,
+                ISNULL(rso.CanRead,     0) AS GrantedCanRead,
+                ISNULL(rso.CanCreate,   0) AS GrantedCanCreate,
+                ISNULL(rso.CanUpdate,   0) AS GrantedCanUpdate,
+                ISNULL(rso.CanDelete,   0) AS GrantedCanDelete,
+                ISNULL(rso.CanDownload, 0) AS GrantedCanDownload,
+                ISNULL(rso.CanExport,   0) AS GrantedCanExport,
+                ISNULL(rso.CanExecute,  0) AS GrantedCanExecute
+            FROM [Admin].[SystemModules] m
+            INNER JOIN [Security].[SystemOptions] o
+                ON o.ModuleId = m.Id AND o.GcRecord = 0
+            LEFT JOIN [Security].[RoleSystemOptions] rso
+                ON rso.SystemOptionId = o.Id
+               AND rso.RoleId = @RoleId
+               AND rso.CompanyId = @CompanyId
+               AND rso.GcRecord = 0
+            WHERE m.GcRecord = 0 AND m.IsActive = 1
+            ORDER BY
+                ISNULL(m.[Order], 2147483647) ASC,
+                m.Name ASC,
+                ISNULL(o.OrderMenu, 2147483647) ASC,
+                o.Name ASC;
+            """;
+
+        var rows = (await connection.QueryAsync<MatrixRow>(
+            new CommandDefinition(matrixSql, new { RoleId = roleId, CompanyId = companyId }, cancellationToken: cancellationToken))).AsList();
+
+        var modules = rows
+            .GroupBy(r => new { r.ModuleId, r.ModuleName, r.ModuleOrder })
+            .OrderBy(g => g.Key.ModuleOrder ?? int.MaxValue)
+            .ThenBy(g => g.Key.ModuleName)
+            .Select(g => new RoleSystemOptionMatrixModuleDto(
+                ModuleId: g.Key.ModuleId,
+                ModuleName: g.Key.ModuleName,
+                Options: g
+                    .OrderBy(r => r.OptionOrderMenu ?? int.MaxValue)
+                    .ThenBy(r => r.OptionName)
+                    .Select(r => new RoleSystemOptionMatrixOptionDto(
+                        SystemOptionId: r.OptionId,
+                        Name: r.OptionName,
+                        Route: r.OptionRoute,
+                        Supports: new RoleSystemOptionSupportFlags(
+                            r.SupportCanRead, r.SupportCanCreate, r.SupportCanUpdate,
+                            r.SupportCanDelete, r.SupportCanDownload, r.SupportCanExport, r.SupportCanExecute),
+                        Granted: new RoleSystemOptionGrantedFlags(
+                            r.GrantedCanRead, r.GrantedCanCreate, r.GrantedCanUpdate,
+                            r.GrantedCanDelete, r.GrantedCanDownload, r.GrantedCanExport, r.GrantedCanExecute)))
+                    .ToList()))
+            .ToList();
+
+        return new RoleSystemOptionMatrixDto(roleId, roleName, modules);
+    }
+
+    /// <summary>
+    /// Internal row shape used by <see cref="GetMatrixByRoleAsync"/> to flatten the
+    /// module→option→LEFT-JOIN-grants result into a single list before re-grouping in memory.
+    /// </summary>
+    private sealed class MatrixRow
+    {
+        public Guid ModuleId { get; set; }
+        public string ModuleName { get; set; } = string.Empty;
+        public int? ModuleOrder { get; set; }
+        public Guid OptionId { get; set; }
+        public string OptionName { get; set; } = string.Empty;
+        public string OptionRoute { get; set; } = string.Empty;
+        public int? OptionOrderMenu { get; set; }
+        public bool SupportCanRead { get; set; }
+        public bool SupportCanCreate { get; set; }
+        public bool SupportCanUpdate { get; set; }
+        public bool SupportCanDelete { get; set; }
+        public bool SupportCanDownload { get; set; }
+        public bool SupportCanExport { get; set; }
+        public bool SupportCanExecute { get; set; }
+        public bool GrantedCanRead { get; set; }
+        public bool GrantedCanCreate { get; set; }
+        public bool GrantedCanUpdate { get; set; }
+        public bool GrantedCanDelete { get; set; }
+        public bool GrantedCanDownload { get; set; }
+        public bool GrantedCanExport { get; set; }
+        public bool GrantedCanExecute { get; set; }
+    }
+
+    /// <inheritdoc />
+    public async Task<(IReadOnlyList<Guid> Created, IReadOnlyList<Guid> Updated, IReadOnlyList<Guid> Removed)>
+        BulkUpsertAsync(
+            Guid roleId,
+            Guid companyId,
+            IReadOnlyList<RoleSystemOption> newItems,
+            CancellationToken cancellationToken = default)
+    {
+        // Dapper with explicit SQL transaction — no EF change tracker.
+        // 1. FOR UPDATE locks the existing rows for (roleId, companyId), serializing against
+        //    a concurrent PUT /{id} that may try to insert the same (roleId, systemOptionId).
+        // 2. INSERT each item absent from the existing set.
+        // 3. UPDATE each item present in both sets.
+        // 4. Soft-delete (GcRecord = stamp) each existing item absent from newItems.
+        // 5. COMMIT. ROLLBACK on any failure.
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+        try
+        {
+            const string existingSql = """
+                SELECT Id, SystemOptionId
+                FROM [Security].[RoleSystemOptions] WITH (UPDLOCK, HOLDLOCK)
+                WHERE RoleId = @RoleId AND CompanyId = @CompanyId AND GcRecord = 0;
+                """;
+
+            var existing = (await connection.QueryAsync<(Guid Id, Guid SystemOptionId)>(
+                new CommandDefinition(existingSql, new { RoleId = roleId, CompanyId = companyId }, transaction: transaction, cancellationToken: cancellationToken))).ToList();
+            var existingByOption = existing.ToDictionary(e => e.SystemOptionId, e => e.Id);
+
+            var incomingByOption = newItems.ToDictionary(i => i.SystemOptionId);
+
+            var created = new List<Guid>();
+            var updated = new List<Guid>();
+            var removed = new List<Guid>();
+
+            const string insertSql = """
+                INSERT INTO [Security].[RoleSystemOptions]
+                    (Id, CompanyId, RoleId, SystemOptionId,
+                     CanRead, CanCreate, CanUpdate, CanDelete,
+                     CanDownload, CanExport, CanExecute,
+                     IsVisibleMenu, OrderMenu,
+                     Created, CreatedBy, LastModified, LastModifiedBy, GcRecord)
+                VALUES
+                    (@Id, @CompanyId, @RoleId, @SystemOptionId,
+                     @CanRead, @CanCreate, @CanUpdate, @CanDelete,
+                     @CanDownload, @CanExport, @CanExecute,
+                     @IsVisibleMenu, @OrderMenu,
+                     @Created, @CreatedBy, NULL, NULL, 0);
+                """;
+
+            const string updateSql = """
+                UPDATE [Security].[RoleSystemOptions]
+                SET CanRead = @CanRead,
+                    CanCreate = @CanCreate,
+                    CanUpdate = @CanUpdate,
+                    CanDelete = @CanDelete,
+                    CanDownload = @CanDownload,
+                    CanExport = @CanExport,
+                    CanExecute = @CanExecute,
+                    IsVisibleMenu = @IsVisibleMenu,
+                    OrderMenu = @OrderMenu,
+                    LastModified = SYSUTCDATETIME(),
+                    LastModifiedBy = @LastModifiedBy
+                WHERE Id = @Id;
+                """;
+
+            const string softDeleteSql = """
+                UPDATE [Security].[RoleSystemOptions]
+                SET GcRecord = 1,
+                    LastModified = SYSUTCDATETIME(),
+                    LastModifiedBy = @LastModifiedBy
+                WHERE Id = @Id;
+                """;
+
+            foreach (var item in newItems)
+            {
+                if (existingByOption.TryGetValue(item.SystemOptionId, out var existingId))
+                {
+                    await connection.ExecuteAsync(new CommandDefinition(updateSql, new
+                    {
+                        Id = existingId,
+                        item.CanRead, item.CanCreate, item.CanUpdate, item.CanDelete,
+                        item.CanDownload, item.CanExport, item.CanExecute,
+                        item.IsVisibleMenu, item.OrderMenu,
+                        item.LastModifiedBy
+                    }, transaction: transaction, cancellationToken: cancellationToken));
+                    updated.Add(existingId);
+                }
+                else
+                {
+                    await connection.ExecuteAsync(new CommandDefinition(insertSql, new
+                    {
+                        item.Id, item.CompanyId, item.RoleId, item.SystemOptionId,
+                        item.CanRead, item.CanCreate, item.CanUpdate, item.CanDelete,
+                        item.CanDownload, item.CanExport, item.CanExecute,
+                        item.IsVisibleMenu, item.OrderMenu,
+                        item.Created, item.CreatedBy
+                    }, transaction: transaction, cancellationToken: cancellationToken));
+                    created.Add(item.Id);
+                }
+            }
+
+            // Items that exist in the DB but not in the incoming set → soft-delete.
+            var lastModifiedBy = newItems.FirstOrDefault()?.LastModifiedBy ?? newItems.FirstOrDefault()?.CreatedBy;
+            foreach (var e in existing)
+            {
+                if (!incomingByOption.ContainsKey(e.SystemOptionId))
+                {
+                    await connection.ExecuteAsync(new CommandDefinition(softDeleteSql, new
+                    {
+                        Id = e.Id,
+                        LastModifiedBy = lastModifiedBy
+                    }, transaction: transaction, cancellationToken: cancellationToken));
+                    removed.Add(e.Id);
+                }
+            }
+
+            transaction.Commit();
+            return (created, updated, removed);
+        }
+        catch
+        {
+            try { transaction.Rollback(); } catch { /* connection may already be torn down */ }
+            throw;
+        }
     }
 }

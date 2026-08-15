@@ -1,6 +1,6 @@
 # SPEC 25 — `RoleSystemOptions` bulk upsert + matrix
 
-> **Status:** Borrador
+> **Status:** Implementado
 > **Depends on:** SPEC 18 (Roles CRUD), SPEC 22 (RoleSystemOption DTO), SPEC 23 (tenant from token), SPEC 24 (Roles hardening)
 > **Date:** 2026-08-15
 > **Objective:** Cerrar los dos gaps de UX que dejaron pendientes SPEC 18/22 sin tocar los endpoints existentes: (a) `PUT /bulk` para que el front guarde toda la matriz de permisos de un rol en una sola llamada atómica con diff `{ created, updated, removed }` e invalidación de caché de sidebar/permisos de los usuarios del rol; (b) `GET /matrix?roleId=` para que el front renderice la grilla de permisos agrupada por módulo sin tener que cruzar manualmente `SystemOptions` paginado con `RoleSystemOptions` paginado. Ambos endpoints siguen la convención CQRS, son tenant-scoped desde el JWT (SPEC 23), reusan el `PermissionFlags` shape de 7 flags de SPEC 22, y no rompen el contrato de los seis endpoints ya expuestos por `RoleSystemOptionsController`.

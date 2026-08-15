@@ -1,7 +1,9 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
 using JOIN.Application.UseCases.Security.RoleSystemOptions.Commands;
+using JOIN.Application.UseCases.Security.RoleSystemOptions.Commands.BulkUpsertRoleSystemOptions;
 using JOIN.Application.UseCases.Security.RoleSystemOptions.Queries;
+using JOIN.Application.UseCases.Security.RoleSystemOptions.Queries.GetRoleSystemOptionMatrix;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -252,6 +254,73 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
             companyId);
 
         var response = await mediator.Send(query, cancellationToken);
+        return response.IsSuccess ? Ok(response) : BadRequest(response);
+    }
+
+    /// <summary>
+    /// Replaces the entire permission set of a role in a single atomic transaction.
+    /// Inserts missing rows, updates existing rows' flags, and soft-deletes rows absent
+    /// from the request. Invalidates the permission + sidebar caches for every user
+    /// currently assigned to the role in the caller's tenant.
+    /// </summary>
+    /// <param name="request">Payload with the target role id and the desired final set of permissions.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    /// <returns>
+    /// A standardized response containing the diff
+    /// (<c>created</c>, <c>updated</c>, <c>removed</c>) — each a list of <c>RoleSystemOption.Id</c>.
+    /// Returns <c>404 Not Found</c> when the role does not exist or is inactive.
+    /// Returns <c>400 Bad Request</c> when the payload fails validation
+    /// (empty / oversized / duplicate <c>SystemOptionId</c> / empty role id).
+    /// </returns>
+    [HttpPut("bulk")]
+    public async Task<ActionResult<Response<BulkUpsertRoleSystemOptionsResult>>> BulkUpsert(
+        [FromBody] BulkUpsertRoleSystemOptionsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var response = await mediator.Send(
+            new BulkUpsertRoleSystemOptionsCommand(request.RoleId, request.Items), cancellationToken);
+
+        if (!response.IsSuccess && response.Message == "ROLE_NOT_FOUND")
+        {
+            return NotFound(response);
+        }
+        if (!response.IsSuccess && response.Message == "TENANT_REQUIRED")
+        {
+            return Unauthorized(response);
+        }
+
+        return response.IsSuccess ? Ok(response) : BadRequest(response);
+    }
+
+    /// <summary>
+    /// Returns the full permissions matrix for a role in the caller's tenant.
+    /// Includes every active <c>SystemOption</c> grouped by <c>SystemModule</c>, with
+    /// both the option's <c>Supports</c> defaults and the role's <c>Granted</c> flags.
+    /// Even when the role has zero granted rows, the matrix still contains every option
+    /// with <c>Granted = all-false</c> so the UI can paint the full grid.
+    /// </summary>
+    /// <param name="roleId">Target role id. Must exist and be active (GcRecord = 0).</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    /// <returns>
+    /// A standardized response containing the matrix.
+    /// Returns <c>404 Not Found</c> when the role does not exist or is inactive.
+    /// </returns>
+    [HttpGet("matrix")]
+    public async Task<ActionResult<Response<RoleSystemOptionMatrixDto>>> GetMatrix(
+        [FromQuery] Guid roleId,
+        CancellationToken cancellationToken)
+    {
+        var response = await mediator.Send(new GetRoleSystemOptionMatrixQuery(roleId), cancellationToken);
+
+        if (!response.IsSuccess && response.Message == "ROLE_NOT_FOUND")
+        {
+            return NotFound(response);
+        }
+        if (!response.IsSuccess && response.Message == "TENANT_REQUIRED")
+        {
+            return Unauthorized(response);
+        }
+
         return response.IsSuccess ? Ok(response) : BadRequest(response);
     }
 }

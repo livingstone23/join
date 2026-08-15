@@ -428,6 +428,28 @@ curl -X PUT http://localhost:5000/api/v1/RoleSystemOptions/{id} \
 curl -X DELETE http://localhost:5000/api/v1/RoleSystemOptions/{id} \
   -H "Authorization: Bearer $TOKEN"
 
+# Bulk replace (CanUpdate, SPEC 25). Atomic transaction. Items represents the DESIRED FINAL SET
+# for the role in the caller's tenant; rows in the DB absent from Items are soft-deleted,
+# rows in Items absent from the DB are inserted, rows present in both have their flags overwritten.
+# Capped at 500 items per request (BULK_TOO_LARGE). Duplicates rejected (BULK_DUPLICATE_OPTION).
+# Invalidates the permission + sidebar caches for every user currently assigned to the role.
+curl -X PUT http://localhost:5000/api/v1/RoleSystemOptions/bulk \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "roleId": "<guid>",
+    "items": [
+      { "systemOptionId": "<guid-1>", "canRead": true,  "canCreate": false, "canUpdate": false, "canDelete": false, "canDownload": false, "canExport": false, "canExecute": false },
+      { "systemOptionId": "<guid-2>", "canRead": true,  "canCreate": true,  "canUpdate": true,  "canDelete": false, "canDownload": true,  "canExport": true,  "canExecute": false }
+    ]
+  }'
+
+# Permissions matrix (CanRead, SPEC 25). Returns the full grid grouped by SystemModule.
+# Every active SystemOption is included even when the role has no RoleSystemOption row for it
+# (Granted collapses to all-false). 404 ROLE_NOT_FOUND when the role does not exist or is inactive.
+curl "http://localhost:5000/api/v1/RoleSystemOptions/matrix?roleId=<guid>" \
+  -H "Authorization: Bearer $TOKEN"
+
 # SuperAdmin cross-tenant paged listing (requires SuperAdmin role).
 SA_TOKEN="<jwt-from-superadmin>"
 curl "http://localhost:5000/api/v1/RoleSystemOptions/superadmin/all?canDownload=true" \
@@ -469,6 +491,24 @@ Validator rejections (FluentValidation, returned as `400 Bad Request` via the st
 | `OrderMenu` | `[0, 10000]` when present |
 
 `bool` fields (`CanDownload`, `CanExport`, `CanExecute`, `IsVisibleMenu`) accept any value; defaults cover omission.
+
+Bulk endpoint (`PUT /bulk`, SPEC 25) rejections:
+
+| Cause | Status | Error code |
+|-------|--------|------------|
+| `RoleId` empty | `400` | `RoleId required.` |
+| `items` null / empty | `400` | `BULK_EMPTY` |
+| `items.Count > 500` | `400` | `BULK_TOO_LARGE` |
+| `items` contain duplicate `SystemOptionId` | `400` | `BULK_DUPLICATE_OPTION` |
+| Role missing / inactive | `404` | `ROLE_NOT_FOUND` |
+| Token missing `CompanyId` claim | `401` | `TENANT_REQUIRED` |
+
+Matrix endpoint (`GET /matrix?roleId=`, SPEC 25) rejections:
+
+| Cause | Status | Error code |
+|-------|--------|------------|
+| Role missing / inactive | `404` | `ROLE_NOT_FOUND` |
+| Token missing `CompanyId` claim | `401` | `TENANT_REQUIRED` |
 
 Auth failures on PUT/DELETE:
 
