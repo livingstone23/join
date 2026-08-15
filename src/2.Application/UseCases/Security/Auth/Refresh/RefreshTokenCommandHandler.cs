@@ -69,20 +69,36 @@ public class RefreshTokenCommandHandler(
 
         var effectiveCompanyId = await ResolveEffectiveCompanyIdAsync(userCompanies, roleAssignments, isSuperAdmin);
         var roleNames = await ResolveRoleNamesAsync(user.IsSuperAdminCompany, effectiveCompanyId, roleAssignments, isSuperAdmin);
-        var (accessToken, newRefreshToken, expiration, refreshTokenExpiration) =
-            _jwtTokenGenerator.GenerateToken(user, effectiveCompanyId, roleNames);
 
-        await refreshTokenRepository.InsertAsync(new UserRefreshToken
+        // Refresh-token-id MUST be persisted (along with the old token revocation) before the
+        // access token is issued so the embedded `refresh_token_id` claim never references a
+        // non-existent row and the revoked token update is durable.
+        var newRefreshTokenId = Guid.NewGuid();
+        var newRefreshTokenString = _jwtTokenGenerator.GenerateRefreshTokenString();
+        var newRefreshTokenExpiration = _jwtTokenGenerator.GetRefreshTokenExpirationUtc();
+
+        try
         {
-            UserId = user.Id,
-            Token = newRefreshToken,
-            ExpiryDate = refreshTokenExpiration,
-            IsRevoked = false,
-            Created = DateTime.UtcNow,
-            CreatedBy = user.Email ?? user.UserName
-        });
+            await refreshTokenRepository.InsertAsync(new UserRefreshToken(newRefreshTokenId)
+            {
+                UserId = user.Id,
+                Token = newRefreshTokenString,
+                ExpiryDate = newRefreshTokenExpiration,
+                IsRevoked = false,
+                Created = DateTime.UtcNow,
+                CreatedBy = user.Email ?? user.UserName
+            });
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // Refuse to leak a token whose refresh row never persisted.
+            throw new UnauthorizedAccessException("The session could not be renewed.");
+        }
+
+        var (accessToken, newRefreshToken, expiration, _) =
+            _jwtTokenGenerator.GenerateToken(user, effectiveCompanyId, roleNames, newRefreshTokenId);
 
         return new LoginResponse
         {

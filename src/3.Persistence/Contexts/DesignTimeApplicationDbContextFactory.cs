@@ -64,5 +64,11 @@ public sealed class DesignTimeApplicationDbContextFactory : IDesignTimeDbContext
         public Guid CompanyId => Guid.Empty;
 
         public bool IsAuthenticated => false;
+
+        public Guid? RefreshTokenId => null;
+
+        public string? IpAddress => null;
+
+        public string? UserAgent => null;
     }
 }

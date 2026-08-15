@@ -175,10 +175,19 @@ public sealed class LoginCommandHandlerTests
             }.AsEnumerable());
 
         context.TokenGeneratorMock
+            .Setup(x => x.GenerateRefreshTokenString())
+            .Returns("refresh-token");
+
+        context.TokenGeneratorMock
+            .Setup(x => x.GetRefreshTokenExpirationUtc())
+            .Returns(refreshExpiration);
+
+        context.TokenGeneratorMock
             .Setup(x => x.GenerateToken(
                 user,
                 requestedCompanyId,
-                It.Is<IEnumerable<string>>(roles => roles.OrderBy(x => x).SequenceEqual(new[] { "Admin", "Manager" }))))
+                It.Is<IEnumerable<string>>(roles => roles.OrderBy(x => x).SequenceEqual(new[] { "Admin", "Manager" })),
+                It.IsAny<Guid>()))
             .Returns(("jwt-token", "refresh-token", expiration, refreshExpiration));
 
         context.RefreshTokenRepositoryMock
@@ -252,8 +261,10 @@ public sealed class LoginCommandHandlerTests
             .Setup(x => x.GenerateToken(
                 user,
                 assignedCompanyId,
-                It.Is<IEnumerable<string>>(roles => roles.Single() == "Agent")))
+                It.Is<IEnumerable<string>>(roles => roles.Single() == "Agent"),
+                It.IsAny<Guid>()))
             .Returns(CreateTokenResult());
+
 
         context.RefreshTokenRepositoryMock
             .Setup(x => x.InsertAsync(It.IsAny<UserRefreshToken>()))
@@ -326,8 +337,10 @@ public sealed class LoginCommandHandlerTests
             .Setup(x => x.GenerateToken(
                 user,
                 assignedCompanyId,
-                It.Is<IEnumerable<string>>(roles => roles.Single() == "Reader")))
+                It.Is<IEnumerable<string>>(roles => roles.Single() == "Reader"),
+                It.IsAny<Guid>()))
             .Returns(CreateTokenResult());
+
 
         context.RefreshTokenRepositoryMock
             .Setup(x => x.InsertAsync(It.IsAny<UserRefreshToken>()))
@@ -377,8 +390,10 @@ public sealed class LoginCommandHandlerTests
             .Setup(x => x.GenerateToken(
                 user,
                 requestedCompanyId,
-                It.Is<IEnumerable<string>>(roles => roles.Single() == "SuperAdmin")))
+                It.Is<IEnumerable<string>>(roles => roles.Single() == "SuperAdmin"),
+                It.IsAny<Guid>()))
             .Returns(CreateTokenResult());
+
 
         context.RefreshTokenRepositoryMock
             .Setup(x => x.InsertAsync(It.IsAny<UserRefreshToken>()))
@@ -431,8 +446,10 @@ public sealed class LoginCommandHandlerTests
             .Setup(x => x.GenerateToken(
                 user,
                 fallbackCompanyId,
-                It.Is<IEnumerable<string>>(roles => roles.Single() == "SuperAdmin")))
+                It.Is<IEnumerable<string>>(roles => roles.Single() == "SuperAdmin"),
+                It.IsAny<Guid>()))
             .Returns(CreateTokenResult());
+
 
         context.RefreshTokenRepositoryMock
             .Setup(x => x.InsertAsync(It.IsAny<UserRefreshToken>()))
@@ -477,8 +494,10 @@ public sealed class LoginCommandHandlerTests
             .Setup(x => x.GenerateToken(
                 user,
                 null,
-                It.Is<IEnumerable<string>>(roles => roles.Single() == "Basic")))
+                It.Is<IEnumerable<string>>(roles => roles.Single() == "Basic"),
+                It.IsAny<Guid>()))
             .Returns(CreateTokenResult());
+
 
         context.RefreshTokenRepositoryMock
             .Setup(x => x.InsertAsync(It.IsAny<UserRefreshToken>()))

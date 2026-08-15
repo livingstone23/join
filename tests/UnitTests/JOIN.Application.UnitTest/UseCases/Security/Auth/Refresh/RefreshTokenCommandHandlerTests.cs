@@ -269,11 +269,22 @@ public sealed class RefreshTokenCommandHandlerTests
             }.AsEnumerable());
 
         context.TokenGeneratorMock
+            .Setup(x => x.GenerateRefreshTokenString())
+            .Returns("rotated-refresh");
+
+        context.TokenGeneratorMock
+            .Setup(x => x.GetRefreshTokenExpirationUtc())
+            .Returns(refreshExpiration);
+
+        context.TokenGeneratorMock
             .Setup(x => x.GenerateToken(
                 user,
                 companyId,
-                It.Is<IEnumerable<string>>(roles => roles.Single() == "Admin")))
+                It.Is<IEnumerable<string>>(roles => roles.Single() == "Admin"),
+                It.IsAny<Guid>()))
             .Returns(("new-access", "rotated-refresh", expiration, refreshExpiration));
+
+
 
         context.UnitOfWorkMock
             .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -358,7 +369,8 @@ public sealed class RefreshTokenCommandHandlerTests
             .Setup(x => x.GenerateToken(
                 user,
                 assignedCompanyId,
-                It.Is<IEnumerable<string>>(roles => roles.Single() == "Reader")))
+                It.Is<IEnumerable<string>>(roles => roles.Single() == "Reader"),
+                It.IsAny<Guid>()))
             .Returns(CreateTokenResult());
 
         context.UnitOfWorkMock
@@ -418,7 +430,8 @@ public sealed class RefreshTokenCommandHandlerTests
             .Setup(x => x.GenerateToken(
                 user,
                 fallbackCompanyId,
-                It.Is<IEnumerable<string>>(roles => roles.Single() == "SuperAdmin")))
+                It.Is<IEnumerable<string>>(roles => roles.Single() == "SuperAdmin"),
+                It.IsAny<Guid>()))
             .Returns(CreateTokenResult());
 
         context.UnitOfWorkMock

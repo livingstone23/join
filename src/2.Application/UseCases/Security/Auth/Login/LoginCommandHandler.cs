@@ -72,20 +72,35 @@ public class LoginCommandHandler(
             isSuperAdmin);
 
         var roleNames = await ResolveRoleNamesAsync(user, effectiveCompanyId, roleAssignments, isSuperAdmin);
-        var (token, refreshToken, expiration, refreshTokenExpiration) =
-            _jwtTokenGenerator.GenerateToken(user, effectiveCompanyId, roleNames);
 
-        await _unitOfWork.GetRepository<UserRefreshToken>().InsertAsync(new UserRefreshToken
+        // Refresh-token-id MUST be persisted before the access token is issued so the
+        // embedded `refresh_token_id` claim never references a non-existent row.
+        var refreshTokenId = Guid.NewGuid();
+        var refreshTokenString = _jwtTokenGenerator.GenerateRefreshTokenString();
+        var refreshTokenExpiration = _jwtTokenGenerator.GetRefreshTokenExpirationUtc();
+
+        try
         {
-            UserId = user.Id,
-            Token = refreshToken,
-            ExpiryDate = refreshTokenExpiration,
-            IsRevoked = false,
-            Created = DateTime.UtcNow,
-            CreatedBy = user.Email ?? user.UserName
-        });
+            await _unitOfWork.GetRepository<UserRefreshToken>().InsertAsync(new UserRefreshToken(refreshTokenId)
+            {
+                UserId = user.Id,
+                Token = refreshTokenString,
+                ExpiryDate = refreshTokenExpiration,
+                IsRevoked = false,
+                Created = DateTime.UtcNow,
+                CreatedBy = user.Email ?? user.UserName
+            });
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // Refuse to leak a token whose refresh row never persisted.
+            throw new UnauthorizedAccessException("The session could not be established.");
+        }
+
+        var (token, refreshToken, expiration, _) =
+            _jwtTokenGenerator.GenerateToken(user, effectiveCompanyId, roleNames, refreshTokenId);
 
         return new LoginResponse
         {

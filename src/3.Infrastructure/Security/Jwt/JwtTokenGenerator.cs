@@ -29,8 +29,11 @@ public class JwtTokenGenerator(IConfiguration configuration) : IJwtTokenGenerato
     /// <param name="user">The authenticated application user.</param>
     /// <param name="companyId">The effective company identifier for the session, if one is available.</param>
     /// <param name="roles">All effective role names for the session.</param>
+    /// <param name="refreshTokenId">The identifier of the persisted <c>Security.UserRefreshTokens</c> row.
+    /// Embedded as the <c>refresh_token_id</c> claim so the access token can later be tied back to
+    /// its persisted refresh token record.</param>
     /// <returns>A tuple containing the access token, refresh token, and their expiration metadata.</returns>
-    public (string Token, string RefreshToken, DateTime Expiration, DateTime RefreshTokenExpiration) GenerateToken(ApplicationUser user, Guid? companyId, IEnumerable<string> roles)
+    public (string Token, string RefreshToken, DateTime Expiration, DateTime RefreshTokenExpiration) GenerateToken(ApplicationUser user, Guid? companyId, IEnumerable<string> roles, Guid refreshTokenId)
     {
         var issuer = _configuration["Jwt:Issuer"] ?? "JOIN.Services.WebApi";
         var audience = _configuration["Jwt:Audience"] ?? "JOIN.Client";
@@ -89,6 +92,11 @@ public class JwtTokenGenerator(IConfiguration configuration) : IJwtTokenGenerato
             claims.Add(new Claim("LastName", user.LastName));
         }
 
+        if (refreshTokenId != Guid.Empty)
+        {
+            claims.Add(new Claim("refresh_token_id", refreshTokenId.ToString()));
+        }
+
         var tokenDescriptor = new JwtSecurityToken(
             issuer: issuer,
             audience: audience,
@@ -98,18 +106,28 @@ public class JwtTokenGenerator(IConfiguration configuration) : IJwtTokenGenerato
 
         var tokenHandler = new JwtSecurityTokenHandler();
         var token = tokenHandler.WriteToken(tokenDescriptor);
-        var refreshToken = GenerateSecureRefreshToken();
+        var refreshToken = GenerateRefreshTokenString();
 
         return (token, refreshToken, expiration, refreshTokenExpiration);
     }
 
     /// <summary>
-    /// Generates a cryptographically secure refresh token string.
+    /// Generates a cryptographically secure refresh token string suitable for persistence
+    /// in <c>Security.UserRefreshTokens</c>.
     /// </summary>
-    /// <returns>A random Base64Url-encoded refresh token.</returns>
-    private static string GenerateSecureRefreshToken()
+    /// <returns>A random Base64-encoded refresh token (64 random bytes encoded).</returns>
+    public string GenerateRefreshTokenString()
     {
         var randomBytes = RandomNumberGenerator.GetBytes(64);
         return Convert.ToBase64String(randomBytes);
+    }
+
+    /// <inheritdoc />
+    public DateTime GetRefreshTokenExpirationUtc()
+    {
+        var refreshTokenExpirationDays = int.TryParse(_configuration["Jwt:RefreshTokenExpirationDays"], out var parsedDays)
+            ? parsedDays
+            : 30;
+        return DateTime.UtcNow.AddDays(refreshTokenExpirationDays);
     }
 }

@@ -32,5 +32,25 @@ public interface ICurrentUserService
     /// Gets a value indicating whether the current execution context is associated with an authenticated user.
     /// </summary>
     bool IsAuthenticated { get; }
-    
+
+    /// <summary>
+    /// Gets the GUID identifier of the active refresh token row in <c>Security.UserRefreshTokens</c>.
+    /// Resolved from the <c>refresh_token_id</c> JWT claim. Returns <c>null</c> when the claim is absent
+    /// or cannot be parsed (e.g. tokens issued before the refresh-token-id claim was introduced).
+    /// </summary>
+    Guid? RefreshTokenId { get; }
+
+    /// <summary>
+    /// Gets the originating client IP address for the current request.
+    /// Resolution order: <c>X-Forwarded-For</c> header (first hop), then <c>Connection.RemoteIpAddress</c>.
+    /// Returns <c>null</c> when the value cannot be resolved.
+    /// </summary>
+    string? IpAddress { get; }
+
+    /// <summary>
+    /// Gets the originating client User-Agent header for the current request.
+    /// Returns <c>null</c> when the header is absent.
+    /// </summary>
+    string? UserAgent { get; }
+
 }

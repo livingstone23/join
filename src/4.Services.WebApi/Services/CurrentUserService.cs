@@ -70,4 +70,51 @@ public class CurrentUserService : ICurrentUserService
             return Guid.Empty;
         }
     }
+
+    /// <summary>
+    /// Reads the <c>refresh_token_id</c> claim from the current JWT and parses it as a <see cref="Guid"/>.
+    /// Returns <c>null</c> when the claim is absent or unparseable (back-compat for tokens
+    /// issued before the claim was introduced).
+    /// </summary>
+    public Guid? RefreshTokenId
+    {
+        get
+        {
+            var raw = _httpContextAccessor.HttpContext?.User?.FindFirstValue("refresh_token_id");
+            return Guid.TryParse(raw, out var parsedId) ? parsedId : null;
+        }
+    }
+
+    /// <summary>
+    /// Resolves the originating client IP address.
+    /// Order: first entry of <c>X-Forwarded-For</c>, then <c>Connection.RemoteIpAddress</c>.
+    /// </summary>
+    public string? IpAddress
+    {
+        get
+        {
+            var httpContext = _httpContextAccessor.HttpContext;
+            if (httpContext == null)
+            {
+                return null;
+            }
+
+            var forwarded = httpContext.Request?.Headers["X-Forwarded-For"].FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(forwarded))
+            {
+                var firstHop = forwarded.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(firstHop))
+                {
+                    return firstHop;
+                }
+            }
+
+            return httpContext.Connection?.RemoteIpAddress?.ToString();
+        }
+    }
+
+    /// <summary>
+    /// Reads the originating client User-Agent header (raw). Returns <c>null</c> when missing.
+    /// </summary>
+    public string? UserAgent => _httpContextAccessor.HttpContext?.Request?.Headers.UserAgent.FirstOrDefault();
 }

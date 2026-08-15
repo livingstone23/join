@@ -12,6 +12,22 @@ namespace JOIN.Domain.Security;
 public class UserRefreshToken : BaseAuditableEntity
 {
     /// <summary>
+    /// Initializes a new instance of the <see cref="UserRefreshToken"/> class with a generated identifier.
+    /// </summary>
+    public UserRefreshToken() { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="UserRefreshToken"/> class with the supplied identifier.
+    /// Used when the caller needs to embed the identifier inside the access token (e.g. the
+    /// <c>refresh_token_id</c> claim) before persistence and therefore must pre-generate the row id.
+    /// </summary>
+    /// <param name="id">The pre-determined identifier for the new row.</param>
+    public UserRefreshToken(Guid id)
+    {
+        Id = id;
+    }
+
+    /// <summary>
     /// Gets or sets the identifier of the user who owns the refresh token.
     /// </summary>
     public Guid UserId { get; set; }
