@@ -28,7 +28,7 @@ public sealed class RoleUserSessionRepository(ISqlConnectionFactory connectionFa
                 UNION ALL
                 SELECT CAST(Id AS uniqueidentifier) AS Id, CAST(1 AS int) AS [Type]
                 FROM [Security].[UserConnectionLogs]
-                WHERE Id = @sessionId AND IsActiveSession = 1 AND GcRecord = 0
+                WHERE Id = @sessionId AND IsActiveSession = 1
             ) AS s;
             """;
 
@@ -52,7 +52,7 @@ public sealed class RoleUserSessionRepository(ISqlConnectionFactory connectionFa
                 WHERE Id = @sessionId AND GcRecord = 0
                 UNION ALL
                 SELECT UserId FROM [Security].[UserConnectionLogs]
-                WHERE Id = @sessionId AND GcRecord = 0
+                WHERE Id = @sessionId
             ) AS s;
             """;
 
@@ -89,8 +89,7 @@ public sealed class RoleUserSessionRepository(ISqlConnectionFactory connectionFa
             SET IsActiveSession = 0,
                 DisconnectionDate = @utcNow
             WHERE UserId = @userId
-              AND IsActiveSession = 1
-              AND GcRecord = 0;
+              AND IsActiveSession = 1;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -126,8 +125,7 @@ public sealed class RoleUserSessionRepository(ISqlConnectionFactory connectionFa
             SET IsActiveSession = 0,
                 DisconnectionDate = @utcNow
             WHERE Id = @connectionId
-              AND IsActiveSession = 1
-              AND GcRecord = 0;
+              AND IsActiveSession = 1;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -202,10 +200,10 @@ public sealed class RoleUserSessionRepository(ISqlConnectionFactory connectionFa
                     CAST(so.CanExport AS bit) AS SupportCanExport,
                     CAST(so.CanExecute AS bit) AS SupportCanExecute
                 FROM [Security].[SystemOptions] so
-                INNER JOIN [Security].[SystemModules] mo
-                    ON mo.Id = so.SystemModuleId AND mo.GcRecord = 0
-                WHERE so.CompanyId = @companyId
-                  AND so.GcRecord = 0
+                INNER JOIN [Admin].[SystemModules] mo
+                    ON mo.Id = so.ModuleId AND mo.GcRecord = 0
+                WHERE so.GcRecord = 0
+                  AND mo.IsActive = 1
             )
             SELECT
                 mo.ModuleId,
@@ -244,8 +242,55 @@ public sealed class RoleUserSessionRepository(ISqlConnectionFactory connectionFa
         };
 
         using var connection = _connectionFactory.CreateConnection();
-        var rows = await connection.QueryAsync<PermissionFlagGridRow>(
+        var flat = await connection.QueryAsync<PermissionFlagGridFlatRow>(
             new CommandDefinition(sql, parameters, cancellationToken: ct));
-        return rows.AsList();
+        return flat.Select(MapToGridRow).AsList();
     }
+
+    /// <summary>
+    /// Flat projection used to deserialize the CTE result set directly from Dapper.
+    /// The 7 supports + 7 granted flags travel as separate columns; the public
+    /// <see cref="PermissionFlagGridRow"/> wraps them in nested record types so consumers
+    /// can pass them straight to <see cref="RoleSystemOptionMatrixOptionDto"/>.
+    /// </summary>
+    private sealed class PermissionFlagGridFlatRow
+    {
+        public Guid ModuleId { get; set; }
+        public string ModuleName { get; set; } = string.Empty;
+        public Guid SystemOptionId { get; set; }
+        public string OptionName { get; set; } = string.Empty;
+        public string OptionRoute { get; set; } = string.Empty;
+        public int DisplayOrder { get; set; }
+        public bool SupportCanRead { get; set; }
+        public bool SupportCanCreate { get; set; }
+        public bool SupportCanUpdate { get; set; }
+        public bool SupportCanDelete { get; set; }
+        public bool SupportCanDownload { get; set; }
+        public bool SupportCanExport { get; set; }
+        public bool SupportCanExecute { get; set; }
+        public bool GrantedCanRead { get; set; }
+        public bool GrantedCanCreate { get; set; }
+        public bool GrantedCanUpdate { get; set; }
+        public bool GrantedCanDelete { get; set; }
+        public bool GrantedCanDownload { get; set; }
+        public bool GrantedCanExport { get; set; }
+        public bool GrantedCanExecute { get; set; }
+    }
+
+    /// <summary>
+    /// Lifts the flat row into the public DTO shape.
+    /// </summary>
+    private static PermissionFlagGridRow MapToGridRow(PermissionFlagGridFlatRow flat) => new(
+        ModuleId: flat.ModuleId,
+        ModuleName: flat.ModuleName,
+        SystemOptionId: flat.SystemOptionId,
+        OptionName: flat.OptionName,
+        OptionRoute: flat.OptionRoute,
+        DisplayOrder: flat.DisplayOrder,
+        Supports: new RoleSystemOptionSupportFlags(
+            flat.SupportCanRead, flat.SupportCanCreate, flat.SupportCanUpdate,
+            flat.SupportCanDelete, flat.SupportCanDownload, flat.SupportCanExport, flat.SupportCanExecute),
+        Granted: new RoleSystemOptionGrantedFlags(
+            flat.GrantedCanRead, flat.GrantedCanCreate, flat.GrantedCanUpdate,
+            flat.GrantedCanDelete, flat.GrantedCanDownload, flat.GrantedCanExport, flat.GrantedCanExecute));
 }

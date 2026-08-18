@@ -35,6 +35,7 @@ public sealed class UserMfaRecoveryCodeRepository(ISqlConnectionFactory connecti
         }
 
         using var connection = _connectionFactory.CreateConnection();
+        connection.Open();
         using var transaction = connection.BeginTransaction();
         try
         {
