@@ -87,7 +87,6 @@ _ReSharper*/
 
 # VS Code
 .vscode/*
-!.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
@@ -195,6 +194,9 @@ coveragereport/
 # Cursor IDE (Si llegas a usarlo)
 .cursor/
 workspace.json
+
+# Excluir el settings.json
+settings.json
 
 # Skills / marketplaces de agentes instalados localmente (npx ctx7, skill installers, etc.)
 .agents/
