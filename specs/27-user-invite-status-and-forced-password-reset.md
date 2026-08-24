@@ -1,6 +1,6 @@
 # SPEC 27 — Alta administrada de usuarios (invite), activación/desactivación y reseteo forzado de contraseña
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 17 (PermissionResource + flag override), SPEC 23 (tenant desde el token), SPEC 25 (`IPermissionService.InvalidateUserCacheAsync`)
 > **Date:** 2026-08-15
 > **Objective:** Cerrar el ciclo de vida administrado de un usuario de empresa —alta por invitación con correo de setup-password, activación/desactivación con motivo, y reseteo forzado de contraseña— corrigiendo de paso los cuatro defectos de infraestructura que hoy lo bloquean: los tres handlers de `Auth` que existen como comando sin handler, el `TransactionBehavior` que commitea las fallas de negocio, y el filtro global de EF que esconde a los usuarios inactivos.

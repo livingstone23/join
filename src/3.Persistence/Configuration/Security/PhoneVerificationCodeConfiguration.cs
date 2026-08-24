@@ -35,9 +35,12 @@ public class PhoneVerificationCodeConfiguration : IEntityTypeConfiguration<Phone
         builder.Property(code => code.AttemptCount)
             .IsRequired();
 
+        // IsRequired(false) keeps the navigation optional because ApplicationUser carries
+        // a global query filter (GcRecord == 0 && IsActive) — see SPEC 27 migration notes.
         builder.HasOne(code => code.User)
             .WithMany()
             .HasForeignKey(code => code.UserId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Cascade);
 
         // Spec F8 acceptance: drives the "latest active code for a user" lookup.

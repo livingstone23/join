@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using JOIN.Application.Interface;
 using JOIN.Infrastructure.HealthChecks;
+using JOIN.Infrastructure.Messaging.Logging;
 using JOIN.Infrastructure.Messaging.SendGrid;
 using JOIN.Infrastructure.Persistence;
 using JOIN.Infrastructure.Security;
@@ -50,25 +51,38 @@ public static class DependencyInjection
         services.AddScoped<ISmsService, NoOpSmsService>();
 
         // ------------------------------------------------------------------
-        // Messaging: SendGrid email adapter (Adapter Pattern — Pillar 4)
-        // Bind strongly-typed options from the "SendGrid" configuration section,
-        // then register the adapter as a Typed Client wrapped in a Polly v8
-        // standard resilience pipeline (retry + circuit-breaker + attempt /
-        // total timeouts). Only the retry predicate and MaxRetryAttempts are
-        // customized per SPEC 05; the rest stays on the Microsoft preset defaults.
+        // Messaging: Email adapter (Adapter Pattern — Pillar 4).
+        // Switch between providers via the "Email:Provider" configuration key:
+        //   - "Log"      → LoggingEmailAdapter (dev only — no outbound traffic)
+        //   - "SendGrid" → SendGridEmailAdapter + Polly v8 standard resilience pipeline
+        // Unknown values and missing keys fall back to SendGrid so production never
+        // silently routes through the dev log sink. The Development override file
+        // (appsettings.Development.json) is the only place that sets "Log".
         // ------------------------------------------------------------------
-        services.Configure<SendGridOptions>(configuration.GetSection("SendGrid"));
-        services.AddHttpClient<IEmailService, SendGridEmailAdapter>()
-            .AddStandardResilienceHandler(options =>
-            {
-                options.Retry.MaxRetryAttempts = 3;
-                options.Retry.ShouldHandle = args => ValueTask.FromResult(
-                    args.Outcome.Result?.StatusCode is HttpStatusCode.RequestTimeout
-                        or HttpStatusCode.TooManyRequests
-                        or >= HttpStatusCode.InternalServerError
-                    || args.Outcome.Exception is HttpRequestException);
-                // CircuitBreaker, AttemptTimeout, TotalRequestTimeout: preset defaults.
-            });
+        var emailProvider = configuration["Email:Provider"];
+
+        if (string.Equals(emailProvider, "Log", StringComparison.OrdinalIgnoreCase))
+        {
+            // Transient lifetime matches the AddHttpClient<> registration used for
+            // SendGridEmailAdapter in the else-branch. HealthCheckEmailPublisher is a
+            // singleton and would reject a scoped dependency at DI validation time.
+            services.AddTransient<IEmailService, LoggingEmailAdapter>();
+        }
+        else
+        {
+            services.Configure<SendGridOptions>(configuration.GetSection("SendGrid"));
+            services.AddHttpClient<IEmailService, SendGridEmailAdapter>()
+                .AddStandardResilienceHandler(options =>
+                {
+                    options.Retry.MaxRetryAttempts = 3;
+                    options.Retry.ShouldHandle = args => ValueTask.FromResult(
+                        args.Outcome.Result?.StatusCode is HttpStatusCode.RequestTimeout
+                            or HttpStatusCode.TooManyRequests
+                            or >= HttpStatusCode.InternalServerError
+                        || args.Outcome.Exception is HttpRequestException);
+                    // CircuitBreaker, AttemptTimeout, TotalRequestTimeout: preset defaults.
+                });
+        }
 
         return services;
     }

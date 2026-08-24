@@ -1,6 +1,6 @@
 # SPEC 26 — `account/*` self-management (sessions, MFA, email change, phone verify, activity log)
 
-> **Status:** Aprobado (expanded)
+> **Status:** Implementado (expanded)
 > **Depends on:** SPEC 18 (Roles), SPEC 22 (RoleSystemOption 7 flags), SPEC 23 (tenant from token), SPEC 25 (matrix shape), `Otp.NET` NuGet.
 > **Date:** 2026-08-15
 > **Objective:** Cerrar el set completo de self-management del usuario autenticado en `AccountController`. Originalmente SPEC 26 cubría solo items 10 (sessions revoke) + 14 (my-permissions); items 9 (MFA), 11 (confirm email change), 12 (verify phone), 13 (security activity log) se difirieron a specs 27/28/29. Decisión: reabsorber los 4 items en esta spec para entregar el surface completo de `AccountController` en una sola entrega. Cambios viven en `AccountController`, 8 handlers nuevos, 3 tablas nuevas (`Security.SecurityEventLog`, `Security.UserMfaRecoveryCode`, `Security.PhoneVerificationCode`), 1 columna nueva en `Security.Users` (`MfaEnabledAtUtc`), 4 repositorios Dapper nuevos, 2 servicios de dominio nuevos (`ISecurityEventLogger`, `ISmsService`), refactor de `JwtTokenGenerator.GenerateToken` para incluir claim `refresh_token_id`, expansión de `ICurrentUserService` con `RefreshTokenId`/`IpAddress`/`UserAgent`, refactor de `LoginCommandHandler` + `RefreshTokenCommandHandler` para persistir `UserRefreshToken` antes de emitir access token. No nuevos controllers, no cambios en los 6 endpoints existentes.

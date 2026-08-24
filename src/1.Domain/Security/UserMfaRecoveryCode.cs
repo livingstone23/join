@@ -26,8 +26,12 @@ public class UserMfaRecoveryCode : BaseAuditableEntity
 
     /// <summary>
     /// Foreign key to <see cref="ApplicationUser"/>.
+    /// Nullable so the relationship stays optional — <see cref="ApplicationUser"/> carries
+    /// a global query filter (<c>GcRecord == 0 &amp;&amp; IsActive</c>) which EF would otherwise
+    /// warn about on a required principal end. Recovery codes persist for audit when a user
+    /// is soft-deleted or deactivated; cascade delete still cleans them up on hard delete.
     /// </summary>
-    public Guid UserId { get; set; }
+    public Guid? UserId { get; set; }
 
     /// <summary>
     /// PBKDF2-SHA256 hash, base64-encoded as <c>salt:hash</c>.

@@ -113,6 +113,7 @@ var areaPaginationSection = builder.Configuration.GetSection("AreaPagination");
 builder.Services.Configure<PaginationSettings>(areaPaginationSection);
 
 builder.Services.Configure<PerformanceSettings>(builder.Configuration.GetSection("Performance"));
+builder.Services.Configure<JOIN.Application.Common.Options.AppUrlsOptions>(builder.Configuration.GetSection(JOIN.Application.Common.Options.AppUrlsOptions.SectionName));
 
 // Application Layer (MediatR, FluentValidation Pipeline)
 builder.Services.AddApplicationServices();

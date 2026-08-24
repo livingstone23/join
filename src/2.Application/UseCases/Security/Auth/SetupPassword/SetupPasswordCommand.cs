@@ -15,6 +15,12 @@ namespace JOIN.Application.UseCases.Security.Auth.SetupPassword;
 public sealed record SetupPasswordCommand : IRequest<Response<bool>>
 {
     /// <summary>
+    /// Gets the email address of the account being activated. Required so the Identity token
+    /// can resolve the user (tokens are not self-describing).
+    /// </summary>
+    public string Email { get; init; } = string.Empty;
+
+    /// <summary>
     /// Gets the one-time setup token sent to the user.
     /// </summary>
     public string Token { get; init; } = string.Empty;

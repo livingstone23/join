@@ -8,6 +8,12 @@ namespace JOIN.Application.DTO.Security.Auth;
 public sealed record SetupPasswordRequestDto
 {
     /// <summary>
+    /// Email of the account being activated. Required to resolve the Identity token against
+    /// the user record.
+    /// </summary>
+    public string Email { get; init; } = string.Empty;
+
+    /// <summary>
     /// Gets the one-time setup token sent to the user's email address.
     /// </summary>
     public string Token { get; init; } = string.Empty;

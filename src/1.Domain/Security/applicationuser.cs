@@ -59,6 +59,13 @@ public class ApplicationUser : IdentityUser<Guid>, IAuditableEntity
     public string? MfaSecretKey { get; set; }
 
     /// <summary>
+    /// Free-text reason captured on the latest active/inactive flip
+    /// (<c>PUT /Users/{id}/status</c>, SPEC 27 item 16). Null until the first change.
+    /// Not indexed — only consulted when surfacing the status change in the UI.
+    /// </summary>
+    public string? StatusChangeReason { get; set; }
+
+    /// <summary>
     /// UTC instant when MFA was last enabled. Null until <c>IsMfaEnabled</c> flips to true.
     /// Used as audit + clock data for recovery-code re-issue and rotation policies.
     /// </summary>

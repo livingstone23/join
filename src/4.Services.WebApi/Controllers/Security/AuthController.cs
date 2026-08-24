@@ -53,6 +53,7 @@ public class AuthController(ISender sender) : ControllerBase
     {
         var response = await _sender.Send(new SetupPasswordCommand
         {
+            Email = request.Email,
             Token = request.Token,
             NewPassword = request.NewPassword,
             ConfirmPassword = request.ConfirmPassword
@@ -105,6 +106,7 @@ public class AuthController(ISender sender) : ControllerBase
     {
         var response = await _sender.Send(new ResetPasswordCommand
         {
+            Email = request.Email,
             Token = request.Token,
             NewPassword = request.NewPassword,
             ConfirmPassword = request.ConfirmPassword

@@ -30,9 +30,12 @@ public class UserMfaRecoveryCodeConfiguration : IEntityTypeConfiguration<UserMfa
 
         builder.Property(code => code.UsedAtUtc);
 
+        // IsRequired(false) keeps the navigation optional because ApplicationUser carries
+        // a global query filter (GcRecord == 0 && IsActive) — see SPEC 27 migration notes.
         builder.HasOne(code => code.User)
             .WithMany()
             .HasForeignKey(code => code.UserId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Cascade);
 
         // Drives DisableMfa recovery-code path lookup + MFA-management UX listings.

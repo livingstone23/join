@@ -8,6 +8,12 @@ namespace JOIN.Application.DTO.Security.Auth;
 public sealed record ResetPasswordRequestDto
 {
     /// <summary>
+    /// Email of the account whose password is being reset. Required to resolve the Identity
+    /// token against the user record.
+    /// </summary>
+    public string Email { get; init; } = string.Empty;
+
+    /// <summary>
     /// Gets the one-time recovery token sent to the user's email address.
     /// </summary>
     public string Token { get; init; } = string.Empty;

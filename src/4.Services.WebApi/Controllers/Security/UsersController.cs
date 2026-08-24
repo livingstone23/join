@@ -1,5 +1,6 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
+using JOIN.Application.DTO.Security.User;
 using JOIN.Application.UseCases.Security.Auth.Login;
 using JOIN.Application.UseCases.Security.Auth.Refresh;
 using JOIN.Application.UseCases.Security.Auth.Register;
@@ -8,9 +9,13 @@ using JOIN.Application.UseCases.Security.Queries.GetSidebarMenu;
 using JOIN.Application.UseCases.Security.Queries.GetSystemWideUserReport;
 using JOIN.Application.UseCases.Security.UserCompanies.Commands.SetDefaultCompany;
 using JOIN.Application.UseCases.Security.UserCompanies.Queries.GetUserCompanies;
+using JOIN.Application.UseCases.Security.Users.Commands.ChangeUserStatus;
+using JOIN.Application.UseCases.Security.Users.Commands.ForceUserPasswordReset;
 using JOIN.Application.UseCases.Security.Users.Commands.InvalidateSidebarCache;
+using JOIN.Application.UseCases.Security.Users.Commands.InviteUser;
 using JOIN.Application.UseCases.Security.Users.Commands.ReplaceUserRoles;
 using JOIN.Application.UseCases.Security.Users.Queries.GetUsersWithRoles;
+using JOIN.Domain.Security;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.RateLimiting;
@@ -334,6 +339,148 @@ public class UsersController(IMediator mediator) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+
+
+    /// <summary>
+    /// Invites a user to the caller's tenant. <c>POST /Users/invite</c> (SPEC 27 item 15).
+    /// Tenant context comes from the bearer token, not the body.
+    /// </summary>
+    /// <param name="request">Invite payload (email + names + role ids).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    [HttpPost("invite")]
+    [ProducesResponseType(typeof(Response<InviteUserResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status502BadGateway)]
+    public async Task<IActionResult> Invite(
+        [FromBody] InviteUserRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(
+            new InviteUserCommand(request.Email, request.FirstName, request.LastName, request.RoleIds),
+            cancellationToken);
+
+        return MapInviteResponse(response);
+    }
+
+
+
+    /// <summary>
+    /// Activates or deactivates a user in the caller's tenant. <c>PUT /Users/{userId}/status</c>
+    /// (SPEC 27 item 16).
+    /// </summary>
+    /// <param name="userId">Target user.</param>
+    /// <param name="request">Status payload (isActive + reason).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    [HttpPut("{userId:guid}/status")]
+    [ProducesResponseType(typeof(Response<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ChangeStatus(
+        Guid userId,
+        [FromBody] ChangeUserStatusRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(
+            new ChangeUserStatusCommand(userId, request.IsActive, request.Reason),
+            cancellationToken);
+
+        return MapChangeStatusResponse(response);
+    }
+
+
+
+    /// <summary>
+    /// Forces a password reset on a target user. <c>POST /Users/{userId}/force-password-reset</c>
+    /// (SPEC 27 item 17). Requires the <c>CanExecute</c> permission flag (not the default
+    /// <c>CanCreate</c>) because the operation is administrative, not a resource creation.
+    /// </summary>
+    /// <param name="userId">Target user.</param>
+    /// <param name="request">Force-reset payload (optional reason).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    [HttpPost("{userId:guid}/force-password-reset")]
+    [RequirePermission(PermissionFlags.CanExecute)]
+    [ProducesResponseType(typeof(Response<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status502BadGateway)]
+    public async Task<IActionResult> ForcePasswordReset(
+        Guid userId,
+        [FromBody] ForceUserPasswordResetRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(
+            new ForceUserPasswordResetCommand(userId, request.Reason),
+            cancellationToken);
+
+        return MapForceResetResponse(response);
+    }
+
+    // ──────────────────────────────────────────────
+    //  Response → HTTP mapping (SPEC 27 F8 table)
+    // ──────────────────────────────────────────────
+
+    private IActionResult MapInviteResponse(Response<InviteUserResultDto> response)
+    {
+        if (response.IsSuccess)
+        {
+            return Ok(response);
+        }
+
+        return response.Message switch
+        {
+            "TENANT_REQUIRED" => BadRequest(response),
+            "ROLE_NOT_FOUND" => NotFound(response),
+            "USER_ALREADY_EXISTS" => Conflict(response),
+            "EMAIL_DELIVERY_FAILED" => StatusCode(StatusCodes.Status502BadGateway, response),
+            "FRONTEND_URL_NOT_CONFIGURED" => StatusCode(StatusCodes.Status500InternalServerError, response),
+            _ => BadRequest(response)
+        };
+    }
+
+    private IActionResult MapChangeStatusResponse(Response<bool> response)
+    {
+        if (response.IsSuccess)
+        {
+            return Ok(response);
+        }
+
+        return response.Message switch
+        {
+            "TENANT_REQUIRED" => BadRequest(response),
+            "USER_NOT_FOUND" => NotFound(response),
+            "CANNOT_CHANGE_OWN_STATUS" => Conflict(response),
+            "STATUS_UNCHANGED" => Conflict(response),
+            _ => BadRequest(response)
+        };
+    }
+
+    private IActionResult MapForceResetResponse(Response<bool> response)
+    {
+        if (response.IsSuccess)
+        {
+            return Ok(response);
+        }
+
+        return response.Message switch
+        {
+            "TENANT_REQUIRED" => BadRequest(response),
+            "USER_INACTIVE" => BadRequest(response),
+            "USER_NOT_FOUND" => NotFound(response),
+            "EMAIL_DELIVERY_FAILED" => StatusCode(StatusCodes.Status502BadGateway, response),
+            "FRONTEND_URL_NOT_CONFIGURED" => StatusCode(StatusCodes.Status500InternalServerError, response),
+            _ => BadRequest(response)
+        };
     }
 
 }
