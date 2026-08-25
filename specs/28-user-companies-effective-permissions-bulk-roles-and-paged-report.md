@@ -1,6 +1,6 @@
 # SPEC 28 — Membresía multi-empresa, permisos efectivos, asignación masiva de roles y reporte de usuarios paginado
 
-> **Status:** Borrador
+> **Status:** Implementado
 > **Depends on:** SPEC 17 (PermissionResource + flag override), SPEC 23 (tenant desde el token), SPEC 25 (sub-DTOs de matriz + `IPermissionService.InvalidateUserCacheAsync`), **SPEC 27** (arreglo de `TransactionBehavior` + `IUserAdminRepository`)
 > **Date:** 2026-08-15
 > **Objective:** Completar la administración de usuarios de empresa desde la tabla del panel —alta y baja de pertenencia multi-empresa, matriz de permisos efectivos por usuario, asignación masiva de roles y reporte paginado con búsqueda— y corregir en el camino que los roles se escriban en la tabla de Identity en lugar de `UserRoleCompanies`, que es la única que gobierna la autorización.

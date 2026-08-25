@@ -184,6 +184,20 @@ public sealed class InviteUserCommandHandlerTests
         public IOptions<AppUrlsOptions> AppUrls { get; } =
             Options.Create(new AppUrlsOptions { FrontendBaseUrl = "https://app.join.com" });
 
+        public Context()
+        {
+            // InviteUserCommandHandler.ReplaceUserRoleCompaniesAsync / membership
+            // creation both call into IUnitOfWork.GetRepository<T>(). Without these
+            // setups Moq returns null and the handler throws NullReferenceException
+            // on the first InsertAsync.
+            UnitOfWorkMock
+                .Setup(x => x.GetRepository<UserCompany>())
+                .Returns(() => Mock.Of<IGenericRepository<UserCompany>>());
+            UnitOfWorkMock
+                .Setup(x => x.GetRepository<UserRoleCompany>())
+                .Returns(() => Mock.Of<IGenericRepository<UserRoleCompany>>());
+        }
+
         public InviteUserCommandHandler Handler => new(
             UserManagerMock.Object,
             UnitOfWorkMock.Object,

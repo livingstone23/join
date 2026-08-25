@@ -137,6 +137,86 @@ public class AuthController { ... }
 public class UsersController { ... }
 ```
 
+## Users — `/api/v1/Users` (SPEC 28)
+
+SPEC 28 reshapes the user-management surface of `UsersController`: roles are now written
+to `Security.UserRoleCompanies` (the table that actually governs authorization), the
+`/companies` endpoints are restricted to `SuperAdmin`, and a bulk role endpoint plus
+a paginated `reports/my-company` endpoint are added. Tenant comes from the JWT (SPEC 23).
+
+```bash
+TOKEN="<jwt-from-login>"
+COMPANY="00000000-0000-0000-0000-000000000001"
+USER_ID="<target-user-guid>"
+
+# 1) Replace the full role set of a user (PUT /{userId}/roles).
+#    Body is the role NAMES (unchanged contract); resolution is tenant-scoped.
+#    Writes Security.UserRoleCompanies (NOT Security.UserRoles) and invalidates
+#    the permission cache for the user/tenant pair.
+curl -X PUT "http://localhost:5000/api/v1/Users/${USER_ID}/roles" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY" \
+  -H "Content-Type: application/json" \
+  -d '{"roles":["Admin","Contador"]}'
+
+# 2) Bulk add/remove roles across up to 200 users in one transaction (PUT /roles/bulk).
+#    Delta semantics: addRoleIds and removeRoleIds are applied per user; rows not
+#    in either list are untouched. Declared BEFORE PUT /{userId}/roles so the
+#    literal "roles/bulk" segment wins the routing match.
+curl -X PUT "http://localhost:5000/api/v1/Users/roles/bulk" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userIds":["11111111-1111-1111-1111-111111111111","22222222-2222-2222-2222-222222222222"],
+    "addRoleIds":["33333333-3333-3333-3333-333333333333"],
+    "removeRoleIds":["44444444-4444-4444-4444-444444444444"]
+  }'
+
+# 3) Effective permissions of a user inside the caller's tenant (GET /{userId}/effective-permissions).
+#    No ?companyId= — the tenant comes from the JWT. The handler runs a fresh
+#    Dapper query (no PermissionService cache) so the panel reflects live DB state.
+curl "http://localhost:5000/api/v1/Users/${USER_ID}/effective-permissions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# 4) List every active company linked to a user (GET /{userId}/companies).
+#    SPEC 28: restricted to SuperAdmin (was leaking cross-tenant before).
+curl "http://localhost:5000/api/v1/Users/${USER_ID}/companies" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# 5) Add or refresh a user's membership in a company (POST /{userId}/companies).
+#    SuperAdmin only. Body's companyId is the tenant of the new membership, not
+#    the caller's tenant. Idempotent; reactivates soft-deleted rows in place
+#    so the (UserId, CompanyId) unique index never collides.
+curl -X POST "http://localhost:5000/api/v1/Users/${USER_ID}/companies" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "companyId":"55555555-5555-5555-5555-555555555555",
+    "roleIds":["33333333-3333-3333-3333-333333333333"]
+  }'
+
+# 6) Remove a user's membership in a company (DELETE /{userId}/companies/{companyId}).
+#    SuperAdmin only. Guard order: 409 CANNOT_REMOVE_LAST_COMPANY beats
+#    409 CANNOT_REMOVE_DEFAULT_COMPANY when a user has only one company.
+curl -X DELETE "http://localhost:5000/api/v1/Users/${USER_ID}/companies/55555555-5555-5555-5555-555555555555" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# 7) Paged user-management report for the caller's company (GET /reports/my-company).
+#    Shape changed in SPEC 28 from a flat collection to PagedResult<T>.
+#    pageNumber >= 1 (clamped), pageSize in [1, 50] (default 10, clamped).
+#    search matches Email and "FirstName ' ' LastName" case-insensitive.
+#    isActive absent → both; isActive=false → inactive users (Dapper bypasses
+#    the EF global filter that would otherwise hide them).
+curl "http://localhost:5000/api/v1/Users/reports/my-company?pageNumber=1&pageSize=10&search=juan&isActive=false" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+```
+
 ## Roles — `/api/v1/Roles`
 
 The Roles controller keeps the legacy `GET /` endpoint (`IEnumerable<string>`) for selectors and adds a detailed CRUD surface. The detailed endpoints are gated by the `Roles` permission resource and the HTTP-verb default flag. The preview endpoint `GET /{id}/users` is gated by the `Roles` resource and the `SuperAdminCompany` role; it powers the "usuarios afectados" preview before saving role changes (SPEC 20).

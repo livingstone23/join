@@ -7,10 +7,16 @@ using MediatR;
 namespace JOIN.Application.UseCases.Security.Users.Queries.GetUsersWithRoles;
 
 /// <summary>
-/// Handles the retrieval of all active users and their assigned roles.
+/// Handles the retrieval of the active user list together with the roles currently
+/// assigned to each account inside the caller's tenant. Rewritten by SPEC 28 / F2
+/// to read from <c>Security.UserRoleCompanies</c> (the table that governs
+/// authorization) instead of <c>Security.UserRoles</c> (Identity) and to scope the
+/// result set to users with an active membership in the tenant from the JWT
+/// (SPEC 23). Without the tenant filter the endpoint was a cross-tenant leak.
 /// </summary>
-/// <param name="connectionFactory">Factory used to create engine-agnostic read connections.</param>
-public sealed class GetUsersWithRolesQueryHandler(ISqlConnectionFactory connectionFactory)
+public sealed class GetUsersWithRolesQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetUsersWithRolesQuery, Response<IEnumerable<UserWithRolesDto>>>
 {
     private const string Sql = """
@@ -20,30 +26,39 @@ public sealed class GetUsersWithRolesQueryHandler(ISqlConnectionFactory connecti
             u.Email,
             u.IsActive,
             r.Name AS RoleName
-        FROM Security.Users u
-        LEFT JOIN Security.UserRoles ur
-            ON ur.UserId = u.Id
-        LEFT JOIN Security.Roles r
-            ON r.Id = ur.RoleId
+        FROM [Security].[Users] u
+        INNER JOIN [Security].[UserCompanies] uc
+            ON uc.UserId = u.Id
+           AND uc.CompanyId = @CompanyId
+           AND uc.GcRecord = 0
+        LEFT JOIN [Security].[UserRoleCompanies] urc
+            ON urc.UserId = u.Id
+           AND urc.CompanyId = @CompanyId
+           AND urc.GcRecord = 0
+        LEFT JOIN [Security].[Roles] r
+            ON r.Id = urc.RoleId
            AND r.GcRecord = 0
         WHERE u.GcRecord = 0
         ORDER BY u.UserName, r.Name;
         """;
 
-    /// <summary>
-    /// Retrieves the active users and aggregates their assigned roles.
-    /// </summary>
-    /// <param name="request">The query payload.</param>
-    /// <param name="cancellationToken">Token used to cancel the operation.</param>
-    /// <returns>A standardized response with the user/role projection.</returns>
     public async Task<Response<IEnumerable<UserWithRolesDto>>> Handle(
         GetUsersWithRolesQuery request,
         CancellationToken cancellationToken)
     {
+        var companyId = currentUserService.CompanyId;
+        if (companyId == Guid.Empty)
+        {
+            return Response<IEnumerable<UserWithRolesDto>>.Error(
+                "TENANT_REQUIRED",
+                ["A tenant context is required to list users."]);
+        }
+
         using var connection = connectionFactory.CreateConnection();
+        connection.Open();
 
         var rows = (await connection.QueryAsync<UserWithRolesSqlRow>(
-            new CommandDefinition(Sql, cancellationToken: cancellationToken)))
+            new CommandDefinition(Sql, new { CompanyId = companyId }, cancellationToken: cancellationToken)))
             .AsList();
 
         var users = rows

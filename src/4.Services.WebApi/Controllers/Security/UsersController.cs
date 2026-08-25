@@ -7,13 +7,17 @@ using JOIN.Application.UseCases.Security.Auth.Register;
 using JOIN.Application.UseCases.Security.Queries.GetMyCompanyUserReport;
 using JOIN.Application.UseCases.Security.Queries.GetSidebarMenu;
 using JOIN.Application.UseCases.Security.Queries.GetSystemWideUserReport;
+using JOIN.Application.UseCases.Security.UserCompanies.Commands.AddUserCompany;
+using JOIN.Application.UseCases.Security.UserCompanies.Commands.RemoveUserCompany;
 using JOIN.Application.UseCases.Security.UserCompanies.Commands.SetDefaultCompany;
 using JOIN.Application.UseCases.Security.UserCompanies.Queries.GetUserCompanies;
+using JOIN.Application.UseCases.Security.Users.Commands.BulkUpdateUserRoles;
 using JOIN.Application.UseCases.Security.Users.Commands.ChangeUserStatus;
 using JOIN.Application.UseCases.Security.Users.Commands.ForceUserPasswordReset;
 using JOIN.Application.UseCases.Security.Users.Commands.InvalidateSidebarCache;
 using JOIN.Application.UseCases.Security.Users.Commands.InviteUser;
 using JOIN.Application.UseCases.Security.Users.Commands.ReplaceUserRoles;
+using JOIN.Application.UseCases.Security.Users.Queries.GetUserEffectivePermissions;
 using JOIN.Application.UseCases.Security.Users.Queries.GetUsersWithRoles;
 using JOIN.Domain.Security;
 using JOIN.Services.WebApi.Filters;
@@ -76,7 +80,7 @@ public class UsersController(IMediator mediator) : ControllerBase
     /// </summary>
     /// <param name="command">The registration payload containing the new user data.</param>
     /// <param name="cancellationToken">Token used to cancel the registration request while the command is being handled.</param>
-    /// <returns>A standardized response containing the identifier of the newly created user.</returns>
+    /// <returns>A standardized response containing the identifier of the newly registered user.</returns>
     [AllowAnonymous]
     [HttpPost("register")]
     [ProducesResponseType(typeof(Response<RegisterResponseDto>), StatusCodes.Status200OK)]
@@ -94,7 +98,7 @@ public class UsersController(IMediator mediator) : ControllerBase
     /// This endpoint is intended to extend a user session without forcing the user to re-enter credentials.
     /// </summary>
     /// <param name="command">The refresh-token payload used to request a renewed session.</param>
-    /// <param name="cancellationToken">Token used to cancel the refresh request while the command is being processed.</param>
+    /// <param name="cancellationToken">Token used to cancel the refresh request while the command is being handled.</param>
     /// <returns>The renewed authenticated session payload when the refresh token is valid.</returns>
     [AllowAnonymous]
     [EnableRateLimiting("Strict")]
@@ -133,7 +137,7 @@ public class UsersController(IMediator mediator) : ControllerBase
 
     /// <summary>
     /// Returns the user management and activity report across all companies in the system.
-    /// Access is restricted to `SuperAdmin` users because the response spans multiple tenants and may include cross-company activity information.
+    /// Access is restricted to <c>SuperAdmin</c> users because the response spans multiple tenants and may include cross-company activity information.
     /// </summary>
     /// <param name="fromDate">Optional lower UTC date boundary used to limit the report window.</param>
     /// <param name="toDate">Optional upper UTC date boundary used to limit the report window.</param>
@@ -163,29 +167,43 @@ public class UsersController(IMediator mediator) : ControllerBase
 
 
     /// <summary>
-    /// Returns the user management and activity report restricted to the authenticated user's active company context.
-    /// The effective tenant is resolved first from <c>Security.UserCompanies</c> using the default company, then from <c>Security.UserRoleCompanies</c> when necessary, and finally applied to scope the report data safely.
+    /// Returns a paginated slice of the user management and activity report restricted to the
+    /// authenticated user's active company context. SPEC 28 / F7 (item 21).
+    /// The response shape changed from a flat collection to <c>PagedResult&lt;T&gt;</c> —
+    /// coordinate the deploy with the front-end consumer.
     /// </summary>
+    /// <param name="pageNumber">1-based page index; values below 1 are clamped to 1.</param>
+    /// <param name="pageSize">Items per page; values outside <c>[1, 50]</c> are clamped (default 10).</param>
+    /// <param name="search">Optional partial match against Email or full name, case-insensitive.</param>
+    /// <param name="isActive">Optional active/inactive filter; omit to include both.</param>
     /// <param name="fromDate">Optional lower UTC date boundary used to filter the report window.</param>
     /// <param name="toDate">Optional upper UTC date boundary used to filter the report window.</param>
     /// <param name="roleNames">Optional list of role names used to narrow the report result set.</param>
     /// <param name="cancellationToken">Token used to cancel the request while the company-scoped report query runs.</param>
-    /// <returns>A standardized response containing the company-scoped user management report rows.</returns>
+    /// <returns>A standardized paginated response containing the requested user management rows.</returns>
     [HttpGet("reports/my-company")]
-    [ProducesResponseType(typeof(Response<IReadOnlyCollection<UserManagementReportDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<PagedResult<UserManagementReportDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetMyCompanyReport(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null,
+        [FromQuery] bool? isActive = null,
         [FromQuery] DateTime? fromDate = null,
         [FromQuery] DateTime? toDate = null,
         [FromQuery] string[]? roleNames = null,
         CancellationToken cancellationToken = default)
     {
         var response = await _mediator.Send(
-            new GetMyCompanyUserReportQuery(fromDate, toDate, roleNames),
+            new GetMyCompanyUserReportQuery(
+                fromDate, toDate, roleNames,
+                pageNumber, pageSize,
+                search, isActive),
             cancellationToken);
 
-        return Ok(response);
+        return response.IsSuccess ? Ok(response) : BadRequest(response);
     }
 
 
@@ -241,15 +259,19 @@ public class UsersController(IMediator mediator) : ControllerBase
 
 
     /// <summary>
-    /// Returns every active company linked to the specified user and indicates which assignment is currently marked as the default operational context.
-    /// This endpoint is used to drive user-context switching screens and related security administration workflows.
+    /// Returns every active company linked to the specified user and indicates which assignment is
+    /// currently marked as the default operational context. SPEC 28 / F8 restricted this endpoint
+    /// to <c>SuperAdmin</c> because the previous behaviour leaked cross-tenant memberships (H2).
     /// </summary>
     /// <param name="userId">The unique identifier of the user whose company assignments should be listed.</param>
     /// <param name="cancellationToken">Token used to cancel the request while the company-assignment query executes.</param>
     /// <returns>A standardized response containing the linked companies for the requested user.</returns>
+    [Authorize(Roles = "SuperAdmin")]
+    [SkipDynamicAuthorization]
     [HttpGet("{userId:guid}/companies")]
     [ProducesResponseType(typeof(Response<IEnumerable<UserCompanyDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUserCompanies(Guid userId, CancellationToken cancellationToken = default)
     {
@@ -258,6 +280,108 @@ public class UsersController(IMediator mediator) : ControllerBase
         if (!response.IsSuccess && string.Equals(response.Message, "User not found.", StringComparison.Ordinal))
         {
             return NotFound(response);
+        }
+
+        return Ok(response);
+    }
+
+
+
+    /// <summary>
+    /// Adds (or refreshes the role set of) a user's membership in a company.
+    /// SPEC 28 / F3 (item 18, <c>POST /Users/{userId}/companies</c>).
+    /// SuperAdmin only — the body's <c>companyId</c> is the tenant of the new membership, not the
+    /// caller's tenant. The endpoint is idempotent and reactivates soft-deleted rows in place so
+    /// the unique <c>(UserId, CompanyId)</c> index never collides.
+    /// </summary>
+    /// <param name="userId">User whose membership should be added or refreshed.</param>
+    /// <param name="request">Payload containing the target company id and the role ids to assign.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [Authorize(Roles = "SuperAdmin")]
+    [SkipDynamicAuthorization]
+    [HttpPost("{userId:guid}/companies")]
+    [ProducesResponseType(typeof(Response<AddUserCompanyResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AddUserCompany(
+        Guid userId,
+        [FromBody] AddUserCompanyRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(
+            new AddUserCompanyCommand(userId, request.CompanyId, request.RoleIds),
+            cancellationToken);
+
+        return MapCompaniesResponse(response);
+    }
+
+
+
+    /// <summary>
+    /// Removes a user's membership in a company and every role assignment attached to that pair.
+    /// SPEC 28 / F4 (item 18, <c>DELETE /Users/{userId}/companies/{companyId}</c>).
+    /// SuperAdmin only. Guard order from the spec: last-company beats default-company so a
+    /// single-tenant user gets the more useful error.
+    /// </summary>
+    /// <param name="userId">User whose membership should be removed.</param>
+    /// <param name="companyId">Company of the membership to remove.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [Authorize(Roles = "SuperAdmin")]
+    [SkipDynamicAuthorization]
+    [HttpDelete("{userId:guid}/companies/{companyId:guid}")]
+    [ProducesResponseType(typeof(Response<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RemoveUserCompany(
+        Guid userId,
+        Guid companyId,
+        CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(
+            new RemoveUserCompanyCommand(userId, companyId),
+            cancellationToken);
+
+        return MapCompaniesResponse(response);
+    }
+
+
+
+    /// <summary>
+    /// Resolves the effective permissions of a user inside the caller's tenant. SPEC 28 / F5
+    /// (item 19, <c>GET /Users/{userId}/effective-permissions</c>). The tenant comes from the JWT
+    /// (SPEC 23) — the route deliberately does NOT expose a <c>?companyId=</c> parameter. The
+    /// handler runs a fresh Dapper query (no <c>PermissionService</c> cache) so the panel reflects
+    /// the live DB state.
+    /// </summary>
+    /// <param name="userId">User whose effective permissions are being inspected.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpGet("{userId:guid}/effective-permissions")]
+    [ProducesResponseType(typeof(Response<UserEffectivePermissionsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetUserEffectivePermissions(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(
+            new GetUserEffectivePermissionsQuery(userId),
+            cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            return response.Message switch
+            {
+                "USER_NOT_FOUND" => NotFound(response),
+                "TENANT_REQUIRED" => BadRequest(response),
+                _ => BadRequest(response)
+            };
         }
 
         return Ok(response);
@@ -293,24 +417,55 @@ public class UsersController(IMediator mediator) : ControllerBase
 
     /// <summary>
     /// Returns the active users registered in the system together with all roles currently assigned to each one.
-    /// This endpoint is especially useful for user-administration screens that need a consolidated role view before applying changes.
+    /// Tenant-scoped by SPEC 28 / F2: only users with an active membership in the caller's tenant.
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel the request while the user-role query is being processed.</param>
     /// <returns>A standardized response containing the user list and their assigned roles.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(Response<IEnumerable<UserWithRolesDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetUsersWithRoles(CancellationToken cancellationToken = default)
     {
         var response = await _mediator.Send(new GetUsersWithRolesQuery(), cancellationToken);
-        return Ok(response);
+
+        return response.IsSuccess ? Ok(response) : BadRequest(response);
     }
 
 
 
     /// <summary>
-    /// Replaces the full role set assigned to a specific user.
-    /// The endpoint receives the desired final role list, delegates the replacement logic to the Application layer, and returns `404`, `400`, or `200` depending on the execution outcome.
+    /// Bulk add / remove roles across up to <c>200</c> users in a single transaction. SPEC 28 / F6
+    /// (item 20, <c>PUT /Users/roles/bulk</c>). Delta semantics: rows not present in either input
+    /// list are left untouched. Declared <b>before</b> <see cref="ReplaceUserRoles"/> so the literal
+    /// <c>roles/bulk</c> segment wins the routing match over the templated <c>{userId:guid}/roles</c>.
+    /// </summary>
+    /// <param name="request">Bulk payload with user ids, add-role ids, and remove-role ids.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPut("roles/bulk")]
+    [ProducesResponseType(typeof(Response<BulkUpdateUserRolesResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> BulkUpdateUserRoles(
+        [FromBody] BulkUpdateUserRolesRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(
+            new BulkUpdateUserRolesCommand(request.UserIds, request.AddRoleIds, request.RemoveRoleIds),
+            cancellationToken);
+
+        return response.IsSuccess ? Ok(response) : BadRequest(response);
+    }
+
+
+
+    /// <summary>
+    /// Replaces the full role set assigned to a specific user. SPEC 28 / F2: the underlying handler
+    /// now writes to <c>Security.UserRoleCompanies</c> (the table that governs authorization) and
+    /// resolves names against the caller's tenant. The external contract — request shape
+    /// <c>{ roles: ["Admin"] }</c> and response <c>Response&lt;UserWithRolesDto&gt;</c> — is unchanged.
     /// </summary>
     /// <param name="userId">The unique identifier of the user whose roles should be replaced.</param>
     /// <param name="request">The payload containing the final list of roles that must remain assigned to the user.</param>
@@ -427,8 +582,28 @@ public class UsersController(IMediator mediator) : ControllerBase
     }
 
     // ──────────────────────────────────────────────
-    //  Response → HTTP mapping (SPEC 27 F8 table)
+    //  Response → HTTP mapping (SPEC 28 F8 table)
     // ──────────────────────────────────────────────
+
+    private IActionResult MapCompaniesResponse<T>(Response<T> response)
+    {
+        if (response.IsSuccess)
+        {
+            return Ok(response);
+        }
+
+        return response.Message switch
+        {
+            "TENANT_REQUIRED" => BadRequest(response),
+            "USER_NOT_FOUND" => NotFound(response),
+            "COMPANY_NOT_FOUND" => NotFound(response),
+            "ROLE_NOT_FOUND" => NotFound(response),
+            "MEMBERSHIP_NOT_FOUND" => NotFound(response),
+            "CANNOT_REMOVE_DEFAULT_COMPANY" => Conflict(response),
+            "CANNOT_REMOVE_LAST_COMPANY" => Conflict(response),
+            _ => BadRequest(response)
+        };
+    }
 
     private IActionResult MapInviteResponse(Response<InviteUserResultDto> response)
     {
