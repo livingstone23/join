@@ -1,6 +1,6 @@
 # SPEC 29 — Bitácora de seguridad: tabla de auditoría con diff y endpoint de consulta
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 17 (PermissionResource + flag override), SPEC 23 (tenant desde el token), SPEC 25 (`RoleSystemOptionsRepository.BulkUpsertAsync`, camino Dapper a instrumentar), **SPEC 27** (flip de estado por Dapper a instrumentar), **SPEC 28** (`ReplaceUserRoles` reescrito, `BulkUpdateUserRoles`, `AddUserCompany`, `RemoveUserCompany`, todos a instrumentar)
 > **Date:** 2026-08-15
 > **Objective:** Dar respuesta consultable a "quién cambió qué permiso y cuándo" creando la tabla `Security.AuditLogs` con diff de valores viejo/nuevo, un servicio `IAuditLogger` invocado explícitamente desde cada handler que muta roles, permisos, usuarios o membresías —único mecanismo que cubre tanto los caminos EF como los Dapper—, y el endpoint `GET /api/v1/Audit/security` para leerla.
