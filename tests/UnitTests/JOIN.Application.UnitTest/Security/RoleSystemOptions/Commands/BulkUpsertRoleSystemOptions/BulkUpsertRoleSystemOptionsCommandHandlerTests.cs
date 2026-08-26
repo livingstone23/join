@@ -198,6 +198,7 @@ public sealed class BulkUpsertRoleSystemOptionsCommandHandlerTests
         public Mock<IRoleRepository> RoleRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IPermissionService> PermissionServiceMock { get; } = new();
+        public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
 
         public BulkUpsertRoleSystemOptionsCommandHandler CreateHandler()
             => new(
@@ -205,6 +206,7 @@ public sealed class BulkUpsertRoleSystemOptionsCommandHandlerTests
                 RoleRepositoryMock.Object,
                 CurrentUserServiceMock.Object,
                 PermissionServiceMock.Object,
+                AuditLoggerMock.Object,
                 NullLogger<BulkUpsertRoleSystemOptionsCommandHandler>.Instance);
     }
 }

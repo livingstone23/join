@@ -1,5 +1,6 @@
 using AutoFixture;
 using FluentAssertions;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.UseCases.Security.UserCompanies.Commands.SetDefaultCompany;
 using JOIN.Domain.Security;
@@ -161,10 +162,11 @@ public sealed class SetDefaultCompanyCommandHandlerTests
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
         public Mock<IGenericRepository<UserCompany>> RepositoryMock { get; } = new();
+        public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
 
         public SetDefaultCompanyCommandHandler CreateHandler()
         {
-            return new SetDefaultCompanyCommandHandler(UnitOfWorkMock.Object);
+            return new SetDefaultCompanyCommandHandler(UnitOfWorkMock.Object, AuditLoggerMock.Object);
         }
     }
 }

@@ -22,7 +22,8 @@ public sealed class RemoveUserCompanyCommandHandler(
     IUserAdminRepository userAdminRepository,
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
-    IPermissionService permissionService)
+    IPermissionService permissionService,
+    IAuditLogger auditLogger)
     : IRequestHandler<RemoveUserCompanyCommand, Response<bool>>
 {
     // Loads every active + soft-deleted UserRoleCompany row for the pair so the
@@ -126,6 +127,25 @@ public sealed class RemoveUserCompanyCommandHandler(
         // now-empty role set for this user inside this tenant.
         await permissionService.InvalidateUserCacheAsync(
             request.CompanyId, request.UserId, cancellationToken);
+
+        // Bitácora de seguridad — UserCompany soft-deleted plus one UserRoleCompany per
+        // assignment that was removed. Single batch keeps the round-trip count low.
+        var companyLabel = $"{request.UserId} @ {request.CompanyId}";
+        var auditEntries = new List<AuditLogEntryRequest>
+        {
+            new(AuditedEntity.UserCompany, membershipRow.Id, AuditAction.Deleted, EntityLabel: companyLabel)
+        };
+
+        foreach (var row in roleIndex)
+        {
+            auditEntries.Add(new AuditLogEntryRequest(
+                AuditedEntity.UserRoleCompany,
+                row.Id,
+                AuditAction.Deleted,
+                EntityLabel: $"{request.UserId} → {request.CompanyId}"));
+        }
+
+        await auditLogger.LogManyAsync(auditEntries, cancellationToken);
 
         return new Response<bool>
         {

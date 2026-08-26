@@ -50,7 +50,7 @@ public sealed class AddUserCompanyCommandHandlerTests
         var companyId = Guid.NewGuid();
         ctx.UserAdminRepositoryMock
             .Setup(x => x.GetAdminSnapshotAsync(userId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false));
+            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false, StatusChangeReason: null));
         ctx.UserAdminRepositoryMock
             .Setup(x => x.CompanyExistsAsync(companyId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
@@ -72,7 +72,7 @@ public sealed class AddUserCompanyCommandHandlerTests
         var roleId = Guid.NewGuid();
         ctx.UserAdminRepositoryMock
             .Setup(x => x.GetAdminSnapshotAsync(userId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false));
+            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false, StatusChangeReason: null));
         ctx.UserAdminRepositoryMock
             .Setup(x => x.CompanyExistsAsync(companyId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -97,7 +97,7 @@ public sealed class AddUserCompanyCommandHandlerTests
         var roleId = Guid.NewGuid();
         ctx.UserAdminRepositoryMock
             .Setup(x => x.GetAdminSnapshotAsync(userId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false));
+            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false, StatusChangeReason: null));
         ctx.UserAdminRepositoryMock
             .Setup(x => x.CompanyExistsAsync(companyId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -137,7 +137,7 @@ public sealed class AddUserCompanyCommandHandlerTests
         var roleId = Guid.NewGuid();
         ctx.UserAdminRepositoryMock
             .Setup(x => x.GetAdminSnapshotAsync(userId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false));
+            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false, StatusChangeReason: null));
         ctx.UserAdminRepositoryMock
             .Setup(x => x.CompanyExistsAsync(companyId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -168,7 +168,7 @@ public sealed class AddUserCompanyCommandHandlerTests
         var existingMembershipId = Guid.NewGuid();
         ctx.UserAdminRepositoryMock
             .Setup(x => x.GetAdminSnapshotAsync(userId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: true));
+            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: true, StatusChangeReason: null));
         ctx.UserAdminRepositoryMock
             .Setup(x => x.CompanyExistsAsync(companyId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -209,7 +209,7 @@ public sealed class AddUserCompanyCommandHandlerTests
         var softDeletedMembershipId = Guid.NewGuid();
         ctx.UserAdminRepositoryMock
             .Setup(x => x.GetAdminSnapshotAsync(userId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false));
+            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false, StatusChangeReason: null));
         ctx.UserAdminRepositoryMock
             .Setup(x => x.CompanyExistsAsync(companyId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -261,6 +261,7 @@ public sealed class AddUserCompanyCommandHandlerTests
         public Mock<IUserAdminRepository> UserAdminRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IPermissionService> PermissionServiceMock { get; } = new();
+        public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
 
         public Context()
         {
@@ -280,6 +281,7 @@ public sealed class AddUserCompanyCommandHandlerTests
             UserAdminRepositoryMock.Object,
             UnitOfWorkMock.Object,
             CurrentUserServiceMock.Object,
-            PermissionServiceMock.Object);
+            PermissionServiceMock.Object,
+            AuditLoggerMock.Object);
     }
 }

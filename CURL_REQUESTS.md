@@ -597,3 +597,105 @@ Auth failures on PUT/DELETE:
 | JWT missing / `CompanyId` claim empty (`X-Company-Id` not set either) | `400` `INVALID_COMPANY_ID` |
 | Body `companyId` (PUT) or query `companyId` (DELETE) differs from token tenant | `400` `COMPANY_MISMATCH` |
 | Rule not found for the caller's tenant | `404` `ROLE_SYSTEM_OPTION_NOT_FOUND` |
+
+## Audit / Security bitácora (SPEC 29)
+
+The endpoint requires `CanRead` on the `Audit` resource (resolved via the
+`SystemOption` of the same `ControllerName`). A SuperAdmin can pass
+`allTenants=true` to span every tenant; everyone else sees only their own.
+
+```bash
+TOKEN="<jwt-from-login>"
+COMPANY="00000000-0000-0000-0000-000000000001"
+
+# Default page (pageNumber=1, pageSize=20) — only the caller's tenant
+curl "http://localhost:5000/api/v1/Audit/security" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# Filter by entity (case-insensitive), with paging
+curl "http://localhost:5000/api/v1/Audit/security?entity=RoleSystemOption&pageNumber=1&pageSize=50" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# Filter by date range and actor
+curl "http://localhost:5000/api/v1/Audit/security?fromDate=2026-08-01&toDate=2026-08-31&changedBy=<userId>" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# Filter by a specific row of one of the audited entities
+curl "http://localhost:5000/api/v1/Audit/security?entity=UserRoleCompany&entityId=<urc-id>" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# SuperAdmin only — every tenant's events
+curl "http://localhost:5000/api/v1/Audit/security?allTenants=true&pageSize=100" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+
+# Filter by action (Created | Updated | Deleted)
+curl "http://localhost:5000/api/v1/Audit/security?action=Deleted&entity=Role" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $COMPANY"
+```
+
+Available query parameters:
+
+| Param | Type | Notes |
+|-------|------|-------|
+| `entity` | `Role` \| `User` \| `RoleSystemOption` \| `UserRoleCompany` \| `UserCompany` \| `RoleCompany` | Case-insensitive; invalid value → `400 INVALID_ENTITY` |
+| `entityId` | Guid | Filters to one row of the chosen entity |
+| `changedBy` | user-id string | Exact match |
+| `action` | `Created` \| `Updated` \| `Deleted` | Case-insensitive; invalid value → `400 INVALID_ACTION` |
+| `fromDate` / `toDate` | ISO date | Inclusive `fromDate`, exclusive `toDate` (`toDate + 1 day`); `fromDate > toDate` → `400` |
+| `pageNumber` | int | Clamped to `>= 1`, default `1` |
+| `pageSize` | int | Clamped to `[1, 100]`, default `20` |
+| `allTenants` | bool | Honored only for SuperAdmin; ignored silently otherwise |
+
+Endpoint errors:
+
+| Cause | Status | Code |
+|-------|--------|------|
+| Token missing `CompanyId` | `400` | `TENANT_REQUIRED` |
+| `entity` outside the enum | `400` | `INVALID_ENTITY` |
+| `action` outside the enum | `400` | `INVALID_ACTION` |
+| Missing / invalid token | `401` | — |
+| Caller lacks `CanRead` on `Audit` | `403` | — |
+| `fromDate > toDate` | `400` | FluentValidation |
+
+Response shape (one item per bitácora row):
+
+```json
+{
+  "isSuccess": true,
+  "message": "Security audit log retrieved.",
+  "data": {
+    "items": [
+      {
+        "id": "…",
+        "entityName": "RoleSystemOption",
+        "entityId": "…",
+        "entityLabel": "Contador → Personas",
+        "action": "Updated",
+        "changedBy": "…",
+        "changedByName": "Ana Pérez",
+        "changedAtUtc": "2026-08-15T14:22:07Z",
+        "ipAddress": "190.12.4.8",
+        "changes": [
+          { "field": "CanDelete", "oldValue": "True", "newValue": "False" }
+        ],
+        "metadata": "{\"bulkOperationId\":\"…\"}"
+      }
+    ],
+    "pageNumber": 1,
+    "pageSize": 20,
+    "totalCount": 42,
+    "totalPages": 3
+  }
+}
+```
+
+`changes[]` is the union of keys from `OldValuesJson` / `NewValuesJson`; rows
+with corrupt JSON surface with an empty `changes[]` instead of failing the page.
+`metadata` carries `bulkOperationId` for grouped bulk writes (RoleSystemOptions
+matrix upsert and bulk role updates).

@@ -4,6 +4,7 @@ using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.Mappings.Security;
+using JOIN.Domain.Audit;
 using MediatR;
 
 namespace JOIN.Application.UseCases.Security.Roles.Commands.UpdateRole;
@@ -16,7 +17,8 @@ public sealed class UpdateRoleCommandHandler(
     IUnitOfWork unitOfWork,
     IRoleRepository roleRepository,
     IRoleMapper roleMapper,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IAuditLogger auditLogger)
     : IRequestHandler<UpdateRoleCommand, Response<RoleDto>>
 {
     public async Task<Response<RoleDto>> Handle(UpdateRoleCommand request, CancellationToken cancellationToken)
@@ -63,6 +65,15 @@ public sealed class UpdateRoleCommandHandler(
             return Response<RoleDto>.Error($"Ya existe otro rol con el nombre '{trimmedName}'.");
         }
 
+        // Snapshot pre-mutation state for the bitácora diff. Skip audit columns / Identity
+        // internals (ConcurrencyStamp etc.) so the JSON stays business-readable.
+        var oldValues = new Dictionary<string, object?>
+        {
+            ["Name"] = existing.Name,
+            ["Description"] = existing.Description,
+            ["IsSystemDefault"] = existing.IsSystemDefault
+        };
+
         existing.Name = trimmedName;
         existing.NormalizedName = newNormalizedName;
         existing.Description = request.Description;
@@ -76,6 +87,22 @@ public sealed class UpdateRoleCommandHandler(
         {
             return Response<RoleDto>.Error("No se pudo actualizar el rol. Intente nuevamente.");
         }
+
+        var newValues = new Dictionary<string, object?>
+        {
+            ["Name"] = existing.Name,
+            ["Description"] = existing.Description,
+            ["IsSystemDefault"] = existing.IsSystemDefault
+        };
+
+        await auditLogger.LogAsync(
+            AuditedEntity.Role,
+            existing.Id,
+            AuditAction.Updated,
+            entityLabel: existing.Name,
+            oldValues: oldValues,
+            newValues: newValues,
+            ct: cancellationToken);
 
         var dto = roleMapper.FromEntity(existing);
         return new Response<RoleDto>

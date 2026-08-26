@@ -16,6 +16,7 @@ public sealed class DeleteRoleCommandHandler(
     IUnitOfWork unitOfWork,
     IRoleRepository roleRepository,
     ICurrentUserService currentUserService,
+    IAuditLogger auditLogger,
     ILogger<DeleteRoleCommandHandler> logger)
     : IRequestHandler<DeleteRoleCommand, Response<bool>>
 {
@@ -52,6 +53,16 @@ public sealed class DeleteRoleCommandHandler(
                 [$"El rol tiene {usersCount} usuario(s) asignado(s). Desasigná antes de eliminar."]);
         }
 
+        // Snapshot for the bitácora before stamping GcRecord — the diff should reflect the
+        // row as it stood when the operator hit delete.
+        var deletedLabel = existing.Name;
+        var deletedOldValues = new Dictionary<string, object?>
+        {
+            ["Name"] = existing.Name,
+            ["Description"] = existing.Description,
+            ["IsSystemDefault"] = existing.IsSystemDefault
+        };
+
         var modifiedBy = currentUserService.UserId ?? "system";
 
         // Stamp GcRecord with the yyyyMMdd UTC int, matching the project-wide soft-delete convention
@@ -67,6 +78,14 @@ public sealed class DeleteRoleCommandHandler(
             logger.LogWarning("Soft delete of role {RoleId} affected 0 rows. Race condition or already deleted.", existing.Id);
             return Response<bool>.Error("Rol no encontrado o inactivo.");
         }
+
+        await auditLogger.LogAsync(
+            AuditedEntity.Role,
+            existing.Id,
+            AuditAction.Deleted,
+            entityLabel: deletedLabel,
+            oldValues: deletedOldValues,
+            ct: cancellationToken);
 
         return new Response<bool>
         {

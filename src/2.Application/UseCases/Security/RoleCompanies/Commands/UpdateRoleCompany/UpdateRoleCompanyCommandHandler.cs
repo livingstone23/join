@@ -6,6 +6,7 @@ using JOIN.Application.DTO.Security.RoleCompany;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
+using JOIN.Domain.Audit;
 using MediatR;
 
 namespace JOIN.Application.UseCases.Security.RoleCompanies.Commands.UpdateRoleCompany;
@@ -18,13 +19,15 @@ public sealed class UpdateRoleCompanyCommandHandler(
     IUnitOfWork unitOfWork,
     IRoleCompanyRepository roleCompanyRepository,
     IRoleRepository roleRepository,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IAuditLogger auditLogger)
     : IRequestHandler<UpdateRoleCompanyCommand, Response<RoleCompanyDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
     private readonly IRoleCompanyRepository _roleCompanyRepository = roleCompanyRepository ?? throw new ArgumentNullException(nameof(roleCompanyRepository));
     private readonly IRoleRepository _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
     private readonly ICurrentUserService _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
+    private readonly IAuditLogger _auditLogger = auditLogger ?? throw new ArgumentNullException(nameof(auditLogger));
 
     public async Task<Response<RoleCompanyDto>> Handle(UpdateRoleCompanyCommand request, CancellationToken cancellationToken)
     {
@@ -69,6 +72,9 @@ public sealed class UpdateRoleCompanyCommandHandler(
                 new[] { "Ya existe otro vínculo activo entre este rol y la compañía del token." });
         }
 
+        // Bitácora: capture the prior RoleId before mutation so the diff is meaningful.
+        var oldRoleId = existing.RoleId;
+
         existing.RoleId = request.RoleId;
         existing.LastModified = DateTime.UtcNow;
         existing.LastModifiedBy = _currentUserService.UserId;
@@ -81,6 +87,15 @@ public sealed class UpdateRoleCompanyCommandHandler(
                 "ROLE_COMPANY_UPDATE_FAILED",
                 new[] { "No se pudo actualizar el vínculo rol-empresa. Intente nuevamente." });
         }
+
+        await _auditLogger.LogAsync(
+            AuditedEntity.RoleCompany,
+            existing.Id,
+            AuditAction.Updated,
+            entityLabel: $"{existingRole.Name} @ {tenantId}",
+            oldValues: new Dictionary<string, object?> { ["RoleId"] = oldRoleId },
+            newValues: new Dictionary<string, object?> { ["RoleId"] = existing.RoleId },
+            ct: cancellationToken);
 
         // Reload via Dapper so the response carries RoleName + IsSystemDefault.
         var dto = await _roleCompanyRepository.GetByIdAsync(existing.Id, tenantId, cancellationToken);

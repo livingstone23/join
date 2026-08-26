@@ -6,6 +6,7 @@ using JOIN.Application.DTO.Security.RoleCompany;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
+using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
 using MediatR;
 
@@ -20,13 +21,15 @@ public sealed class CreateRoleCompanyCommandHandler(
     IUnitOfWork unitOfWork,
     IRoleCompanyRepository roleCompanyRepository,
     IRoleRepository roleRepository,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IAuditLogger auditLogger)
     : IRequestHandler<CreateRoleCompanyCommand, Response<RoleCompanyDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
     private readonly IRoleCompanyRepository _roleCompanyRepository = roleCompanyRepository ?? throw new ArgumentNullException(nameof(roleCompanyRepository));
     private readonly IRoleRepository _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
     private readonly ICurrentUserService _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
+    private readonly IAuditLogger _auditLogger = auditLogger ?? throw new ArgumentNullException(nameof(auditLogger));
 
     public async Task<Response<RoleCompanyDto>> Handle(CreateRoleCompanyCommand request, CancellationToken cancellationToken)
     {
@@ -82,6 +85,18 @@ public sealed class CreateRoleCompanyCommandHandler(
                 "ROLE_COMPANY_CREATE_FAILED",
                 new[] { "No se pudo crear el vínculo rol-empresa. Intente nuevamente." });
         }
+
+        await _auditLogger.LogAsync(
+            AuditedEntity.RoleCompany,
+            entity.Id,
+            AuditAction.Created,
+            entityLabel: $"{existingRole.Name} @ {tenantId}",
+            newValues: new Dictionary<string, object?>
+            {
+                ["RoleId"] = entity.RoleId,
+                ["CompanyId"] = entity.CompanyId
+            },
+            ct: cancellationToken);
 
         // Reload via Dapper so the response carries RoleName + IsSystemDefault from Security.Roles.
         var dto = await _roleCompanyRepository.GetByIdAsync(entity.Id, tenantId, cancellationToken);

@@ -68,7 +68,7 @@ public sealed class UpdateRoleSystemOptionCommandHandlerTests
         var currentUserServiceMock = new Mock<ICurrentUserService>();
         currentUserServiceMock.Setup(x => x.CompanyId).Returns(companyId);
 
-        var handler = new UpdateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object);
+        var handler = new UpdateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, Mock.Of<IAuditLogger>());
 
         var cmd = new UpdateRoleSystemOptionCommand(
             Id: id,
@@ -114,7 +114,7 @@ public sealed class UpdateRoleSystemOptionCommandHandlerTests
         var currentUserServiceMock = new Mock<ICurrentUserService>();
         currentUserServiceMock.Setup(x => x.CompanyId).Returns(Guid.Empty);
 
-        var handler = new UpdateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object);
+        var handler = new UpdateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, Mock.Of<IAuditLogger>());
 
         var cmd = new UpdateRoleSystemOptionCommand(
             Id: Guid.NewGuid(),
@@ -144,7 +144,7 @@ public sealed class UpdateRoleSystemOptionCommandHandlerTests
         var currentUserServiceMock = new Mock<ICurrentUserService>();
         currentUserServiceMock.Setup(x => x.CompanyId).Returns(tokenCompanyId);
 
-        var handler = new UpdateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object);
+        var handler = new UpdateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, Mock.Of<IAuditLogger>());
 
         var cmd = new UpdateRoleSystemOptionCommand(
             Id: Guid.NewGuid(),
@@ -185,7 +185,7 @@ public sealed class UpdateRoleSystemOptionCommandHandlerTests
         var currentUserServiceMock = new Mock<ICurrentUserService>();
         currentUserServiceMock.Setup(x => x.CompanyId).Returns(companyId);
 
-        var handler = new UpdateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object);
+        var handler = new UpdateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, Mock.Of<IAuditLogger>());
 
         var cmd = new UpdateRoleSystemOptionCommand(
             Id: id,
@@ -221,7 +221,7 @@ public sealed class UpdateRoleSystemOptionCommandHandlerTests
         var currentUserServiceMock = new Mock<ICurrentUserService>();
         currentUserServiceMock.Setup(x => x.CompanyId).Returns(companyId);
 
-        var handler = new UpdateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object);
+        var handler = new UpdateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, Mock.Of<IAuditLogger>());
 
         var cmd = new UpdateRoleSystemOptionCommand(id, true, true, true, true);
 
@@ -231,3 +231,4 @@ public sealed class UpdateRoleSystemOptionCommandHandlerTests
         response.Message.Should().Be("ROLE_SYSTEM_OPTION_NOT_FOUND");
     }
 }
+

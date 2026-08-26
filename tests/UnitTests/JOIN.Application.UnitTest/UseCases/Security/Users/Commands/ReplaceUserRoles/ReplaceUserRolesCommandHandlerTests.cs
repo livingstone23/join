@@ -287,6 +287,7 @@ public sealed class ReplaceUserRolesCommandHandlerTests
         public Mock<IUserAdminRepository> UserAdminRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IPermissionService> PermissionServiceMock { get; } = new();
+        public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
 
         // Single shared UserRoleCompany repository mock so tests that need a
         // specific GetAsync(...) behavior can configure it directly via
@@ -305,6 +306,7 @@ public sealed class ReplaceUserRolesCommandHandlerTests
             UserAdminRepositoryMock.Object,
             UnitOfWorkMock.Object,
             CurrentUserServiceMock.Object,
-            PermissionServiceMock.Object);
+            PermissionServiceMock.Object,
+            AuditLoggerMock.Object);
     }
 }

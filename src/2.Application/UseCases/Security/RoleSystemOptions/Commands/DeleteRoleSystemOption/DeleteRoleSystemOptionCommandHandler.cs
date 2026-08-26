@@ -1,6 +1,8 @@
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.Interface.Persistence.Security;
+using JOIN.Domain.Audit;
 using MediatR;
 
 namespace JOIN.Application.UseCases.Security.RoleSystemOptions.Commands;
@@ -11,7 +13,8 @@ namespace JOIN.Application.UseCases.Security.RoleSystemOptions.Commands;
 /// </summary>
 public sealed class DeleteRoleSystemOptionCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IAuditLogger auditLogger)
     : IRequestHandler<DeleteRoleSystemOptionCommand, Response<Guid>>
 {
     public async Task<Response<Guid>> Handle(DeleteRoleSystemOptionCommand request, CancellationToken cancellationToken)
@@ -36,6 +39,23 @@ public sealed class DeleteRoleSystemOptionCommandHandler(
             return Response<Guid>.Error("ROLE_SYSTEM_OPTION_NOT_FOUND", ["Role system option not found."]);
         }
 
+        // Snapshot flags + display names BEFORE stamping GcRecord — the post-delete
+        // readback would skip the soft-deleted row.
+        var oldValues = new Dictionary<string, object?>
+        {
+            ["CanRead"] = entity.CanRead,
+            ["CanCreate"] = entity.CanCreate,
+            ["CanUpdate"] = entity.CanUpdate,
+            ["CanDelete"] = entity.CanDelete,
+            ["CanDownload"] = entity.CanDownload,
+            ["CanExport"] = entity.CanExport,
+            ["CanExecute"] = entity.CanExecute,
+            ["IsVisibleMenu"] = entity.IsVisibleMenu,
+            ["OrderMenu"] = entity.OrderMenu
+        };
+        var names = await repository.GetNamesByIdAndCompanyAsync(entity.Id, companyId, cancellationToken);
+        var deletedLabel = names is not null ? $"{names.RoleName} → {names.SystemOptionName}" : null;
+
         entity.MarkAsDeleted();
         await repository.UpdateAsync(entity);
 
@@ -44,6 +64,14 @@ public sealed class DeleteRoleSystemOptionCommandHandler(
         {
             return Response<Guid>.Error("DELETE_FAILED", ["No records were affected while deleting the permission rule."]);
         }
+
+        await auditLogger.LogAsync(
+            AuditedEntity.RoleSystemOption,
+            entity.Id,
+            AuditAction.Deleted,
+            entityLabel: deletedLabel,
+            oldValues: oldValues,
+            ct: cancellationToken);
 
         return new Response<Guid>
         {

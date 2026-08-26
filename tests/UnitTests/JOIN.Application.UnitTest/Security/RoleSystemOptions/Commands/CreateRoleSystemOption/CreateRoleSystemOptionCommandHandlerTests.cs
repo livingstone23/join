@@ -8,6 +8,7 @@ using JOIN.Application.UseCases.Security.RoleSystemOptions.Commands;
 using JOIN.Domain.Common;
 using JOIN.Domain.Security;
 using Moq;
+using JOIN.Application.Interface;
 
 namespace JOIN.Application.UnitTest.Security.RoleSystemOptions.Commands.CreateRoleSystemOption;
 
@@ -76,7 +77,7 @@ public sealed class CreateRoleSystemOptionCommandHandlerTests
         mapperMock.Setup(x => x.ToEntity(It.IsAny<CreateRoleSystemOptionCommand>())).Returns(new RoleSystemOption());
         mapperMock.Setup(x => x.ToDto(It.IsAny<RoleSystemOption>())).Returns(dto);
 
-        var handler = new CreateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object);
+        var handler = new CreateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, Mock.Of<IAuditLogger>());
 
         var cmd = new CreateRoleSystemOptionCommand(
             CompanyId: companyId,
@@ -128,7 +129,7 @@ public sealed class CreateRoleSystemOptionCommandHandlerTests
         var unitOfWorkMock = new Mock<IUnitOfWork>();
         var mapperMock = new Mock<IRoleSystemOptionMapper>();
 
-        var handler = new CreateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object);
+        var handler = new CreateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, Mock.Of<IAuditLogger>());
 
         var cmd = new CreateRoleSystemOptionCommand(
             CompanyId: Guid.Empty,
@@ -177,7 +178,7 @@ public sealed class CreateRoleSystemOptionCommandHandlerTests
         var mapperMock = new Mock<IRoleSystemOptionMapper>();
         mapperMock.Setup(x => x.ToEntity(It.IsAny<CreateRoleSystemOptionCommand>())).Returns(new RoleSystemOption());
 
-        var handler = new CreateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object);
+        var handler = new CreateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, Mock.Of<IAuditLogger>());
 
         var cmd = new CreateRoleSystemOptionCommand(companyId, roleId, systemOptionId, true, true, true, true);
         var response = await handler.Handle(cmd, CancellationToken.None);
@@ -222,7 +223,7 @@ public sealed class CreateRoleSystemOptionCommandHandlerTests
         var fallbackDto = new RoleSystemOptionDto { Id = Guid.NewGuid(), CompanyId = companyId };
         mapperMock.Setup(x => x.ToDto(It.IsAny<RoleSystemOption>())).Returns(fallbackDto);
 
-        var handler = new CreateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object);
+        var handler = new CreateRoleSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, Mock.Of<IAuditLogger>());
 
         var cmd = new CreateRoleSystemOptionCommand(companyId, roleId, systemOptionId, true, true, true, true);
         var response = await handler.Handle(cmd, CancellationToken.None);
@@ -232,3 +233,5 @@ public sealed class CreateRoleSystemOptionCommandHandlerTests
         mapperMock.Verify(x => x.ToDto(It.IsAny<RoleSystemOption>()), Times.Once);
     }
 }
+
+

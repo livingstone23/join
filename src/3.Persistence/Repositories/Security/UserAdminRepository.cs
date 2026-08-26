@@ -69,6 +69,7 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
                    u.FirstName   AS FirstName,
                    u.IsActive    AS IsActive,
                    u.GcRecord    AS GcRecord,
+                   u.StatusChangeReason AS StatusChangeReason,
                    CASE WHEN EXISTS (
                        SELECT 1
                        FROM [Security].[UserCompanies] uc
@@ -96,7 +97,8 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
                 FirstName: row.FirstName,
                 IsActive: row.IsActive,
                 GcRecord: row.GcRecord,
-                HasMembership: row.HasMembership != 0);
+                HasMembership: row.HasMembership != 0,
+                StatusChangeReason: row.StatusChangeReason);
     }
 
     public async Task<bool> SetUserActiveStatusAsync(
@@ -123,6 +125,30 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
             new { UserId = userId, IsActive = isActive, Reason = reason, ModifiedBy = modifiedBy, UtcNow = utcNow },
             cancellationToken: ct));
         return affected == 1;
+    }
+
+    public async Task<bool> IsSuperAdminAsync(string? userId, CancellationToken ct = default)
+    {
+        if (!Guid.TryParse(userId, out var parsed))
+        {
+            return false;
+        }
+
+        const string sql = """
+            SELECT CAST(CASE WHEN EXISTS (
+                SELECT 1
+                FROM [Security].[Users]
+                WHERE Id = @UserId
+                  AND GcRecord = 0
+                  AND IsSuperAdmin = 1
+            ) THEN 1 ELSE 0 END AS bit);
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        connection.Open();
+        var result = await connection.ExecuteScalarAsync<int>(
+            new CommandDefinition(sql, new { UserId = parsed }, cancellationToken: ct));
+        return result == 1;
     }
 
     public async Task<bool> HasCompanyMembershipAsync(Guid userId, Guid companyId, CancellationToken ct = default)
@@ -533,6 +559,7 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
         public string? FirstName { get; set; }
         public bool IsActive { get; set; }
         public int GcRecord { get; set; }
+        public string? StatusChangeReason { get; set; }
         public int HasMembership { get; set; }
     }
 

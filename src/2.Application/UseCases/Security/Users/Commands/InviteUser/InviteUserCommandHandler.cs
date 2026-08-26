@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Dapper;
 using JOIN.Application.Common;
 using JOIN.Application.Common.Email;
 using JOIN.Application.Common.Options;
@@ -24,19 +25,42 @@ public sealed class InviteUserCommandHandler(
     UserManager<ApplicationUser> userManager,
     IUnitOfWork unitOfWork,
     IUserAdminRepository userAdminRepository,
+    ISqlConnectionFactory connectionFactory,
     ICurrentUserService currentUserService,
     IEmailService emailService,
     IOptions<AppUrlsOptions> appUrls,
-    ISecurityEventLogger securityEventLogger)
+    ISecurityEventLogger securityEventLogger,
+    IAuditLogger auditLogger)
     : IRequestHandler<InviteUserCommand, Response<InviteUserResultDto>>
 {
     private readonly UserManager<ApplicationUser> _userManager = userManager;
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
     private readonly IUserAdminRepository _userAdminRepository = userAdminRepository;
+    private readonly ISqlConnectionFactory _connectionFactory = connectionFactory;
     private readonly ICurrentUserService _currentUserService = currentUserService;
     private readonly IEmailService _emailService = emailService;
     private readonly AppUrlsOptions _appUrls = appUrls.Value;
     private readonly ISecurityEventLogger _securityEventLogger = securityEventLogger;
+    private readonly IAuditLogger _auditLogger = auditLogger;
+
+    private const string ExistingRoleIdsSql = """
+        SELECT Id          AS Id,
+               FirstName   AS FirstName,
+               LastName    AS LastName,
+               IsActive    AS IsActive,
+               Email       AS Email
+        FROM [Security].[Users]
+        WHERE Id = @UserId
+          AND GcRecord = 0;
+        """;
+
+    private const string PriorUserRoleCompaniesSql = """
+        SELECT RoleId AS RoleId
+        FROM [Security].[UserRoleCompanies]
+        WHERE UserId = @UserId
+          AND CompanyId = @CompanyId
+          AND GcRecord = 0;
+        """;
 
     public async Task<Response<InviteUserResultDto>> Handle(InviteUserCommand request, CancellationToken cancellationToken)
     {
@@ -110,7 +134,22 @@ public sealed class InviteUserCommandHandler(
             }
         }
 
+        // Bitácora: capture prior UserRoleCompanies for this tenant BEFORE we touch them
+        // so the diff is meaningful for the InvitationResent branch (Created/MembershipAdded
+        // see an empty prior set, so every requested role becomes Created).
+        HashSet<Guid> priorUrRoleIds;
+        using (var conn = _connectionFactory.CreateConnection())
+        {
+            conn.Open();
+            var priorRows = await conn.QueryAsync<Guid>(
+                new CommandDefinition(PriorUserRoleCompaniesSql,
+                    new { UserId = user.Id, CompanyId = companyId },
+                    cancellationToken: cancellationToken));
+            priorUrRoleIds = new HashSet<Guid>(priorRows);
+        }
+
         // Membership row — only create when not already present (branches 1 and 2).
+        var userCompanyCreated = false;
         if (outcome == InviteOutcome.Created || outcome == InviteOutcome.MembershipAdded)
         {
             var hasMembership = await _userAdminRepository.HasCompanyMembershipAsync(user.Id, companyId, cancellationToken);
@@ -127,6 +166,7 @@ public sealed class InviteUserCommandHandler(
                     CreatedBy = _currentUserService.UserId
                 };
                 await _unitOfWork.GetRepository<UserCompany>().InsertAsync(userCompany);
+                userCompanyCreated = true;
             }
 
             await ReplaceUserRoleCompaniesAsync(user.Id, companyId, request.RoleIds, cancellationToken);
@@ -154,7 +194,58 @@ public sealed class InviteUserCommandHandler(
             return Response<InviteUserResultDto>.Error("EMAIL_DELIVERY_FAILED", ["Unable to send the invitation email."]);
         }
 
-        // Audit row (best-effort).
+        // Bitácora de seguridad — append-only rows in Security.AuditLogs.
+        var auditEntries = new List<AuditLogEntryRequest>();
+
+        if (outcome == InviteOutcome.Created)
+        {
+            auditEntries.Add(new AuditLogEntryRequest(
+                AuditedEntity.User,
+                user.Id,
+                AuditAction.Created,
+                EntityLabel: email,
+                NewValues: new Dictionary<string, object?>
+                {
+                    ["Email"] = email,
+                    ["FirstName"] = user.FirstName,
+                    ["LastName"] = user.LastName,
+                    ["IsActive"] = user.IsActive
+                }));
+        }
+
+        if (userCompanyCreated)
+        {
+            auditEntries.Add(new AuditLogEntryRequest(
+                AuditedEntity.UserCompany,
+                Guid.NewGuid(),
+                AuditAction.Created,
+                EntityLabel: $"{email} @ {companyId}",
+                NewValues: new Dictionary<string, object?>
+                {
+                    ["UserId"] = user.Id,
+                    ["CompanyId"] = companyId
+                }));
+        }
+
+        // UserRoleCompany rows: only the ones that effectively changed are recorded.
+        foreach (var roleId in request.RoleIds)
+        {
+            if (!priorUrRoleIds.Contains(roleId))
+            {
+                auditEntries.Add(new AuditLogEntryRequest(
+                    AuditedEntity.UserRoleCompany,
+                    Guid.NewGuid(),
+                    AuditAction.Created,
+                    EntityLabel: $"{email} → {roleId}"));
+            }
+        }
+
+        if (auditEntries.Count > 0)
+        {
+            await _auditLogger.LogManyAsync(auditEntries, cancellationToken);
+        }
+
+        // Existing SecurityEventLog row — left in place per SPEC 26 to keep session events there.
         var metadata = JsonSerializer.Serialize(new { userId = user.Id, outcome = outcome.ToString(), roleCount = request.RoleIds.Count });
         await _securityEventLogger.LogAsync(
             SecurityEventType.MfaSetupInitiated, // closest existing event — proper SPEC 29 audit row arrives later

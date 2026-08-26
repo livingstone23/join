@@ -32,7 +32,8 @@ public sealed class ReplaceUserRolesCommandHandler(
     IUserAdminRepository userAdminRepository,
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
-    IPermissionService permissionService)
+    IPermissionService permissionService,
+    IAuditLogger auditLogger)
     : IRequestHandler<ReplaceUserRolesCommand, Response<UserWithRolesDto>>
 {
     private const string UserLookupSql = """
@@ -217,6 +218,47 @@ public sealed class ReplaceUserRolesCommandHandler(
             .Select(name => name!)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
+
+        // Bitácora de seguridad — log one UserRoleCompany row per role that effectively changed.
+        // Resolved: roles in resolvedSet that were NOT active before → Created.
+        // Removed:   roles that WERE active before but are NOT in resolvedSet → Deleted.
+        var beforeActive = new HashSet<Guid>(activeIdsByRow.Keys);
+        var auditEntries = new List<AuditLogEntryRequest>();
+        var userEmail = userRow.Email ?? string.Empty;
+
+        foreach (var roleId in resolvedIds)
+        {
+            if (beforeActive.Contains(roleId))
+            {
+                continue;
+            }
+
+            var rowId = softDeletedIdsByRoleId.TryGetValue(roleId, out var reusable) ? reusable : Guid.NewGuid();
+            auditEntries.Add(new AuditLogEntryRequest(
+                AuditedEntity.UserRoleCompany,
+                rowId,
+                AuditAction.Created,
+                EntityLabel: $"{userEmail} → {roleId}"));
+        }
+
+        foreach (var roleId in beforeActive)
+        {
+            if (resolvedSet.Contains(roleId))
+            {
+                continue;
+            }
+
+            auditEntries.Add(new AuditLogEntryRequest(
+                AuditedEntity.UserRoleCompany,
+                activeIdsByRow[roleId],
+                AuditAction.Deleted,
+                EntityLabel: $"{userEmail} → {roleId}"));
+        }
+
+        if (auditEntries.Count > 0)
+        {
+            await auditLogger.LogManyAsync(auditEntries, cancellationToken);
+        }
 
         return new Response<UserWithRolesDto>
         {

@@ -2577,7 +2577,11 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Roles", "/Seguridad/Roles", "@Icons.Material.Filled.VerifiedUser", null,"Roles", false, false, false, false),
         new("RoleCompanies", "/Seguridad/RoleCompanies", "@Icons.Material.Filled.VerifiedUser", null, "RoleCompanies", false, false, false, false),
         new("SystemOption", "/Seguridad/systemOptions", "@Icons.Material.Filled.SystemSecurityUpdateWarning", null,"SystemOptions", false, false, false, false),
-        new("RoleSystemOption", "/Seguridad/rolesystemoption", "@Icons.Material.Filled.SystemSecurityUpdateGood", null,"RoleSystemOption", false, false, false, false)
+        new("RoleSystemOption", "/Seguridad/rolesystemoption", "@Icons.Material.Filled.SystemSecurityUpdateGood", null,"RoleSystemOption", false, false, false, false),
+        // SPEC 29 — bitácora de seguridad. Read-only; other flags left at false so the
+        // DynamicAuthorizationFilter denies anything other than GET. Without this row
+        // the AuditController would 403 for everyone except SuperAdmin.
+        new("Bitacora", "/Seguridad/bitacora", "@Icons.Material.Filled.HistoryEdu", null, "Audit", true, false, false, false)
 
     ];
 

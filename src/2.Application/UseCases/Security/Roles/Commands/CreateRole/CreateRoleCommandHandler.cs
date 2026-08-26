@@ -4,6 +4,7 @@ using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.Mappings.Security;
+using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,7 @@ public sealed class CreateRoleCommandHandler(
     IRoleRepository roleRepository,
     IRoleMapper roleMapper,
     ICurrentUserService currentUserService,
+    IAuditLogger auditLogger,
     ILogger<CreateRoleCommandHandler> logger)
     : IRequestHandler<CreateRoleCommand, Response<RoleDto>>
 {
@@ -135,6 +137,20 @@ public sealed class CreateRoleCommandHandler(
                     [$"No se pudieron clonar los permisos del rol origen al rol nuevo."]);
             }
         }
+
+        // Bitácora: role created. Diff captures only the auditable scalar fields.
+        await auditLogger.LogAsync(
+            AuditedEntity.Role,
+            entity.Id,
+            AuditAction.Created,
+            entityLabel: entity.Name,
+            newValues: new Dictionary<string, object?>
+            {
+                ["Name"] = entity.Name,
+                ["Description"] = entity.Description,
+                ["IsSystemDefault"] = entity.IsSystemDefault
+            },
+            ct: cancellationToken);
 
         var dto = roleMapper.FromEntity(entity);
         return new Response<RoleDto>

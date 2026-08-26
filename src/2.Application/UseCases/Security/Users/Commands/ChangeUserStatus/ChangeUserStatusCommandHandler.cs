@@ -1,6 +1,8 @@
+using System.Text.Json;
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence.Security;
+using JOIN.Domain.Audit;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
@@ -16,12 +18,14 @@ public sealed class ChangeUserStatusCommandHandler(
     IUserAdminRepository userAdminRepository,
     ICurrentUserService currentUserService,
     IPermissionService permissionService,
+    IAuditLogger auditLogger,
     ILogger<ChangeUserStatusCommandHandler> logger)
     : IRequestHandler<ChangeUserStatusCommand, Response<bool>>
 {
     private readonly IUserAdminRepository _userAdminRepository = userAdminRepository;
     private readonly ICurrentUserService _currentUserService = currentUserService;
     private readonly IPermissionService _permissionService = permissionService;
+    private readonly IAuditLogger _auditLogger = auditLogger;
     private readonly ILogger<ChangeUserStatusCommandHandler> _logger = logger;
 
     public async Task<Response<bool>> Handle(ChangeUserStatusCommand request, CancellationToken cancellationToken)
@@ -49,6 +53,7 @@ public sealed class ChangeUserStatusCommandHandler(
             return Response<bool>.Error("STATUS_UNCHANGED", ["The user already has the requested status."]);
         }
 
+        var priorIsActive = snapshot.IsActive;
         var utcNow = DateTime.UtcNow;
         var modifiedBy = _currentUserService.UserId;
 
@@ -74,6 +79,28 @@ public sealed class ChangeUserStatusCommandHandler(
         {
             _logger.LogWarning(ex, "Failed to invalidate permission cache for user {UserId} after status change.", request.UserId);
         }
+
+        // Bitácora de seguridad — Dapper path, audit logger resolves the actor from
+        // ICurrentUserService so the spec-mandated fields (CompanyId, ChangedBy, IpAddress)
+        // are populated even though the underlying write was a raw SQL UPDATE.
+        var reasonMetadata = JsonSerializer.Serialize(new { reason = request.Reason });
+        await _auditLogger.LogAsync(
+            AuditedEntity.User,
+            request.UserId,
+            AuditAction.Updated,
+            entityLabel: snapshot.Email,
+            oldValues: new Dictionary<string, object?>
+            {
+                ["IsActive"] = priorIsActive,
+                ["StatusChangeReason"] = snapshot.StatusChangeReason
+            },
+            newValues: new Dictionary<string, object?>
+            {
+                ["IsActive"] = request.IsActive,
+                ["StatusChangeReason"] = request.Reason
+            },
+            metadataJson: reasonMetadata,
+            ct: cancellationToken);
 
         return new Response<bool>
         {

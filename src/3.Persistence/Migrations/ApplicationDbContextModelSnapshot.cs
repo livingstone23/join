@@ -1050,6 +1050,66 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("UserCommunicationChannels", "Admin");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Audit.AuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTime>("ChangedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ChangedBy")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EntityLabel")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("EntityName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("nvarchar(45)");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("NewValuesJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OldValuesJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "ChangedAtUtc")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("IX_AuditLogs_Company_ChangedAt");
+
+                    b.HasIndex("EntityName", "EntityId", "ChangedAtUtc")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("IX_AuditLogs_Entity");
+
+                    b.ToTable("AuditLogs", "Security");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Common.CommunicationChannel", b =>
                 {
                     b.Property<Guid>("Id")

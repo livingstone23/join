@@ -23,7 +23,8 @@ public sealed class AddUserCompanyCommandHandler(
     IUserAdminRepository userAdminRepository,
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
-    IPermissionService permissionService)
+    IPermissionService permissionService,
+    IAuditLogger auditLogger)
     : IRequestHandler<AddUserCompanyCommand, Response<AddUserCompanyResultDto>>
 {
     // Lightweight index of every membership row (active + soft-deleted) for the
@@ -219,6 +220,62 @@ public sealed class AddUserCompanyCommandHandler(
         // fresh UserRoleCompanies state.
         await permissionService.InvalidateUserCacheAsync(
             request.CompanyId, request.UserId, cancellationToken);
+
+        // Bitácora de seguridad — log membership + every URC that effectively changed.
+        var userEmail = snapshot.Email ?? string.Empty;
+        var companyLabel = $"{userEmail} @ {request.CompanyId}";
+
+        var auditEntries = new List<AuditLogEntryRequest>();
+
+        if (activeMembership is null)
+        {
+            // Either freshly inserted or a reactivation of a soft-deleted row — both surface
+            // to the operator as "the user is now in this tenant" so log Created.
+            auditEntries.Add(new AuditLogEntryRequest(
+                AuditedEntity.UserCompany,
+                Guid.NewGuid(),
+                AuditAction.Created,
+                EntityLabel: companyLabel,
+                NewValues: new Dictionary<string, object?>
+                {
+                    ["UserId"] = request.UserId,
+                    ["CompanyId"] = request.CompanyId,
+                    ["IsDefault"] = isDefault
+                }));
+        }
+
+        // URC rows that effectively changed: every role that was active before this call
+        // and is NOT in the requested set got soft-deleted; every role that was not active
+        // and IS in the requested set got inserted or reactivated.
+        foreach (var (roleId, rowId) in activeByRoleId)
+        {
+            if (!requestedRoleSet.Contains(roleId))
+            {
+                auditEntries.Add(new AuditLogEntryRequest(
+                    AuditedEntity.UserRoleCompany,
+                    rowId,
+                    AuditAction.Deleted,
+                    EntityLabel: $"{userEmail} → {roleId}"));
+            }
+        }
+
+        foreach (var roleId in request.RoleIds)
+        {
+            if (activeByRoleId.ContainsKey(roleId))
+            {
+                continue;
+            }
+            auditEntries.Add(new AuditLogEntryRequest(
+                AuditedEntity.UserRoleCompany,
+                softDeletedByRoleId.TryGetValue(roleId, out var reusableId) ? reusableId : Guid.NewGuid(),
+                AuditAction.Created,
+                EntityLabel: $"{userEmail} → {roleId}"));
+        }
+
+        if (auditEntries.Count > 0)
+        {
+            await auditLogger.LogManyAsync(auditEntries, cancellationToken);
+        }
 
         return new Response<AddUserCompanyResultDto>
         {

@@ -4,6 +4,7 @@
 using System.Reflection;
 using JOIN.Application.Interface;
 using JOIN.Domain.Admin;
+using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
@@ -96,6 +97,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<SecurityEventLog> SecurityEventLogs => Set<SecurityEventLog>();
     public DbSet<UserMfaRecoveryCode> UserMfaRecoveryCodes => Set<UserMfaRecoveryCode>();
     public DbSet<PhoneVerificationCode> PhoneVerificationCodes => Set<PhoneVerificationCode>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     
     

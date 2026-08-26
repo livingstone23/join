@@ -279,11 +279,13 @@ public sealed class UpdateRoleCompanyCommandHandlerTests
         public Mock<IRoleCompanyRepository> RoleCompanyRepositoryMock { get; } = new();
         public Mock<IRoleRepository> RoleRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
+        public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
 
         public UpdateRoleCompanyCommandHandler CreateHandler() => new(
             UnitOfWorkMock.Object,
             RoleCompanyRepositoryMock.Object,
             RoleRepositoryMock.Object,
-            CurrentUserServiceMock.Object);
+            CurrentUserServiceMock.Object,
+            AuditLoggerMock.Object);
     }
 }

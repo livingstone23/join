@@ -57,7 +57,7 @@ public sealed class GetUserEffectivePermissionsQueryHandlerTests
         ctx.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
         ctx.UserAdminRepositoryMock
             .Setup(x => x.GetAdminSnapshotAsync(userId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: true));
+            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: true, StatusChangeReason: null));
         ctx.UserAdminRepositoryMock
             .Setup(x => x.GetEffectivePermissionsAsync(userId, companyId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((UserEffectivePermissionsDto?)null);
@@ -79,7 +79,7 @@ public sealed class GetUserEffectivePermissionsQueryHandlerTests
         ctx.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
         ctx.UserAdminRepositoryMock
             .Setup(x => x.GetAdminSnapshotAsync(userId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: true));
+            .ReturnsAsync(new UserAdminSnapshot(userId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: true, StatusChangeReason: null));
         ctx.UserAdminRepositoryMock
             .Setup(x => x.GetEffectivePermissionsAsync(userId, companyId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new UserEffectivePermissionsDto(

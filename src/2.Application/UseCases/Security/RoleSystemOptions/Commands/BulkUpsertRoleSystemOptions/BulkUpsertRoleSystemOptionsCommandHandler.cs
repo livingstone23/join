@@ -2,6 +2,7 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence.Security;
+using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,7 @@ public sealed class BulkUpsertRoleSystemOptionsCommandHandler(
     IRoleRepository roleRepository,
     ICurrentUserService currentUserService,
     IPermissionService permissionService,
+    IAuditLogger auditLogger,
     ILogger<BulkUpsertRoleSystemOptionsCommandHandler> logger)
     : IRequestHandler<BulkUpsertRoleSystemOptionsCommand, Response<BulkUpsertRoleSystemOptionsResult>>
 {
@@ -74,6 +76,13 @@ public sealed class BulkUpsertRoleSystemOptionsCommandHandler(
             return entity;
         }).ToList();
 
+        // Bitácora: snapshot the pre-upsert active rows so the Updated diff has the old flags.
+        // GetActiveByRoleAndCompanyAsync runs on its own connection (Dapper) — safe here because
+        // no other handler holds a transaction against the table at this point.
+        var preSnapshot = await roleSystemOptionsRepository.GetActiveByRoleAndCompanyAsync(
+            request.RoleId, companyId, cancellationToken);
+        var preByOption = preSnapshot.ToDictionary(x => x.SystemOptionId);
+
         IReadOnlyList<Guid> created;
         IReadOnlyList<Guid> updated;
         IReadOnlyList<Guid> removed;
@@ -88,6 +97,54 @@ public sealed class BulkUpsertRoleSystemOptionsCommandHandler(
                 "BulkUpsertRoleSystemOptions failed for role {RoleId} in company {CompanyId}.",
                 request.RoleId, companyId);
             throw; // Do NOT invalidate cache when the DB diff didn't commit (see class summary).
+        }
+
+        // Bitácora: one row per affected SystemOptionId, all sharing the same bulkOperationId.
+        var bulkOperationId = Guid.NewGuid();
+        var auditMetadata = $"{{\"bulkOperationId\":\"{bulkOperationId}\"}}";
+        var auditEntries = new List<AuditLogEntryRequest>();
+
+        foreach (var opt in newItems)
+        {
+            if (created.Contains(opt.SystemOptionId))
+            {
+                auditEntries.Add(new AuditLogEntryRequest(
+                    AuditedEntity.RoleSystemOption,
+                    opt.Id,
+                    AuditAction.Created,
+                    MetadataJson: auditMetadata,
+                    NewValues: SnapshotFlags(opt)));
+            }
+            else if (updated.Contains(opt.SystemOptionId) && preByOption.TryGetValue(opt.SystemOptionId, out var prior))
+            {
+                auditEntries.Add(new AuditLogEntryRequest(
+                    AuditedEntity.RoleSystemOption,
+                    opt.Id,
+                    AuditAction.Updated,
+                    MetadataJson: auditMetadata,
+                    OldValues: SnapshotFlags(prior),
+                    NewValues: SnapshotFlags(opt)));
+            }
+        }
+
+        foreach (var removedId in removed)
+        {
+            // The bulk path doesn't return the removed row's id directly, but the preSnapshot
+            // does carry each row by SystemOptionId; the Id we log is whatever was on file.
+            if (preByOption.TryGetValue(removedId, out var prior))
+            {
+                auditEntries.Add(new AuditLogEntryRequest(
+                    AuditedEntity.RoleSystemOption,
+                    prior.Id,
+                    AuditAction.Deleted,
+                    MetadataJson: auditMetadata,
+                    OldValues: SnapshotFlags(prior)));
+            }
+        }
+
+        if (auditEntries.Count > 0)
+        {
+            await auditLogger.LogManyAsync(auditEntries, cancellationToken);
         }
 
         // Cache invalidation: only users that actually had this role in this tenant before the diff.
@@ -131,4 +188,17 @@ public sealed class BulkUpsertRoleSystemOptionsCommandHandler(
             Data = new BulkUpsertRoleSystemOptionsResult(created, updated, removed)
         };
     }
+
+    private static Dictionary<string, object?> SnapshotFlags(RoleSystemOption r) => new()
+    {
+        ["CanRead"] = r.CanRead,
+        ["CanCreate"] = r.CanCreate,
+        ["CanUpdate"] = r.CanUpdate,
+        ["CanDelete"] = r.CanDelete,
+        ["CanDownload"] = r.CanDownload,
+        ["CanExport"] = r.CanExport,
+        ["CanExecute"] = r.CanExecute,
+        ["IsVisibleMenu"] = r.IsVisibleMenu,
+        ["OrderMenu"] = r.OrderMenu
+    };
 }

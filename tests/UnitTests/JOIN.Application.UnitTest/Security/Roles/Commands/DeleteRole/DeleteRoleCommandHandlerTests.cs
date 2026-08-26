@@ -279,6 +279,7 @@ public sealed class DeleteRoleCommandHandlerTests
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
         public Mock<IRoleRepository> RoleRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
+        public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
 
         public TestContext()
         {
@@ -294,6 +295,7 @@ public sealed class DeleteRoleCommandHandlerTests
                 UnitOfWorkMock.Object,
                 RoleRepositoryMock.Object,
                 CurrentUserServiceMock.Object,
+                AuditLoggerMock.Object,
                 NullLogger<DeleteRoleCommandHandler>.Instance);
         }
     }

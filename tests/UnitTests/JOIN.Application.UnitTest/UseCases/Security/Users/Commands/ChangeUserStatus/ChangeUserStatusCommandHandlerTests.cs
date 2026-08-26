@@ -24,7 +24,7 @@ public sealed class ChangeUserStatusCommandHandlerTests
         ctx.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
         ctx.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns(Guid.NewGuid().ToString());
         ctx.UserAdminRepositoryMock.Setup(x => x.GetAdminSnapshotAsync(targetUserId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: true));
+            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: true, StatusChangeReason: null));
         ctx.UserAdminRepositoryMock.Setup(x => x.SetUserActiveStatusAsync(targetUserId, false, "left", It.IsAny<string?>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
@@ -47,7 +47,7 @@ public sealed class ChangeUserStatusCommandHandlerTests
         ctx.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
         ctx.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns(Guid.NewGuid().ToString());
         ctx.UserAdminRepositoryMock.Setup(x => x.GetAdminSnapshotAsync(targetUserId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: false, GcRecord: 0, HasMembership: true));
+            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: false, GcRecord: 0, HasMembership: true, StatusChangeReason: null));
         ctx.UserAdminRepositoryMock.Setup(x => x.SetUserActiveStatusAsync(targetUserId, true, "back", It.IsAny<string?>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
@@ -103,7 +103,7 @@ public sealed class ChangeUserStatusCommandHandlerTests
         ctx.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.NewGuid());
         ctx.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns(Guid.NewGuid().ToString());
         ctx.UserAdminRepositoryMock.Setup(x => x.GetAdminSnapshotAsync(targetUserId, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false));
+            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false, StatusChangeReason: null));
 
         var response = await ctx.Handler.Handle(
             new ChangeUserStatusCommand(targetUserId, false, "x"),
@@ -121,7 +121,7 @@ public sealed class ChangeUserStatusCommandHandlerTests
         ctx.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.NewGuid());
         ctx.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns(Guid.NewGuid().ToString());
         ctx.UserAdminRepositoryMock.Setup(x => x.GetAdminSnapshotAsync(targetUserId, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: true));
+            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: true, StatusChangeReason: null));
 
         var response = await ctx.Handler.Handle(
             new ChangeUserStatusCommand(targetUserId, true, "x"),
@@ -140,7 +140,7 @@ public sealed class ChangeUserStatusCommandHandlerTests
         ctx.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
         ctx.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns(Guid.NewGuid().ToString());
         ctx.UserAdminRepositoryMock.Setup(x => x.GetAdminSnapshotAsync(targetUserId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: true));
+            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: true, StatusChangeReason: null));
         ctx.UserAdminRepositoryMock.Setup(x => x.SetUserActiveStatusAsync(targetUserId, false, "x", It.IsAny<string?>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         ctx.PermissionServiceMock.Setup(x => x.InvalidateUserCacheAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -173,12 +173,14 @@ public sealed class ChangeUserStatusCommandHandlerTests
         public Mock<IUserAdminRepository> UserAdminRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IPermissionService> PermissionServiceMock { get; } = new();
+        public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
         public Mock<ILogger<ChangeUserStatusCommandHandler>> LoggerMock { get; } = new();
 
         public ChangeUserStatusCommandHandler Handler => new(
             UserAdminRepositoryMock.Object,
             CurrentUserServiceMock.Object,
             PermissionServiceMock.Object,
+            AuditLoggerMock.Object,
             LoggerMock.Object);
     }
 }

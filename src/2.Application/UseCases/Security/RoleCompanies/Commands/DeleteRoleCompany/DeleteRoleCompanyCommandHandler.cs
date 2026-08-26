@@ -21,12 +21,14 @@ public sealed class DeleteRoleCompanyCommandHandler(
     IUnitOfWork unitOfWork,
     IRoleCompanyRepository roleCompanyRepository,
     ICurrentUserService currentUserService,
+    IAuditLogger auditLogger,
     ILogger<DeleteRoleCompanyCommandHandler> logger)
     : IRequestHandler<DeleteRoleCompanyCommand, Response<bool>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
     private readonly IRoleCompanyRepository _roleCompanyRepository = roleCompanyRepository ?? throw new ArgumentNullException(nameof(roleCompanyRepository));
     private readonly ICurrentUserService _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
+    private readonly IAuditLogger _auditLogger = auditLogger ?? throw new ArgumentNullException(nameof(auditLogger));
     private readonly ILogger<DeleteRoleCompanyCommandHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public async Task<Response<bool>> Handle(DeleteRoleCompanyCommand request, CancellationToken cancellationToken)
@@ -47,6 +49,10 @@ public sealed class DeleteRoleCompanyCommandHandler(
                 new[] { "No se encontró el vínculo rol-empresa para la compañía del token." });
         }
 
+        // Snapshot for the bitácora before stamping GcRecord.
+        var deletedRoleId = existing.RoleId;
+        var deletedLabel = $"{existing.RoleId} @ {tenantId}";
+
         // Soft delete via the project's standard helper (writes GcRecord = yyyyMMdd UTC int).
         existing.MarkAsDeleted();
         existing.LastModified = DateTime.UtcNow;
@@ -63,6 +69,18 @@ public sealed class DeleteRoleCompanyCommandHandler(
                 "ROLE_COMPANY_NOT_FOUND",
                 new[] { "No se encontró el vínculo rol-empresa para la compañía del token." });
         }
+
+        await _auditLogger.LogAsync(
+            AuditedEntity.RoleCompany,
+            existing.Id,
+            AuditAction.Deleted,
+            entityLabel: deletedLabel,
+            oldValues: new Dictionary<string, object?>
+            {
+                ["RoleId"] = deletedRoleId,
+                ["CompanyId"] = tenantId
+            },
+            ct: cancellationToken);
 
         // Visibility-only warning: a deleted RoleCompany can leave active UserRoleCompany rows pointing at the
         // same Role. Not blocking the delete; cleanup is delegated to a future spec.

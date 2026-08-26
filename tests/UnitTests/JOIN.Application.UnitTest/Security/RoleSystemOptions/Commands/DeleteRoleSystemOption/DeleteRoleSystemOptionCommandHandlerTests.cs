@@ -38,7 +38,7 @@ public sealed class DeleteRoleSystemOptionCommandHandlerTests
         var currentUserServiceMock = new Mock<ICurrentUserService>();
         currentUserServiceMock.Setup(x => x.CompanyId).Returns(companyId);
 
-        var handler = new DeleteRoleSystemOptionCommandHandler(unitOfWorkMock.Object, currentUserServiceMock.Object);
+        var handler = new DeleteRoleSystemOptionCommandHandler(unitOfWorkMock.Object, currentUserServiceMock.Object, Mock.Of<IAuditLogger>());
 
         var cmd = new DeleteRoleSystemOptionCommand(id);
 
@@ -60,7 +60,7 @@ public sealed class DeleteRoleSystemOptionCommandHandlerTests
         var currentUserServiceMock = new Mock<ICurrentUserService>();
         currentUserServiceMock.Setup(x => x.CompanyId).Returns(Guid.Empty);
 
-        var handler = new DeleteRoleSystemOptionCommandHandler(unitOfWorkMock.Object, currentUserServiceMock.Object);
+        var handler = new DeleteRoleSystemOptionCommandHandler(unitOfWorkMock.Object, currentUserServiceMock.Object, Mock.Of<IAuditLogger>());
 
         var cmd = new DeleteRoleSystemOptionCommand(Guid.NewGuid());
 
@@ -85,7 +85,7 @@ public sealed class DeleteRoleSystemOptionCommandHandlerTests
         var currentUserServiceMock = new Mock<ICurrentUserService>();
         currentUserServiceMock.Setup(x => x.CompanyId).Returns(tokenCompanyId);
 
-        var handler = new DeleteRoleSystemOptionCommandHandler(unitOfWorkMock.Object, currentUserServiceMock.Object);
+        var handler = new DeleteRoleSystemOptionCommandHandler(unitOfWorkMock.Object, currentUserServiceMock.Object, Mock.Of<IAuditLogger>());
 
         var cmd = new DeleteRoleSystemOptionCommand(Guid.NewGuid(), CompanyId: commandCompanyId);
 
@@ -115,7 +115,7 @@ public sealed class DeleteRoleSystemOptionCommandHandlerTests
         var currentUserServiceMock = new Mock<ICurrentUserService>();
         currentUserServiceMock.Setup(x => x.CompanyId).Returns(companyId);
 
-        var handler = new DeleteRoleSystemOptionCommandHandler(unitOfWorkMock.Object, currentUserServiceMock.Object);
+        var handler = new DeleteRoleSystemOptionCommandHandler(unitOfWorkMock.Object, currentUserServiceMock.Object, Mock.Of<IAuditLogger>());
 
         var response = await handler.Handle(new DeleteRoleSystemOptionCommand(id), CancellationToken.None);
 
@@ -123,3 +123,4 @@ public sealed class DeleteRoleSystemOptionCommandHandlerTests
         response.Message.Should().Be("ROLE_SYSTEM_OPTION_NOT_FOUND");
     }
 }
+

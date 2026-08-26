@@ -28,6 +28,7 @@ public sealed class BulkUpdateUserRolesCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
     IPermissionService permissionService,
+    IAuditLogger auditLogger,
     ILogger<BulkUpdateUserRolesCommandHandler> logger)
     : IRequestHandler<BulkUpdateUserRolesCommand, Response<BulkUpdateUserRolesResultDto>>
 {
@@ -227,6 +228,61 @@ public sealed class BulkUpdateUserRolesCommandHandler(
 
         // 6. Single atomic flush inside the open TransactionBehavior scope.
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Bitácora de seguridad — one row per URC that effectively changed across the
+        // batch. All rows share the same bulkOperationId so the UI can group them as
+        // "operator X changed N roles across M users in one go". Only users whose
+        // outcome was Updated contribute rows.
+        var bulkOperationId = Guid.NewGuid();
+        var bulkMetadata = $"{{\"bulkOperationId\":\"{bulkOperationId}\"}}";
+
+        var auditEntries = new List<AuditLogEntryRequest>();
+        foreach (var userItem in items.Where(i => i.Outcome == BulkRoleOutcome.Updated))
+        {
+            var uid = userItem.UserId;
+            var userEmail = uid.ToString();
+
+            if (!activeByUserRole.TryGetValue(uid, out var activeForUser))
+            {
+                continue;
+            }
+
+            foreach (var roleId in addRoleIds)
+            {
+                if (activeForUser.ContainsKey(roleId))
+                {
+                    continue;
+                }
+                var rowId = softDeletedByUserRole.TryGetValue(uid, out var sForUser) && sForUser.TryGetValue(roleId, out var reusable)
+                    ? reusable
+                    : Guid.NewGuid();
+                auditEntries.Add(new AuditLogEntryRequest(
+                    AuditedEntity.UserRoleCompany,
+                    rowId,
+                    AuditAction.Created,
+                    EntityLabel: $"{userEmail} → {roleId}",
+                    MetadataJson: bulkMetadata));
+            }
+
+            foreach (var (roleId, rowId) in activeForUser)
+            {
+                if (!removeSet.Contains(roleId))
+                {
+                    continue;
+                }
+                auditEntries.Add(new AuditLogEntryRequest(
+                    AuditedEntity.UserRoleCompany,
+                    rowId,
+                    AuditAction.Deleted,
+                    EntityLabel: $"{userEmail} → {roleId}",
+                    MetadataJson: bulkMetadata));
+            }
+        }
+
+        if (auditEntries.Count > 0)
+        {
+            await auditLogger.LogManyAsync(auditEntries, cancellationToken);
+        }
 
         // 7. Cache invalidation only for users whose roles actually changed. Each
         //    invalidation is independently try/caught — a Redis blip must not

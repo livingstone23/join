@@ -181,6 +181,8 @@ public sealed class InviteUserCommandHandlerTests
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IEmailService> EmailServiceMock { get; } = new();
         public Mock<ISecurityEventLogger> SecurityEventLoggerMock { get; } = new();
+        public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
+        public Mock<ISqlConnectionFactory> ConnectionFactoryMock { get; } = new();
         public IOptions<AppUrlsOptions> AppUrls { get; } =
             Options.Create(new AppUrlsOptions { FrontendBaseUrl = "https://app.join.com" });
 
@@ -196,15 +198,22 @@ public sealed class InviteUserCommandHandlerTests
             UnitOfWorkMock
                 .Setup(x => x.GetRepository<UserRoleCompany>())
                 .Returns(() => Mock.Of<IGenericRepository<UserRoleCompany>>());
+
+            // Bitácora diff needs prior UserRoleCompany ids; default to empty set.
+            ConnectionFactoryMock
+                .Setup(x => x.CreateConnection())
+                .Returns(() => Mock.Of<System.Data.Common.DbConnection>());
         }
 
         public InviteUserCommandHandler Handler => new(
             UserManagerMock.Object,
             UnitOfWorkMock.Object,
             UserAdminRepositoryMock.Object,
+            ConnectionFactoryMock.Object,
             CurrentUserServiceMock.Object,
             EmailServiceMock.Object,
             AppUrls,
-            SecurityEventLoggerMock.Object);
+            SecurityEventLoggerMock.Object,
+            AuditLoggerMock.Object);
     }
 }

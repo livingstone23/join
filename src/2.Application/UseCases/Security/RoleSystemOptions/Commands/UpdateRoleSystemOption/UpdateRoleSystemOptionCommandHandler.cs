@@ -4,6 +4,7 @@ using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.Mappings.Security.RoleSystemOption;
+using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
 using MediatR;
 
@@ -16,7 +17,8 @@ namespace JOIN.Application.UseCases.Security.RoleSystemOptions.Commands;
 public sealed class UpdateRoleSystemOptionCommandHandler(
     IUnitOfWork unitOfWork,
     IRoleSystemOptionMapper mapper,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IAuditLogger auditLogger)
     : IRequestHandler<UpdateRoleSystemOptionCommand, Response<RoleSystemOptionDto>>
 {
     public async Task<Response<RoleSystemOptionDto>> Handle(UpdateRoleSystemOptionCommand request, CancellationToken cancellationToken)
@@ -41,6 +43,20 @@ public sealed class UpdateRoleSystemOptionCommandHandler(
             return Response<RoleSystemOptionDto>.Error("ROLE_SYSTEM_OPTION_NOT_FOUND", ["Role system option not found."]);
         }
 
+        // Snapshot pre-mutation flags for the bitácora diff.
+        var oldValues = new Dictionary<string, object?>
+        {
+            ["CanRead"] = entity.CanRead,
+            ["CanCreate"] = entity.CanCreate,
+            ["CanUpdate"] = entity.CanUpdate,
+            ["CanDelete"] = entity.CanDelete,
+            ["CanDownload"] = entity.CanDownload,
+            ["CanExport"] = entity.CanExport,
+            ["CanExecute"] = entity.CanExecute,
+            ["IsVisibleMenu"] = entity.IsVisibleMenu,
+            ["OrderMenu"] = entity.OrderMenu
+        };
+
         mapper.ApplyUpdate(request, entity);
         await repository.UpdateAsync(entity);
 
@@ -61,6 +77,28 @@ public sealed class UpdateRoleSystemOptionCommandHandler(
                 SystemOptionName = names.SystemOptionName
             };
         }
+
+        var newValues = new Dictionary<string, object?>
+        {
+            ["CanRead"] = entity.CanRead,
+            ["CanCreate"] = entity.CanCreate,
+            ["CanUpdate"] = entity.CanUpdate,
+            ["CanDelete"] = entity.CanDelete,
+            ["CanDownload"] = entity.CanDownload,
+            ["CanExport"] = entity.CanExport,
+            ["CanExecute"] = entity.CanExecute,
+            ["IsVisibleMenu"] = entity.IsVisibleMenu,
+            ["OrderMenu"] = entity.OrderMenu
+        };
+
+        await auditLogger.LogAsync(
+            AuditedEntity.RoleSystemOption,
+            entity.Id,
+            AuditAction.Updated,
+            entityLabel: names is not null ? $"{names.RoleName} → {names.SystemOptionName}" : null,
+            oldValues: oldValues,
+            newValues: newValues,
+            ct: cancellationToken);
 
         return new Response<RoleSystemOptionDto>
         {

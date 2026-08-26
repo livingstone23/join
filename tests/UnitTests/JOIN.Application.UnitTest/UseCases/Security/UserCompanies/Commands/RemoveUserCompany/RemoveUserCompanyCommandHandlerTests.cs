@@ -140,6 +140,7 @@ public sealed class RemoveUserCompanyCommandHandlerTests
         public Mock<IUserAdminRepository> UserAdminRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IPermissionService> PermissionServiceMock { get; } = new();
+        public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
 
         public Context()
         {
@@ -156,6 +157,7 @@ public sealed class RemoveUserCompanyCommandHandlerTests
             UserAdminRepositoryMock.Object,
             UnitOfWorkMock.Object,
             CurrentUserServiceMock.Object,
-            PermissionServiceMock.Object);
+            PermissionServiceMock.Object,
+            AuditLoggerMock.Object);
     }
 }

@@ -6,10 +6,12 @@
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Admin;
+using JOIN.Application.Interface.Persistence.Audit;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Persistence.Contexts;
 using JOIN.Persistence.Repositories;
 using JOIN.Persistence.Repositories.Admin;
+using JOIN.Persistence.Repositories.Audit;
 using JOIN.Persistence.Repositories.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -101,6 +103,7 @@ public static class ConfigureServices
         services.AddScoped<IUserMfaRecoveryCodeRepository, UserMfaRecoveryCodeRepository>();
         services.AddScoped<IPhoneVerificationCodeRepository, PhoneVerificationCodeRepository>();
         services.AddScoped<IUserAdminRepository, UserAdminRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         
         // El UnitOfWork ahora es híbrido y manejará el resto de los módulos dinámicamente.
         services.AddScoped<IUnitOfWork, UnitOfWork>();

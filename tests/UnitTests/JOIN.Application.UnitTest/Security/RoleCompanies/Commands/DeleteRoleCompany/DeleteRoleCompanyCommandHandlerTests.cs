@@ -129,11 +129,13 @@ public sealed class DeleteRoleCompanyCommandHandlerTests
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
         public Mock<IRoleCompanyRepository> RoleCompanyRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
+        public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
 
         public DeleteRoleCompanyCommandHandler CreateHandler() => new(
             UnitOfWorkMock.Object,
             RoleCompanyRepositoryMock.Object,
             CurrentUserServiceMock.Object,
+            AuditLoggerMock.Object,
             NullLogger<DeleteRoleCompanyCommandHandler>.Instance);
     }
 }

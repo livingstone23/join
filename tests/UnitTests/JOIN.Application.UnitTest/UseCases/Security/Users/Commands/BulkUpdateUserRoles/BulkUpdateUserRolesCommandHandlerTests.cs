@@ -265,6 +265,7 @@ public sealed class BulkUpdateUserRolesCommandHandlerTests
         public Mock<IUserAdminRepository> UserAdminRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IPermissionService> PermissionServiceMock { get; } = new();
+        public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
 
         public Context()
         {
@@ -279,6 +280,7 @@ public sealed class BulkUpdateUserRolesCommandHandlerTests
             UnitOfWorkMock.Object,
             CurrentUserServiceMock.Object,
             PermissionServiceMock.Object,
+            AuditLoggerMock.Object,
             NullLogger<BulkUpdateUserRolesCommandHandler>.Instance);
     }
 }

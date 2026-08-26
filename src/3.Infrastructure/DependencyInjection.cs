@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using JOIN.Application.Interface;
+using JOIN.Infrastructure.Audit;
 using JOIN.Infrastructure.HealthChecks;
 using JOIN.Infrastructure.Messaging.Logging;
 using JOIN.Infrastructure.Messaging.SendGrid;
@@ -47,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<ISecurityEventLogger, SecurityEventLogger>();
+        services.AddScoped<IAuditLogger, AuditLogger>();
         services.AddScoped<IMfaTotpValidator, MfaTotpValidator>();
         services.AddScoped<ISmsService, NoOpSmsService>();
 

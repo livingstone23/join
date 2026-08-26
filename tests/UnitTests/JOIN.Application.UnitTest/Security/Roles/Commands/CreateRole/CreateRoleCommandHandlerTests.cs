@@ -99,12 +99,7 @@ public sealed class CreateRoleCommandHandlerTests
         var dto = new RoleDto(Guid.NewGuid(), "Admin", "ADMIN", "All access", false, "user-1", DateTime.UtcNow);
         mapperMock.Setup(x => x.FromEntity(It.IsAny<ApplicationRole>())).Returns(dto);
 
-        var handler = new CreateRoleCommandHandler(
-            context.UnitOfWorkMock.Object,
-            context.RoleRepositoryMock.Object,
-            mapperMock.Object,
-            context.CurrentUserServiceMock.Object,
-            NullLogger<CreateRoleCommandHandler>.Instance);
+        var handler = new CreateRoleCommandHandler(context.UnitOfWorkMock.Object, context.RoleRepositoryMock.Object, mapperMock.Object, context.CurrentUserServiceMock.Object, context.AuditLoggerMock.Object, NullLogger<CreateRoleCommandHandler>.Instance);
 
         var response = await handler.Handle(new CreateRoleCommand("  Admin  ", "All access", false), CancellationToken.None);
 
@@ -195,12 +190,7 @@ public sealed class CreateRoleCommandHandlerTests
         var mapperMock = new Mock<IRoleMapper>();
         mapperMock.Setup(x => x.FromEntity(It.IsAny<ApplicationRole>())).Returns((ApplicationRole r) => new RoleDto(r.Id, r.Name, r.NormalizedName, r.Description, r.IsSystemDefault, r.CreatedBy, r.Created));
 
-        var handler = new CreateRoleCommandHandler(
-            context.UnitOfWorkMock.Object,
-            context.RoleRepositoryMock.Object,
-            mapperMock.Object,
-            context.CurrentUserServiceMock.Object,
-            NullLogger<CreateRoleCommandHandler>.Instance);
+        var handler = new CreateRoleCommandHandler(context.UnitOfWorkMock.Object, context.RoleRepositoryMock.Object, mapperMock.Object, context.CurrentUserServiceMock.Object, context.AuditLoggerMock.Object, NullLogger<CreateRoleCommandHandler>.Instance);
 
         var response = await handler.Handle(new CreateRoleCommand("Cloned", null, false, CloneFromRoleId: originId), CancellationToken.None);
 
@@ -306,12 +296,7 @@ public sealed class CreateRoleCommandHandlerTests
         var mapperMock = new Mock<IRoleMapper>();
         mapperMock.Setup(x => x.FromEntity(It.IsAny<ApplicationRole>())).Returns((ApplicationRole r) => new RoleDto(r.Id, r.Name, r.NormalizedName, r.Description, r.IsSystemDefault, r.CreatedBy, r.Created));
 
-        var handler = new CreateRoleCommandHandler(
-            context.UnitOfWorkMock.Object,
-            context.RoleRepositoryMock.Object,
-            mapperMock.Object,
-            context.CurrentUserServiceMock.Object,
-            NullLogger<CreateRoleCommandHandler>.Instance);
+        var handler = new CreateRoleCommandHandler(context.UnitOfWorkMock.Object, context.RoleRepositoryMock.Object, mapperMock.Object, context.CurrentUserServiceMock.Object, context.AuditLoggerMock.Object, NullLogger<CreateRoleCommandHandler>.Instance);
 
         var response = await handler.Handle(new CreateRoleCommand("Cloned", null, false, CloneFromRoleId: originId), CancellationToken.None);
 
@@ -357,6 +342,7 @@ public sealed class CreateRoleCommandHandlerTests
             context.RoleRepositoryMock.Object,
             new Mock<IRoleMapper>().Object,
             context.CurrentUserServiceMock.Object,
+            context.AuditLoggerMock.Object,
             NullLogger<CreateRoleCommandHandler>.Instance);
 
         var response = await handler.Handle(new CreateRoleCommand("Cloned", null, false, CloneFromRoleId: originId), CancellationToken.None);
@@ -371,6 +357,7 @@ public sealed class CreateRoleCommandHandlerTests
         public Mock<IRoleRepository> RoleRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IRoleSystemOptionsRepository> RoleSystemOptionsRepositoryMock { get; } = new();
+        public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
 
         public TestContext()
         {
@@ -387,7 +374,9 @@ public sealed class CreateRoleCommandHandlerTests
                 RoleRepositoryMock.Object,
                 mapperMock.Object,
                 CurrentUserServiceMock.Object,
+                AuditLoggerMock.Object,
                 NullLogger<CreateRoleCommandHandler>.Instance);
         }
     }
 }
+

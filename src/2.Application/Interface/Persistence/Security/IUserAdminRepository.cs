@@ -91,6 +91,13 @@ public interface IUserAdminRepository
     /// </summary>
     Task<UserEffectivePermissionsDto?> GetEffectivePermissionsAsync(
         Guid userId, Guid companyId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns <c>true</c> when <paramref name="userId"/> exists and carries the
+    /// <c>IsSuperAdmin = 1</c> flag (platform-wide administrator, not the company-scoped
+    /// variant). <c>null</c>/malformed user ids return <c>false</c>.
+    /// </summary>
+    Task<bool> IsSuperAdminAsync(string? userId, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -113,4 +120,5 @@ public sealed record UserAdminSnapshot(
     string? FirstName,
     bool IsActive,
     int GcRecord,
-    bool HasMembership);
+    bool HasMembership,
+    string? StatusChangeReason);

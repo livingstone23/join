@@ -1,5 +1,7 @@
 using JOIN.Application.Common;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
 using MediatR;
 
@@ -9,10 +11,13 @@ namespace JOIN.Application.UseCases.Security.UserCompanies.Commands.SetDefaultCo
 /// Handles the update of the default company for a specific user.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used to persist the operation atomically.</param>
-public sealed class SetDefaultCompanyCommandHandler(IUnitOfWork unitOfWork)
+public sealed class SetDefaultCompanyCommandHandler(
+    IUnitOfWork unitOfWork,
+    IAuditLogger auditLogger)
     : IRequestHandler<SetDefaultCompanyCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly IAuditLogger _auditLogger = auditLogger;
 
     /// <summary>
     /// Reassigns the default company for the requested user.
@@ -62,6 +67,34 @@ public sealed class SetDefaultCompanyCommandHandler(IUnitOfWork unitOfWork)
         if (hasChanges)
         {
             await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        // Bitácora de seguridad — every UserCompany row whose IsDefault flipped is logged.
+        if (hasChanges)
+        {
+            var entries = new List<AuditLogEntryRequest>();
+
+            foreach (var oldDefault in userCompanies.Where(link => !link.IsDefault && link.Id != targetLink.Id && link.CompanyId != targetLink.CompanyId))
+            {
+                // This row was a default in the loop above and has now been flipped to false.
+                entries.Add(new AuditLogEntryRequest(
+                    AuditedEntity.UserCompany,
+                    oldDefault.Id,
+                    AuditAction.Updated,
+                    EntityLabel: $"{request.UserId} @ {oldDefault.CompanyId}",
+                    OldValues: new Dictionary<string, object?> { ["IsDefault"] = true },
+                    NewValues: new Dictionary<string, object?> { ["IsDefault"] = false }));
+            }
+
+            entries.Add(new AuditLogEntryRequest(
+                AuditedEntity.UserCompany,
+                targetLink.Id,
+                AuditAction.Updated,
+                EntityLabel: $"{request.UserId} @ {targetLink.CompanyId}",
+                OldValues: new Dictionary<string, object?> { ["IsDefault"] = !targetLink.IsDefault },
+                NewValues: new Dictionary<string, object?> { ["IsDefault"] = targetLink.IsDefault }));
+
+            await _auditLogger.LogManyAsync(entries, cancellationToken);
         }
 
         return new Response<Guid>

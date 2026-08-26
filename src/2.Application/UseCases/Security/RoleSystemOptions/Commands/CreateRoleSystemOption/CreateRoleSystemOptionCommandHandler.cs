@@ -1,8 +1,10 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.Mappings.Security.RoleSystemOption;
+using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
 using JOIN.Domain.Security;
 using MediatR;
@@ -14,7 +16,8 @@ namespace JOIN.Application.UseCases.Security.RoleSystemOptions.Commands;
 /// </summary>
 public sealed class CreateRoleSystemOptionCommandHandler(
     IUnitOfWork unitOfWork,
-    IRoleSystemOptionMapper mapper)
+    IRoleSystemOptionMapper mapper,
+    IAuditLogger auditLogger)
     : IRequestHandler<CreateRoleSystemOptionCommand, Response<RoleSystemOptionDto>>
 {
     public async Task<Response<RoleSystemOptionDto>> Handle(CreateRoleSystemOptionCommand request, CancellationToken cancellationToken)
@@ -80,6 +83,25 @@ public sealed class CreateRoleSystemOptionCommandHandler(
                 SystemOptionName = names.SystemOptionName
             };
         }
+
+        await auditLogger.LogAsync(
+            AuditedEntity.RoleSystemOption,
+            entity.Id,
+            AuditAction.Created,
+            entityLabel: names is not null ? $"{names.RoleName} → {names.SystemOptionName}" : null,
+            newValues: new Dictionary<string, object?>
+            {
+                ["CanRead"] = entity.CanRead,
+                ["CanCreate"] = entity.CanCreate,
+                ["CanUpdate"] = entity.CanUpdate,
+                ["CanDelete"] = entity.CanDelete,
+                ["CanDownload"] = entity.CanDownload,
+                ["CanExport"] = entity.CanExport,
+                ["CanExecute"] = entity.CanExecute,
+                ["IsVisibleMenu"] = entity.IsVisibleMenu,
+                ["OrderMenu"] = entity.OrderMenu
+            },
+            ct: cancellationToken);
 
         return new Response<RoleSystemOptionDto>
         {

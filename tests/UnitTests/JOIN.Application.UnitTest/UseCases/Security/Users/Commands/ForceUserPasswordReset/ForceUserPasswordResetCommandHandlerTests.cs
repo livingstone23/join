@@ -28,7 +28,7 @@ public sealed class ForceUserPasswordResetCommandHandlerTests
         var user = new ApplicationUser { Id = targetUserId, Email = "u@x.com", FirstName = "U", IsActive = true };
         ctx.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
         ctx.UserAdminRepositoryMock.Setup(x => x.GetAdminSnapshotAsync(targetUserId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(targetUserId, user.Email, user.FirstName, IsActive: true, GcRecord: 0, HasMembership: true));
+            .ReturnsAsync(new UserAdminSnapshot(targetUserId, user.Email, user.FirstName, IsActive: true, GcRecord: 0, HasMembership: true, StatusChangeReason: null));
         ctx.UserManagerMock.Setup(x => x.FindByIdAsync(targetUserId.ToString())).ReturnsAsync(user);
         ctx.UserManagerMock.Setup(x => x.GeneratePasswordResetTokenAsync(user)).ReturnsAsync("token");
         ctx.EmailServiceMock.Setup(x => x.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
@@ -50,7 +50,7 @@ public sealed class ForceUserPasswordResetCommandHandlerTests
         var user = new ApplicationUser { Id = targetUserId, Email = "u@x.com", FirstName = "U", IsActive = true };
         ctx.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
         ctx.UserAdminRepositoryMock.Setup(x => x.GetAdminSnapshotAsync(targetUserId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(targetUserId, user.Email, user.FirstName, IsActive: true, GcRecord: 0, HasMembership: true));
+            .ReturnsAsync(new UserAdminSnapshot(targetUserId, user.Email, user.FirstName, IsActive: true, GcRecord: 0, HasMembership: true, StatusChangeReason: null));
         ctx.UserManagerMock.Setup(x => x.FindByIdAsync(targetUserId.ToString())).ReturnsAsync(user);
         ctx.UserManagerMock.Setup(x => x.GeneratePasswordResetTokenAsync(user)).ReturnsAsync("token");
         ctx.EmailServiceMock.Setup(x => x.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(false);
@@ -87,7 +87,7 @@ public sealed class ForceUserPasswordResetCommandHandlerTests
         var targetUserId = Guid.NewGuid();
         ctx.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.NewGuid());
         ctx.UserAdminRepositoryMock.Setup(x => x.GetAdminSnapshotAsync(targetUserId, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false));
+            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: true, GcRecord: 0, HasMembership: false, StatusChangeReason: null));
 
         var response = await ctx.Handler.Handle(
             new ForceUserPasswordResetCommand(targetUserId, null),
@@ -105,7 +105,7 @@ public sealed class ForceUserPasswordResetCommandHandlerTests
         var companyId = Guid.NewGuid();
         ctx.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
         ctx.UserAdminRepositoryMock.Setup(x => x.GetAdminSnapshotAsync(targetUserId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: false, GcRecord: 0, HasMembership: true));
+            .ReturnsAsync(new UserAdminSnapshot(targetUserId, "u@x.com", "U", IsActive: false, GcRecord: 0, HasMembership: true, StatusChangeReason: null));
 
         var response = await ctx.Handler.Handle(
             new ForceUserPasswordResetCommand(targetUserId, null),
