@@ -81,7 +81,11 @@ public sealed class BulkUpsertRoleSystemOptionsCommandHandler(
         // no other handler holds a transaction against the table at this point.
         var preSnapshot = await roleSystemOptionsRepository.GetActiveByRoleAndCompanyAsync(
             request.RoleId, companyId, cancellationToken);
-        var preByOption = preSnapshot.ToDictionary(x => x.SystemOptionId);
+        // Repository contract returns IReadOnlyList; treat a null result the same as an
+        // empty snapshot so the diff downstream (and audit-log mapping) still works when
+        // a tenant has no prior RoleSystemOption rows for this role.
+        var preByOption = (preSnapshot ?? Array.Empty<RoleSystemOption>())
+            .ToDictionary(x => x.SystemOptionId);
 
         IReadOnlyList<Guid> created;
         IReadOnlyList<Guid> updated;

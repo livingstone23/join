@@ -10,7 +10,7 @@ namespace JOIN.Domain.Security;
 /// Tracks user login events, capturing origin data such as IP address and Country.
 /// Also used to determine currently active sessions.
 /// </summary>
-public class UserConnectionLog : BaseEntity // Hereda solo de BaseEntity para tener el Guid Id
+public class UserConnectionLog : BaseAuditableEntity // Hereda de BaseAuditableEntity para soft-delete + auditoría (Created/LastModified/GcRecord)
 {
     /// <summary>
     /// Foreign key to the ApplicationUser. Nullable so the connection audit log survives if the user is deleted.

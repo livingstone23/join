@@ -1,6 +1,7 @@
 // Copyright (c) 2026-2027 JOIN Inc. All rights reserved.
 // See LICENSE in the project root for license information.
 
+using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -41,6 +42,20 @@ public class UserConnectionLogConfiguration : IEntityTypeConfiguration<UserConne
 
         builder.Property(log => log.IsActiveSession)
             .IsRequired();
+
+        // --- Audit / soft-delete columns (BaseAuditableEntity) ---
+        builder.Property(log => log.Created)
+            .IsRequired();
+
+        builder.Property(log => log.CreatedBy)
+            .HasMaxLength(256);
+
+        builder.Property(log => log.LastModifiedBy)
+            .HasMaxLength(256);
+
+        builder.Property(log => log.GcRecord)
+            .IsRequired()
+            .HasDefaultValue(BaseAuditableEntity.ActiveGcRecord);  // = 0
 
         // --- Relationships ---
 

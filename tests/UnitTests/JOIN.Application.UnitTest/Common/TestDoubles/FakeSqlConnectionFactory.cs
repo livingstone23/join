@@ -61,7 +61,7 @@ internal sealed class FakeDbConnection : DbConnection
     public override void Open() { }
 
     protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel)
-        => throw new NotSupportedException();
+        => new FakeDbTransaction(this);
 
     protected override DbCommand CreateDbCommand()
     {
@@ -245,6 +245,29 @@ internal sealed class FakeResultSet
 
     public static FakeResultSet FromScalar(object? value)
         => new(new[] { new Dictionary<string, object?> { ["Value"] = value } });
+}
+
+/// <summary>
+/// No-op transaction used by <see cref="FakeDbConnection"/>. Real database transactions
+/// aren't simulated here — handlers under test just need something IDisposable the
+/// <c>using var tx = connection.BeginTransaction(...)</c> pattern can flush without
+/// committing. SPEC 28 handlers wrap their reads in REPEATABLE READ so the fake
+/// must satisfy the call without <c>NotSupportedException</c>.
+/// </summary>
+internal sealed class FakeDbTransaction : DbTransaction
+{
+    private readonly DbConnection _connection;
+
+    public FakeDbTransaction(DbConnection connection)
+    {
+        _connection = connection;
+    }
+
+    protected override DbConnection DbConnection => _connection;
+    public override IsolationLevel IsolationLevel { get; } = IsolationLevel.ReadCommitted;
+
+    public override void Commit() { }
+    public override void Rollback() { }
 }
 
 internal sealed class FakeDbDataReader : DbDataReader

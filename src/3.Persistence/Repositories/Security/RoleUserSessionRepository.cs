@@ -28,7 +28,7 @@ public sealed class RoleUserSessionRepository(ISqlConnectionFactory connectionFa
                 UNION ALL
                 SELECT CAST(Id AS uniqueidentifier) AS Id, CAST(1 AS int) AS [Type]
                 FROM [Security].[UserConnectionLogs]
-                WHERE Id = @sessionId AND IsActiveSession = 1
+                WHERE Id = @sessionId AND IsActiveSession = 1 AND GcRecord = 0
             ) AS s;
             """;
 
@@ -52,7 +52,7 @@ public sealed class RoleUserSessionRepository(ISqlConnectionFactory connectionFa
                 WHERE Id = @sessionId AND GcRecord = 0
                 UNION ALL
                 SELECT UserId FROM [Security].[UserConnectionLogs]
-                WHERE Id = @sessionId
+                WHERE Id = @sessionId AND GcRecord = 0
             ) AS s;
             """;
 
@@ -89,7 +89,8 @@ public sealed class RoleUserSessionRepository(ISqlConnectionFactory connectionFa
             SET IsActiveSession = 0,
                 DisconnectionDate = @utcNow
             WHERE UserId = @userId
-              AND IsActiveSession = 1;
+              AND IsActiveSession = 1
+              AND GcRecord = 0;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -125,7 +126,8 @@ public sealed class RoleUserSessionRepository(ISqlConnectionFactory connectionFa
             SET IsActiveSession = 0,
                 DisconnectionDate = @utcNow
             WHERE Id = @connectionId
-              AND IsActiveSession = 1;
+              AND IsActiveSession = 1
+              AND GcRecord = 0;
             """;
 
         using var connection = _connectionFactory.CreateConnection();

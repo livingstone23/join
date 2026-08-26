@@ -1,6 +1,6 @@
 # SPEC 30 — Paridad de soft-delete en `UserConnectionLogs` y cobertura de integración del repo de sesiones
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 06 (infraestructura `tests/IntegrationTests/` con Testcontainers.MsSql + WebApplicationFactory), SPEC 26 (AccountController session-revoke endpoints + `RoleUserSessionRepository`).
 > **Date:** 2026-08-18
 > **Objective:** Cerrar la grieta que dejó pasar el bug SQL 207 ("Invalid column name 'GcRecord'") en `RoleUserSessionRepository` corrigiendo la causa raíz — `Security.UserConnectionLogs` no tiene columna `GcRecord` aunque el resto del schema sí— y sumando cobertura de integración que ejecute SQL real contra SQL Server, porque los unit tests mockean el repo y CI no detecta desalineaciones modelo↔DDL.
