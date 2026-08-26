@@ -5,6 +5,7 @@ using JOIN.Application.DTO.Security.User;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
+using JOIN.Application.UnitTest.Common.TestDoubles;
 using JOIN.Application.UseCases.Security.Users.Commands.InviteUser;
 using JOIN.Domain.Security;
 using Microsoft.AspNetCore.Identity;
@@ -182,7 +183,7 @@ public sealed class InviteUserCommandHandlerTests
         public Mock<IEmailService> EmailServiceMock { get; } = new();
         public Mock<ISecurityEventLogger> SecurityEventLoggerMock { get; } = new();
         public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
-        public Mock<ISqlConnectionFactory> ConnectionFactoryMock { get; } = new();
+        public FakeSqlConnectionFactory ConnectionFactory { get; } = new();
         public IOptions<AppUrlsOptions> AppUrls { get; } =
             Options.Create(new AppUrlsOptions { FrontendBaseUrl = "https://app.join.com" });
 
@@ -200,16 +201,14 @@ public sealed class InviteUserCommandHandlerTests
                 .Returns(() => Mock.Of<IGenericRepository<UserRoleCompany>>());
 
             // Bitácora diff needs prior UserRoleCompany ids; default to empty set.
-            ConnectionFactoryMock
-                .Setup(x => x.CreateConnection())
-                .Returns(() => Mock.Of<System.Data.Common.DbConnection>());
+            ConnectionFactory.SetResults(FakeResultSet.Empty("RoleId"));
         }
 
         public InviteUserCommandHandler Handler => new(
             UserManagerMock.Object,
             UnitOfWorkMock.Object,
             UserAdminRepositoryMock.Object,
-            ConnectionFactoryMock.Object,
+            ConnectionFactory,
             CurrentUserServiceMock.Object,
             EmailServiceMock.Object,
             AppUrls,
