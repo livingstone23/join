@@ -63,13 +63,17 @@ public class UsersController(IMediator mediator) : ControllerBase
     [AllowAnonymous]
     [EnableRateLimiting("Strict")]
     [HttpPost("login")]
-    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<LoginResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginCommand command, CancellationToken cancellationToken)
     {
         var response = await _mediator.Send(command, cancellationToken);
-        return Ok(response);
+        return Ok(new Response<LoginResponse>
+        {
+            IsSuccess = true,
+            Data = response
+        });
     }
 
 
@@ -103,13 +107,17 @@ public class UsersController(IMediator mediator) : ControllerBase
     [AllowAnonymous]
     [EnableRateLimiting("Strict")]
     [HttpPost("refresh")]
-    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<LoginResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand command, CancellationToken cancellationToken)
     {
         var response = await _mediator.Send(command, cancellationToken);
-        return Ok(response);
+        return Ok(new Response<LoginResponse>
+        {
+            IsSuccess = true,
+            Data = response
+        });
     }
 
 
