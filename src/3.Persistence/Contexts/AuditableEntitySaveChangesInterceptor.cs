@@ -56,7 +56,16 @@ public class AuditableEntitySaveChangesInterceptor : SaveChangesInterceptor
             {
                 entry.Entity.Created = utcNow;
                 entry.Entity.CreatedBy = currentUserId;
-                entry.Entity.GcRecord = BaseAuditableEntity.ActiveGcRecord; // Ensure it's active
+                // Preserve an explicit non-default GcRecord (e.g. a soft-delete stamp set
+                // by a test seed, migration backfill, or data import). BaseAuditableEntity
+                // already defaults GcRecord to ActiveGcRecord (0), so this branch only fires
+                // when the caller intentionally pre-stamped a deletion value — overwriting it
+                // would silently corrupt that intent (caught by the soft-delete parity tests
+                // in RoleUserSessionRepositoryIntegrationTests).
+                if (entry.Entity.GcRecord == BaseAuditableEntity.ActiveGcRecord)
+                {
+                    entry.Entity.GcRecord = BaseAuditableEntity.ActiveGcRecord; // Ensure it's active
+                }
             }
 
             if (entry.State == EntityState.Added || entry.State == EntityState.Modified || entry.HasChangedOwnedEntities())

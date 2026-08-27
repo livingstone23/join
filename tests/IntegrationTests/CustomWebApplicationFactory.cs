@@ -6,7 +6,9 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Moq;
+using Serilog;
 using Testcontainers.MsSql;
 
 namespace JOIN.IntegrationTests;
@@ -26,6 +28,21 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         .Build();
 
     private string _connectionString = string.Empty;
+
+    /// <summary>
+    /// Resets <see cref="Log.Logger"/> to <c>null</c> before each host build so the
+    /// bootstrap logger assignment in <c>Program.cs</c> runs cleanly and Serilog's
+    /// <c>UseSerilog</c> can <c>Freeze()</c> a fresh instance. Required because multiple
+    /// <see cref="CustomWebApplicationFactory"/> instances can exist concurrently
+    /// (xUnit creates one per <c>[Collection]</c> test class via <c>IClassFixture</c>),
+    /// and <c>Log.Logger</c> is a process-wide static — without this reset, the second
+    /// host build fails with <c>InvalidOperationException: The logger is already frozen.</c>
+    /// </summary>
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        Log.Logger = null!;
+        return base.CreateHost(builder);
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
