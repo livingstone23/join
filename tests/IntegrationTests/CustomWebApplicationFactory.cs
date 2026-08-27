@@ -30,17 +30,23 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     private string _connectionString = string.Empty;
 
     /// <summary>
-    /// Resets <see cref="Log.Logger"/> to <c>null</c> before each host build so the
-    /// bootstrap logger assignment in <c>Program.cs</c> runs cleanly and Serilog's
+    /// Resets <see cref="Log.Logger"/> to a fresh empty instance before each host build so
+    /// the bootstrap logger assignment in <c>Program.cs</c> runs cleanly and Serilog's
     /// <c>UseSerilog</c> can <c>Freeze()</c> a fresh instance. Required because multiple
-    /// <see cref="CustomWebApplicationFactory"/> instances can exist concurrently
-    /// (xUnit creates one per <c>[Collection]</c> test class via <c>IClassFixture</c>),
-    /// and <c>Log.Logger</c> is a process-wide static — without this reset, the second
-    /// host build fails with <c>InvalidOperationException: The logger is already frozen.</c>
+    /// <see cref="CustomWebApplicationFactory"/> instances can exist concurrently (xUnit
+    /// creates one per <c>[Collection]</c> test class via <c>IClassFixture</c>), and
+    /// <c>Log.Logger</c> is a process-wide static — without this reset, the second host
+    /// build fails with <c>InvalidOperationException: The logger is already frozen.</c>
+    /// <para>
+    /// Cannot pass <c>null</c> — <see cref="Log.Logger"/> setter rejects null with
+    /// <c>Guard.AgainstNull</c>. A no-sink <see cref="LoggerConfiguration"/> is the
+    /// cheapest valid placeholder; <c>Program.cs</c> overwrites it with the real
+    /// bootstrap logger on the next line, so no log output is lost.
+    /// </para>
     /// </summary>
     protected override IHost CreateHost(IHostBuilder builder)
     {
-        Log.Logger = null!;
+        Log.Logger = new LoggerConfiguration().CreateLogger();
         return base.CreateHost(builder);
     }
 
