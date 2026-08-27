@@ -14,6 +14,8 @@ using JOIN.Application.UseCases.Security.Auth.Register;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
 using JOIN.Persistence.Contexts;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JOIN.IntegrationTests.Security;
@@ -58,6 +60,45 @@ public sealed class AccountSessionsRevokeTests : IClassFixture<CustomWebApplicat
                 LastName = _fixture.Create<string>(),
             });
         registerResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // 1b. Seed the freshly-registered user with both a Company membership and the
+        //     SuperAdmin role. RegisterCommandHandler does neither (see its source comment:
+        //     "Creates a new active user without company assignments"). Without this:
+        //     - LoginCommandHandler.ResolveEffectiveCompanyIdAsync falls back to the Company
+        //       table; if no Company is seeded, effectiveCompanyId stays Guid.Empty and
+        //       JwtTokenGenerator emits a JWT with no CompanyId claim.
+        //     - DynamicAuthorizationFilter (line 76-79) only bypasses the CompanyId check
+        //       for users in the SuperAdmin role. A bare registered user with no CompanyId
+        //       claim gets 401 on the DELETE below.
+        await using (var seedScope = _factory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var userManager = seedScope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+            var defaultCompany = await seedDb.Companies
+                .Where(c => c.IsActive && c.GcRecord == 0)
+                .OrderBy(c => c.Created)
+                .FirstOrDefaultAsync();
+
+            var registeredUser = await userManager.FindByEmailAsync(email);
+
+            registeredUser.Should().NotBeNull();
+            defaultCompany.Should().NotBeNull("DatabaseSeeder must populate Security.Companies");
+
+            seedDb.UserCompanies.Add(new UserCompany
+            {
+                UserId = registeredUser!.Id,
+                CompanyId = defaultCompany!.Id,
+                IsDefault = true,
+                GcRecord = BaseAuditableEntity.ActiveGcRecord,
+                CreatedBy = nameof(AccountSessionsRevokeTests),
+            });
+
+            (await userManager.AddToRoleAsync(registeredUser, "SuperAdmin"))
+                .Succeeded.Should().BeTrue("AddToRoleAsync must succeed for the seeded SuperAdmin role");
+
+            await seedDb.SaveChangesAsync();
+        }
 
         // 2. First login → bearer token1. The token1 refresh row is the one we deliberately
         //    AVOID revoking. A second refresh-token row is materialised directly in the DB
