@@ -1,11 +1,11 @@
 # SPEC 31 — MFA configuration runbook (user + admin guide)
 
-> **Status:** Borrador
+> **Status:** Implementado
 > **Depends on:** SPEC 26 (F6 MFA endpoints), `Otp.NET` validator, `Security.UserMfaRecoveryCodes` table, `Security.Users.MfaEnabledAtUtc` column.
 > **Date:** 2026-08-18
 > **Objective:** Procedimiento paso-a-paso para enrolar MFA desde el endpoint `AccountController`, con los curl exactos, respuesta esperada y resolución de los errores observados durante la prueba inicial (`POST /mfa/setup` → 500 por `BeginTransaction` sin `Open()`, audit log timeout 30s+).
 
----
+---imp
 
 ## Prerequisites
 
@@ -151,7 +151,7 @@ Mismo patrón ya existía en `RoleSystemOptionsRepository.BulkUpsertAsync:302`. 
 3. Mover audit log a un `Channel<T>` en background (fire-and-forget) — el handler no espera, log nunca bloquea request.
 4. Investigar SQL Server: `SELECT * FROM sys.dm_exec_requests WHERE status='running' ORDER BY cpu_time DESC` para detectar sesiones bloqueantes.
 
-**Estado:** observado, no resuelto en scope spec 26.
+**Estado:** resuelto (opción 2 — `commandTimeout: 5s` en `SecurityEventRepository.InsertAsync`, aplicada en `src/3.Persistence/Repositories/Security/SecurityEventRepository.cs`).
 
 ---
 

@@ -28,6 +28,11 @@ public sealed class SecurityEventRepository(ISqlConnectionFactory connectionFact
                 (@Id, @UserId, @EventType, @OccurredAtUtc, @IpAddress, @UserAgent, @Result, @MetadataJson);
             """;
 
+        // SPEC 31 (E2) — commandTimeout 5s instead of Dapper's 30s default.
+        // Audit log writes must fail fast: a stuck SecurityEventLogs insert should NOT
+        // hold the user-facing request (e.g. POST /mfa/setup) for half a minute. The
+        // SecurityEventLogger.LogAsync caller already swallows the timeout (best-effort
+        // audit), so this only affects the latency budget of the failing path.
         using var connection = _connectionFactory.CreateConnection();
         return await connection.ExecuteAsync(new CommandDefinition(sql, new
         {
@@ -39,7 +44,7 @@ public sealed class SecurityEventRepository(ISqlConnectionFactory connectionFact
             entry.UserAgent,
             entry.Result,
             entry.MetadataJson
-        }, cancellationToken: ct));
+        }, commandTimeout: 5, cancellationToken: ct));
     }
 
     /// <inheritdoc />
