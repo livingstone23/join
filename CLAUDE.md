@@ -14,20 +14,28 @@ dotnet restore
 dotnet build
 dotnet run --project src/4.Services.WebApi/JOIN.Services.WebApi.csproj
 
-# Tests (single unit test project, xUnit)
+# Unit tests (single project, xUnit + Moq + AutoFixture + FluentAssertions)
 dotnet test
 dotnet test --filter "FullyQualifiedName~CreatePersonCommandHandlerTests"
+
+# Unit tests with the same coverage gate CI enforces
+dotnet test tests/UnitTests/JOIN.Application.UnitTest/JOIN.Application.UnitTest.csproj \
+  /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:Threshold=90 /p:ThresholdType=line
+
+# Integration tests (needs Docker — spins up a real SQL Server via Testcontainers)
+dotnet test tests/IntegrationTests/JOIN.IntegrationTests.csproj
 
 # EF Core migrations (run from src/4.Services.WebApi so the Design package + DbContext resolve)
 dotnet ef migrations add <Name> --project ../3.Persistence --startup-project .
 dotnet ef database update --project ../3.Persistence --startup-project .
+
+# Docker (no bundled database — point ConnectionStrings__DefaultConnection at your own instance via .env)
+docker-compose up -d --build
 ```
 
 Migrations apply automatically at startup (`Program.cs` calls `context.Database.MigrateAsync()`), and the `DatabaseSeeder` runs after any pending migration or, in Development with no pending migrations, re-runs the idempotent menu/permissions seed.
 
-CI (`.github/workflows/ci.yml`) builds in Release and runs `dotnet test` with Coverlet, **failing the build if line coverage drops below 90%**. Keep new Application-layer code covered by unit tests under `tests/UnitTests/JOIN.Application.UnitTest`, mirroring the `UseCases/<Area>/<Feature>/Commands|Queries/<Name>` folder structure of the source.
-
-No `docker-compose` file exists yet despite the README mentioning one — local dev currently points at a real SQL Server instance via `appsettings.json` connection strings.
+CI (`.github/workflows/ci.yml`) builds in Release and runs `dotnet test` scoped explicitly to `tests/UnitTests/JOIN.Application.UnitTest/JOIN.Application.UnitTest.csproj` with Coverlet, **failing the build if line coverage drops below 90%**. This scoping is deliberate: running the whole solution would pull in `IntegrationTests` and inflate the metric with coverage of Controllers/Behaviors/EF Core that the gate isn't meant to measure. Integration tests run as a separate, uncovered CI step. Keep new Application-layer code covered by unit tests under `tests/UnitTests/JOIN.Application.UnitTest`, mirroring the `UseCases/<Area>/<Feature>/Commands|Queries/<Name>` folder structure of the source.
 
 ## Layer map
 
@@ -38,7 +46,8 @@ src/2.Application       JOIN.Application       CQRS handlers (MediatR), FluentVa
 src/3.Infrastructure    JOIN.Infrastructure    ISqlConnectionFactory impl, JWT, SendGrid, Identity security logic, DI wiring.
 src/3.Persistence       JOIN.Persistence       DbContext, EF configurations, migrations, repositories, UnitOfWork, seeder.
 src/4.Services.WebApi   JOIN.Services.WebApi   Controllers, Program.cs, middlewares, filters.
-tests/UnitTests          JOIN.Application.UnitTest   MSTest-style xUnit tests (Moq, AutoFixture, FluentAssertions) for Application handlers/mappers.
+tests/UnitTests          JOIN.Application.UnitTest   Handler/mapper/validator tests for Application, 90% coverage gate.
+tests/IntegrationTests    JOIN.IntegrationTests       Testcontainers.MsSql + WebApplicationFactory<Program>, full API flows, not gated on coverage.
 ```
 
 Dependency direction is strict: Domain has no project references; Application depends only on Domain + DTO; Persistence/Infrastructure depend on Application+Domain; WebApi depends on Application+Infrastructure+Persistence. Each layer is registered via its own `AddXServices`/`AddInfrastructure`-style extension method (`2.Application/Common/ConfigureServices.cs`, `3.Persistence/Configuration/ConfigureServices.cs`, `3.Infrastructure/DependencyInjection.cs`), all called from `Program.cs`.
@@ -49,10 +58,13 @@ Every use case lives at `src/2.Application/UseCases/<Area>/<Feature>/{Commands|Q
 
 - **Commands (writes)**: go through `IUnitOfWork` + EF Core repositories (`_unitOfWork.GetRepository<T>()` for generic CRUD, or a named repository like `_unitOfWork.Persons` for custom queries) so multiple aggregates commit atomically via `SaveAsync`.
 - **Queries (reads)**: go through `ISqlConnectionFactory` + raw Dapper SQL for performance — never load via EF Core's change tracker for a query handler. Every hand-written query filters `WHERE CompanyId = @TenantId AND GcRecord = 0` (soft-delete + tenant isolation). Cross-DB portability matters: use `CONCAT()` not vendor date functions, and branch pagination clauses on `LIMIT/OFFSET` (Postgres) vs `OFFSET...FETCH NEXT` (SQL Server) — see `GetPersonsPagedQueryHandler` for the pattern.
+- **Cross-record invariants** (e.g. "only one default/current/active X per person") are enforced by a feature-local `<Thing><Invariant>Coordinator` class living beside the use case (e.g. `PersonAddressDefaultCoordinator`, `PersonEmploymentCurrentCoordinator`, `PersonBusinessProfileActiveCoordinator`) — a plain DI-injected class the command handler calls into, not a MediatR behavior or a Domain-layer type.
+- Five MediatR pipeline behaviors wrap every request, registered in this order in `AddApplicationServices` (`2.Application/Common/ConfigureServices.cs`): `UnhandledExceptionBehavior` (outermost, catches everything) → `PerformanceBehavior` (times the full pipeline) → `ValidationBehavior` → `LoggingBehavior` (after validation, before the transaction) → `TransactionBehavior` (opens/commits/rolls back for any command implementing `ITransactionalCommand<T>`; no-ops otherwise). Preserve this order if you touch it — each behavior's comment in that file explains why it sits where it does.
 - Handlers return `Response<T>` (`src/2.Application/Common/Response.cs`) — never throw for expected business failures; set `IsSuccess = false` / use `Response<T>.Error(message, errors)` instead.
 - Tenant resolution: every handler that touches tenant data checks `currentUserService.CompanyId == Guid.Empty` up front and short-circuits with an error `Response<T>`. `ICurrentUserService` resolves `CompanyId` from JWT claims or the `X-Company-Id` header.
 - IDs are always `Guid`, never `int`.
 - Handlers never return Domain entities directly — map to DTOs via the project's Mapperly mappers (`I<Entity>Mapper`, source-generated, in `2.Application/Mappings`).
+- Use primary constructors for DI (`public sealed class FooCommandHandler(IUnitOfWork unitOfWork, ...) : IRequestHandler<...>`) — the convention followed throughout the Application layer.
 
 ## Auth & security
 
@@ -68,6 +80,10 @@ ASP.NET Core Identity (`ApplicationUser`/`ApplicationRole`, GUID keys) + JWT bea
 - Status codes: `401 Unauthorized` for missing/invalid token or missing `CompanyId`; `403 ForbidResult` when the token is valid but the required flag is `false`. RFC 7235 semantics — do not collapse.
 - Resource resolution precedence: action-level attribute → class-level attribute → `descriptor.ControllerName` (stripped) → fail-closed (`403`). Fail-closed ensures an unannotated controller with an unstripped class name does not silently open access.
 - The `PermissionService` cache key was bumped to `permissions:v2:{companyId}:{userId}` when the cached snapshot shape changed from 4 to 7 flags; older cache entries are ignored. See `specs/17-permissionresource-optional-and-flag-override-drift-audit.csv` for the controller ↔ seed `ControllerName` audit.
+
+## Testing gotchas
+
+- `CustomWebApplicationFactory` (`tests/IntegrationTests/CustomWebApplicationFactory.cs`) spins up an ephemeral SQL Server via Testcontainers per fixture and mocks `IEmailService` so nothing hits a real network. Building the host is guarded by a static `_hostBuildLock`: Serilog's `Log.Logger` is a static singleton, and `Program.Main` (re-invoked by every `WebApplicationFactory<Program>` instance) reassigns and freezes it — concurrent factory construction across xUnit test classes throws `InvalidOperationException: The logger is already frozen` without that lock. Keep the lock if you touch this file.
 
 ## API surface
 
