@@ -60,17 +60,14 @@ public sealed class ReplaceUserRolesCommandHandler(
           AND CompanyId = @CompanyId;
         """;
 
-    private const string CurrentAssignmentNamesSql = """
-        SELECT urc.RoleId AS RoleId,
-               r.Name     AS RoleName
-        FROM [Security].[UserRoleCompanies] urc
-        INNER JOIN [Security].[Roles] r
-            ON r.Id = urc.RoleId
-           AND r.GcRecord = 0
-        WHERE urc.UserId = @UserId
-          AND urc.CompanyId = @CompanyId
-          AND urc.GcRecord = 0
-        ORDER BY r.Name;
+    // Looked up by id, BEFORE any writes happen (see remarks below on why the
+    // former post-write "current assignment names" query was removed).
+    private const string RoleNamesByIdSql = """
+        SELECT Id   AS Id,
+               Name AS Name
+        FROM [Security].[Roles]
+        WHERE Id IN @Ids
+          AND GcRecord = 0;
         """;
 
     public async Task<Response<UserWithRolesDto>> Handle(
@@ -125,6 +122,22 @@ public sealed class ReplaceUserRolesCommandHandler(
         }
 
         var resolvedSet = new HashSet<Guid>(resolvedIds);
+
+        // 3b. Resolve names for the response DTO now, while resolvedIds is still fresh
+        //     and — critically — BEFORE any writes happen on this same connection. A
+        //     prior version of this handler re-queried "current assignment names" AFTER
+        //     the EF Core writes (step 7), on this same un-enlisted raw connection: that
+        //     read blocked on the just-written, still-uncommitted EF Core transaction
+        //     (TransactionBehavior only commits after Handle() returns) until the SQL
+        //     command timeout (~30s), then surfaced as an unhandled 500. Found live
+        //     while testing specs/07-usuarios-listado.md (join_frontb) — every save
+        //     that passed role-name validation hung for ~30s and then failed.
+        var roleNamesById = resolvedIds.Length == 0
+            ? new Dictionary<Guid, string>()
+            : (await connection.QueryAsync<RoleNameRow>(
+                new CommandDefinition(RoleNamesByIdSql, new { Ids = resolvedIds }, cancellationToken: cancellationToken)))
+                .Where(row => !string.IsNullOrWhiteSpace(row.Name))
+                .ToDictionary(row => row.Id, row => row.Name!);
 
         // 4. Index of every (active + soft-deleted) assignment for this user/tenant.
         //    Read via Dapper for the lightweight (Id, RoleId, GcRecord) projection;
@@ -204,18 +217,13 @@ public sealed class ReplaceUserRolesCommandHandler(
         //    one invalidation per successful request.
         await permissionService.InvalidateUserCacheAsync(companyId, request.UserId, cancellationToken);
 
-        // 9. Project the freshly written assignment set for the response DTO. Names
-        //    come from the DB (not from the request) so the DTO reflects what is
-        //    actually persisted.
-        var nameRows = (await connection.QueryAsync<AssignmentNameRow>(
-            new CommandDefinition(CurrentAssignmentNamesSql,
-                new { UserId = request.UserId, CompanyId = companyId },
-                cancellationToken: cancellationToken))).AsList();
-
-        var roleNames = nameRows
-            .Select(row => row.RoleName)
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Select(name => name!)
+        // 9. Project the freshly written assignment set for the response DTO, from the
+        //    in-memory map resolved in step 3b — resolvedIds is exactly what this
+        //    request just persisted, so no post-write DB round-trip is needed (and,
+        //    per the remarks on RoleNamesByIdSql above, must not be one).
+        var roleNames = resolvedIds
+            .Where(roleNamesById.ContainsKey)
+            .Select(roleId => roleNamesById[roleId])
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
@@ -290,9 +298,9 @@ public sealed class ReplaceUserRolesCommandHandler(
         public int GcRecord { get; set; }
     }
 
-    private sealed class AssignmentNameRow
+    private sealed class RoleNameRow
     {
-        public Guid RoleId { get; set; }
-        public string? RoleName { get; set; }
+        public Guid Id { get; set; }
+        public string? Name { get; set; }
     }
 }
