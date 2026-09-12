@@ -187,7 +187,8 @@ public sealed class LoginCommandHandlerTests
                 user,
                 requestedCompanyId,
                 It.Is<IEnumerable<string>>(roles => roles.OrderBy(x => x).SequenceEqual(new[] { "Admin", "Manager" })),
-                It.IsAny<Guid>()))
+                It.IsAny<Guid>(),
+                It.IsAny<string>()))
             .Returns(("jwt-token", "refresh-token", expiration, refreshExpiration));
 
         context.RefreshTokenRepositoryMock
@@ -262,7 +263,8 @@ public sealed class LoginCommandHandlerTests
                 user,
                 assignedCompanyId,
                 It.Is<IEnumerable<string>>(roles => roles.Single() == "Agent"),
-                It.IsAny<Guid>()))
+                It.IsAny<Guid>(),
+                It.IsAny<string>()))
             .Returns(CreateTokenResult());
 
 
@@ -338,7 +340,8 @@ public sealed class LoginCommandHandlerTests
                 user,
                 assignedCompanyId,
                 It.Is<IEnumerable<string>>(roles => roles.Single() == "Reader"),
-                It.IsAny<Guid>()))
+                It.IsAny<Guid>(),
+                It.IsAny<string>()))
             .Returns(CreateTokenResult());
 
 
@@ -391,7 +394,8 @@ public sealed class LoginCommandHandlerTests
                 user,
                 requestedCompanyId,
                 It.Is<IEnumerable<string>>(roles => roles.Single() == "SuperAdmin"),
-                It.IsAny<Guid>()))
+                It.IsAny<Guid>(),
+                It.IsAny<string>()))
             .Returns(CreateTokenResult());
 
 
@@ -447,7 +451,8 @@ public sealed class LoginCommandHandlerTests
                 user,
                 fallbackCompanyId,
                 It.Is<IEnumerable<string>>(roles => roles.Single() == "SuperAdmin"),
-                It.IsAny<Guid>()))
+                It.IsAny<Guid>(),
+                It.IsAny<string>()))
             .Returns(CreateTokenResult());
 
 
@@ -495,7 +500,8 @@ public sealed class LoginCommandHandlerTests
                 user,
                 null,
                 It.Is<IEnumerable<string>>(roles => roles.Single() == "Basic"),
-                It.IsAny<Guid>()))
+                It.IsAny<Guid>(),
+                It.IsAny<string>()))
             .Returns(CreateTokenResult());
 
 

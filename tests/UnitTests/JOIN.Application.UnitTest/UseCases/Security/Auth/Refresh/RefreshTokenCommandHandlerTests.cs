@@ -281,7 +281,8 @@ public sealed class RefreshTokenCommandHandlerTests
                 user,
                 companyId,
                 It.Is<IEnumerable<string>>(roles => roles.Single() == "Admin"),
-                It.IsAny<Guid>()))
+                It.IsAny<Guid>(),
+                It.IsAny<string>()))
             .Returns(("new-access", "rotated-refresh", expiration, refreshExpiration));
 
 
@@ -370,7 +371,8 @@ public sealed class RefreshTokenCommandHandlerTests
                 user,
                 assignedCompanyId,
                 It.Is<IEnumerable<string>>(roles => roles.Single() == "Reader"),
-                It.IsAny<Guid>()))
+                It.IsAny<Guid>(),
+                It.IsAny<string>()))
             .Returns(CreateTokenResult());
 
         context.UnitOfWorkMock
@@ -431,7 +433,8 @@ public sealed class RefreshTokenCommandHandlerTests
                 user,
                 fallbackCompanyId,
                 It.Is<IEnumerable<string>>(roles => roles.Single() == "SuperAdmin"),
-                It.IsAny<Guid>()))
+                It.IsAny<Guid>(),
+                It.IsAny<string>()))
             .Returns(CreateTokenResult());
 
         context.UnitOfWorkMock

@@ -51,10 +51,12 @@ public sealed class GetMySessionsQueryHandlerTests
     }
 
     /// <summary>
-    /// Verifies that mixed sessions are returned ordered by last activity and the first one is marked as current.
+    /// Verifies that mixed sessions are returned ordered by last activity and the one whose SessionId
+    /// matches the caller's own refresh_token_id claim is marked as current — here that happens to be
+    /// the most recently active row too.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenSessionsExist_ShouldReturnOrderedSessionsWithCurrentFlag()
+    public async Task Handle_WhenSessionsExist_ShouldMarkCallersOwnSessionAsCurrent()
     {
         // Arrange
         var userId = _fixture.Create<Guid>();
@@ -63,6 +65,7 @@ public sealed class GetMySessionsQueryHandlerTests
         var newestActivity = new DateTime(2026, 7, 12, 9, 0, 0, DateTimeKind.Utc);
         var olderActivity = new DateTime(2026, 7, 11, 9, 0, 0, DateTimeKind.Utc);
         var context = new GetMySessionsQueryHandlerTestContext();
+        context.CurrentUserServiceMock.Setup(x => x.RefreshTokenId).Returns(newestSessionId);
 
         context.Connection.SetResults(
             FakeResultSet.FromRows(
@@ -105,6 +108,90 @@ public sealed class GetMySessionsQueryHandlerTests
         sessions[1].IpAddress.Should().BeNull();
     }
 
+    /// <summary>
+    /// Regression test for the bug where <c>IsCurrent</c> was assigned to whichever row was most
+    /// recently active instead of the row matching the caller's own refresh_token_id claim. This
+    /// surfaced when a user had two browsers open: loading the list from the browser that had been
+    /// idle longer showed the *other* browser's session as "current" (and its own as revocable),
+    /// so revoking the mislabeled row was then rejected by RevokeMySessionCommandHandler with
+    /// CANNOT_REVOKE_CURRENT because that row's id really did match the request's own refresh token.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenCallersOwnSessionIsNotTheMostRecentlyActive_ShouldStillMarkItAsCurrent()
+    {
+        // Arrange
+        var userId = _fixture.Create<Guid>();
+        var newestSessionId = _fixture.Create<Guid>(); // Another of the user's own sessions (e.g. a second browser), busier right now.
+        var callersOwnSessionId = _fixture.Create<Guid>(); // The session actually making this request — idle for a minute, but still "current" from its own point of view.
+        var newestActivity = new DateTime(2026, 7, 12, 9, 0, 0, DateTimeKind.Utc);
+        var olderActivity = newestActivity.AddMinutes(-1);
+        var context = new GetMySessionsQueryHandlerTestContext();
+        context.CurrentUserServiceMock.Setup(x => x.RefreshTokenId).Returns(callersOwnSessionId);
+
+        context.Connection.SetResults(
+            FakeResultSet.FromRows(
+                new Dictionary<string, object?>
+                {
+                    ["SessionId"] = newestSessionId,
+                    ["ConnectedAtUtc"] = newestActivity.AddHours(-1),
+                    ["LastActivityAtUtc"] = newestActivity,
+                    ["Device"] = "JWT Refresh Token",
+                    ["IpAddress"] = null
+                },
+                new Dictionary<string, object?>
+                {
+                    ["SessionId"] = callersOwnSessionId,
+                    ["ConnectedAtUtc"] = olderActivity.AddHours(-2),
+                    ["LastActivityAtUtc"] = olderActivity,
+                    ["Device"] = "JWT Refresh Token",
+                    ["IpAddress"] = null
+                }));
+
+        var handler = context.CreateHandler();
+
+        // Act
+        var response = await handler.Handle(new GetMySessionsQuery(userId), CancellationToken.None);
+
+        // Assert
+        var sessions = response.Data!.ToList();
+
+        sessions.Single(s => s.SessionId == callersOwnSessionId).IsCurrent.Should().BeTrue();
+        sessions.Single(s => s.SessionId == newestSessionId).IsCurrent.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Legacy tokens predating the refresh_token_id claim resolve to a null RefreshTokenId — falls
+    /// back to the previous heuristic (most recently active row) rather than marking nothing current.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenRefreshTokenIdClaimIsMissing_ShouldFallBackToMostRecentRow()
+    {
+        // Arrange
+        var userId = _fixture.Create<Guid>();
+        var newestSessionId = _fixture.Create<Guid>();
+        var context = new GetMySessionsQueryHandlerTestContext();
+        context.CurrentUserServiceMock.Setup(x => x.RefreshTokenId).Returns((Guid?)null);
+
+        context.Connection.SetResults(
+            FakeResultSet.FromRows(
+                new Dictionary<string, object?>
+                {
+                    ["SessionId"] = newestSessionId,
+                    ["ConnectedAtUtc"] = DateTime.UtcNow,
+                    ["LastActivityAtUtc"] = DateTime.UtcNow,
+                    ["Device"] = "JWT Refresh Token",
+                    ["IpAddress"] = null
+                }));
+
+        var handler = context.CreateHandler();
+
+        // Act
+        var response = await handler.Handle(new GetMySessionsQuery(userId), CancellationToken.None);
+
+        // Assert
+        response.Data!.Single().IsCurrent.Should().BeTrue();
+    }
+
     private sealed class GetMySessionsQueryHandlerTestContext
     {
         public GetMySessionsQueryHandlerTestContext()
@@ -113,11 +200,12 @@ public sealed class GetMySessionsQueryHandlerTests
         }
 
         public Mock<ISqlConnectionFactory> ConnectionFactoryMock { get; } = new();
+        public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public FakeDbConnection Connection { get; } = new();
 
         public GetMySessionsQueryHandler CreateHandler()
         {
-            return new GetMySessionsQueryHandler(ConnectionFactoryMock.Object);
+            return new GetMySessionsQueryHandler(ConnectionFactoryMock.Object, CurrentUserServiceMock.Object);
         }
     }
 }

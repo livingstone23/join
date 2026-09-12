@@ -24,7 +24,13 @@ public class JwtTokenGenerator(IConfiguration configuration) : IJwtTokenGenerato
 
 
     /// <summary>
-    /// Generates a signed access token and a secure refresh token for the supplied user session.
+    /// Generates a signed access token for the supplied user session. Does NOT generate a refresh
+    /// token — <paramref name="refreshTokenString"/> must already be the one the caller persisted
+    /// to <c>Security.UserRefreshTokens</c> for <paramref name="refreshTokenId"/>; it is returned
+    /// as-is. (Bug fixed 2026-09-12: this used to call <see cref="GenerateRefreshTokenString"/> again
+    /// here, handing the client a *different* random string than the one actually persisted —
+    /// every refresh attempt failed with "invalid, expired, or revoked" because the string sent back
+    /// to log in with never matched any row.)
     /// </summary>
     /// <param name="user">The authenticated application user.</param>
     /// <param name="companyId">The effective company identifier for the session, if one is available.</param>
@@ -32,8 +38,9 @@ public class JwtTokenGenerator(IConfiguration configuration) : IJwtTokenGenerato
     /// <param name="refreshTokenId">The identifier of the persisted <c>Security.UserRefreshTokens</c> row.
     /// Embedded as the <c>refresh_token_id</c> claim so the access token can later be tied back to
     /// its persisted refresh token record.</param>
+    /// <param name="refreshTokenString">The exact string already persisted for <paramref name="refreshTokenId"/>; echoed back, never regenerated.</param>
     /// <returns>A tuple containing the access token, refresh token, and their expiration metadata.</returns>
-    public (string Token, string RefreshToken, DateTime Expiration, DateTime RefreshTokenExpiration) GenerateToken(ApplicationUser user, Guid? companyId, IEnumerable<string> roles, Guid refreshTokenId)
+    public (string Token, string RefreshToken, DateTime Expiration, DateTime RefreshTokenExpiration) GenerateToken(ApplicationUser user, Guid? companyId, IEnumerable<string> roles, Guid refreshTokenId, string refreshTokenString)
     {
         var issuer = _configuration["Jwt:Issuer"] ?? "JOIN.Services.WebApi";
         var audience = _configuration["Jwt:Audience"] ?? "JOIN.Client";
@@ -106,9 +113,8 @@ public class JwtTokenGenerator(IConfiguration configuration) : IJwtTokenGenerato
 
         var tokenHandler = new JwtSecurityTokenHandler();
         var token = tokenHandler.WriteToken(tokenDescriptor);
-        var refreshToken = GenerateRefreshTokenString();
 
-        return (token, refreshToken, expiration, refreshTokenExpiration);
+        return (token, refreshTokenString, expiration, refreshTokenExpiration);
     }
 
     /// <summary>

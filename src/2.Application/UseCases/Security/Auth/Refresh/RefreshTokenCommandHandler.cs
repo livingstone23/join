@@ -104,7 +104,7 @@ public class RefreshTokenCommandHandler(
         }
 
         var (accessToken, newRefreshToken, expiration, _) =
-            _jwtTokenGenerator.GenerateToken(user, effectiveCompanyId, roleNames, newRefreshTokenId);
+            _jwtTokenGenerator.GenerateToken(user, effectiveCompanyId, roleNames, newRefreshTokenId, newRefreshTokenString);
 
         var refreshMetadata = System.Text.Json.JsonSerializer.Serialize(new
         {

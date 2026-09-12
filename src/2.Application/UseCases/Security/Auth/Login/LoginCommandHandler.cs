@@ -110,7 +110,7 @@ public class LoginCommandHandler(
         }
 
         var (token, refreshToken, expiration, _) =
-            _jwtTokenGenerator.GenerateToken(user, effectiveCompanyId, roleNames, refreshTokenId);
+            _jwtTokenGenerator.GenerateToken(user, effectiveCompanyId, roleNames, refreshTokenId, refreshTokenString);
 
         var successMetadata = System.Text.Json.JsonSerializer.Serialize(new
         {

@@ -6,7 +6,7 @@ using MediatR;
 
 namespace JOIN.Application.UseCases.Security.Account.Queries.GetMySessions;
 
-public sealed class GetMySessionsQueryHandler(ISqlConnectionFactory connectionFactory)
+public sealed class GetMySessionsQueryHandler(ISqlConnectionFactory connectionFactory, ICurrentUserService currentUserService)
     : IRequestHandler<GetMySessionsQuery, Response<IReadOnlyCollection<ActiveSessionDto>>>
 {
     public async Task<Response<IReadOnlyCollection<ActiveSessionDto>>> Handle(GetMySessionsQuery request, CancellationToken cancellationToken)
@@ -54,9 +54,24 @@ public sealed class GetMySessionsQueryHandler(ISqlConnectionFactory connectionFa
                 new { request.UserId, UtcNow = DateTime.UtcNow },
                 cancellationToken: cancellationToken))).AsList();
 
-        if (sessions.Count > 0)
+        // The row that authenticated *this* request is the one whose SessionId matches the
+        // refresh_token_id claim of the caller's own JWT — not simply "whichever row was most
+        // recently active" (that heuristic breaks as soon as another of the user's own sessions,
+        // e.g. a second browser, was used more recently than this one).
+        var currentRefreshTokenId = currentUserService.RefreshTokenId;
+        var currentIndex = currentRefreshTokenId.HasValue
+            ? sessions.FindIndex(s => s.SessionId == currentRefreshTokenId.Value)
+            : -1;
+
+        if (currentIndex < 0 && sessions.Count > 0)
         {
-            sessions[0] = sessions[0] with { IsCurrent = true };
+            // Back-compat fallback for tokens issued before the refresh_token_id claim existed.
+            currentIndex = 0;
+        }
+
+        if (currentIndex >= 0)
+        {
+            sessions[currentIndex] = sessions[currentIndex] with { IsCurrent = true };
         }
 
         return new Response<IReadOnlyCollection<ActiveSessionDto>>
