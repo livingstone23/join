@@ -2572,16 +2572,25 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("TicketStatuses", "/ManejoTickets/ticket-statuses", "@Icons.Material.Filled.PendingActions", "ManejoTickets", "TicketStatuses", true, true, true, true),
         new("TicketCompanyDefaults", "/ManejoTickets/ticket-company-defaults", "@Icons.Material.Filled.LocalPlay", "ManejoTickets", "TicketCompanyDefaults", true, true, true, true),
 
-        new("Seguridad", "/Seguridad", "@Icons.Material.Filled.Security", null, null, false, false, false, false),
+        new("Seguridad", "/security", "@Icons.Material.Filled.Security", null, null, false, false, false, false),
         new("Usuarios", "/security/users", "@Icons.Material.Filled.SupervisedUserCircle", null,"Users", false, false, false, false),
-        new("Roles", "/Seguridad/Roles", "@Icons.Material.Filled.VerifiedUser", null,"Roles", false, false, false, false),
-        new("RoleCompanies", "/Seguridad/RoleCompanies", "@Icons.Material.Filled.VerifiedUser", null, "RoleCompanies", false, false, false, false),
-        new("SystemOption", "/Seguridad/systemOptions", "@Icons.Material.Filled.SystemSecurityUpdateWarning", null,"SystemOptions", false, false, false, false),
-        new("RoleSystemOption", "/Seguridad/rolesystemoption", "@Icons.Material.Filled.SystemSecurityUpdateGood", null,"RoleSystemOption", false, false, false, false),
+        new("Roles", "/security/roles", "@Icons.Material.Filled.VerifiedUser", null,"Roles", false, false, false, false),
+        // "RoleCompanies" no tiene todavía una pantalla frontend confirmada (join_frontb
+        // specs 01-09) — ruta traducida por consistencia con el resto de /security/*,
+        // a revisar cuando esa pantalla se defina.
+        new("RoleCompanies", "/security/role-companies", "@Icons.Material.Filled.VerifiedUser", null, "RoleCompanies", false, false, false, false),
+        // Confirmado en join_frontb specs/09-roles-permisos.md ("Out of scope"): pantalla
+        // futura documentada como /security/system-options.
+        new("SystemOption", "/security/system-options", "@Icons.Material.Filled.SystemSecurityUpdateWarning", null,"SystemOptions", false, false, false, false),
+        // "RoleSystemOption" respalda la matriz de /security/roles (specs/09), no tiene
+        // pantalla propia — ruta traducida por consistencia, sin uso real desde el frontend hoy.
+        new("RoleSystemOption", "/security/role-system-options", "@Icons.Material.Filled.SystemSecurityUpdateGood", null,"RoleSystemOption", false, false, false, false),
         // SPEC 29 — bitácora de seguridad. Read-only; other flags left at false so the
         // DynamicAuthorizationFilter denies anything other than GET. Without this row
         // the AuditController would 403 for everyone except SuperAdmin.
-        new("Bitacora", "/Seguridad/bitacora", "@Icons.Material.Filled.HistoryEdu", null, "Audit", true, false, false, false)
+        // Ruta de pantalla frontend aún no definida en ningún spec de join_frontb — best-effort,
+        // a confirmar cuando exista una pantalla real de auditoría.
+        new("Bitacora", "/security/audit-log", "@Icons.Material.Filled.HistoryEdu", null, "Audit", true, false, false, false)
 
     ];
 
