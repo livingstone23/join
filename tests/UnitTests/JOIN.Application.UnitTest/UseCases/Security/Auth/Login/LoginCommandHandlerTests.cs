@@ -364,6 +364,64 @@ public sealed class LoginCommandHandlerTests
     }
 
     /// <summary>
+    /// Regression test: a user can hold both IsSuperAdmin and IsSuperAdminCompany at once.
+    /// The early SuperAdmin return must not drop the SuperAdminCompany claim — found live
+    /// while re-testing specs/08 in join_frontb (a user with both flags got a JWT with only
+    /// "SuperAdmin", 403'ing on every endpoint gated on "SuperAdminCompany" despite the flag
+    /// being true in the database).
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenSuperAdminAlsoSuperAdminCompany_ShouldIncludeBothRoles()
+    {
+        // Arrange
+        var context = new LoginCommandHandlerTestContext();
+        var requestedCompanyId = _fixture.Create<Guid>();
+        var request = CreateValidCommand(requestedCompanyId);
+        var user = CreateUser(isSuperAdmin: true, isSuperAdminCompany: true);
+
+        ArrangeAuthenticatedUser(context, user, request);
+
+        context.UserCompanyRepositoryMock
+            .Setup(x => x.GetAllAsync())
+            .ReturnsAsync(Array.Empty<UserCompany>());
+
+        context.UserRoleCompanyRepositoryMock
+            .Setup(x => x.GetAllAsync())
+            .ReturnsAsync(Array.Empty<UserRoleCompany>());
+
+        context.CompanyRepositoryMock
+            .Setup(x => x.GetAsync(requestedCompanyId))
+            .ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+
+        context.TokenGeneratorMock
+            .Setup(x => x.GenerateToken(
+                user,
+                requestedCompanyId,
+                It.Is<IEnumerable<string>>(roles =>
+                    roles.Contains("SuperAdmin") && roles.Contains("SuperAdminCompany") && roles.Count() == 2),
+                It.IsAny<Guid>(),
+                It.IsAny<string>()))
+            .Returns(CreateTokenResult());
+
+        context.RefreshTokenRepositoryMock
+            .Setup(x => x.InsertAsync(It.IsAny<UserRefreshToken>()))
+            .ReturnsAsync(true);
+
+        context.UnitOfWorkMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var handler = context.CreateHandler();
+
+        // Act
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        // Assert
+        response.CompanyId.Should().Be(requestedCompanyId);
+        response.Roles.Should().BeEquivalentTo(["SuperAdmin", "SuperAdminCompany"]);
+    }
+
+    /// <summary>
     /// Verifies the requested-company branch for a super administrator when the company exists.
     /// </summary>
     [Fact]
@@ -561,7 +619,7 @@ public sealed class LoginCommandHandlerTests
     /// <summary>
     /// Creates a valid user for the authentication scenarios.
     /// </summary>
-    private static ApplicationUser CreateUser(bool isActive = true, bool isSuperAdmin = false)
+    private static ApplicationUser CreateUser(bool isActive = true, bool isSuperAdmin = false, bool isSuperAdminCompany = false)
     {
         return new ApplicationUser
         {
@@ -570,6 +628,7 @@ public sealed class LoginCommandHandlerTests
             Email = "user@join.com",
             IsActive = isActive,
             IsSuperAdmin = isSuperAdmin,
+            IsSuperAdminCompany = isSuperAdminCompany,
             GcRecord = 0
         };
     }

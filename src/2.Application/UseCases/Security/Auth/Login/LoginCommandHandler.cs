@@ -251,7 +251,16 @@ public class LoginCommandHandler(
     {
         if (isSuperAdmin)
         {
-            return ["SuperAdmin"];
+            // A user can hold both flags at once (global SuperAdmin + SuperAdminCompany).
+            // Without this, the early return below skipped the IsSuperAdminCompany merge
+            // that the tenant-scoped branch does further down, so such a user's JWT ended
+            // up with only "SuperAdmin" — silently missing "SuperAdminCompany" and 403'ing
+            // on every endpoint gated on that role (e.g. GET /Companies), even though the
+            // flag was true in the database. Found live while re-testing specs/08 in
+            // join_frontb.
+            return user.IsSuperAdminCompany
+                ? ["SuperAdmin", "SuperAdminCompany"]
+                : ["SuperAdmin"];
         }
 
         if (!companyId.HasValue || companyId.Value == Guid.Empty)

@@ -165,7 +165,12 @@ public sealed class BulkUpdateUserRolesCommandHandler(
 
                 if (softDeletedForUser.TryGetValue(roleId, out var reusableId))
                 {
-                    var reusable = await roleRepository.GetAsync(reusableId);
+                    // GetIncludingDeletedAsync, not GetAsync — GetAsync (FindAsync)
+                    // applies the GcRecord == 0 global query filter and would return
+                    // null for this soft-deleted row, silently no-oping the reactivation
+                    // (same shape found live in ReplaceUserRolesCommandHandler while
+                    // re-testing specs/08 in join_frontb).
+                    var reusable = await roleRepository.GetIncludingDeletedAsync(reusableId);
                     if (reusable is not null)
                     {
                         reusable.GcRecord = BaseAuditableEntity.ActiveGcRecord;

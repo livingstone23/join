@@ -231,7 +231,9 @@ public sealed class AddUserCompanyCommandHandlerTests
             FakeResultSet.FromRows());
 
         // Repo returns the soft-deleted entity when fetched by id so reactivation
-        // can mutate it (the handler reads via repo.GetAsync then writes via
+        // can mutate it (the handler reads via repo.GetIncludingDeletedAsync — not
+        // GetAsync/FindAsync, which applies the GcRecord == 0 global query filter and
+        // would return null for this already-soft-deleted row — then writes via
         // repo.UpdateAsync). BaseEntity's ctor assigns the Id; we override it via
         // reflection because the setter is protected.
         var reactivateTarget = new UserCompany();
@@ -240,7 +242,7 @@ public sealed class AddUserCompanyCommandHandlerTests
             .SetValue(reactivateTarget, softDeletedMembershipId);
         var userRoleCompanyRepo = new Mock<IGenericRepository<UserRoleCompany>>();
         var userCompanyRepo = new Mock<IGenericRepository<UserCompany>>();
-        userCompanyRepo.Setup(x => x.GetAsync(softDeletedMembershipId)).ReturnsAsync(reactivateTarget);
+        userCompanyRepo.Setup(x => x.GetIncludingDeletedAsync(softDeletedMembershipId)).ReturnsAsync(reactivateTarget);
         ctx.UnitOfWorkMock.Setup(x => x.GetRepository<UserCompany>()).Returns(userCompanyRepo.Object);
         ctx.UnitOfWorkMock.Setup(x => x.GetRepository<UserRoleCompany>()).Returns(userRoleCompanyRepo.Object);
 

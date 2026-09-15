@@ -120,8 +120,12 @@ public sealed class AddUserCompanyCommandHandler(
         else if (softDeletedMembership is not null)
         {
             // Guard 5: reactivate the soft-deleted membership in place. Insert would
-            // collide with the unique (UserId, CompanyId) index.
-            var entity = await membershipRepository.GetAsync(softDeletedMembership.Id);
+            // collide with the unique (UserId, CompanyId) index. Must use
+            // GetIncludingDeletedAsync — GetAsync (FindAsync) applies the entity's
+            // GcRecord == 0 global query filter and would return null for this row,
+            // silently no-oping the reactivation (see ReplaceUserRolesCommandHandler,
+            // where this exact shape was found live re-testing specs/08 in join_frontb).
+            var entity = await membershipRepository.GetIncludingDeletedAsync(softDeletedMembership.Id);
             isDefault = !await userAdminRepository.HasAnyCompanyAsync(
                 request.UserId, cancellationToken);
 
@@ -190,7 +194,8 @@ public sealed class AddUserCompanyCommandHandler(
 
             if (softDeletedByRoleId.TryGetValue(roleId, out var reusableId))
             {
-                var reusable = await roleRepository.GetAsync(reusableId);
+                // GetIncludingDeletedAsync, not GetAsync — same reason as Guard 5 above.
+                var reusable = await roleRepository.GetIncludingDeletedAsync(reusableId);
                 if (reusable is not null)
                 {
                     reusable.GcRecord = BaseAuditableEntity.ActiveGcRecord;

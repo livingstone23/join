@@ -169,7 +169,13 @@ public sealed class ReplaceUserRolesCommandHandler(
 
             if (softDeletedIdsByRoleId.TryGetValue(roleId, out var reusableId))
             {
-                var reusable = await repository.GetAsync(reusableId);
+                // GetAsync (FindAsync) applies the entity's GcRecord == 0 global query
+                // filter, so it would return null here — the row we're looking for IS the
+                // soft-deleted one. That silently turned every re-add of a previously
+                // removed role into a no-op (found live while re-testing specs/08 in
+                // join_frontb: PUT succeeded and returned the requested roles, but a fresh
+                // read showed the role never actually reactivated).
+                var reusable = await repository.GetIncludingDeletedAsync(reusableId);
                 if (reusable is not null)
                 {
                     reusable.GcRecord = BaseAuditableEntity.ActiveGcRecord;

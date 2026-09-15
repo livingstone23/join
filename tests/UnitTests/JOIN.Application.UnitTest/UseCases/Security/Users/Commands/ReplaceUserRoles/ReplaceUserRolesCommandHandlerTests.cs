@@ -220,7 +220,11 @@ public sealed class ReplaceUserRolesCommandHandlerTests
 
         var repo = ctx.UserRoleCompanyRepoMock;
         UserRoleCompany? capturedForReactivation = null;
-        repo.Setup(x => x.GetAsync(softDeletedId))
+        // GetAsync (FindAsync) applies the GcRecord == 0 global query filter and would
+        // return null for this soft-deleted row in production — the handler must go
+        // through GetIncludingDeletedAsync to actually see it. Regression test for the
+        // silent-no-op bug found live while re-testing specs/08 in join_frontb.
+        repo.Setup(x => x.GetIncludingDeletedAsync(softDeletedId))
             .ReturnsAsync(() =>
             {
                 capturedForReactivation = new UserRoleCompany

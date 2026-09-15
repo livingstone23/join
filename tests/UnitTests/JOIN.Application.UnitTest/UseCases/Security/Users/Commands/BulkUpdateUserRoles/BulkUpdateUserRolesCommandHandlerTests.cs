@@ -245,7 +245,10 @@ public sealed class BulkUpdateUserRolesCommandHandlerTests
             GcRecord = 20260101
         };
         var repo = new Mock<IGenericRepository<UserRoleCompany>>();
-        repo.Setup(x => x.GetAsync(softDeletedId)).ReturnsAsync(reusable);
+        // GetIncludingDeletedAsync, not GetAsync — GetAsync (FindAsync) applies the
+        // GcRecord == 0 global query filter and would return null for this
+        // already-soft-deleted row, silently no-oping the reactivation.
+        repo.Setup(x => x.GetIncludingDeletedAsync(softDeletedId)).ReturnsAsync(reusable);
         ctx.UnitOfWorkMock.Setup(x => x.GetRepository<UserRoleCompany>()).Returns(repo.Object);
 
         var response = await ctx.Handler.Handle(

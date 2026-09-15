@@ -49,6 +49,17 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
     // --- Queries ---
     public virtual async Task<T?> GetAsync(Guid id) => await _context.Set<T>().FindAsync(id);
 
+    // FindAsync (used by GetAsync above) applies global query filters, so it returns null
+    // for a soft-deleted row even though it exists — silently no-oping any
+    // reactivate-if-soft-deleted branch (e.g. ReplaceUserRolesCommandHandler re-adding a
+    // previously removed role). IgnoreQueryFilters() + a property-based lookup on "Id"
+    // bypasses that filter; every entity in this codebase derives from BaseEntity, which
+    // declares Id as Guid.
+    public virtual async Task<T?> GetIncludingDeletedAsync(Guid id) =>
+        await _context.Set<T>()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(e => EF.Property<Guid>(e, "Id") == id);
+
     public virtual async Task<IEnumerable<T>> GetAllAsync() => await _context.Set<T>().ToListAsync();
 
     public virtual async Task<IEnumerable<T>> GetAllWithPaginationAsync(int pageNumber, int pageSize)

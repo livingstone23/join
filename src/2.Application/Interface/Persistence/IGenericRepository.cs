@@ -23,6 +23,17 @@ public interface IGenericRepository<T> where T : class
     #region Queries (Read-Only & High Performance)
     
     Task<T?> GetAsync(Guid id);
+
+    /// <summary>
+    /// Fetches an entity by id bypassing any global query filter (e.g. the standard
+    /// <c>GcRecord == 0</c> soft-delete filter), so a previously soft-deleted row can be
+    /// located in order to reactivate it. <see cref="GetAsync"/> cannot be reused for this:
+    /// EF Core's <c>FindAsync</c> applies global query filters, so it returns <c>null</c>
+    /// for a soft-deleted id even though the row exists — silently turning a
+    /// reactivate-if-soft-deleted branch into a no-op.
+    /// </summary>
+    Task<T?> GetIncludingDeletedAsync(Guid id);
+
     Task<IEnumerable<T>> GetAllAsync();
     Task<IEnumerable<T>> GetAllWithPaginationAsync(int pageNumber, int pageSize);
     Task<int> CountAsync();

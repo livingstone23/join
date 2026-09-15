@@ -120,7 +120,16 @@ public sealed class SwitchCompanyCommandHandler(
     {
         if (isSuperAdmin)
         {
-            return ["SuperAdmin"];
+            // A user can hold both flags at once (global SuperAdmin + SuperAdminCompany).
+            // Without this, the early return skipped the IsSuperAdminCompany merge done
+            // below, so such a user's JWT ended up with only "SuperAdmin" — silently
+            // missing "SuperAdminCompany" and 403'ing on every endpoint gated on that role
+            // (e.g. GET /Companies), even though the flag was true in the database. Same
+            // shape as LoginCommandHandler/RefreshTokenCommandHandler — found live while
+            // re-testing specs/08 in join_frontb.
+            return user.IsSuperAdminCompany
+                ? ["SuperAdmin", "SuperAdminCompany"]
+                : ["SuperAdmin"];
         }
 
         var roleIds = roleAssignments
