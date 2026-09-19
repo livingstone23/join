@@ -23,7 +23,7 @@ public sealed class GetRoleCompanyByIdQueryHandler(
 
     public async Task<Response<RoleCompanyDto>> Handle(GetRoleCompanyByIdQuery request, CancellationToken cancellationToken)
     {
-        var tenantId = _currentUserService.CompanyId;
+        var tenantId = TenantResolver.Resolve(_currentUserService, request.CompanyId);
         if (tenantId == Guid.Empty)
         {
             return Response<RoleCompanyDto>.Error(

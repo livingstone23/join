@@ -11,8 +11,12 @@ namespace JOIN.Application.UseCases.Security.Roles.Queries.GetUsersByRoleId;
 /// Query for the paged list of users assigned to a given role within the caller's tenant
 /// (i.e. users whose Security.UserRoleCompanies row matches RoleId and CompanyId from the token).
 /// Powers the "usuarios afectados" preview shown by the UI before saving role changes.
+/// <see cref="CompanyId"/> overrides the token's tenant only for a real <c>SuperAdmin</c>
+/// (see <see cref="JOIN.Application.Common.TenantResolver"/>), so the same preview also works
+/// when inspecting a role in a company other than the caller's own.
 /// </summary>
 public sealed record GetUsersByRoleIdQuery(
     Guid RoleId,
     int Page = 1,
-    int PageSize = 20) : IRequest<Response<PagedResult<RoleAffectedUserDto>>>;
+    int PageSize = 20,
+    Guid? CompanyId = null) : IRequest<Response<PagedResult<RoleAffectedUserDto>>>;

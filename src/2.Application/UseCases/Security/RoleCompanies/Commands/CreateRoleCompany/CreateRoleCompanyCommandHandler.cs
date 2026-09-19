@@ -33,7 +33,7 @@ public sealed class CreateRoleCompanyCommandHandler(
 
     public async Task<Response<RoleCompanyDto>> Handle(CreateRoleCompanyCommand request, CancellationToken cancellationToken)
     {
-        var tenantId = _currentUserService.CompanyId;
+        var tenantId = TenantResolver.Resolve(_currentUserService, request.CompanyId);
         if (tenantId == Guid.Empty)
         {
             return Response<RoleCompanyDto>.Error(

@@ -53,4 +53,11 @@ public interface ICurrentUserService
     /// </summary>
     string? UserAgent { get; }
 
+    /// <summary>
+    /// Indicates whether the current user holds the given Identity role (e.g. <c>"SuperAdmin"</c>),
+    /// as opposed to a domain flag like <c>ApplicationUser.IsSuperAdmin</c>. Used to gate cross-tenant
+    /// overrides (join_frontb specs/10-role-companies.md) that only a real <c>SuperAdmin</c> may use.
+    /// </summary>
+    bool IsInRole(string role);
+
 }

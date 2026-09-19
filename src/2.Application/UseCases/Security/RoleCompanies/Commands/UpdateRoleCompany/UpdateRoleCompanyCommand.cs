@@ -8,7 +8,9 @@ using MediatR;
 namespace JOIN.Application.UseCases.Security.RoleCompanies.Commands.UpdateRoleCompany;
 
 /// <summary>
-/// Command that changes the RoleId of an existing RoleCompany link.
-/// CompanyId is preserved from the caller's token; only the role changes.
+/// Command that changes the RoleId of an existing RoleCompany link. <see cref="CompanyId"/>
+/// overrides the token's tenant only for a real <c>SuperAdmin</c>
+/// (see <see cref="JOIN.Application.Common.TenantResolver"/>); otherwise preserved from the
+/// caller's token, same as before.
 /// </summary>
-public sealed record UpdateRoleCompanyCommand(Guid Id, Guid RoleId) : IRequest<Response<RoleCompanyDto>>;
+public sealed record UpdateRoleCompanyCommand(Guid Id, Guid RoleId, Guid? CompanyId = null) : IRequest<Response<RoleCompanyDto>>;

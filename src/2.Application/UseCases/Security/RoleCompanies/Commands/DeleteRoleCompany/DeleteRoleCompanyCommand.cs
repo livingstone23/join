@@ -8,5 +8,7 @@ namespace JOIN.Application.UseCases.Security.RoleCompanies.Commands.DeleteRoleCo
 
 /// <summary>
 /// Command that soft-deletes an existing RoleCompany link by stamping GcRecord with the yyyyMMdd UTC int.
+/// <see cref="CompanyId"/> overrides the token's tenant only for a real <c>SuperAdmin</c>
+/// (see <see cref="JOIN.Application.Common.TenantResolver"/>).
 /// </summary>
-public sealed record DeleteRoleCompanyCommand(Guid Id) : IRequest<Response<bool>>;
+public sealed record DeleteRoleCompanyCommand(Guid Id, Guid? CompanyId = null) : IRequest<Response<bool>>;

@@ -2549,7 +2549,6 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Projects", "/administracion/projects", "@Icons.Material.Filled.Factory", "Administracion", "Projects", true, true, true, true),
         new("SystemModules"  , "/administracion/system-modules"  , "@Icons.Material.Filled.FolderCopy", "Administracion", "SystemModules", true, true, true, true),
         new("EntityStatuses" , "/administracion/entity-statuses" , "@Icons.Material.Filled.Highlight", "Administracion", "EntityStatuses", true, true, true, true),
-        new("Compañias"      , "/administracion/companies"       , "@Icons.Material.Filled.HomeWork"      ,  "Administracion", "Companies"    , true, true, true, true),
         new("CompanyModules", "/administracion/company-modules", "@Icons.Material.Filled.HolidayVillage", "Administracion", "CompanyModules", true, true, true, true),
         new("CommunicationChannels", "/administracion/communication-channels", "@Icons.Material.Filled.KeyboardAlt", "Administracion", "CommunicationChannels", true, true, true, true),
 
@@ -2575,6 +2574,11 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Seguridad", "/security", "@Icons.Material.Filled.Security", null, null, false, false, false, false),
         new("Usuarios", "/security/users", "@Icons.Material.Filled.SupervisedUserCircle", null,"Users", false, false, false, false),
         new("Roles", "/security/roles", "@Icons.Material.Filled.VerifiedUser", null,"Roles", false, false, false, false),
+        // Reubicado desde "Administracion" (/administracion/companies) a "Seguridad"
+        // (join_frontb specs/10-role-companies.md, paso 1 del plan de implementación) —
+        // mismo Name/ResourceCode "Compañias"/"Companies", solo cambia dónde aparece en
+        // el menú; no se duplica el SystemOption ni se mueve el CompaniesController.
+        new("Compañias", "/security/companies", "@Icons.Material.Filled.HomeWork", null, "Companies", true, true, true, true),
         // "RoleCompanies" no tiene todavía una pantalla frontend confirmada (join_frontb
         // specs 01-09) — ruta traducida por consistencia con el resto de /security/*,
         // a revisar cuando esa pantalla se defina.

@@ -29,7 +29,7 @@ public sealed class GetRoleCompaniesPagedQueryHandler(
         GetRoleCompaniesPagedQuery request,
         CancellationToken cancellationToken)
     {
-        var tenantId = _currentUserService.CompanyId;
+        var tenantId = TenantResolver.Resolve(_currentUserService, request.CompanyId);
         if (tenantId == Guid.Empty)
         {
             return Response<PagedResult<RoleCompanyListItemDto>>.Error(

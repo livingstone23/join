@@ -70,5 +70,7 @@ public sealed class DesignTimeApplicationDbContextFactory : IDesignTimeDbContext
         public string? IpAddress => null;
 
         public string? UserAgent => null;
+
+        public bool IsInRole(string role) => false;
     }
 }

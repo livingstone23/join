@@ -130,14 +130,23 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
     /// <param name="id">Unique identifier of the role.</param>
     /// <param name="page">1-based page number; clamped to &gt;= 1.</param>
     /// <param name="pageSize">Page size; clamped to [1, 100].</param>
+    /// <param name="companyId">
+    /// Optional tenant override — honored only when the caller is a real <c>SuperAdmin</c>;
+    /// ignored for anyone else (join_frontb specs/10-role-companies.md).
+    /// </param>
     /// <param name="cancellationToken">Token used to cancel the request.</param>
     /// <returns>
     /// A standardized paged response containing matching users. <c>404 Not Found</c>
     /// when the role is missing or soft-deleted; <c>401 Unauthorized</c> when the
     /// caller's token lacks a CompanyId claim/header.
     /// </returns>
+    /// <remarks>
+    /// Also reachable by a real <c>SuperAdmin</c> (not just <c>SuperAdminCompany</c>) so the
+    /// "usuarios afectados" preview also works when inspecting a role in a company other than
+    /// their own, via the <c>companyId</c> override (join_frontb specs/10-role-companies.md).
+    /// </remarks>
     [HttpGet("{id:guid}/users")]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin,SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<PagedResult<RoleAffectedUserDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -147,9 +156,10 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
         Guid id,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] Guid? companyId = null,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetUsersByRoleIdQuery(id, page, pageSize), cancellationToken);
+        var response = await _mediator.Send(new GetUsersByRoleIdQuery(id, page, pageSize, companyId), cancellationToken);
 
         if (response.IsSuccess) return Ok(response);
 

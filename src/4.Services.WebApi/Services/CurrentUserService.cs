@@ -117,4 +117,10 @@ public class CurrentUserService : ICurrentUserService
     /// Reads the originating client User-Agent header (raw). Returns <c>null</c> when missing.
     /// </summary>
     public string? UserAgent => _httpContextAccessor.HttpContext?.Request?.Headers.UserAgent.FirstOrDefault();
+
+    /// <summary>
+    /// Checks the given role against the current request's ClaimsPrincipal (JWT role claims),
+    /// same source the <c>[Authorize(Roles = ...)]</c> attribute reads from.
+    /// </summary>
+    public bool IsInRole(string role) => _httpContextAccessor.HttpContext?.User?.IsInRole(role) ?? false;
 }

@@ -92,10 +92,11 @@ public class CompaniesController(IMediator mediator, ICurrentUserService current
     /// <param name="cancellationToken">Token used to cancel the request while the creation command is being handled.</param>
     /// <returns>A `201 Created` response containing the newly created company resource.</returns>
     [HttpPost]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(Response<CompanyDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateCompanyCommand command, CancellationToken cancellationToken = default)
     {
@@ -122,10 +123,11 @@ public class CompaniesController(IMediator mediator, ICurrentUserService current
     /// <param name="cancellationToken">Token used to cancel the request while the update command is being processed.</param>
     /// <returns>A standardized response containing the updated company data.</returns>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(Response<CompanyDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCompanyCommand command, CancellationToken cancellationToken = default)

@@ -8,6 +8,8 @@ using MediatR;
 namespace JOIN.Application.UseCases.Security.RoleCompanies.Commands.CreateRoleCompany;
 
 /// <summary>
-/// Command that creates a new RoleCompany link. CompanyId is resolved from the caller's token.
+/// Command that creates a new RoleCompany link. <see cref="CompanyId"/> overrides the token's
+/// tenant only for a real <c>SuperAdmin</c> (see <see cref="JOIN.Application.Common.TenantResolver"/>);
+/// otherwise resolved from the caller's token, same as before.
 /// </summary>
-public sealed record CreateRoleCompanyCommand(Guid RoleId) : IRequest<Response<RoleCompanyDto>>;
+public sealed record CreateRoleCompanyCommand(Guid RoleId, Guid? CompanyId = null) : IRequest<Response<RoleCompanyDto>>;

@@ -22,8 +22,10 @@ namespace JOIN.Services.WebApi.Controllers.Security;
 
 /// <summary>
 /// Exposes the RoleCompany junction endpoints used by a SuperAdminCompany to decide which roles
-/// their tenant may assign to users. All handlers resolve <c>CompanyId</c> exclusively from the
-/// caller's token; the body / query string never carries a tenant identifier.
+/// their tenant may assign to users. <c>CompanyId</c> is always resolved from the caller's token,
+/// except for a real <c>SuperAdmin</c> (Identity role), who may pass an explicit tenant override
+/// via the body / query string (join_frontb specs/10-role-companies.md) — everyone else's override,
+/// if any, is silently ignored.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
@@ -38,20 +40,24 @@ public class RoleCompaniesController(IMediator mediator) : ControllerBase
     /// Returns the detailed projection of a single RoleCompany link, scoped to the caller's tenant.
     /// </summary>
     /// <param name="id">Unique identifier of the RoleCompany junction row.</param>
+    /// <param name="companyId">
+    /// Optional tenant override — honored only when the caller is a real <c>SuperAdmin</c>;
+    /// ignored for anyone else (join_frontb specs/10-role-companies.md).
+    /// </param>
     /// <param name="cancellationToken">Token used to cancel the request.</param>
     /// <returns>
     /// <c>200 OK</c> with the DTO; <c>404 Not Found</c> when the link is missing, soft-deleted,
     /// or belongs to another tenant (cross-tenant reads are intentionally indistinguishable from missing).
     /// </returns>
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin,SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<RoleCompanyDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<Response<RoleCompanyDto>>> GetById(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<Response<RoleCompanyDto>>> GetById(Guid id, [FromQuery] Guid? companyId, CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(new GetRoleCompanyByIdQuery(id), cancellationToken);
+        var response = await _mediator.Send(new GetRoleCompanyByIdQuery(id, companyId), cancellationToken);
         return MapGetByIdResponse(response);
     }
 
@@ -62,9 +68,13 @@ public class RoleCompaniesController(IMediator mediator) : ControllerBase
     /// <param name="isActive">Optional active flag (true = GcRecord = 0; false = GcRecord != 0; null = all).</param>
     /// <param name="page">1-based page number; clamped to &gt;= 1.</param>
     /// <param name="pageSize">Page size; clamped to [1, 100].</param>
+    /// <param name="companyId">
+    /// Optional tenant override — honored only when the caller is a real <c>SuperAdmin</c>;
+    /// ignored for anyone else (join_frontb specs/10-role-companies.md).
+    /// </param>
     /// <param name="cancellationToken">Token used to cancel the request.</param>
     [HttpGet]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin,SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<PagedResult<RoleCompanyListItemDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
@@ -73,19 +83,21 @@ public class RoleCompaniesController(IMediator mediator) : ControllerBase
         [FromQuery] bool? isActive,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] Guid? companyId = null,
         CancellationToken cancellationToken = default)
     {
         var response = await _mediator.Send(
-            new GetRoleCompaniesPagedQuery(roleId, isActive, page, pageSize),
+            new GetRoleCompaniesPagedQuery(roleId, isActive, page, pageSize, companyId),
             cancellationToken);
 
         return MapMutationOrQueryResponse(response, successStatus: StatusCodes.Status200OK);
     }
 
     /// <summary>
-    /// Creates a new RoleCompany link. <c>CompanyId</c> is taken from the caller's token, never the body.
+    /// Creates a new RoleCompany link. <c>CompanyId</c> is taken from the caller's token, unless the
+    /// caller is a real <c>SuperAdmin</c> and the body carries an explicit override.
     /// </summary>
-    /// <param name="request">Payload with the RoleId to link.</param>
+    /// <param name="request">Payload with the RoleId to link and an optional tenant override.</param>
     /// <param name="cancellationToken">Token used to cancel the request.</param>
     /// <returns>
     /// <c>201 Created</c> with the DTO and a <c>Location</c> header pointing to the new resource;
@@ -93,7 +105,7 @@ public class RoleCompaniesController(IMediator mediator) : ControllerBase
     /// <c>409 Conflict</c> when an active link for the same (Role, Company) already exists.
     /// </returns>
     [HttpPost]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin,SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<RoleCompanyDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -103,7 +115,7 @@ public class RoleCompaniesController(IMediator mediator) : ControllerBase
         [FromBody] CreateRoleCompanyRequestDto request,
         CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(new CreateRoleCompanyCommand(request.RoleId), cancellationToken);
+        var response = await _mediator.Send(new CreateRoleCompanyCommand(request.RoleId, request.CompanyId), cancellationToken);
         if (response.IsSuccess && response.Data is not null)
         {
             return CreatedAtAction(nameof(GetById), new { id = response.Data.Id }, response);
@@ -125,7 +137,7 @@ public class RoleCompaniesController(IMediator mediator) : ControllerBase
     /// <c>409 Conflict</c> when the new RoleId already has an active link in the same tenant.
     /// </returns>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin,SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<RoleCompanyDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -137,7 +149,7 @@ public class RoleCompaniesController(IMediator mediator) : ControllerBase
         [FromBody] UpdateRoleCompanyRequestDto request,
         CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(new UpdateRoleCompanyCommand(id, request.RoleId), cancellationToken);
+        var response = await _mediator.Send(new UpdateRoleCompanyCommand(id, request.RoleId, request.CompanyId), cancellationToken);
         return MapMutationOrQueryResponse(response, successStatus: StatusCodes.Status200OK);
     }
 
@@ -145,20 +157,24 @@ public class RoleCompaniesController(IMediator mediator) : ControllerBase
     /// Soft-deletes a RoleCompany link (stamps GcRecord with the yyyyMMdd UTC int).
     /// </summary>
     /// <param name="id">Unique identifier of the RoleCompany link to delete.</param>
+    /// <param name="companyId">
+    /// Optional tenant override — honored only when the caller is a real <c>SuperAdmin</c>;
+    /// ignored for anyone else (join_frontb specs/10-role-companies.md).
+    /// </param>
     /// <param name="cancellationToken">Token used to cancel the request.</param>
     /// <returns>
     /// <c>204 No Content</c> on success;
     /// <c>404 Not Found</c> when the link is missing, soft-deleted, or cross-tenant.
     /// </returns>
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin,SuperAdminCompany")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(Guid id, [FromQuery] Guid? companyId, CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(new DeleteRoleCompanyCommand(id), cancellationToken);
+        var response = await _mediator.Send(new DeleteRoleCompanyCommand(id, companyId), cancellationToken);
         if (response.IsSuccess)
         {
             return NoContent();
