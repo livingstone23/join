@@ -23,6 +23,28 @@ namespace JOIN.IntegrationTests;
 /// </summary>
 public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    // Must be set BEFORE any host in this process builds — see the static constructor below.
+    // RateLimitingServiceCollectionExtensions.AddJoinRateLimiting reads
+    // configuration.GetSection("RateLimiting") EAGERLY (a one-time `section.Get<...>()`
+    // snapshot captured into the AddPolicy("Strict", ...) closure) rather than lazily via
+    // IOptionsSnapshot/IOptionsMonitor — unlike ConnectionStrings:DefaultConnection, which is
+    // deliberately resolved lazily inside the AddDbContext callback (see
+    // 3.Persistence/Configuration/ConfigureServices.cs) specifically so a
+    // ConfigureWebHost/ConfigureAppConfiguration overlay can still reach it. Because of that
+    // eager read, overriding "RateLimiting:Strict:PermitLimit" via ConfigureAppConfiguration's
+    // in-memory collection does NOT reliably reach AddJoinRateLimiting before it runs — it
+    // depends on exactly when that overlay gets spliced into builder.Configuration relative to
+    // Program.cs's own top-level statements, which is not guaranteed for an eagerly-read value.
+    // Environment variables, by contrast, are added as one of the very first configuration
+    // providers inside WebApplication.CreateBuilder(args) itself, before ANY of Program.cs's
+    // subsequent code (including AddJoinRateLimiting) executes — so setting them here, before
+    // this in-process TestServer's host is ever built, is what actually works.
+    static CustomWebApplicationFactory()
+    {
+        Environment.SetEnvironmentVariable("RateLimiting__Global__PermitLimit", "1000000");
+        Environment.SetEnvironmentVariable("RateLimiting__Strict__PermitLimit", "1000000");
+    }
+
     private readonly MsSqlContainer _dbContainer = new MsSqlBuilder()
         .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
         .Build();
@@ -69,21 +91,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:DefaultConnection"] = _connectionString,
-
-                // The "Strict" policy (appsettings.json: 5 req/60s) is partitioned by client IP
-                // (RateLimitingServiceCollectionExtensions.BuildPartitionKey). Inside TestServer
-                // every request shares the same simulated IP, and CustomWebApplicationFactory is
-                // a single IClassFixture reused across every [Fact] in a test class — so the
-                // counter accumulates across the whole class, not per test. A single test class
-                // that legitimately needs several rapid calls to a Strict-gated endpoint (e.g.
-                // SPEC 32's MFA challenge lockout, which must fire 6 consecutive
-                // /auth/mfa/challenge/verify calls to prove the 5-attempt business-logic lockout)
-                // would otherwise get 429'd by this IP-level infra limiter before its own
-                // assertions ever run. Raise both limits sky-high here only — production
-                // appsettings.json and the limiter wiring itself are untouched.
-                ["RateLimiting:Global:PermitLimit"] = "100000",
-                ["RateLimiting:Strict:PermitLimit"] = "100000"
+                ["ConnectionStrings:DefaultConnection"] = _connectionString
             });
         });
 
