@@ -69,7 +69,21 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:DefaultConnection"] = _connectionString
+                ["ConnectionStrings:DefaultConnection"] = _connectionString,
+
+                // The "Strict" policy (appsettings.json: 5 req/60s) is partitioned by client IP
+                // (RateLimitingServiceCollectionExtensions.BuildPartitionKey). Inside TestServer
+                // every request shares the same simulated IP, and CustomWebApplicationFactory is
+                // a single IClassFixture reused across every [Fact] in a test class — so the
+                // counter accumulates across the whole class, not per test. A single test class
+                // that legitimately needs several rapid calls to a Strict-gated endpoint (e.g.
+                // SPEC 32's MFA challenge lockout, which must fire 6 consecutive
+                // /auth/mfa/challenge/verify calls to prove the 5-attempt business-logic lockout)
+                // would otherwise get 429'd by this IP-level infra limiter before its own
+                // assertions ever run. Raise both limits sky-high here only — production
+                // appsettings.json and the limiter wiring itself are untouched.
+                ["RateLimiting:Global:PermitLimit"] = "100000",
+                ["RateLimiting:Strict:PermitLimit"] = "100000"
             });
         });
 
