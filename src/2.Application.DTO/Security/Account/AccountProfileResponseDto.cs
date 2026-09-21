@@ -53,6 +53,17 @@ public sealed record AccountProfileResponseDto
     public bool IsMfaEnabled { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether email OTP 2FA is enabled for the authenticated user.
+    /// </summary>
+    public bool IsEmailOtpEnabled { get; init; }
+
+    /// <summary>
+    /// Gets the 2FA method ("email" | "totp") the login challenge should default to when both
+    /// are active. Null when only one method is active or none is.
+    /// </summary>
+    public string? PreferredMfaMethod { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether the authenticated user has global super admin privileges.
     /// </summary>
     public bool IsSuperAdmin { get; init; }

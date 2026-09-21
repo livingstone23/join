@@ -111,6 +111,9 @@ public sealed class GetMyProfileQueryHandlerTests
         response.Data.CommunicationChannels.First().Type.Should().Be("WhatsApp");
         response.Data.CommunicationChannels.First().Value.Should().Be("+34123456789");
         response.Data.CommunicationChannels.First().IsPreferred.Should().BeTrue();
+        response.Data.IsMfaEnabled.Should().Be(user.IsMfaEnabled);
+        response.Data.IsEmailOtpEnabled.Should().Be(user.IsEmailOtpEnabled);
+        response.Data.PreferredMfaMethod.Should().Be(user.PreferredMfaMethod);
 
         context.Connection.LastCommandText.Should().Contain("INNER JOIN Common.CommunicationChannels");
         context.Connection.LastCommandText.Should().Contain("WHERE ucc.UserId = @UserId");
@@ -130,6 +133,8 @@ public sealed class GetMyProfileQueryHandlerTests
             EmailConfirmed = true,
             PhoneNumberConfirmed = false,
             IsMfaEnabled = true,
+            IsEmailOtpEnabled = true,
+            PreferredMfaMethod = "email",
             IsSuperAdmin = false,
             IsSuperAdminCompany = true,
             Created = new DateTime(2026, 1, 15, 10, 0, 0, DateTimeKind.Utc),

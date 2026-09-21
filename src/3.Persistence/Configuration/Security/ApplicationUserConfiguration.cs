@@ -44,6 +44,7 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(u => u.ExternalProvider).HasMaxLength(50);
         builder.Property(u => u.ExternalProviderId).HasMaxLength(255);
         builder.Property(u => u.MfaSecretKey).HasMaxLength(100);
+        builder.Property(u => u.PreferredMfaMethod).HasMaxLength(20);
 
         // SPEC 27 item 16 — reason captured by the admin on the latest status flip.
         builder.Property(u => u.StatusChangeReason).HasMaxLength(500);

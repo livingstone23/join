@@ -97,6 +97,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<SecurityEventLog> SecurityEventLogs => Set<SecurityEventLog>();
     public DbSet<UserMfaRecoveryCode> UserMfaRecoveryCodes => Set<UserMfaRecoveryCode>();
     public DbSet<PhoneVerificationCode> PhoneVerificationCodes => Set<PhoneVerificationCode>();
+    public DbSet<MfaLoginChallenge> MfaLoginChallenges => Set<MfaLoginChallenge>();
+    public DbSet<EmailOtpEnableCode> EmailOtpEnableCodes => Set<EmailOtpEnableCode>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     

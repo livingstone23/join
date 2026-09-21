@@ -72,6 +72,18 @@ public class ApplicationUser : IdentityUser<Guid>, IAuditableEntity
     public DateTime? MfaEnabledAtUtc { get; set; }
 
     /// <summary>
+    /// Indicates whether the user has enabled email-based one-time-password 2FA, as a second
+    /// method parallel to <see cref="IsMfaEnabled"/> (TOTP).
+    /// </summary>
+    public bool IsEmailOtpEnabled { get; set; } = false;
+
+    /// <summary>
+    /// The 2FA method ("email" | "totp") the login challenge should default to when both are
+    /// active. Null when only one method is active or none is.
+    /// </summary>
+    public string? PreferredMfaMethod { get; set; }
+
+    /// <summary>
     /// The name of the external identity provider used for authentication (e.g., "Google", "Microsoft"). 
     /// If null, the user authenticates via local credentials.
     /// </summary>

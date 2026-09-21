@@ -102,6 +102,8 @@ public static class ConfigureServices
         services.AddScoped<IRoleUserSessionRepository, RoleUserSessionRepository>();
         services.AddScoped<IUserMfaRecoveryCodeRepository, UserMfaRecoveryCodeRepository>();
         services.AddScoped<IPhoneVerificationCodeRepository, PhoneVerificationCodeRepository>();
+        services.AddScoped<IMfaLoginChallengeRepository, MfaLoginChallengeRepository>();
+        services.AddScoped<IEmailOtpEnableCodeRepository, EmailOtpEnableCodeRepository>();
         services.AddScoped<IUserAdminRepository, UserAdminRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         

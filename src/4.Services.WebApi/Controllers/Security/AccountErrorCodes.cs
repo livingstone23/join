@@ -25,7 +25,26 @@ internal static class AccountErrorCodes
         ["PHONE_CODE_INVALID"] = StatusCodes.Status400BadRequest,
 
         // 429 Too Many Requests reserved for the SMS-code lock path.
-        ["PHONE_CODE_LOCKED"] = StatusCodes.Status429TooManyRequests
+        ["PHONE_CODE_LOCKED"] = StatusCodes.Status429TooManyRequests,
+
+        // SPEC 32 — MFA login challenge (F6).
+        ["CHALLENGE_NOT_FOUND"] = StatusCodes.Status401Unauthorized,
+        ["CHALLENGE_EXPIRED"] = StatusCodes.Status401Unauthorized,
+        ["CHALLENGE_INVALID_CODE"] = StatusCodes.Status401Unauthorized,
+        ["CHALLENGE_LOCKED"] = StatusCodes.Status429TooManyRequests,
+        ["CHALLENGE_METHOD_NOT_AVAILABLE"] = StatusCodes.Status400BadRequest,
+        ["CHALLENGE_METHOD_NOT_RESENDABLE"] = StatusCodes.Status400BadRequest,
+        ["CHALLENGE_SEND_COOLDOWN"] = StatusCodes.Status429TooManyRequests,
+
+        // SPEC 32 — Email OTP enable/disable (F7).
+        ["EMAIL_NOT_CONFIRMED"] = StatusCodes.Status400BadRequest,
+        ["EMAIL_OTP_NOT_REQUESTED"] = StatusCodes.Status400BadRequest,
+        ["EMAIL_OTP_CODE_EXPIRED"] = StatusCodes.Status400BadRequest,
+        ["EMAIL_OTP_CODE_INVALID"] = StatusCodes.Status400BadRequest,
+        ["EMAIL_OTP_CODE_LOCKED"] = StatusCodes.Status429TooManyRequests,
+
+        // SPEC 32 — preferred MFA method (F8).
+        ["PREFERRED_METHOD_NOT_ENABLED"] = StatusCodes.Status400BadRequest
     };
 
     /// <summary>

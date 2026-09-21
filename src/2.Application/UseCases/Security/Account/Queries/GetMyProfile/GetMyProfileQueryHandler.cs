@@ -53,6 +53,8 @@ public sealed class GetMyProfileQueryHandler(
             EmailConfirmed = user.EmailConfirmed,
             PhoneNumberConfirmed = user.PhoneNumberConfirmed,
             IsMfaEnabled = user.IsMfaEnabled,
+            IsEmailOtpEnabled = user.IsEmailOtpEnabled,
+            PreferredMfaMethod = user.PreferredMfaMethod,
             IsSuperAdmin = user.IsSuperAdmin,
             IsSuperAdminCompany = user.IsSuperAdminCompany,
             Created = user.Created,

@@ -34,16 +34,39 @@ public record LoginResponse
 
     /// <summary>
     /// Gets the signed JWT access token that must be sent by the client in subsequent authorized requests.
+    /// Null when the response is an MFA challenge instead of a completed login (see <see cref="ChallengeToken"/>).
     /// </summary>
-    public string Token { get; init; } = string.Empty;
+    public string? Token { get; init; }
 
     /// <summary>
     /// Gets the refresh token associated with the current authenticated session and used to renew access without re-entering credentials.
+    /// Null when the response is an MFA challenge instead of a completed login.
     /// </summary>
-    public string RefreshToken { get; init; } = string.Empty;
+    public string? RefreshToken { get; init; }
 
     /// <summary>
     /// Gets the UTC expiration timestamp for the access token currently assigned to the session.
+    /// Null when the response is an MFA challenge instead of a completed login.
     /// </summary>
-    public DateTime Expiration { get; init; }
+    public DateTime? Expiration { get; init; }
+
+    /// <summary>
+    /// Opaque, single-use token identifying the pending MFA challenge. Sent back by the client on
+    /// <c>POST /auth/mfa/challenge/send</c> and <c>/verify</c>. Null when the login completed without
+    /// a challenge (see <see cref="Token"/>).
+    /// </summary>
+    public string? ChallengeToken { get; init; }
+
+    /// <summary>
+    /// The 2FA methods active for this user ("email" and/or "totp") that the client can offer for the
+    /// pending challenge. Null when the login completed without a challenge.
+    /// </summary>
+    public IReadOnlyCollection<string>? AvailableMethods { get; init; }
+
+    /// <summary>
+    /// The method ("email" | "totp") the client should default to when <see cref="AvailableMethods"/>
+    /// has more than one entry. Null when the login completed without a challenge, or when the user
+    /// has not set a preference yet.
+    /// </summary>
+    public string? PreferredMethod { get; init; }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using JOIN.Application.Interface;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -7,7 +8,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Moq;
 using Serilog;
 using Testcontainers.MsSql;
 
@@ -76,12 +76,15 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IEmailService>();
-            // Register as Transient to match the production lifetime
+            // CapturingEmailService itself is Singleton (one shared capture store per factory
+            // instance, resolvable from tests via Services.GetRequiredService<CapturingEmailService>()
+            // to read back OTP codes emailed during SPEC 32's MFA flows) but is exposed as
+            // IEmailService via a Transient factory delegate — matching the production lifetime
             // (services.AddTransient<IEmailService, SendGridEmailAdapter>() in
-            // JOIN.Infrastructure.DependencyInjection). Singleton consumers like
-            // HealthCheckEmailPublisher would otherwise fail DI scope validation.
-            services.AddTransient(_ => Mock.Of<IEmailService>(
-                e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()) == Task.FromResult(true)));
+            // JOIN.Infrastructure.DependencyInjection) so Singleton consumers like
+            // HealthCheckEmailPublisher don't hit DI scope validation.
+            services.AddSingleton<CapturingEmailService>();
+            services.AddTransient<IEmailService>(sp => sp.GetRequiredService<CapturingEmailService>());
         });
     }
 
@@ -158,4 +161,31 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     }
 
     public new Task DisposeAsync() => _dbContainer.DisposeAsync().AsTask();
+}
+
+/// <summary>
+/// Test double for <see cref="IEmailService"/>: always reports delivery success (no external
+/// network involved) and records every send so integration tests can read back plaintext OTP
+/// codes that only ever exist in the email body (the DB only stores a PBKDF2/SHA-256 hash).
+/// </summary>
+public sealed class CapturingEmailService : IEmailService
+{
+    private readonly ConcurrentQueue<SentEmail> _sent = new();
+
+    public Task<bool> SendEmailAsync(string to, string subject, string htmlContent)
+    {
+        _sent.Enqueue(new SentEmail(to, subject, htmlContent, DateTime.UtcNow));
+        return Task.FromResult(true);
+    }
+
+    /// <summary>
+    /// Returns the most recently captured email sent to <paramref name="to"/>, or
+    /// <c>null</c> when none has been sent yet.
+    /// </summary>
+    public SentEmail? LastSentTo(string to) =>
+        _sent.Where(email => string.Equals(email.To, to, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(email => email.SentAtUtc)
+            .FirstOrDefault();
+
+    public sealed record SentEmail(string To, string Subject, string HtmlContent, DateTime SentAtUtc);
 }

@@ -3,8 +3,10 @@
 
 using System.Reflection;
 using FluentValidation;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Admin;
 using JOIN.Application.UseCases.Admin.PersonAddresses;
+using JOIN.Application.UseCases.Security.Auth.Login;
 using JOIN.Application.UseCases.Admin.PersonContacts;
 using JOIN.Application.UseCases.Admin.PersonEmployments;
 using JOIN.Application.UseCases.Admin.PersonBusinessProfiles;
@@ -79,6 +81,8 @@ public static class ConfigureServices
         services.AddScoped<IRoleSystemOptionMapper, RoleSystemOptionMapper>();
         services.AddScoped<IRoleMapper, RoleMapper>();
         services.AddScoped<ICustomerCodeGenerator, CustomerCodeGenerator>();
+        services.AddScoped<IAuthenticatedSessionIssuer, AuthenticatedSessionIssuer>();
+        services.AddScoped<IMfaLoginChallengeIssuer, MfaLoginChallengeIssuer>();
         services.AddScoped<PersonAddressDefaultCoordinator>();
         services.AddScoped<PersonContactPrimaryCoordinator>();
         services.AddScoped<PersonEmploymentCurrentCoordinator>();

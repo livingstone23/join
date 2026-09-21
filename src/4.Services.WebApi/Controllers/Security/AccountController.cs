@@ -3,13 +3,17 @@ using JOIN.Application.DTO.Security.Account;
 using JOIN.Application.Interface;
 using JOIN.Application.UseCases.Security.Account.Commands.ChangeMyPassword;
 using JOIN.Application.UseCases.Security.Account.Commands.ConfirmEmailChange;
+using JOIN.Application.UseCases.Security.Account.Commands.DisableEmailOtp;
 using JOIN.Application.UseCases.Security.Account.Commands.DisableMfa;
+using JOIN.Application.UseCases.Security.Account.Commands.EmailOtpSendCode;
+using JOIN.Application.UseCases.Security.Account.Commands.EnableEmailOtp;
 using JOIN.Application.UseCases.Security.Account.Commands.EnableMfa;
 using JOIN.Application.UseCases.Security.Account.Commands.ConfirmPhoneVerification;
 using JOIN.Application.UseCases.Security.Account.Commands.RequestEmailChange;
 using JOIN.Application.UseCases.Security.Account.Commands.RequestPhoneVerification;
 using JOIN.Application.UseCases.Security.Account.Commands.RevokeOtherMySessions;
 using JOIN.Application.UseCases.Security.Account.Commands.RevokeMySession;
+using JOIN.Application.UseCases.Security.Account.Commands.SetPreferredMfaMethod;
 using JOIN.Application.UseCases.Security.Account.Commands.SetupMfa;
 using JOIN.Application.UseCases.Security.Account.Commands.UpdateMyProfile;
 using JOIN.Application.UseCases.Security.Account.Queries.GetMyPermissions;
@@ -297,6 +301,88 @@ public class AccountController(ISender sender, ICurrentUserService currentUserSe
     public async Task<IActionResult> DisableMfa([FromBody] DisableMfaRequestDto request, CancellationToken cancellationToken = default)
     {
         var response = await _sender.Send(new DisableMfaCommand(request.Code), cancellationToken);
+        return Translate(response);
+    }
+
+    /// <summary>
+    /// Sends (or resends) the 6-digit test code to the caller's confirmed email, required
+    /// before <c>email-otp/enable</c> or <c>email-otp/disable</c>.
+    /// </summary>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    /// <returns>
+    /// Returns <c>200</c> on dispatch, <c>400</c> when the account email is not confirmed,
+    /// or <c>401</c> when unauthenticated.
+    /// </returns>
+    [HttpPost("email-otp/send-code")]
+    [ProducesResponseType(typeof(Response<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> SendEmailOtpCode(CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new EmailOtpSendCodeCommand(), cancellationToken);
+        return Translate(response);
+    }
+
+    /// <summary>
+    /// Confirms the emailed 6-digit code and flips <c>IsEmailOtpEnabled</c> on for the caller.
+    /// </summary>
+    /// <param name="request">Body carrying the 6-digit code.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    /// <returns>
+    /// Returns <c>200</c> on success, <c>400</c> when the code is missing/expired/invalid or no
+    /// code was ever requested, <c>401</c> when unauthenticated, or <c>429</c> when locked (5+
+    /// failed attempts).
+    /// </returns>
+    [HttpPost("email-otp/enable")]
+    [ProducesResponseType(typeof(Response<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> EnableEmailOtp([FromBody] EnableEmailOtpRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new EnableEmailOtpCommand(request.Code), cancellationToken);
+        return Translate(response);
+    }
+
+    /// <summary>
+    /// Confirms the emailed 6-digit code and flips <c>IsEmailOtpEnabled</c> off for the caller.
+    /// No minimum-active-method check — the caller's last active 2FA method can be disabled.
+    /// </summary>
+    /// <param name="request">Body carrying the 6-digit code.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    /// <returns>
+    /// Returns <c>200</c> on success, <c>400</c> when the code is missing/expired/invalid or no
+    /// code was ever requested, <c>401</c> when unauthenticated, or <c>429</c> when locked (5+
+    /// failed attempts).
+    /// </returns>
+    [HttpPost("email-otp/disable")]
+    [ProducesResponseType(typeof(Response<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> DisableEmailOtp([FromBody] DisableEmailOtpRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new DisableEmailOtpCommand(request.Code), cancellationToken);
+        return Translate(response);
+    }
+
+    /// <summary>
+    /// Sets the caller's preferred 2FA method, used to default the login challenge when both
+    /// TOTP and Email OTP are active. Rejects a method that is not currently active.
+    /// </summary>
+    /// <param name="request">Body carrying the method to set as preferred ("email" | "totp").</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    /// <returns>
+    /// Returns <c>200</c> on success, <c>400</c> when the method is unknown or not active for
+    /// the caller, or <c>401</c> when unauthenticated.
+    /// </returns>
+    [HttpPut("mfa/preferred-method")]
+    [ProducesResponseType(typeof(Response<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> SetPreferredMfaMethod([FromBody] SetPreferredMfaMethodRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new SetPreferredMfaMethodCommand(request.Method), cancellationToken);
         return Translate(response);
     }
 

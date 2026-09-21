@@ -24,4 +24,12 @@ public enum SecurityEventType
     SessionRevoked = 16,
     SessionsRevokedOthers = 17,
     RoleChanged = 18,
+    LoginMfaChallengeVerified = 19,
+    LoginMfaChallengeFailed = 20,
+    LoginMfaChallengeLocked = 21,
+    LoginMfaChallengeCodeSent = 22,
+    EmailOtpEnableCodeRequested = 23,
+    EmailOtpEnabled = 24,
+    EmailOtpDisabled = 25,
+    MfaPreferredMethodChanged = 26,
 }
