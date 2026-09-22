@@ -56,7 +56,7 @@ public sealed class GetPersonsPagedQueryHandlerTests
 
         var query = new GetPersonsPagedQuery(
             PageNumber: 0,
-            PageSize: 100,
+            PageSize: 150,
             PersonType: "  Physical  ",
             FirstName: "  Jane  ",
             LastName: " Doe ",
@@ -75,9 +75,9 @@ public sealed class GetPersonsPagedQueryHandlerTests
         response.Data.Should().NotBeNull();
         response.Data!.Items.Should().HaveCount(1);
         response.Data.PageNumber.Should().Be(1);
-        response.Data.PageSize.Should().Be(50);
+        response.Data.PageSize.Should().Be(100);
         response.Data.TotalCount.Should().Be(51);
-        response.Data.TotalPages.Should().Be(2);
+        response.Data.TotalPages.Should().Be(1);
 
         var item = response.Data.Items.Single();
         item.CompanyId.Should().Be(companyId);
@@ -104,7 +104,7 @@ public sealed class GetPersonsPagedQueryHandlerTests
         context.Connection.CapturedParameters["IdentificationTypeId"].Should().Be(identificationTypeId);
         context.Connection.CapturedParameters["IdentificationNumber"].Should().Be("%12345%");
         context.Connection.CapturedParameters["Offset"].Should().Be(0);
-        context.Connection.CapturedParameters["PageSize"].Should().Be(50);
+        context.Connection.CapturedParameters["PageSize"].Should().Be(100);
     }
 
     /// <summary>
