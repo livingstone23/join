@@ -1,6 +1,6 @@
 # SPEC 32 — Desafío de login MFA (Email OTP + TOTP) y activación de Email OTP
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 03/SPEC 26 (`AccountController.mfa/setup|enable|disable`, `IMfaTotpValidator`, `SecurityEventType`), SPEC 30 (`PhoneVerificationCode` + `IPhoneVerificationCodeRepository`, patrón que este spec clona para el email), repo hermano `join_frontb/specs/12-doble-factor-autenticacion.md` (spec de frontend que origina este pedido)
 > **Date:** 2026-09-20
 > **Objective:** Que `POST /Users/login` deje de emitir el JWT incondicionalmente: si el usuario tiene 1+ método de 2FA activo (`IsMfaEnabled` y/o el nuevo `IsEmailOtpEnabled`), el login se detiene en un "desafío" que solo libera el JWT tras verificar un código TOTP o un código enviado por email — y agregar el ciclo completo de activar/desactivar Email OTP como segundo método, paralelo al TOTP que ya existe.
