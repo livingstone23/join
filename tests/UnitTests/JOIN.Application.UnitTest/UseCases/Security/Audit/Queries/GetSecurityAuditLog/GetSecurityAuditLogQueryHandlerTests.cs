@@ -9,6 +9,7 @@ using JOIN.Application.Interface.Persistence.Audit;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.UseCases.Security.Audit.Queries.GetSecurityAuditLog;
 using JOIN.Domain.Audit;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Security.Audit.Queries.GetSecurityAuditLog;
@@ -75,21 +76,21 @@ public sealed class GetSecurityAuditLogQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenPageSizeExceedsMax_ClampsTo100()
+    public async Task Handle_WhenPageSizeExceedsMax_ClampsToMaxPageSize()
     {
         var ctx = new Context();
         ctx.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.NewGuid());
         ctx.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns(Guid.NewGuid().ToString());
         ctx.UserAdminRepositoryMock.Setup(x => x.IsSuperAdminAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
         ctx.RepositoryMock.Setup(x => x.ListPagedAsync(
-                It.IsAny<Guid?>(), null, null, null, null, null, null, 1, 100, It.IsAny<CancellationToken>()))
+                It.IsAny<Guid?>(), null, null, null, null, null, null, 1, 50, It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<AuditLog>(), new Dictionary<string, string>(), 0));
 
         var response = await ctx.Handler.Handle(
             new GetSecurityAuditLogQuery(PageSize: 500), CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
-        response.Data!.PageSize.Should().Be(100);
+        response.Data!.PageSize.Should().Be(50);
     }
 
     [Fact]
@@ -211,11 +212,19 @@ public sealed class GetSecurityAuditLogQueryHandlerTests
         public Mock<IAuditLogRepository> RepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IUserAdminRepository> UserAdminRepositoryMock { get; } = new();
+        public IOptions<PaginationSettings> PaginationOptions { get; } = Options.Create(new PaginationSettings
+        {
+            DefaultPageNumber = 1,
+            DefaultPageSize = 10,
+            MaxPageSize = 50,
+            MinPageSize = 1
+        });
 
         public GetSecurityAuditLogQueryHandler Handler => new(
             RepositoryMock.Object,
             CurrentUserServiceMock.Object,
-            UserAdminRepositoryMock.Object);
+            UserAdminRepositoryMock.Object,
+            PaginationOptions);
     }
 }
 

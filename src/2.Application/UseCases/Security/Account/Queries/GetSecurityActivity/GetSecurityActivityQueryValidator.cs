@@ -1,4 +1,6 @@
 using FluentValidation;
+using JOIN.Application.Common;
+using Microsoft.Extensions.Options;
 
 namespace JOIN.Application.UseCases.Security.Account.Queries.GetSecurityActivity;
 
@@ -9,18 +11,21 @@ namespace JOIN.Application.UseCases.Security.Account.Queries.GetSecurityActivity
 public sealed class GetSecurityActivityQueryValidator : AbstractValidator<GetSecurityActivityQuery>
 {
     /// <summary>
-    /// Builds the validator.
+    /// Builds the validator, bounding <c>PageSize</c> against the shared
+    /// <see cref="PaginationSettings"/> instead of a hardcoded range.
     /// </summary>
-    public GetSecurityActivityQueryValidator()
+    public GetSecurityActivityQueryValidator(IOptions<PaginationSettings> paginationOptions)
     {
+        var paginationSettings = paginationOptions.Value ?? new PaginationSettings();
+
         RuleFor(query => query.PageNumber)
             .GreaterThanOrEqualTo(1)
             .WithErrorCode("PAGE_NUMBER_INVALID")
             .WithMessage("Page number must be 1 or greater.");
 
         RuleFor(query => query.PageSize)
-            .InclusiveBetween(1, 100)
+            .InclusiveBetween(paginationSettings.MinPageSize, paginationSettings.MaxPageSize)
             .WithErrorCode("PAGE_SIZE_INVALID")
-            .WithMessage("Page size must be between 1 and 100.");
+            .WithMessage($"Page size must be between {paginationSettings.MinPageSize} and {paginationSettings.MaxPageSize}.");
     }
 }

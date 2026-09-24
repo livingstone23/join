@@ -1,8 +1,10 @@
 using AutoFixture;
 using FluentAssertions;
+using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Queries.TestDoubles;
 using JOIN.Application.UseCases.Common.Companies.Queries;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Common.Companies.Queries.GetCompaniesPaged;
@@ -100,10 +102,17 @@ public sealed class GetCompaniesPagedQueryHandlerTests
 
         public Mock<ISqlConnectionFactory> ConnectionFactoryMock { get; } = new();
         public FakeDbConnection Connection { get; }
+        public IOptions<PaginationSettings> PaginationOptions { get; } = Options.Create(new PaginationSettings
+        {
+            DefaultPageNumber = 1,
+            DefaultPageSize = 10,
+            MaxPageSize = 50,
+            MinPageSize = 1
+        });
 
         public GetCompaniesPagedQueryHandler CreateHandler()
         {
-            return new GetCompaniesPagedQueryHandler(ConnectionFactoryMock.Object);
+            return new GetCompaniesPagedQueryHandler(ConnectionFactoryMock.Object, PaginationOptions);
         }
     }
 }

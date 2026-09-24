@@ -4,27 +4,27 @@ using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Domain.Security;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace JOIN.Application.UseCases.Security.Account.Queries.GetSecurityActivity;
 
 /// <summary>
-/// Returns the caller's paginated security-activity feed. Clamps <c>pageNumber</c>
-/// to &gt;= 1 and <c>pageSize</c> to 1..100, projects rows to DTOs (enum names — never
+/// Returns the caller's paginated security-activity feed. Sanitizes <c>pageNumber</c>/<c>pageSize</c>
+/// via the shared <see cref="PaginationSettings"/>, projects rows to DTOs (enum names — never
 /// the int values), and returns a <see cref="PagedResult{T}"/>.
 /// </summary>
 /// <param name="currentUserService">Resolves the calling user id.</param>
 /// <param name="securityEventRepository">Dapper-backed audit feed queries.</param>
+/// <param name="paginationOptions">Configurable pagination defaults shared across paged endpoints.</param>
 public sealed class GetSecurityActivityQueryHandler(
     ICurrentUserService currentUserService,
-    ISecurityEventRepository securityEventRepository)
+    ISecurityEventRepository securityEventRepository,
+    IOptions<PaginationSettings> paginationOptions)
     : IRequestHandler<GetSecurityActivityQuery, Response<PagedResult<SecurityActivityEventDto>>>
 {
-    private const int MinPageNumber = 1;
-    private const int MinPageSize = 1;
-    private const int MaxPageSize = 100;
-
     private readonly ICurrentUserService _currentUserService = currentUserService;
     private readonly ISecurityEventRepository _securityEventRepository = securityEventRepository;
+    private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
 
     public async Task<Response<PagedResult<SecurityActivityEventDto>>> Handle(
         GetSecurityActivityQuery request,
@@ -37,8 +37,7 @@ public sealed class GetSecurityActivityQueryHandler(
                 ["The authenticated user is not available."]);
         }
 
-        var pageNumber = Math.Max(MinPageNumber, request.PageNumber);
-        var pageSize = Math.Clamp(request.PageSize, MinPageSize, MaxPageSize);
+        var (pageNumber, pageSize) = _paginationSettings.Sanitize(request.PageNumber, request.PageSize);
 
         var rows = await _securityEventRepository
             .ListByUserPagedAsync(callerUserId, pageNumber, pageSize, cancellationToken);

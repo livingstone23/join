@@ -160,15 +160,7 @@ internal static class RoleSystemOptionQuerySql
         int? pageSize,
         PaginationSettings paginationSettings)
     {
-        var defaultPageNumber = paginationSettings.DefaultPageNumber < 1 ? 1 : paginationSettings.DefaultPageNumber;
-        var defaultPageSize = paginationSettings.DefaultPageSize < 1 ? 10 : paginationSettings.DefaultPageSize;
-        var maxPageSize = paginationSettings.MaxPageSize < defaultPageSize ? defaultPageSize : paginationSettings.MaxPageSize;
-
-        var sanitizedPageNumber = pageNumber.GetValueOrDefault(defaultPageNumber);
-        sanitizedPageNumber = sanitizedPageNumber < 1 ? defaultPageNumber : sanitizedPageNumber;
-
-        var requestedPageSize = pageSize.GetValueOrDefault(defaultPageSize);
-        var sanitizedPageSize = requestedPageSize < 1 ? defaultPageSize : Math.Min(requestedPageSize, maxPageSize);
+        var (sanitizedPageNumber, sanitizedPageSize) = paginationSettings.Sanitize(pageNumber, pageSize);
         var offset = (sanitizedPageNumber - 1) * sanitizedPageSize;
 
         return (sanitizedPageNumber, sanitizedPageSize, offset);

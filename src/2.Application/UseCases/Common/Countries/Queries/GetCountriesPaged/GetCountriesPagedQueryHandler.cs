@@ -5,6 +5,7 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Common;
 using JOIN.Application.Interface;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace JOIN.Application.UseCases.Common.Countries.Queries;
 
@@ -12,11 +13,13 @@ namespace JOIN.Application.UseCases.Common.Countries.Queries;
 /// Handles paginated country queries using Dapper for high-performance reads.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create DB-agnostic read connections.</param>
-public class GetCountriesPagedQueryHandler(ISqlConnectionFactory connectionFactory)
+/// <param name="paginationOptions">Configurable pagination defaults shared across paged endpoints.</param>
+public class GetCountriesPagedQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    IOptions<PaginationSettings> paginationOptions)
     : IRequestHandler<GetCountriesPagedQuery, Response<PagedResult<CountryListItemDto>>>
 {
-    private const int MaxPageSize = 50;
-    private const int DefaultPageSize = 10;
+    private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
 
     /// <summary>
     /// Retrieves a paginated list of active countries.
@@ -26,8 +29,7 @@ public class GetCountriesPagedQueryHandler(ISqlConnectionFactory connectionFacto
     /// <returns>A standardized paginated response.</returns>
     public async Task<Response<PagedResult<CountryListItemDto>>> Handle(GetCountriesPagedQuery request, CancellationToken cancellationToken)
     {
-        var sanitizedPageNumber = request.PageNumber < 1 ? 1 : request.PageNumber;
-        var sanitizedPageSize = request.PageSize < 1 ? DefaultPageSize : Math.Min(request.PageSize, MaxPageSize);
+        var (sanitizedPageNumber, sanitizedPageSize) = _paginationSettings.Sanitize(request.PageNumber, request.PageSize);
         var offset = (sanitizedPageNumber - 1) * sanitizedPageSize;
 
         using var connection = connectionFactory.CreateConnection();

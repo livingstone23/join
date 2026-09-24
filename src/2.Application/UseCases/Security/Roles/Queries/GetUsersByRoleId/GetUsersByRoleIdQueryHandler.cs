@@ -6,28 +6,27 @@ using JOIN.Application.DTO.Security.RoleUsers;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence.Security;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace JOIN.Application.UseCases.Security.Roles.Queries.GetUsersByRoleId;
 
 /// <summary>
 /// Handler for the "usuarios afectados por rol" preview query.
 /// Validates the tenant context, confirms the role exists and is not soft-deleted,
-/// sanitizes page/pageSize (clamp 1..100 / &gt;=1), and delegates to
+/// sanitizes page/pageSize via the shared <see cref="PaginationSettings"/>, and delegates to
 /// <see cref="IRoleCompanyRepository.GetUsersByRoleIdPagedAsync"/>.
 /// </summary>
 public sealed class GetUsersByRoleIdQueryHandler(
     IRoleCompanyRepository roleCompanyRepository,
     IRoleRepository roleRepository,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IOptions<PaginationSettings> paginationOptions)
     : IRequestHandler<GetUsersByRoleIdQuery, Response<PagedResult<RoleAffectedUserDto>>>
 {
-    private const int MaxPageSize = 100;
-    private const int MinPageSize = 1;
-    private const int DefaultPageSize = 20;
-
     private readonly IRoleCompanyRepository _roleCompanyRepository = roleCompanyRepository ?? throw new ArgumentNullException(nameof(roleCompanyRepository));
     private readonly IRoleRepository _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
     private readonly ICurrentUserService _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
+    private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
 
     public async Task<Response<PagedResult<RoleAffectedUserDto>>> Handle(
         GetUsersByRoleIdQuery request,
@@ -48,9 +47,7 @@ public sealed class GetUsersByRoleIdQueryHandler(
                 new[] { "El rol indicado no existe o se encuentra inactivo." });
         }
 
-        var sanitizedPage = request.Page < 1 ? 1 : request.Page;
-        var requestedPageSize = request.PageSize < MinPageSize ? DefaultPageSize : request.PageSize;
-        var sanitizedPageSize = Math.Min(requestedPageSize, MaxPageSize);
+        var (sanitizedPage, sanitizedPageSize) = _paginationSettings.Sanitize(request.Page, request.PageSize);
 
         var (items, total) = await _roleCompanyRepository.GetUsersByRoleIdPagedAsync(
             request.RoleId,

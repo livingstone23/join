@@ -3,6 +3,7 @@ using JOIN.Application.DTO.Security;
 using JOIN.Application.Interface;
 using JOIN.Application.UseCases.Security.Queries.GetSystemWideUserReport;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace JOIN.Application.UseCases.Security.Queries.GetMyCompanyUserReport;
 
@@ -15,15 +16,19 @@ namespace JOIN.Application.UseCases.Security.Queries.GetMyCompanyUserReport;
 /// </summary>
 /// <param name="connectionFactory">Factory used to create engine-agnostic read connections.</param>
 /// <param name="currentUserService">Current user context used to enforce tenant isolation.</param>
+/// <param name="paginationOptions">Configurable pagination defaults shared across paged endpoints.</param>
 public sealed class GetMyCompanyUserReportQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IOptions<PaginationSettings> paginationOptions)
     : IRequestHandler<GetMyCompanyUserReportQuery, Response<PagedResult<UserManagementReportDto>>>
 {
+    private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
+
     /// <summary>
     /// Retrieves a paginated slice of the report restricted to the company resolved
-    /// from the authenticated token. Page-size is clamped to <c>[1, 50]</c>; default
-    /// is 10 when the caller omits it.
+    /// from the authenticated token, sanitizing page/pageSize via the shared
+    /// <see cref="PaginationSettings"/>.
     /// </summary>
     public async Task<Response<PagedResult<UserManagementReportDto>>> Handle(
         GetMyCompanyUserReportQuery request,
@@ -37,10 +42,7 @@ public sealed class GetMyCompanyUserReportQueryHandler(
                 ["A tenant context is required to load the report."]);
         }
 
-        var pageNumber = request.PageNumber < 1 ? 1 : request.PageNumber;
-        var pageSize = request.PageSize < 1
-            ? UserManagementReportQueryHelper.DefaultPageSize
-            : Math.Min(request.PageSize, UserManagementReportQueryHelper.MaxPageSize);
+        var (pageNumber, pageSize) = _paginationSettings.Sanitize(request.PageNumber, request.PageSize);
 
         var (items, totalCount) = await UserManagementReportQueryHelper.ReadPagedAsync(
             connectionFactory,

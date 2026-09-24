@@ -1,8 +1,10 @@
 using AutoFixture;
 using FluentAssertions;
+using JOIN.Application.Common;
 using JOIN.Application.UseCases.Admin.Persons.Queries;
 using JOIN.Application.Interface;
 using JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Queries.TestDoubles;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Admin.Persons.Queries.GetPersonsPaged;
@@ -75,9 +77,9 @@ public sealed class GetPersonsPagedQueryHandlerTests
         response.Data.Should().NotBeNull();
         response.Data!.Items.Should().HaveCount(1);
         response.Data.PageNumber.Should().Be(1);
-        response.Data.PageSize.Should().Be(100);
+        response.Data.PageSize.Should().Be(50);
         response.Data.TotalCount.Should().Be(51);
-        response.Data.TotalPages.Should().Be(1);
+        response.Data.TotalPages.Should().Be(2);
 
         var item = response.Data.Items.Single();
         item.CompanyId.Should().Be(companyId);
@@ -104,7 +106,7 @@ public sealed class GetPersonsPagedQueryHandlerTests
         context.Connection.CapturedParameters["IdentificationTypeId"].Should().Be(identificationTypeId);
         context.Connection.CapturedParameters["IdentificationNumber"].Should().Be("%12345%");
         context.Connection.CapturedParameters["Offset"].Should().Be(0);
-        context.Connection.CapturedParameters["PageSize"].Should().Be(100);
+        context.Connection.CapturedParameters["PageSize"].Should().Be(50);
     }
 
     /// <summary>
@@ -194,12 +196,20 @@ public sealed class GetPersonsPagedQueryHandlerTests
         public Mock<ISqlConnectionFactory> ConnectionFactoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public FakeDbConnection Connection { get; }
+        public IOptions<PaginationSettings> PaginationOptions { get; } = Options.Create(new PaginationSettings
+        {
+            DefaultPageNumber = 1,
+            DefaultPageSize = 10,
+            MaxPageSize = 50,
+            MinPageSize = 1
+        });
 
         public GetPersonsPagedQueryHandler CreateHandler()
         {
             return new GetPersonsPagedQueryHandler(
                 ConnectionFactoryMock.Object,
-                CurrentUserServiceMock.Object);
+                CurrentUserServiceMock.Object,
+                PaginationOptions);
         }
     }
 }

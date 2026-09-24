@@ -5,6 +5,7 @@ using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.UseCases.Security.Account.Queries.GetSecurityActivity;
 using JOIN.Domain.Security;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Security.Account.Queries.GetSecurityActivity;
@@ -113,10 +114,10 @@ public sealed class GetSecurityActivityQueryHandlerTests
     }
 
     /// <summary>
-    /// pageSize=200 clamps down to 100 before the repository is called.
+    /// pageSize=200 clamps down to the shared MaxPageSize (50) before the repository is called.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenPageSizeExceedsMax_ShouldClampTo100()
+    public async Task Handle_WhenPageSizeExceedsMax_ShouldClampToMaxPageSize()
     {
         // Arrange
         var context = new GetSecurityActivityQueryHandlerTestContext();
@@ -125,7 +126,7 @@ public sealed class GetSecurityActivityQueryHandlerTests
         context.SetUser(callerId);
 
         context.SecurityEventRepositoryMock
-            .Setup(x => x.ListByUserPagedAsync(callerId, 1, 100, It.IsAny<CancellationToken>()))
+            .Setup(x => x.ListByUserPagedAsync(callerId, 1, 50, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<SecurityEventLog>());
         context.SecurityEventRepositoryMock
             .Setup(x => x.CountByUserAsync(callerId, It.IsAny<CancellationToken>()))
@@ -138,9 +139,9 @@ public sealed class GetSecurityActivityQueryHandlerTests
 
         // Assert
         response.IsSuccess.Should().BeTrue();
-        response.Data!.PageSize.Should().Be(100);
+        response.Data!.PageSize.Should().Be(50);
         context.SecurityEventRepositoryMock.Verify(
-            x => x.ListByUserPagedAsync(callerId, 1, 100, It.IsAny<CancellationToken>()),
+            x => x.ListByUserPagedAsync(callerId, 1, 50, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -151,6 +152,13 @@ public sealed class GetSecurityActivityQueryHandlerTests
     {
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<ISecurityEventRepository> SecurityEventRepositoryMock { get; } = new();
+        public IOptions<PaginationSettings> PaginationOptions { get; } = Options.Create(new PaginationSettings
+        {
+            DefaultPageNumber = 1,
+            DefaultPageSize = 10,
+            MaxPageSize = 50,
+            MinPageSize = 1
+        });
 
         public void SetUser(Guid userId)
         {
@@ -158,6 +166,6 @@ public sealed class GetSecurityActivityQueryHandlerTests
         }
 
         public GetSecurityActivityQueryHandler CreateHandler() =>
-            new(CurrentUserServiceMock.Object, SecurityEventRepositoryMock.Object);
+            new(CurrentUserServiceMock.Object, SecurityEventRepositoryMock.Object, PaginationOptions);
     }
 }

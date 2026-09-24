@@ -109,8 +109,8 @@ var passwordPolicySection = builder.Configuration.GetSection("PasswordPolicy");
 builder.Services.Configure<PasswordPolicySettings>(passwordPolicySection);
 var passwordPolicySettings = passwordPolicySection.Get<PasswordPolicySettings>() ?? new PasswordPolicySettings();
 
-var areaPaginationSection = builder.Configuration.GetSection("AreaPagination");
-builder.Services.Configure<PaginationSettings>(areaPaginationSection);
+var paginationSection = builder.Configuration.GetSection("Pagination");
+builder.Services.Configure<PaginationSettings>(paginationSection);
 
 builder.Services.Configure<PerformanceSettings>(builder.Configuration.GetSection("Performance"));
 builder.Services.Configure<JOIN.Application.Common.Options.AppUrlsOptions>(builder.Configuration.GetSection(JOIN.Application.Common.Options.AppUrlsOptions.SectionName));

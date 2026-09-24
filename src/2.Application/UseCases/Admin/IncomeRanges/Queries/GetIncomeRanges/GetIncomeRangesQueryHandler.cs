@@ -22,8 +22,7 @@ public sealed class GetIncomeRangesQueryHandler(
             return Response<PagedResult<IncomeRangeDto>>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
 
         var companyId = currentUserService.CompanyId;
-        var pageNumber = Math.Max(request.PageNumber ?? _pagination.DefaultPageNumber, 1);
-        var pageSize = Math.Min(Math.Max(request.PageSize ?? _pagination.DefaultPageSize, 1), _pagination.MaxPageSize);
+        var (pageNumber, pageSize) = _pagination.Sanitize(request.PageNumber, request.PageSize);
         var offset = (pageNumber - 1) * pageSize;
 
         using var connection = connectionFactory.CreateConnection();

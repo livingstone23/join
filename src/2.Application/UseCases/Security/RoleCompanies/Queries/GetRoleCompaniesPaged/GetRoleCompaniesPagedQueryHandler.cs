@@ -6,24 +6,24 @@ using JOIN.Application.DTO.Security.RoleCompany;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence.Security;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace JOIN.Application.UseCases.Security.RoleCompanies.Queries.GetRoleCompaniesPaged;
 
 /// <summary>
-/// Handler for the paged RoleCompany listing. Sanitizes page/pageSize (clamp 1..100 / >=1),
-/// validates the tenant context, and delegates to <see cref="IRoleCompanyRepository.GetPagedAsync"/>.
+/// Handler for the paged RoleCompany listing. Sanitizes page/pageSize via the shared
+/// <see cref="PaginationSettings"/>, validates the tenant context, and delegates to
+/// <see cref="IRoleCompanyRepository.GetPagedAsync"/>.
 /// </summary>
 public sealed class GetRoleCompaniesPagedQueryHandler(
     IRoleCompanyRepository roleCompanyRepository,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IOptions<PaginationSettings> paginationOptions)
     : IRequestHandler<GetRoleCompaniesPagedQuery, Response<PagedResult<RoleCompanyListItemDto>>>
 {
-    private const int MaxPageSize = 100;
-    private const int MinPageSize = 1;
-    private const int DefaultPageSize = 20;
-
     private readonly IRoleCompanyRepository _roleCompanyRepository = roleCompanyRepository ?? throw new ArgumentNullException(nameof(roleCompanyRepository));
     private readonly ICurrentUserService _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
+    private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
 
     public async Task<Response<PagedResult<RoleCompanyListItemDto>>> Handle(
         GetRoleCompaniesPagedQuery request,
@@ -37,9 +37,7 @@ public sealed class GetRoleCompaniesPagedQueryHandler(
                 new[] { "El token no contiene un CompanyId válido." });
         }
 
-        var sanitizedPage = request.Page < 1 ? 1 : request.Page;
-        var requestedPageSize = request.PageSize < MinPageSize ? DefaultPageSize : request.PageSize;
-        var sanitizedPageSize = Math.Min(requestedPageSize, MaxPageSize);
+        var (sanitizedPage, sanitizedPageSize) = _paginationSettings.Sanitize(request.Page, request.PageSize);
 
         var (items, total) = await _roleCompanyRepository.GetPagedAsync(
             tenantId,

@@ -1,9 +1,11 @@
 using AutoFixture;
 using FluentAssertions;
+using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.UseCases.Security.Roles.Queries.GetRolesDetailed;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace JOIN.Application.UnitTest.Security.Roles.Queries.GetRolesDetailed;
@@ -56,10 +58,10 @@ public sealed class GetRolesDetailedQueryHandlerTests
     }
 
     /// <summary>
-    /// pageSize above 100 is clamped down to 100 before the repository is called.
+    /// pageSize above the shared MaxPageSize (50) is clamped down before the repository is called.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenPageSizeIsAboveMax_ShouldClampToOneHundred()
+    public async Task Handle_WhenPageSizeIsAboveMax_ShouldClampToMaxPageSize()
     {
         var companyId = Guid.NewGuid();
         var context = new TestContext();
@@ -82,7 +84,7 @@ public sealed class GetRolesDetailedQueryHandlerTests
         var response = await handler.Handle(new GetRolesDetailedQuery(null, null, Page: 1, PageSize: 250), CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
-        capturedPageSize.Should().Be(100);
+        capturedPageSize.Should().Be(50);
         capturedPage.Should().Be(1);
     }
 
@@ -109,7 +111,7 @@ public sealed class GetRolesDetailedQueryHandlerTests
     }
 
     /// <summary>
-    /// pageSize below 1 falls back to the default page size (20).
+    /// pageSize below 1 falls back to the shared DefaultPageSize (10).
     /// </summary>
     [Fact]
     public async Task Handle_WhenPageSizeIsZeroOrNegative_ShouldFallBackToDefault()
@@ -127,7 +129,7 @@ public sealed class GetRolesDetailedQueryHandlerTests
         var handler = context.CreateHandler();
         await handler.Handle(new GetRolesDetailedQuery(null, null, Page: 1, PageSize: 0), CancellationToken.None);
 
-        capturedPageSize.Should().Be(20);
+        capturedPageSize.Should().Be(10);
     }
 
     /// <summary>
@@ -186,8 +188,15 @@ public sealed class GetRolesDetailedQueryHandlerTests
     {
         public Mock<IRoleRepository> RoleRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
+        public IOptions<PaginationSettings> PaginationOptions { get; } = Options.Create(new PaginationSettings
+        {
+            DefaultPageNumber = 1,
+            DefaultPageSize = 10,
+            MaxPageSize = 50,
+            MinPageSize = 1
+        });
 
         public GetRolesDetailedQueryHandler CreateHandler()
-            => new(RoleRepositoryMock.Object, CurrentUserServiceMock.Object);
+            => new(RoleRepositoryMock.Object, CurrentUserServiceMock.Object, PaginationOptions);
     }
 }

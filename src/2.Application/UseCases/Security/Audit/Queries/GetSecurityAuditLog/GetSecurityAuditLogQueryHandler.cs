@@ -6,6 +6,7 @@ using JOIN.Application.Interface.Persistence.Audit;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Domain.Audit;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace JOIN.Application.UseCases.Security.Audit.Queries.GetSecurityAuditLog;
 
@@ -17,12 +18,14 @@ namespace JOIN.Application.UseCases.Security.Audit.Queries.GetSecurityAuditLog;
 public sealed class GetSecurityAuditLogQueryHandler(
     IAuditLogRepository repository,
     ICurrentUserService currentUserService,
-    IUserAdminRepository userAdminRepository)
+    IUserAdminRepository userAdminRepository,
+    IOptions<PaginationSettings> paginationOptions)
     : IRequestHandler<GetSecurityAuditLogQuery, Response<PagedResult<SecurityAuditLogItemDto>>>
 {
     private readonly IAuditLogRepository _repository = repository;
     private readonly ICurrentUserService _currentUserService = currentUserService;
     private readonly IUserAdminRepository _userAdminRepository = userAdminRepository;
+    private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
 
     public async Task<Response<PagedResult<SecurityAuditLogItemDto>>> Handle(
         GetSecurityAuditLogQuery request,
@@ -67,9 +70,8 @@ public sealed class GetSecurityAuditLogQueryHandler(
         bool isSuperAdmin = await _userAdminRepository.IsSuperAdminAsync(_currentUserService.UserId, cancellationToken);
         Guid? scopeCompanyId = request.AllTenants && isSuperAdmin ? null : companyId;
 
-        // 5. Clamp paging + normalize ToDate to exclusive.
-        var pageNumber = Math.Max(1, request.PageNumber);
-        var pageSize = Math.Clamp(request.PageSize, 1, 100);
+        // 5. Sanitize paging + normalize ToDate to exclusive.
+        var (pageNumber, pageSize) = _paginationSettings.Sanitize(request.PageNumber, request.PageSize);
         var fromUtc = request.FromDate?.ToUniversalTime();
         var toUtcExclusive = request.ToDate?.Date.AddDays(1);
 

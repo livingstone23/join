@@ -4,6 +4,7 @@ using JOIN.Application.DTO.Security;
 using JOIN.Application.Interface;
 using JOIN.Application.UseCases.Security.Queries.GetMyCompanyUserReport;
 using JOIN.Application.UnitTest.Common.TestDoubles;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Security.Queries.GetMyCompanyUserReport;
@@ -178,9 +179,17 @@ public sealed class GetMyCompanyUserReportQueryHandlerTests
     {
         public FakeSqlConnectionFactory ConnectionFactory { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
+        public IOptions<PaginationSettings> PaginationOptions { get; } = Options.Create(new PaginationSettings
+        {
+            DefaultPageNumber = 1,
+            DefaultPageSize = 10,
+            MaxPageSize = 50,
+            MinPageSize = 1
+        });
 
         public GetMyCompanyUserReportQueryHandler Handler => new(
             ConnectionFactory,
-            CurrentUserServiceMock.Object);
+            CurrentUserServiceMock.Object,
+            PaginationOptions);
     }
 }

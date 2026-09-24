@@ -27,15 +27,7 @@ public sealed class GetSystemWideTimeUnitsQueryHandler(
     /// </summary>
     public async Task<Response<PagedResult<TimeUnitDto>>> Handle(GetSystemWideTimeUnitsQuery request, CancellationToken cancellationToken)
     {
-        var defaultPageNumber = _paginationSettings.DefaultPageNumber < 1 ? 1 : _paginationSettings.DefaultPageNumber;
-        var defaultPageSize = _paginationSettings.DefaultPageSize < 1 ? 10 : _paginationSettings.DefaultPageSize;
-        var maxPageSize = _paginationSettings.MaxPageSize < defaultPageSize ? defaultPageSize : _paginationSettings.MaxPageSize;
-
-        var sanitizedPageNumber = request.PageNumber.GetValueOrDefault(defaultPageNumber);
-        sanitizedPageNumber = sanitizedPageNumber < 1 ? defaultPageNumber : sanitizedPageNumber;
-
-        var requestedPageSize = request.PageSize.GetValueOrDefault(defaultPageSize);
-        var sanitizedPageSize = requestedPageSize < 1 ? defaultPageSize : Math.Min(requestedPageSize, maxPageSize);
+        var (sanitizedPageNumber, sanitizedPageSize) = _paginationSettings.Sanitize(request.PageNumber, request.PageSize);
         var offset = (sanitizedPageNumber - 1) * sanitizedPageSize;
 
         using var connection = connectionFactory.CreateConnection();

@@ -1,8 +1,10 @@
 using AutoFixture;
 using FluentAssertions;
+using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Queries.TestDoubles;
 using JOIN.Application.UseCases.Common.Countries.Queries;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Common.Countries.Queries.GetCountriesPaged;
@@ -146,10 +148,17 @@ public sealed class GetCountriesPagedQueryHandlerTests
 
         public Mock<ISqlConnectionFactory> ConnectionFactoryMock { get; } = new();
         public FakeDbConnection Connection { get; }
+        public IOptions<PaginationSettings> PaginationOptions { get; } = Options.Create(new PaginationSettings
+        {
+            DefaultPageNumber = 1,
+            DefaultPageSize = 10,
+            MaxPageSize = 50,
+            MinPageSize = 1
+        });
 
         public GetCountriesPagedQueryHandler CreateHandler()
         {
-            return new GetCountriesPagedQueryHandler(ConnectionFactoryMock.Object);
+            return new GetCountriesPagedQueryHandler(ConnectionFactoryMock.Object, PaginationOptions);
         }
     }
 }

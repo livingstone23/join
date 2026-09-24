@@ -1,6 +1,6 @@
 # SPEC 33 — Centralización de `PaginationSettings` y su uso en todos los query handlers
 
-> **Status:** Draft
+> **Status:** Aprobado
 > **Depends on:** Ninguna spec previa. Es un refactor sobre código ya existente: `PaginationSettings` (`src/2.Application/Common/PaginationSettings.cs`), la sección `"AreaPagination"` de `appsettings.json` y los ~37 query handlers/validators que hoy pagina la API.
 > **Date:** 2026-09-22
 > **Objective:** Que exista una única fuente de verdad (`PaginationSettings`, sección de configuración `"Pagination"`) para los límites de paginación (`DefaultPageNumber`/`DefaultPageSize`/`MaxPageSize`/`MinPageSize`) y una lógica de saneamiento compartida (`Sanitize`), migrando a ella los handlers/validators que hoy hardcodean sus propias constantes y retrofiteando los que ya inyectan `PaginationSettings` pero repiten el clamping inline.

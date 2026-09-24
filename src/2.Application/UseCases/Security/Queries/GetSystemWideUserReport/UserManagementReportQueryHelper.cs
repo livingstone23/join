@@ -19,12 +19,6 @@ namespace JOIN.Application.UseCases.Security.Queries.GetSystemWideUserReport;
 /// </summary>
 internal static class UserManagementReportQueryHelper
 {
-    /// <summary>Hard cap on page size for the paginated report.</summary>
-    public const int MaxPageSize = 50;
-
-    /// <summary>Default page size when the caller omits <c>pageSize</c>.</summary>
-    public const int DefaultPageSize = 10;
-
     // Filters shared between ReadAsync and ReadPagedAsync. Built once in C# and
     // interpolated into both query strings so a future change cannot land in only
     // one place (the spec's documented risk about WHERE duplication).
@@ -234,7 +228,9 @@ internal static class UserManagementReportQueryHelper
     /// Paginated variant of <see cref="ReadAsync"/>. Returns the items on the
     /// requested page plus the total count of distinct <c>(UserId, CompanyId)</c>
     /// pairs that pass the filters — not the row count, so callers can render an
-    /// accurate page count.
+    /// accurate page count. <paramref name="pageNumber"/>/<paramref name="pageSize"/>
+    /// are expected to already be sanitized by the caller via
+    /// <see cref="PaginationSettings.Sanitize"/>.
     /// </summary>
     public static async Task<(IReadOnlyCollection<UserManagementReportDto> Items, int TotalCount)>
         ReadPagedAsync(
@@ -250,11 +246,7 @@ internal static class UserManagementReportQueryHelper
             bool? isActive,
             CancellationToken cancellationToken)
     {
-        var sanitizedPageNumber = pageNumber < 1 ? 1 : pageNumber;
-        var sanitizedPageSize = pageSize < 1
-            ? DefaultPageSize
-            : Math.Min(pageSize, MaxPageSize);
-        var offset = (sanitizedPageNumber - 1) * sanitizedPageSize;
+        var offset = (pageNumber - 1) * pageSize;
 
         var (normalizedFromDate, normalizedToDateExclusive) = NormalizeDateRange(fromDate, toDate);
         var normalizedRoleNames = NormalizeRoleNames(roleNames);
@@ -277,7 +269,7 @@ internal static class UserManagementReportQueryHelper
         parameters.Add("IsActive", isActive);
         parameters.Add("Search", searchPattern);
         parameters.Add("Offset", offset);
-        parameters.Add("PageSize", sanitizedPageSize);
+        parameters.Add("PageSize", pageSize);
         // Re-fix the DBNull issue: Dapper rejects DBNull.Value for nullable typed
         // parameters. Passing null directly lets Dapper emit the SQL NULL it needs.
         // (See SPEC 28 / F7 test for Search / IsActive propagation.)

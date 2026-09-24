@@ -5,6 +5,7 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
 using JOIN.Application.Interface;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 
 
@@ -17,13 +18,14 @@ namespace JOIN.Application.UseCases.Admin.Persons.Queries;
 /// </summary>
 /// <param name="connectionFactory">The factory used to create database connections.</param>
 /// <param name="currentUserService">The current user context used to resolve the tenant company.</param>
+/// <param name="paginationOptions">Configurable pagination defaults shared across paged endpoints.</param>
 public class GetPersonsPagedQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IOptions<PaginationSettings> paginationOptions)
     : IRequestHandler<GetPersonsPagedQuery, Response<PagedResult<PersonListItemDto>>>
 {
-    private const int MaxPageSize = 100;
-    private const int DefaultPageSize = 10;
+    private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
 
     /// <summary>
     /// Retrieves a paginated list of customers filtered by the current tenant.
@@ -43,8 +45,7 @@ public class GetPersonsPagedQueryHandler(
             return response;
         }
 
-        var sanitizedPageNumber = request.PageNumber < 1 ? 1 : request.PageNumber;
-        var sanitizedPageSize = request.PageSize < 1 ? DefaultPageSize : Math.Min(request.PageSize, MaxPageSize);
+        var (sanitizedPageNumber, sanitizedPageSize) = _paginationSettings.Sanitize(request.PageNumber, request.PageSize);
         var offset = (sanitizedPageNumber - 1) * sanitizedPageSize;
 
         using var connection = connectionFactory.CreateConnection();

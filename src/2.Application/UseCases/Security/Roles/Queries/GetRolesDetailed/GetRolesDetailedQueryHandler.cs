@@ -3,6 +3,7 @@ using JOIN.Application.DTO.Security;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence.Security;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace JOIN.Application.UseCases.Security.Roles.Queries.GetRolesDetailed;
 
@@ -12,15 +13,13 @@ namespace JOIN.Application.UseCases.Security.Roles.Queries.GetRolesDetailed;
 /// </summary>
 public sealed class GetRolesDetailedQueryHandler(
     IRoleRepository roleRepository,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IOptions<PaginationSettings> paginationOptions)
     : IRequestHandler<GetRolesDetailedQuery, Response<PagedResult<RoleDto>>>
 {
-    private const int MaxPageSize = 100;
-    private const int MinPageSize = 1;
-    private const int DefaultPageSize = 20;
-
     private readonly IRoleRepository _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
     private readonly ICurrentUserService _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
+    private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
 
     public async Task<Response<PagedResult<RoleDto>>> Handle(GetRolesDetailedQuery request, CancellationToken cancellationToken)
     {
@@ -30,9 +29,7 @@ public sealed class GetRolesDetailedQueryHandler(
             return Response<PagedResult<RoleDto>>.Error("No se pudo identificar la compania del usuario actual para listar los roles.");
         }
 
-        var sanitizedPage = request.Page < 1 ? 1 : request.Page;
-        var requestedPageSize = request.PageSize < MinPageSize ? DefaultPageSize : request.PageSize;
-        var sanitizedPageSize = Math.Min(requestedPageSize, MaxPageSize);
+        var (sanitizedPage, sanitizedPageSize) = _paginationSettings.Sanitize(request.Page, request.PageSize);
 
         var (items, total) = await _roleRepository.GetPagedAsync(
             request.Name,

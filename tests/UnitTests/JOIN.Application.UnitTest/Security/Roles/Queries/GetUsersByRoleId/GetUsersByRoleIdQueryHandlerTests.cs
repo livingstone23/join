@@ -1,8 +1,10 @@
 using FluentAssertions;
+using JOIN.Application.Common;
 using JOIN.Application.DTO.Security.RoleUsers;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.UseCases.Security.Roles.Queries.GetUsersByRoleId;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace JOIN.Application.UnitTest.Security.Roles.Queries.GetUsersByRoleId;
@@ -102,10 +104,10 @@ public sealed class GetUsersByRoleIdQueryHandlerTests
     }
 
     /// <summary>
-    /// pageSize above 100 clamps to 100.
+    /// pageSize above the shared MaxPageSize (50) clamps down.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenPageSizeAboveMax_ShouldClampToHundred()
+    public async Task Handle_WhenPageSizeAboveMax_ShouldClampToMaxPageSize()
     {
         var tenantId = Guid.NewGuid();
         var roleId = Guid.NewGuid();
@@ -115,14 +117,14 @@ public sealed class GetUsersByRoleIdQueryHandlerTests
             .Setup(x => x.ExistsAndActiveAsync(roleId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         context.RoleCompanyRepositoryMock
-            .Setup(x => x.GetUsersByRoleIdPagedAsync(roleId, tenantId, 1, 100, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetUsersByRoleIdPagedAsync(roleId, tenantId, 1, 50, It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<RoleAffectedUserDto>(), 0));
 
         var handler = context.CreateHandler();
         var response = await handler.Handle(new GetUsersByRoleIdQuery(roleId, Page: 1, PageSize: 250), CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
-        response.Data!.PageSize.Should().Be(100);
+        response.Data!.PageSize.Should().Be(50);
     }
 
     /// <summary>
@@ -150,7 +152,7 @@ public sealed class GetUsersByRoleIdQueryHandlerTests
     }
 
     /// <summary>
-    /// pageSize below 1 falls back to the default (20).
+    /// pageSize below 1 falls back to the shared DefaultPageSize (10).
     /// </summary>
     [Fact]
     public async Task Handle_WhenPageSizeBelowOne_ShouldFallbackToDefault()
@@ -163,14 +165,14 @@ public sealed class GetUsersByRoleIdQueryHandlerTests
             .Setup(x => x.ExistsAndActiveAsync(roleId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         context.RoleCompanyRepositoryMock
-            .Setup(x => x.GetUsersByRoleIdPagedAsync(roleId, tenantId, 1, 20, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetUsersByRoleIdPagedAsync(roleId, tenantId, 1, 10, It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<RoleAffectedUserDto>(), 0));
 
         var handler = context.CreateHandler();
         var response = await handler.Handle(new GetUsersByRoleIdQuery(roleId, Page: 1, PageSize: 0), CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
-        response.Data!.PageSize.Should().Be(20);
+        response.Data!.PageSize.Should().Be(10);
     }
 
     /// <summary>
@@ -204,8 +206,15 @@ public sealed class GetUsersByRoleIdQueryHandlerTests
         public Mock<IRoleCompanyRepository> RoleCompanyRepositoryMock { get; } = new();
         public Mock<IRoleRepository> RoleRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
+        public IOptions<PaginationSettings> PaginationOptions { get; } = Options.Create(new PaginationSettings
+        {
+            DefaultPageNumber = 1,
+            DefaultPageSize = 10,
+            MaxPageSize = 50,
+            MinPageSize = 1
+        });
 
         public GetUsersByRoleIdQueryHandler CreateHandler() =>
-            new(RoleCompanyRepositoryMock.Object, RoleRepositoryMock.Object, CurrentUserServiceMock.Object);
+            new(RoleCompanyRepositoryMock.Object, RoleRepositoryMock.Object, CurrentUserServiceMock.Object, PaginationOptions);
     }
 }

@@ -5,6 +5,7 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
 using JOIN.Application.Interface;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace JOIN.Application.UseCases.Admin.Customers.Queries;
 
@@ -13,11 +14,11 @@ namespace JOIN.Application.UseCases.Admin.Customers.Queries;
 /// </summary>
 public sealed class GetCustomersPagedQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IOptions<PaginationSettings> paginationOptions)
     : IRequestHandler<GetCustomersPagedQuery, Response<PagedResult<CustomerResponseDto>>>
 {
-    private const int MaxPageSize = 50;
-    private const int DefaultPageSize = 10;
+    private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
 
     public async Task<Response<PagedResult<CustomerResponseDto>>> Handle(
         GetCustomersPagedQuery request,
@@ -30,8 +31,7 @@ public sealed class GetCustomersPagedQueryHandler(
                 ["The X-Company-Id header is required."]);
         }
 
-        var sanitizedPageNumber = request.PageNumber < 1 ? 1 : request.PageNumber;
-        var sanitizedPageSize = request.PageSize < 1 ? DefaultPageSize : Math.Min(request.PageSize, MaxPageSize);
+        var (sanitizedPageNumber, sanitizedPageSize) = _paginationSettings.Sanitize(request.PageNumber, request.PageSize);
         var offset = (sanitizedPageNumber - 1) * sanitizedPageSize;
 
         using var connection = connectionFactory.CreateConnection();
