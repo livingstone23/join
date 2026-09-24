@@ -1139,7 +1139,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
     private static List<PersonSeed> GetJoinPersonSeeds() =>
     [
-        // Physical persons (22)
+        // Physical persons (57)
         new(PersonType.Physical, "Carlos",     "101-1980101-1", LastName: "Mendoza"),
         new(PersonType.Physical, "Ana",        "102-1985621-1", LastName: "Rodriguez"),
         new(PersonType.Physical, "Luis",       "101-1990315-1", LastName: "Garcia"),
@@ -1162,6 +1162,42 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new(PersonType.Physical, "Natalia",    "102-1996204-1", LastName: "Medina"),
         new(PersonType.Physical, "Raul",       "101-1975907-1", LastName: "Gutierrez"),
         new(PersonType.Physical, "Beatriz",    "103-1999118-1", LastName: "Rios"),
+        // 35 additional physical persons (SPEC 33 follow-up request)
+        new(PersonType.Physical, "Gabriela",   "101-2001001-1", LastName: "Fernandez"),
+        new(PersonType.Physical, "Ricardo",    "102-2001002-1", LastName: "Ortiz"),
+        new(PersonType.Physical, "Isabel",     "103-2001003-1", LastName: "Campos"),
+        new(PersonType.Physical, "Eduardo",    "104-2001004-1", LastName: "Molina"),
+        new(PersonType.Physical, "Teresa",     "101-2001005-1", LastName: "Aguilar"),
+        new(PersonType.Physical, "Fernando",   "102-2001006-1", LastName: "Cabrera"),
+        new(PersonType.Physical, "Rosa",       "103-2001007-1", LastName: "Delgado"),
+        new(PersonType.Physical, "Manuel",     "104-2001008-1", LastName: "Espinoza"),
+        new(PersonType.Physical, "Cristina",   "101-2001009-1", LastName: "Herrera"),
+        new(PersonType.Physical, "Sergio",     "102-2001010-1", LastName: "Ibarra"),
+        new(PersonType.Physical, "Adriana",    "103-2001011-1", LastName: "Jimenez"),
+        new(PersonType.Physical, "Victor",     "104-2001012-1", LastName: "Leiva"),
+        new(PersonType.Physical, "Yolanda",    "101-2001013-1", LastName: "Mora"),
+        new(PersonType.Physical, "Ramon",      "102-2001014-1", LastName: "Navarro"),
+        new(PersonType.Physical, "Elena",      "103-2001015-1", LastName: "Ochoa"),
+        new(PersonType.Physical, "Pablo",      "104-2001016-1", LastName: "Pacheco"),
+        new(PersonType.Physical, "Gloria",     "101-2001017-1", LastName: "Quintero"),
+        new(PersonType.Physical, "Julio",      "102-2001018-1", LastName: "Rosales"),
+        new(PersonType.Physical, "Marta",      "103-2001019-1", LastName: "Salgado"),
+        new(PersonType.Physical, "Ivan",       "104-2001020-1", LastName: "Tinoco"),
+        new(PersonType.Physical, "Rocio",      "101-2001021-1", LastName: "Urena"),
+        new(PersonType.Physical, "Nestor",     "102-2001022-1", LastName: "Villalta"),
+        new(PersonType.Physical, "Susana",     "103-2001023-1", LastName: "Zamora"),
+        new(PersonType.Physical, "Leonardo",   "104-2001024-1", LastName: "Aguirre"),
+        new(PersonType.Physical, "Karla",      "101-2001025-1", LastName: "Bermudez"),
+        new(PersonType.Physical, "Danilo",     "102-2001026-1", LastName: "Cordero"),
+        new(PersonType.Physical, "Vanessa",    "103-2001027-1", LastName: "Duarte"),
+        new(PersonType.Physical, "Oscar",      "104-2001028-1", LastName: "Escobar"),
+        new(PersonType.Physical, "Ximena",     "101-2001029-1", LastName: "Figueroa"),
+        new(PersonType.Physical, "Wilfredo",   "102-2001030-1", LastName: "Guevara"),
+        new(PersonType.Physical, "Daniela",    "103-2001031-1", LastName: "Hidalgo"),
+        new(PersonType.Physical, "Mauricio",   "104-2001032-1", LastName: "Iglesias"),
+        new(PersonType.Physical, "Fabiola",    "101-2001033-1", LastName: "Lara"),
+        new(PersonType.Physical, "Alberto",    "102-2001034-1", LastName: "Marin"),
+        new(PersonType.Physical, "Norma",      "103-2001035-1", LastName: "Osorio"),
         // Legal entities (8) — FirstName/LastName belong to the legal representative
         new(PersonType.Legal, "Andres",  "0614-01010-10001", LastName: "Peralta",  CommercialName: "TechSolutions Centroamerica S.A."),
         new(PersonType.Legal, "Carmen",  "0614-01010-10002", LastName: "Reyes",    CommercialName: "Importaciones Global S.R.L."),
@@ -2710,7 +2746,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     private static readonly HashSet<string> FemaleSeedFirstNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "Ana", "Maria", "Sandra", "Claudia", "Patricia", "Carmen", "Silvia", "Diana", "Valeria", "Natalia",
-        "Beatriz", "Lucia", "Monica", "Sarah", "Emily"
+        "Beatriz", "Lucia", "Monica", "Sarah", "Emily",
+        "Gabriela", "Isabel", "Teresa", "Rosa", "Cristina", "Adriana", "Yolanda", "Elena", "Gloria", "Marta",
+        "Rocio", "Susana", "Karla", "Vanessa", "Ximena", "Daniela", "Fabiola", "Norma"
     };
 
     private async Task<Dictionary<string, Guid>> GetGenderIdsByNameAsync(Guid companyId) =>
