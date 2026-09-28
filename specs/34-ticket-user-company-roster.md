@@ -1,6 +1,6 @@
 # SPEC 34 — `TicketUserCompany`: roster de agentes de tickets por empresa
 
-> **Status:** Implementado
+> **Status:** Aprobado
 > **Depends on:** Nada (primera spec del módulo de tickets extendido). Precede a SPEC 35 (acciones de ciclo de vida gateadas por esta entidad), SPEC 36 (adjuntos), SPEC 37 (ingesta multicanal) y SPEC 38 (workflow/SLA parametrizable).
 > **Date:** 2026-09-25
 > **Objective:** Crear la entidad `TicketUserCompany` (vínculo `User` ↔ `Company` con los flags `IsSuperAdminTicket`, `CanFinishTicket`, `CanResolveTicket`) que define, por empresa, qué usuarios están habilitados para gestionar tickets y con qué nivel de autoridad, junto con un `TicketUserCompaniesController` (CRUD tenant-scoped) y la invariante "al menos un `IsSuperAdminTicket` activo por empresa una vez que el roster está poblado".
