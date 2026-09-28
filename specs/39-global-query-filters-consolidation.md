@@ -1,6 +1,6 @@
 # SPEC 39 — Consolidación de query filters globales (soft-delete + tenant) en `ApplicationDbContext`
 
-> **Status:** Aprobado
+> **Status:** Borrador
 > **Depends on:** SPEC 30 (`UserConnectionLog` ganó `GcRecord` ahí; esta spec cierra el lado EF que quedó pendiente). No depende de las specs 34-38 del módulo de tickets, pero las beneficia directamente: sus 5 entidades nuevas (`TicketUserCompany`, `TicketAttachmentSettings`, `TicketDocument`, `TicketInboundChannel`, `TicketStatusTransition`) heredan todas de `BaseTenantEntity` y quedan cubiertas automáticamente por el mecanismo genérico de esta spec, sin que ninguna de esas specs necesite agregar una línea a `ConfigureGlobalQueryFilters`.
 > **Date:** 2026-09-28
 > **Objective:** Reemplazar las ~45 líneas manuales de `ApplicationDbContext.ConfigureGlobalQueryFilters` por un mecanismo genérico basado en reflexión que derive el filtro de soft-delete (`GcRecord == 0`) y, cuando aplica, el filtro de tenant (`CompanyId == currentUserService.CompanyId`) directamente de la jerarquía de clases del dominio (`IAuditableEntity` / `BaseTenantEntity`), preservando exactamente el comportamiento actual — con una única corrección: alinear el filtro de `UserConnectionLog` con lo que SPEC 30 ya estableció a nivel Dapper.
