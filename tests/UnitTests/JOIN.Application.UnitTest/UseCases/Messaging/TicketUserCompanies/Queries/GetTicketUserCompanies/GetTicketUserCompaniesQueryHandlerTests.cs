@@ -1,7 +1,7 @@
 using AutoFixture;
 using FluentAssertions;
 using JOIN.Application.Common;
-using JOIN.Application.UnitTest.UseCases.Messaging.TicketUserCompanies.Queries.TestDoubles;
+using JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Queries.TestDoubles;
 using JOIN.Application.Interface;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetTicketUserCompanies;
 using Microsoft.Extensions.Options;

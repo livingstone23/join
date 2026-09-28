@@ -1,7 +1,7 @@
 using AutoFixture;
 using FluentAssertions;
 using JOIN.Application.Common;
-using JOIN.Application.UnitTest.UseCases.Messaging.TicketUserCompanies.Queries.TestDoubles;
+using JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Queries.TestDoubles;
 using JOIN.Application.Interface;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetSystemWideTicketUserCompanies;
 using Microsoft.Extensions.Options;
@@ -79,6 +79,57 @@ public sealed class GetSystemWideTicketUserCompaniesQueryHandlerTests
         response.IsSuccess.Should().BeTrue();
         context.Connection.LastCommandText.Should().Contain("AND co.Name LIKE @CompanyName");
         context.Connection.CapturedParameters["CompanyName"].Should().Be("%JOIN%");
+    }
+
+    [Fact]
+    public async Task Handle_WhenCapabilityFiltersProvided_ShouldAppendThemToWhereClause()
+    {
+        var userId = _fixture.Create<Guid>();
+        var context = new GetSystemWideTicketUserCompaniesQueryHandlerTestContext(_pagination);
+        context.Connection.SetResults(
+            FakeResultSet.Empty("Id", "CompanyId", "CompanyName", "UserId", "UserName", "UserEmail", "IsSuperAdminTicket", "CanFinishTicket", "CanResolveTicket", "CreatedAt"),
+            FakeResultSet.FromScalar(0));
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(
+            new GetSystemWideTicketUserCompaniesQuery
+            {
+                UserId = userId,
+                IsSuperAdminTicket = true,
+                CanFinishTicket = false,
+                CanResolveTicket = true
+            },
+            CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        response.Data!.TotalPages.Should().Be(0);
+        context.Connection.LastCommandText.Should().Contain("AND tuc.UserId = @UserId");
+        context.Connection.LastCommandText.Should().Contain("AND tuc.IsSuperAdminTicket = @IsSuperAdminTicket");
+        context.Connection.LastCommandText.Should().Contain("AND tuc.CanFinishTicket = @CanFinishTicket");
+        context.Connection.LastCommandText.Should().Contain("AND tuc.CanResolveTicket = @CanResolveTicket");
+        context.Connection.LastCommandText.Should().NotContain("@TenantId");
+        context.Connection.CapturedParameters["UserId"].Should().Be(userId);
+        context.Connection.CapturedParameters["IsSuperAdminTicket"].Should().Be(true);
+        context.Connection.CapturedParameters["CanFinishTicket"].Should().Be(false);
+        context.Connection.CapturedParameters["CanResolveTicket"].Should().Be(true);
+    }
+
+    [Fact]
+    public async Task Handle_WhenUserIdIsEmptyGuid_ShouldNotAppendUserFilter()
+    {
+        var context = new GetSystemWideTicketUserCompaniesQueryHandlerTestContext(_pagination);
+        context.Connection.SetResults(
+            FakeResultSet.Empty("Id", "CompanyId", "CompanyName", "UserId", "UserName", "UserEmail", "IsSuperAdminTicket", "CanFinishTicket", "CanResolveTicket", "CreatedAt"),
+            FakeResultSet.FromScalar(0));
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(
+            new GetSystemWideTicketUserCompaniesQuery { UserId = Guid.Empty, CompanyName = "   " },
+            CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        context.Connection.LastCommandText.Should().NotContain("@UserId");
+        context.Connection.LastCommandText.Should().NotContain("@CompanyName");
     }
 
     private sealed class GetSystemWideTicketUserCompaniesQueryHandlerTestContext

@@ -57,6 +57,16 @@ public class TicketUserCompaniesController(ISender sender) : ControllerBase
             },
             cancellationToken);
 
+        if (!response.IsSuccess)
+        {
+            if (response.Message == "COMPANY_REQUIRED")
+            {
+                return Unauthorized(response);
+            }
+
+            return BadRequest(response);
+        }
+
         return Ok(response);
     }
 
@@ -108,6 +118,11 @@ public class TicketUserCompaniesController(ISender sender) : ControllerBase
 
         if (!response.IsSuccess)
         {
+            if (response.Message == "COMPANY_REQUIRED")
+            {
+                return Unauthorized(response);
+            }
+
             return NotFound(response);
         }
 
@@ -123,14 +138,22 @@ public class TicketUserCompaniesController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create(
-        [FromBody] CreateTicketUserCompanyCommand command,
+        [FromBody] CreateTicketUserCompanyDto request,
         CancellationToken cancellationToken = default)
     {
+        var command = new CreateTicketUserCompanyCommand
+        {
+            UserId = request.UserId,
+            IsSuperAdminTicket = request.IsSuperAdminTicket,
+            CanFinishTicket = request.CanFinishTicket,
+            CanResolveTicket = request.CanResolveTicket
+        };
+
         var response = await _sender.Send(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
-            if (response.Message is "COMPANY_REQUIRED")
+            if (response.Message == "COMPANY_REQUIRED")
             {
                 return Unauthorized(response);
             }
@@ -148,7 +171,7 @@ public class TicketUserCompaniesController(ISender sender) : ControllerBase
 
     /// <summary>
     /// Updates the capability flags of an existing ticket-roster entry.
-    /// The route id is the authoritative resource key; the payload cannot reassign the user.
+    /// The route id is the resource key; the payload carries only the flags, so the user cannot be reassigned.
     /// </summary>
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(Response<TicketUserCompanyDto>), StatusCodes.Status200OK)]
@@ -158,18 +181,18 @@ public class TicketUserCompaniesController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update(
         Guid id,
-        [FromBody] UpdateTicketUserCompanyCommand command,
+        [FromBody] UpdateTicketUserCompanyDto request,
         CancellationToken cancellationToken = default)
     {
-        if (command.Id != Guid.Empty && command.Id != id)
+        var command = new UpdateTicketUserCompanyCommand
         {
-            return BadRequest(Response<TicketUserCompanyDto>.Error(
-                "INVALID_TICKET_USER_COMPANY_ID",
-                ["Route id and payload id must match."]));
-        }
+            Id = id,
+            IsSuperAdminTicket = request.IsSuperAdminTicket,
+            CanFinishTicket = request.CanFinishTicket,
+            CanResolveTicket = request.CanResolveTicket
+        };
 
-        var request = command with { Id = id };
-        var response = await _sender.Send(request, cancellationToken);
+        var response = await _sender.Send(command, cancellationToken);
 
         if (!response.IsSuccess)
         {

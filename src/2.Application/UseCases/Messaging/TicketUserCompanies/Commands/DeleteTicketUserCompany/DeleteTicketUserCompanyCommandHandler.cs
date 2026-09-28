@@ -54,7 +54,7 @@ public sealed class DeleteTicketUserCompanyCommandHandler(
 
         if (result <= 0)
         {
-            return Response<Guid>.Error("DELETE_FAILED", ["No records were affected while deleting the ticket roster entry."]);
+            return Response<Guid>.Error("TICKET_USER_COMPANY_NOT_FOUND", ["No records were affected while deleting the ticket roster entry."]);
         }
 
         return new Response<Guid>

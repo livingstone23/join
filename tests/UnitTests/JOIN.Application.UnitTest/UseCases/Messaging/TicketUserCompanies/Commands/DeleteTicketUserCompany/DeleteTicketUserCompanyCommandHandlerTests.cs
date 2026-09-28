@@ -87,6 +87,39 @@ public sealed class DeleteTicketUserCompanyCommandHandlerTests
         response.Data.Should().Be(target.Id);
     }
 
+    [Fact]
+    public async Task Handle_WhenRowIsNotSuperAdmin_ShouldSoftDeleteWithoutCallingCoordinator()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var context = new DeleteTicketUserCompanyCommandTestContext(companyId);
+        var target = new TicketUserCompany { CompanyId = companyId, IsSuperAdminTicket = false, GcRecord = 0 };
+        context.TicketUserCompanyRepositoryMock.Setup(x => x.GetAsync(target.Id)).ReturnsAsync(target);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(new DeleteTicketUserCompanyCommand(target.Id), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        target.GcRecord.Should().NotBe(0);
+        context.TicketUserCompanyRepositoryMock.Verify(x => x.GetAllAsync(), Times.Never);
+        context.TicketUserCompanyRepositoryMock.Verify(x => x.UpdateAsync(target), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WhenNoRowsAffected_ShouldReturnNotFoundError()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var context = new DeleteTicketUserCompanyCommandTestContext(companyId);
+        var target = new TicketUserCompany { CompanyId = companyId, IsSuperAdminTicket = false, GcRecord = 0 };
+        context.TicketUserCompanyRepositoryMock.Setup(x => x.GetAsync(target.Id)).ReturnsAsync(target);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(new DeleteTicketUserCompanyCommand(target.Id), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("TICKET_USER_COMPANY_NOT_FOUND");
+    }
+
     private sealed class DeleteTicketUserCompanyCommandTestContext
     {
         public DeleteTicketUserCompanyCommandTestContext(Guid companyId)

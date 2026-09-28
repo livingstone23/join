@@ -127,6 +127,51 @@ public sealed class UpdateTicketUserCompanyCommandHandlerTests
         updated!.IsSuperAdminTicket.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task Handle_WhenOnlyOperationalFlagsChange_ShouldPersistWithoutCallingCoordinator()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var context = new UpdateTicketUserCompanyCommandTestContext(companyId);
+        var target = new TicketUserCompany
+        {
+            CompanyId = companyId,
+            IsSuperAdminTicket = true,
+            CanFinishTicket = false,
+            CanResolveTicket = false,
+            GcRecord = 0
+        };
+        context.TicketUserCompanyRepositoryMock.Setup(x => x.GetAsync(target.Id)).ReturnsAsync(target);
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(
+            CreateValidCommand(id: target.Id, isSuperAdminTicket: true, canFinishTicket: true, canResolveTicket: true),
+            CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        response.Data!.CanFinishTicket.Should().BeTrue();
+        response.Data.CanResolveTicket.Should().BeTrue();
+        context.TicketUserCompanyRepositoryMock.Verify(x => x.GetAllAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenUpdated_ShouldStampLastModifiedAndLastModifiedBy()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var context = new UpdateTicketUserCompanyCommandTestContext(companyId);
+        var userId = Guid.NewGuid().ToString();
+        context.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns(userId);
+        var target = new TicketUserCompany { CompanyId = companyId, IsSuperAdminTicket = false, GcRecord = 0 };
+        context.TicketUserCompanyRepositoryMock.Setup(x => x.GetAsync(target.Id)).ReturnsAsync(target);
+        var before = DateTime.UtcNow;
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(CreateValidCommand(id: target.Id, isSuperAdminTicket: false), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        target.LastModified.Should().NotBeNull().And.BeOnOrAfter(before);
+        target.LastModifiedBy.Should().Be(userId);
+    }
+
     private UpdateTicketUserCompanyCommand CreateValidCommand(
         Guid? id = null,
         bool isSuperAdminTicket = true,
