@@ -231,6 +231,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedIndustriesAsync(joinCompanyId);
             await SeedIncomeRangesAsync(joinCompanyId);
             await SeedTicketCompanyDefaultsAsync(joinCompanyId, defaultTimeUnitId);
+            await SeedTicketUserCompaniesAsync(joinCompanyId);
 
             // 7. Entidades operacionales (Clientes)
             await SeedJoinPersonsAsync(joinCompanyId, idTypeId);
@@ -1720,6 +1721,70 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         _logger.LogInformation("JOIN ticket company defaults seed finished. Inserted: 0, Updated: 1");
     }
 
+    private async Task SeedTicketUserCompaniesAsync(Guid joinCompanyId)
+    {
+        var managerUser = await _context.ApplicationUsers
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Email == "manager@join.com");
+
+        var simpleUser = await _context.ApplicationUsers
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Email == "simpleuser@join.com");
+
+        if (managerUser is null || simpleUser is null)
+        {
+            _logger.LogWarning("Ticket roster seed skipped because default users manager@join.com and/or simpleuser@join.com were not found.");
+            return;
+        }
+
+        var seeds = new List<(Guid UserId, bool IsSuperAdminTicket, bool CanFinishTicket, bool CanResolveTicket)>
+        {
+            (managerUser.Id, true, true, true),
+            (simpleUser.Id, false, false, true)
+        };
+
+        var inserted = 0;
+        var skipped = 0;
+        var now = DateTime.UtcNow;
+
+        foreach (var seed in seeds)
+        {
+            var existing = await _context.TicketUserCompanies
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x =>
+                    x.CompanyId == joinCompanyId
+                    && x.UserId == seed.UserId
+                    && x.GcRecord == 0);
+
+            if (existing is not null)
+            {
+                skipped++;
+                continue;
+            }
+
+            _context.TicketUserCompanies.Add(new TicketUserCompany
+            {
+                CompanyId = joinCompanyId,
+                UserId = seed.UserId,
+                IsSuperAdminTicket = seed.IsSuperAdminTicket,
+                CanFinishTicket = seed.CanFinishTicket,
+                CanResolveTicket = seed.CanResolveTicket,
+                Created = now,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            });
+
+            inserted++;
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        _logger.LogInformation("JOIN ticket roster seed finished. Inserted: {Inserted}, Skipped: {Skipped}", inserted, skipped);
+    }
+
     private async Task SeedJoinTicketsAsync(Guid joinCompanyId)
     {
         var managerUser = await _context.ApplicationUsers
@@ -2606,6 +2671,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("TicketComplexities", "/ManejoTickets/ticket-complexities", "@Icons.Material.Filled.Fluorescent", "ManejoTickets", "TicketComplexities", true, true, true, true),
         new("TicketStatuses", "/ManejoTickets/ticket-statuses", "@Icons.Material.Filled.PendingActions", "ManejoTickets", "TicketStatuses", true, true, true, true),
         new("TicketCompanyDefaults", "/ManejoTickets/ticket-company-defaults", "@Icons.Material.Filled.LocalPlay", "ManejoTickets", "TicketCompanyDefaults", true, true, true, true),
+        // SPEC 34 — roster de agentes de tickets por empresa.
+        new("TicketUserCompanies", "/ManejoTickets/ticket-user-companies", "@Icons.Material.Filled.SupervisorAccount", "ManejoTickets", "TicketUserCompanies", true, true, true, true),
 
         new("Seguridad", "/security", "@Icons.Material.Filled.Security", null, null, false, false, false, false),
         new("Usuarios", "/security/users", "@Icons.Material.Filled.SupervisedUserCircle", null,"Users", false, false, false, false),
@@ -2641,6 +2708,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("SuperAdmin", "TicketComplexities", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "TicketStatuses", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "TicketCompanyDefaults", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "TicketUserCompanies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Customers", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Compañias", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
@@ -2650,6 +2718,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Admin", "TicketComplexities", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Admin", "TicketStatuses", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Admin", "TicketCompanyDefaults", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Admin", "TicketUserCompanies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Admin", "Customers", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
         new("Manager", "Administracion", false, false, false, false, CanDownload: true, CanExport: true, CanExecute: true),
@@ -2680,6 +2749,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "TicketComplexities", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "TicketStatuses", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "TicketCompanyDefaults", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "TicketUserCompanies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Seguridad", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Usuarios", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Roles", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -2712,6 +2782,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "TimeUnits", true, true, true, false),
         new("Supervisor", "TicketComplexities", true, true, true, false),
         new("Supervisor", "TicketStatuses", true, true, true, false),
+        new("Supervisor", "TicketUserCompanies", true, false, false, false),
 
         // `UsuarioSimple` receives read-only access to selected administrative options while the remaining entries stay restricted by default.
         new("UsuarioSimple", "Administracion", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
@@ -2735,7 +2806,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("UsuarioSimple", "Tickets", true, true, true, true, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "TimeUnits", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "TicketComplexities", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
-        new("UsuarioSimple", "TicketStatuses", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false)
+        new("UsuarioSimple", "TicketStatuses", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "TicketUserCompanies", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false)
 
     ];
 

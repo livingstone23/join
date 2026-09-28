@@ -699,3 +699,84 @@ Response shape (one item per bitácora row):
 with corrupt JSON surface with an empty `changes[]` instead of failing the page.
 `metadata` carries `bulkOperationId` for grouped bulk writes (RoleSystemOptions
 matrix upsert and bulk role updates).
+
+## TicketUserCompanies — `/api/v1/TicketUserCompanies` (SPEC 34)
+
+Tenant-scoped CRUD over the ticket-management roster (the `User ↔ Company` link
+with `IsSuperAdminTicket`, `CanFinishTicket` and `CanResolveTicket` flags).
+Tenant-scoped endpoints are gated by the flags attached to the `TicketUserCompanies`
+resource; the cross-tenant `system-wide` endpoint is gated by the `SuperAdmin` role.
+
+```bash
+# 1. List (paginated, tenant-scoped, optional filters)
+curl -s "$BASE_URL/api/v1/TicketUserCompanies?pageNumber=1&pageSize=10" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+# Filter by capability flag (nullable bools)
+curl -s "$BASE_URL/api/v1/TicketUserCompanies?isSuperAdminTicket=true" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+```
+
+```bash
+# 2. Cross-tenant list (SuperAdmin only)
+curl -s "$BASE_URL/api/v1/TicketUserCompanies/system-wide?companyName=JOIN" \
+  -H "Authorization: Bearer $TOKEN"
+# Responds 403 for any role other than SuperAdmin.
+```
+
+```bash
+# 3. Get by id (tenant-scoped; returns 404 for cross-tenant ids)
+curl -s "$BASE_URL/api/v1/TicketUserCompanies/$ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+```
+
+```bash
+# 4. Create — UserId comes from the body; CompanyId always comes from the token.
+curl -s -X POST "$BASE_URL/api/v1/TicketUserCompanies" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "11111111-1111-1111-1111-111111111111",
+    "isSuperAdminTicket": true,
+    "canFinishTicket": true,
+    "canResolveTicket": true
+  }'
+# Returns 201 with Location header pointing to /api/v1/TicketUserCompanies/{id}.
+# Returns 409 TICKET_USER_COMPANY_DUPLICATE when an active row already exists
+# for the (UserId, CompanyId) pair.
+# Returns 400 USER_NOT_FOUND / USER_NOT_IN_TENANT when the user is not a
+# member of the tenant.
+```
+
+```bash
+# 5. Update — payload cannot reassign UserId; delete + create to change user.
+curl -s -X PUT "$BASE_URL/api/v1/TicketUserCompanies/$ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "isSuperAdminTicket": false,
+    "canFinishTicket": true,
+    "canResolveTicket": true
+  }'
+# Returns 409 LAST_SUPERADMIN_TICKET when the only active row with
+# IsSuperAdminTicket = true for the tenant is being turned off.
+```
+
+```bash
+# 6. Soft delete
+curl -s -X DELETE "$BASE_URL/api/v1/TicketUserCompanies/$ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+# Returns 409 LAST_SUPERADMIN_TICKET when the row is the only active
+# IsSuperAdminTicket for the tenant.
+```
+
+All endpoints require the `X-Company-Id` header except `system-wide`. The
+filtered unique index `(UserId, CompanyId) WHERE GcRecord = 0` enforces
+"one active row per user-company pair" at the database level even if a
+concurrent request slips past the in-memory check.
