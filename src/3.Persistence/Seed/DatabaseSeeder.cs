@@ -1634,7 +1634,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var mediumComplexityId = await _context.TicketComplexities
             .IgnoreQueryFilters()
-            .Where(x => x.GcRecord == 0 && x.Code == 2)
+            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0 && x.Code == 2)
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync();
 
@@ -1809,9 +1809,11 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             .GroupBy(x => x.Code)
             .ToDictionary(g => g.Key, g => g.First().Id);
 
+        // Catalogs are per tenant: without the CompanyId filter, IgnoreQueryFilters() would
+        // hand JOIN tickets another company's complexity / time unit.
         var complexityByCode = (await _context.TicketComplexities
             .IgnoreQueryFilters()
-            .Where(x => x.GcRecord == 0)
+            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
             .OrderByDescending(x => x.LastModified ?? x.Created)
             .ToListAsync())
             .GroupBy(x => x.Code)
@@ -1819,7 +1821,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var defaultTimeUnit = await _context.TimeUnits
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.GcRecord == 0);
+            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .OrderBy(x => x.Code)
+            .FirstOrDefaultAsync();
 
         var channel = await _context.CommunicationChannels
             .IgnoreQueryFilters()

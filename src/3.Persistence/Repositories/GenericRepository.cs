@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using JOIN.Application.Interface.Persistence;
 using Microsoft.EntityFrameworkCore;
 using JOIN.Persistence.Contexts;
@@ -32,9 +33,58 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         return true; 
     }
 
+    // Detached entities (e.g. materialized with AsNoTracking) keep the classic Update()
+    // semantics. Tracked entities (the usual GetAsync/FindAsync → mutate → UpdateAsync flow)
+    // must NOT go through Update(): BaseEntity assigns Id in its constructor, so Update()'s
+    // graph walk sees a child appended to a collection (e.g. Ticket.AddLog → TicketLog) as an
+    // existing row with a key and marks it Modified, producing an UPDATE that affects 0 rows
+    // and a DbUpdateConcurrencyException. Untracked children found in a tracked root's
+    // collections are new by construction (anything loaded from the DB would already be
+    // tracked), so they are marked Added explicitly instead of relying on DetectChanges'
+    // key-based inference. The root itself is still forced to Modified, exactly as Update()
+    // did, so callers that check "SaveChangesAsync() > 0" keep succeeding on a no-op edit.
     public Task<bool> UpdateAsync(T entity)
     {
-        _context.Set<T>().Update(entity);
+        var changeTracker = _context.ChangeTracker;
+        var autoDetectChanges = changeTracker.AutoDetectChangesEnabled;
+        changeTracker.AutoDetectChangesEnabled = false;
+
+        try
+        {
+            var entry = _context.Entry(entity);
+            if (entry.State == EntityState.Detached)
+            {
+                _context.Set<T>().Update(entity);
+                return Task.FromResult(true);
+            }
+
+            if (entry.State == EntityState.Unchanged)
+            {
+                entry.State = EntityState.Modified;
+            }
+
+            foreach (var collection in entry.Collections)
+            {
+                if (collection.CurrentValue is null)
+                {
+                    continue;
+                }
+
+                foreach (var child in collection.CurrentValue)
+                {
+                    var childEntry = _context.Entry(child);
+                    if (childEntry.State == EntityState.Detached)
+                    {
+                        childEntry.State = EntityState.Added;
+                    }
+                }
+            }
+        }
+        finally
+        {
+            changeTracker.AutoDetectChangesEnabled = autoDetectChanges;
+        }
+
         return Task.FromResult(true);
     }
 
@@ -61,6 +111,13 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
             .FirstOrDefaultAsync(e => EF.Property<Guid>(e, "Id") == id);
 
     public virtual async Task<IEnumerable<T>> GetAllAsync() => await _context.Set<T>().ToListAsync();
+
+    public virtual async Task<IEnumerable<T>> GetAllIncludingDeletedAsync(Expression<Func<T, bool>> predicate) =>
+        await _context.Set<T>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(predicate)
+            .ToListAsync();
 
     public virtual async Task<IEnumerable<T>> GetAllWithPaginationAsync(int pageNumber, int pageSize)
     {

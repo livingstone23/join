@@ -100,7 +100,7 @@ public sealed class FinishTicketCommandHandler(
 
         if (result <= 0)
         {
-            return Response<TicketDto>.Error("UPDATE_FAILED", ["No records were affected while finalizing the ticket."]);
+            return Response<TicketDto>.Error("FINISH_FAILED", ["No records were affected while finalizing the ticket."]);
         }
 
         var company = await _unitOfWork.GetRepository<Company>().GetAsync(tenantId);

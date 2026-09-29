@@ -6,6 +6,7 @@ using JOIN.Application.UseCases.Messaging.Tickets.Commands.FinishTicket;
 using JOIN.Application.UseCases.Messaging.Tickets.Commands.ReassignTicket;
 using JOIN.Application.UseCases.Messaging.Tickets.Queries;
 using JOIN.Domain.Enums;
+using JOIN.Domain.Security;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -320,9 +321,11 @@ public class TicketsController(ISender sender) : ControllerBase
     /// super-admin only), <c>ExternalNote</c> is public. The wire DTO carries
     /// the type as an <see cref="int"/> to keep the webapi surface free of
     /// domain references; only <c>2</c> (InternalNote) and <c>3</c> (ExternalNote)
-    /// are accepted by the validator.
+    /// are accepted by the validator. Gated by <c>CanUpdate</c> (not the POST default
+    /// <c>CanCreate</c>): adding a note mutates an existing ticket rather than creating one.
     /// </summary>
     [HttpPost("{id:guid}/notes")]
+    [RequirePermission(PermissionFlags.CanUpdate)]
     [ProducesResponseType(typeof(Response<TicketLogDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -368,7 +371,7 @@ public class TicketsController(ISender sender) : ControllerBase
                 => NotFound(response),
             "TICKET_REASSIGN_FORBIDDEN" or "TICKET_FINISH_FORBIDDEN"
                 => StatusCode(StatusCodes.Status403Forbidden, response),
-            "TICKET_ALREADY_FINISHED" or "TICKET_CODE_IN_USE"
+            "TICKET_ALREADY_FINISHED"
                 => Conflict(response),
             _ => BadRequest(response)
         };

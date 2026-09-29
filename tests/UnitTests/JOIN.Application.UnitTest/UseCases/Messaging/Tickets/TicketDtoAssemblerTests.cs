@@ -82,7 +82,7 @@ public sealed class TicketDtoAssemblerTests
         context.AreaRepositoryMock.Setup(x => x.GetAsync(ticket.AreaId.Value)).ReturnsAsync(area);
         context.TicketRepositoryMock.Setup(x => x.GetAsync(ticket.PrecedentTicketId.Value)).ReturnsAsync(precedent);
         context.UserRepositoryMock.Setup(x => x.GetAsync(ticket.CreatedByUserId)).ReturnsAsync(creator);
-        context.UserRepositoryMock.Setup(x => x.GetAsync(ticket.AssignedToUserId.Value)).ReturnsAsync(assignee);
+        context.UserRepositoryMock.Setup(x => x.GetAsync(ticket.AssignedToUserId!.Value)).ReturnsAsync(assignee);
 
         // Act
         var dto = await context.CreateAssembler().BuildAsync(ticket, company, CancellationToken.None);

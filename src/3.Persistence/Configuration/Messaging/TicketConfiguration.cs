@@ -30,7 +30,9 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 
         // --- Properties ---
         builder.Property(t => t.Code).IsRequired().HasMaxLength(50);
-        builder.HasIndex(t => t.Code).IsUnique();
+        // Each company keeps its own numbering (see TicketCodeGenerator), so the code is
+        // unique per tenant, not globally: two companies may share a StartCode.
+        builder.HasIndex(t => new { t.CompanyId, t.Code }).IsUnique();
 
         builder.Property(t => t.Name).IsRequired().HasMaxLength(150);
         builder.Property(t => t.Description).HasMaxLength(2000);

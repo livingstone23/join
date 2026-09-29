@@ -786,7 +786,8 @@ concurrent request slips past the in-memory check.
 CRUD over support tickets, plus three lifecycle actions introduced by SPEC 35
 (`reassign`, `finish`, `notes`). All endpoints are tenant-scoped and share the
 `Tickets` permission resource (HTTP-verb default flags: GET → CanRead, POST →
-CanCreate, PUT → CanUpdate, DELETE → CanDelete). A token without `CompanyId`
+CanCreate, PUT → CanUpdate, DELETE → CanDelete). Exception: `POST /{id}/notes`
+requires **CanUpdate**, because adding a note modifies an existing ticket. A token without `CompanyId`
 returns **401** on every endpoint below — including the pre-existing five, which
 previously surfaced it as 400. This is the documented behavior change that landed
 with SPEC 35 (see also `CLAUDE.md`).
@@ -799,7 +800,13 @@ Error codes returned by the ticket endpoints map to HTTP status as follows:
 | `TICKET_NOT_FOUND` | 404 |
 | `TICKET_REASSIGN_FORBIDDEN` / `TICKET_FINISH_FORBIDDEN` | 403 |
 | `TARGET_NOT_ELIGIBLE_RESOLVER` / `INVALID_ASSIGNED_USER` / `INVALID_ASSIGNED_USER_TENANT` / `INVALID_ASSIGNED_USER_NOT_RESOLVER` / `INVALID_TICKET_STATUS` / `TICKET_STATUS_NOT_FINAL` / `INVALID_LOG_TYPE` | 400 |
-| `TICKET_ALREADY_FINISHED` / `TICKET_CODE_IN_USE` | 409 |
+| `TICKET_ALREADY_FINISHED` | 409 |
+| `REASSIGN_FAILED` / `FINISH_FAILED` / `ADD_NOTE_FAILED` (save affected no rows) | 400 |
+
+A request that fails FluentValidation (e.g. empty ids, `logType` other than 2 or 3,
+`summary` over 1000 chars) never reaches the handler: it returns **400** with a
+`ValidationProblemDetails` body (`title: "Validation failure"`, per-field `errors`)
+instead of a `Response<T>` with a business code.
 
 ```bash
 # 1. List (paginated, tenant-scoped, optional filters)
@@ -846,8 +853,15 @@ curl -s -X POST "$BASE_URL/api/v1/Tickets" \
     "assignedToUserId": "77777777-7777-7777-7777-777777777777"
   }'
 # Returns 201 with Location header pointing to /api/v1/Tickets/{id}.
-# Returns 409 TICKET_CODE_IN_USE when the generated TICK-YYYYMM-XXXX code
-# collides with an existing ticket (rare; retry).
+# The code is generated per company from TicketCompanyDefaults:
+#   UsePersonalizedCode = true  → {StartCode}-{N padded to CodeSequenceLength},
+#                                 continuous per company (e.g. TICK-000009)
+#   otherwise / no defaults row → TICK-YYYYMM-NNNN, restarting each month
+# The next N is the highest one already used by the company (soft-deleted
+# tickets included), so a deleted ticket's code is never reissued. Codes are
+# unique per company (index CompanyId + Code), not globally.
+# Returns 409 DUPLICATE_KEY (ProblemDetails) only if two concurrent creates
+# race for the same code; retry.
 # Returns 400 INVALID_ASSIGNED_USER / INVALID_ASSIGNED_USER_TENANT /
 #   INVALID_ASSIGNED_USER_NOT_RESOLVER when the destination is not a roster
 #   resolver of the current tenant.
@@ -944,8 +958,11 @@ curl -s -X POST "$BASE_URL/api/v1/Tickets/$ID/notes" \
     "summary": "Customer escalated by phone at 14:30."
   }'
 # Returns 201 with Response<TicketLogDto> (the freshly-created log entry).
-# Returns 400 INVALID_LOG_TYPE when logType is not 2 or 3 (validator
-#   catches it; handler has a defensive duplicate that emits the same code).
+# Returns 400 when logType is not 2 or 3. In practice the validator rejects it
+#   first, so the body is a ValidationProblemDetails ("Validation failure"),
+#   not a Response with INVALID_LOG_TYPE; the handler's INVALID_LOG_TYPE check
+#   only fires if the validation pipeline is bypassed.
+# Requires CanUpdate on the Tickets resource (not the POST default CanCreate).
 # Returns 404 TICKET_NOT_FOUND for cross-tenant ids.
 # Allowed logType values:
 #   2 = InternalNote  → IsOnlyForCreatedAndAssigned = true  (hidden from third viewers)

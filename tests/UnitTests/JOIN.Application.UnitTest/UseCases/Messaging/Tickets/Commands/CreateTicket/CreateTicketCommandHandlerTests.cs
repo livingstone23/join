@@ -83,7 +83,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, userRepositoryMock);
         SetupRepository(unitOfWorkMock, ticketCompanyDefaultRepositoryMock);
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
@@ -155,7 +155,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, userRepositoryMock);
         SetupRepository(unitOfWorkMock, ticketCompanyDefaultRepositoryMock);
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
@@ -169,12 +169,11 @@ public sealed class CreateTicketCommandHandlerTests
     }
 
     /// <summary>
-    /// Verifies that the handler rejects a duplicated code.
-    /// This test covers the branch where the ticket has already been mapped and coded,
-    /// but the business logic stops persistence to preserve uniqueness.
+    /// Verifies that a code already taken by a soft-deleted ticket is skipped: the next
+    /// sequence is computed from every ticket of the company, deleted ones included.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenGeneratedCodeAlreadyExists_ShouldReturnTicketCodeInUseError()
+    public async Task Handle_WhenCodeWasUsedByDeletedTicket_ShouldSkipToNextSequence()
     {
         var companyId = _fixture.Create<Guid>();
         var currentUserId = _fixture.Create<Guid>();
@@ -186,6 +185,7 @@ public sealed class CreateTicketCommandHandlerTests
         duplicatedTicket.CompanyId = companyId;
         duplicatedTicket.Created = now.AddMonths(-1);
         duplicatedTicket.SetStandardCode(now.Year, now.Month, 1);
+        duplicatedTicket.MarkAsDeleted();
 
         var unitOfWorkMock = new Mock<IUnitOfWork>();
         var mapperMock = new Mock<ITicketMapper>();
@@ -208,7 +208,11 @@ public sealed class CreateTicketCommandHandlerTests
         complexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "Alta" });
         timeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Horas" });
         channelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
-        ticketRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(new[] { duplicatedTicket });
+        ticketRepositoryMock
+            .Setup(x => x.GetAllIncludingDeletedAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Ticket, bool>>>()))
+            .ReturnsAsync(new[] { duplicatedTicket });
+        ticketRepositoryMock.Setup(x => x.InsertAsync(It.IsAny<Ticket>())).ReturnsAsync(true);
+        unitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         ticketCompanyDefaultRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketCompanyDefault>());
         mapperMock.Setup(x => x.ToEntity(request)).Returns(entity);
 
@@ -224,15 +228,13 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, userRepositoryMock);
         SetupRepository(unitOfWorkMock, ticketCompanyDefaultRepositoryMock);
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
-        response.IsSuccess.Should().BeFalse();
-        response.Message.Should().Be("TICKET_CODE_IN_USE");
-
-        ticketRepositoryMock.Verify(x => x.InsertAsync(It.IsAny<Ticket>()), Times.Never);
-        unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        response.IsSuccess.Should().BeTrue();
+        entity.Code.Should().Be($"TICK-{now:yyyyMM}-0002", "a soft-deleted ticket's code must never be reissued");
+        ticketRepositoryMock.Verify(x => x.InsertAsync(entity), Times.Once);
     }
 
     /// <summary>
@@ -288,7 +290,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, userRepositoryMock);
         SetupRepository(unitOfWorkMock, ticketCompanyDefaultRepositoryMock);
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
@@ -311,7 +313,7 @@ public sealed class CreateTicketCommandHandlerTests
         currentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.Empty);
         currentUserServiceMock.SetupGet(x => x.UserId).Returns(_fixture.Create<Guid>().ToString());
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(CreateValidCommand(), CancellationToken.None);
 
@@ -333,7 +335,7 @@ public sealed class CreateTicketCommandHandlerTests
         currentUserServiceMock.SetupGet(x => x.CompanyId).Returns(_fixture.Create<Guid>());
         currentUserServiceMock.SetupGet(x => x.UserId).Returns("not-a-guid");
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(CreateValidCommand(), CancellationToken.None);
 
@@ -360,7 +362,7 @@ public sealed class CreateTicketCommandHandlerTests
         companyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync((Company?)null);
         SetupRepository(unitOfWorkMock, companyRepositoryMock);
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(CreateValidCommand(), CancellationToken.None);
 
@@ -385,7 +387,7 @@ public sealed class CreateTicketCommandHandlerTests
         statusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync((TicketStatus?)null);
         SetupRepository(unitOfWorkMock, statusRepositoryMock);
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
@@ -412,7 +414,7 @@ public sealed class CreateTicketCommandHandlerTests
         complexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync((TicketComplexity?)null);
         SetupRepository(unitOfWorkMock, complexityRepositoryMock);
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
@@ -442,7 +444,7 @@ public sealed class CreateTicketCommandHandlerTests
         timeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync((TimeUnit?)null);
         SetupRepository(unitOfWorkMock, timeUnitRepositoryMock);
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
@@ -475,7 +477,7 @@ public sealed class CreateTicketCommandHandlerTests
         channelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync((CommunicationChannel?)null);
         SetupRepository(unitOfWorkMock, channelRepositoryMock);
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
@@ -528,7 +530,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, projectRepo);
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Ticket>());
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
@@ -580,7 +582,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, areaRepo);
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Ticket>());
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
@@ -618,7 +620,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, userRepo);
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Ticket>());
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
@@ -669,7 +671,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, ticketUserCompanyRepo);
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Ticket>());
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
@@ -711,7 +713,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, userCompanyRepo);
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Ticket>());
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
@@ -763,7 +765,7 @@ public sealed class CreateTicketCommandHandlerTests
         ticketRepo.Setup(x => x.GetAsync(precedentId)).ReturnsAsync((Ticket?)null);
         SetupRepository(unitOfWorkMock, ticketRepo);
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 
@@ -827,7 +829,7 @@ public sealed class CreateTicketCommandHandlerTests
         mapperMock.Setup(x => x.ToEntity(request)).Returns(entity);
         unitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object));
+        var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
         var response = await handler.Handle(request, CancellationToken.None);
 

@@ -20,13 +20,15 @@ public sealed class CreateTicketCommandHandler(
     ITicketMapper ticketMapper,
     ICurrentUserService currentUserService,
     TicketDtoAssembler ticketDtoAssembler,
-    TicketUserCompanyCapabilityResolver capabilityResolver)
+    TicketUserCompanyCapabilityResolver capabilityResolver,
+    TicketCodeGenerator ticketCodeGenerator)
     : IRequestHandler<CreateTicketCommand, Response<TicketDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
     private readonly ITicketMapper _ticketMapper = ticketMapper;
     private readonly TicketDtoAssembler _ticketDtoAssembler = ticketDtoAssembler;
     private readonly TicketUserCompanyCapabilityResolver _capabilityResolver = capabilityResolver;
+    private readonly TicketCodeGenerator _ticketCodeGenerator = ticketCodeGenerator;
 
     /// <summary>
     /// Creates a ticket for the current tenant and returns a flattened ticket projection.
@@ -59,7 +61,6 @@ public sealed class CreateTicketCommandHandler(
         var projectRepository = _unitOfWork.GetRepository<Project>();
         var areaRepository = _unitOfWork.GetRepository<Area>();
         var userRepository = _unitOfWork.GetRepository<ApplicationUser>();
-        var ticketCompanyDefaultRepository = _unitOfWork.GetRepository<TicketCompanyDefault>();
 
         if (await statusRepository.GetAsync(request.TicketStatusId) is null)
         {
@@ -137,40 +138,14 @@ public sealed class CreateTicketCommandHandler(
             }
         }
 
-        var existingTickets = await ticketRepository.GetAllAsync();
-        var ticketCompanyDefaults = await ticketCompanyDefaultRepository.GetAllAsync();
-        var ticketCompanyDefault = ticketCompanyDefaults.FirstOrDefault(x => x.CompanyId == currentUserService.CompanyId && x.GcRecord == 0);
-        var now = DateTime.UtcNow;
-        var monthlySequence = existingTickets.Count(ticket =>
-                ticket.GcRecord == 0
-                && ticket.CompanyId == currentUserService.CompanyId
-                && ticket.Created.Year == now.Year
-                && ticket.Created.Month == now.Month)
-            + 1;
-
         var entity = _ticketMapper.ToEntity(request);
         entity.CompanyId = currentUserService.CompanyId;
         entity.CreatedByUserId = currentUserId;
         entity.EffortPoints = request.EffortPoints;
 
-        if (ticketCompanyDefault is not null && ticketCompanyDefault.UsePersonalizedCode)
-        {
-            entity.SetPersonalizedCode(ticketCompanyDefault.StartCode, monthlySequence, ticketCompanyDefault.CodeSequenceLength);
-        }
-        else
-        {
-            entity.SetStandardCode(now.Year, now.Month, monthlySequence);
-        }
-
-        var duplicatedCode = existingTickets.Any(ticket =>
-            ticket.GcRecord == 0
-            && ticket.CompanyId == currentUserService.CompanyId
-            && string.Equals(ticket.Code, entity.Code, StringComparison.OrdinalIgnoreCase));
-
-        if (duplicatedCode)
-        {
-            return Response<TicketDto>.Error("TICKET_CODE_IN_USE", ["Generated ticket code is already in use. Try again."]);
-        }
+        // Per-company numbering driven by TicketCompanyDefaults (StartCode / CodeSequenceLength);
+        // soft-deleted tickets count, so a code is never reissued.
+        await _ticketCodeGenerator.AssignCodeAsync(entity, DateTime.UtcNow, cancellationToken);
 
         var creationSummary = string.IsNullOrWhiteSpace(channel.Name)
             ? "Ticket creado"

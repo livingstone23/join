@@ -39,6 +39,7 @@ public sealed class TicketMapperTests
         entity.ProjectId.Should().Be(command.ProjectId);
         entity.AreaId.Should().Be(command.AreaId);
         entity.ChannelId.Should().Be(command.ChannelId);
+        entity.AssignedToUserId.Should().Be(command.AssignedToUserId);
         entity.PrecedentTicketId.Should().Be(command.PrecedentTicketId);
 
         entity.Id.Should().NotBeEmpty();
@@ -77,6 +78,7 @@ public sealed class TicketMapperTests
             PersonId = null,
             ProjectId = null,
             AreaId = null,
+            AssignedToUserId = null,
             PrecedentTicketId = null,
             EffortPoints = null
         };
@@ -88,6 +90,7 @@ public sealed class TicketMapperTests
         entity.PersonId.Should().BeNull();
         entity.ProjectId.Should().BeNull();
         entity.AreaId.Should().BeNull();
+        entity.AssignedToUserId.Should().BeNull();
         entity.PrecedentTicketId.Should().BeNull();
         entity.EffortPoints.Should().BeNull();
     }

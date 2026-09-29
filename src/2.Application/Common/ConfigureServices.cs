@@ -93,6 +93,7 @@ public static class ConfigureServices
         services.AddScoped<TicketUserCompanySuperAdminCoordinator>();
         services.AddScoped<TicketUserCompanyCapabilityResolver>();
         services.AddScoped<TicketDtoAssembler>();
+        services.AddScoped<TicketCodeGenerator>();
 
         return services;
     

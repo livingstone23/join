@@ -1,3 +1,5 @@
+using System.Linq.Expressions;
+
 
 
 
@@ -35,6 +37,16 @@ public interface IGenericRepository<T> where T : class
     Task<T?> GetIncludingDeletedAsync(Guid id);
 
     Task<IEnumerable<T>> GetAllAsync();
+
+    /// <summary>
+    /// Returns the rows matching <paramref name="predicate"/> bypassing every global query
+    /// filter (soft-delete <c>GcRecord == 0</c> and tenant). The predicate is translated to SQL,
+    /// so callers must scope it themselves (typically by <c>CompanyId</c>). Results are not
+    /// tracked. Used where soft-deleted rows still matter, e.g. computing the next ticket code
+    /// so a deleted ticket's code is never reissued.
+    /// </summary>
+    Task<IEnumerable<T>> GetAllIncludingDeletedAsync(Expression<Func<T, bool>> predicate);
+
     Task<IEnumerable<T>> GetAllWithPaginationAsync(int pageNumber, int pageSize);
     Task<int> CountAsync();
     

@@ -197,6 +197,9 @@ public sealed class AddTicketNoteCommandHandlerTests
         context.UserRepositoryMock.Setup(x => x.GetAsync(currentUserId))
             .ReturnsAsync(new ApplicationUser { Id = currentUserId, FirstName = "Ana", LastName = "Torres" });
 
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(entity.TicketStatusId))
+            .ReturnsAsync(new TicketStatus { Name = "In Progress" });
+
         // Act
         var response = await context.CreateHandler().Handle(request, CancellationToken.None);
 
@@ -207,10 +210,64 @@ public sealed class AddTicketNoteCommandHandlerTests
         response.Data!.LogType.Should().Be(nameof(LogType.InternalNote));
         response.Data.Summary.Should().Be("Customer escalated by phone.");
         response.Data.UserRegisteredName.Should().Be("Ana Torres");
+        response.Data.NewStatusName.Should().Be("In Progress");
+        response.Data.PreviousStatusName.Should().BeNull();
         response.Data.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
 
         context.TicketRepositoryMock.Verify(x => x.UpdateAsync(entity), Times.Once);
         context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Verifies the fallbacks when the actor and the current status cannot be resolved:
+    /// both names come back as empty strings rather than <c>null</c>.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenActorAndStatusCannotBeResolved_ShouldReturnEmptyNames()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var request = CreateValidCommand(LogType.ExternalNote);
+        var entity = CreateTicket(companyId);
+
+        var context = new AddTicketNoteTestContext(companyId, currentUserId);
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.TicketId)).ReturnsAsync(entity);
+        context.TicketRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Ticket>())).ReturnsAsync(true);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        // Act
+        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeTrue();
+        response.Data!.UserRegisteredName.Should().BeEmpty();
+        response.Data.NewStatusName.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// Verifies that a save affecting no rows surfaces <c>ADD_NOTE_FAILED</c>.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenNoRowsAffected_ShouldReturnAddNoteFailedError()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var request = CreateValidCommand();
+        var entity = CreateTicket(companyId);
+
+        var context = new AddTicketNoteTestContext(companyId, currentUserId);
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.TicketId)).ReturnsAsync(entity);
+        context.TicketRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Ticket>())).ReturnsAsync(true);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        // Act
+        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("ADD_NOTE_FAILED");
     }
 
     private AddTicketNoteCommand CreateValidCommand(LogType logType = LogType.InternalNote) => new()
@@ -248,12 +305,14 @@ public sealed class AddTicketNoteCommandHandlerTests
 
             SetupRepository(UnitOfWorkMock, TicketRepositoryMock);
             SetupRepository(UnitOfWorkMock, UserRepositoryMock);
+            SetupRepository(UnitOfWorkMock, StatusRepositoryMock);
         }
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IGenericRepository<Ticket>> TicketRepositoryMock { get; } = new();
         public Mock<IGenericRepository<ApplicationUser>> UserRepositoryMock { get; } = new();
+        public Mock<IGenericRepository<TicketStatus>> StatusRepositoryMock { get; } = new();
 
         public AddTicketNoteCommandHandler CreateHandler()
         {

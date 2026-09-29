@@ -118,7 +118,7 @@ public sealed class ReassignTicketCommandHandler(
 
         if (result <= 0)
         {
-            return Response<TicketDto>.Error("UPDATE_FAILED", ["No records were affected while reassigning the ticket."]);
+            return Response<TicketDto>.Error("REASSIGN_FAILED", ["No records were affected while reassigning the ticket."]);
         }
 
         var companyForDto = await _unitOfWork.GetRepository<Company>().GetAsync(tenantId);

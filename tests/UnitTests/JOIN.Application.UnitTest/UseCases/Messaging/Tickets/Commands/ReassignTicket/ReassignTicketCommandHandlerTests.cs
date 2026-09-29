@@ -344,6 +344,43 @@ public sealed class ReassignTicketCommandHandlerTests
         context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    /// <summary>
+    /// Verifies that a save affecting no rows surfaces <c>REASSIGN_FAILED</c>.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenNoRowsAffected_ShouldReturnReassignFailedError()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var targetUserId = _fixture.Create<Guid>();
+        var request = CreateValidCommand(targetUserId);
+
+        var entity = CreateTicket(companyId);
+
+        var context = new ReassignTicketTestContext(companyId, currentUserId);
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.TicketId)).ReturnsAsync(entity);
+        context.TicketUserCompanyRepositoryMock.Setup(x => x.GetAllAsync())
+            .ReturnsAsync(new[]
+            {
+                CreateRosterRow(currentUserId, companyId, isSuperAdmin: true),
+                CreateRosterRow(targetUserId, companyId, canResolve: true)
+            });
+        context.UserRepositoryMock.Setup(x => x.GetAsync(targetUserId))
+            .ReturnsAsync(new ApplicationUser { Id = targetUserId, FirstName = "T", LastName = "U" });
+        context.UserCompanyRepositoryMock.Setup(x => x.GetAllAsync())
+            .ReturnsAsync(new[] { CreateUserCompany(targetUserId, companyId) });
+        context.TicketRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Ticket>())).ReturnsAsync(true);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        // Act
+        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("REASSIGN_FAILED");
+    }
+
     private ReassignTicketCommand CreateValidCommand(Guid? newAssignedToUserId = null) => new()
     {
         TicketId = _fixture.Create<Guid>(),

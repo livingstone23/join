@@ -67,7 +67,7 @@ public sealed class AddTicketNoteCommandHandler(
 
         if (result <= 0)
         {
-            return Response<TicketLogDto>.Error("UPDATE_FAILED", ["No records were affected while saving the note."]);
+            return Response<TicketLogDto>.Error("ADD_NOTE_FAILED", ["No records were affected while saving the note."]);
         }
 
         // The log we just appended is the last entry (append-only on the aggregate).
@@ -75,6 +75,7 @@ public sealed class AddTicketNoteCommandHandler(
 
         var userRepository = _unitOfWork.GetRepository<ApplicationUser>();
         var registeredBy = await userRepository.GetAsync(savedLog.UserRegisterLogId);
+        var currentStatus = await _unitOfWork.GetRepository<TicketStatus>().GetAsync(entity.TicketStatusId);
 
         var dto = new TicketLogDto
         {
@@ -83,10 +84,10 @@ public sealed class AddTicketNoteCommandHandler(
             Summary = savedLog.Summary,
             CreatedAt = savedLog.Created,
             UserRegisteredName = registeredBy is null
-                ? null
+                ? string.Empty
                 : $"{registeredBy.FirstName} {registeredBy.LastName}".Trim(),
             PreviousStatusName = null,
-            NewStatusName = null,
+            NewStatusName = currentStatus?.Name ?? string.Empty,
             ConsumedTime = savedLog.ConsumedTime
         };
 

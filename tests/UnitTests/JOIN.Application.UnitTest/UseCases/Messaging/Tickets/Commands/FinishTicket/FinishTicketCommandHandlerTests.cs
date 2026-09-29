@@ -340,6 +340,39 @@ public sealed class FinishTicketCommandHandlerTests
         entity.TicketLogs.Single(x => x.LogType == LogType.Finalization).Summary.Should().Be("Ticket finalizado");
     }
 
+    /// <summary>
+    /// Verifies that a save affecting no rows surfaces <c>FINISH_FAILED</c>.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenNoRowsAffected_ShouldReturnFinishFailedError()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var previousStatusId = Guid.NewGuid();
+        var request = CreateValidCommand();
+
+        var entity = CreateTicket(companyId, currentStatusId: previousStatusId);
+
+        var context = new FinishTicketTestContext(companyId, currentUserId);
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.TicketId)).ReturnsAsync(entity);
+        context.TicketUserCompanyRepositoryMock.Setup(x => x.GetAllAsync())
+            .ReturnsAsync(new[] { CreateRosterRow(currentUserId, companyId, canFinish: true) });
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId))
+            .ReturnsAsync(new TicketStatus { Name = "Closed", IsFinal = true });
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(previousStatusId))
+            .ReturnsAsync(new TicketStatus { Name = "Open", IsFinal = false });
+        context.TicketRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Ticket>())).ReturnsAsync(true);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        // Act
+        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("FINISH_FAILED");
+    }
+
     private FinishTicketCommand CreateValidCommand() => new()
     {
         TicketId = _fixture.Create<Guid>(),

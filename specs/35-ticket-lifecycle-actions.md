@@ -46,7 +46,7 @@ También se detectó que `Ticket.AddLog(...)` ignora el parámetro de visibilida
 - Cubre tanto la primera asignación de un ticket que se creó sin `AssignedToUserId` como la reasignación de uno ya asignado — un único comando gateado, sin distinguir "assign" de "reassign".
 - Gateo: el actor (`ICurrentUserService.UserId`) debe tener `IsSuperAdminTicket = true` para la empresa del token (vía `TicketUserCompanyCapabilityResolver`). Si no, `403` `TICKET_REASSIGN_FORBIDDEN` — mismo patrón de `StatusCode(StatusCodes.Status403Forbidden, response)` que ya usa `RolesController.cs:274` para un rechazo de negocio que no es un `[Authorize]` de framework.
 - El usuario destino debe (a) tener `UserCompany` activo en la empresa (miembro del tenant — mismo chequeo que ya existía) y (b) tener `CanResolveTicket = true` (vía el resolver). Si no cumple (b), `400` `TARGET_NOT_ELIGIBLE_RESOLVER`.
-- Reasignar al mismo usuario que ya tiene el ticket es un no-op exitoso: no genera un segundo log `Reassignment`.
+- Reasignar al mismo usuario que ya tiene el ticket es un no-op exitoso: no genera un segundo log `Reassignment` **y no persiste nada** (no llama `UpdateAsync`/`SaveChangesAsync`; ver paso 8 del flujo).
 - `src/2.Application.DTO/Messaging/Tickets/ReassignTicketDto.cs` (nuevo, webapi-facing): `{ Guid NewAssignedToUserId }`.
 
 ### E. Application — `FinishTicket`
@@ -61,11 +61,11 @@ También se detectó que `Ticket.AddLog(...)` ignora el parámetro de visibilida
 ### F. Application — `AddTicketNote`
 
 - `src/2.Application/UseCases/Messaging/Tickets/Commands/AddTicketNote/AddTicketNoteCommand.cs` + `CommandHandler` + `CommandValidator`.
-- Sin gateo por flags de `TicketUserCompany`: cualquier usuario con `CanUpdate` sobre el recurso `Tickets` (el permiso ya exigido por el controller) puede agregar una nota. Lo que cambia con esta spec no es quién puede escribir una nota, sino **quién puede leerla después** (sección G).
-- `LogType` recibido debe ser `InternalNote` o `ExternalNote`; cualquier otro valor → `400` `INVALID_LOG_TYPE` (los demás tipos son generados por el sistema, no por el usuario).
+- Sin gateo por flags de `TicketUserCompany`: cualquier usuario con `CanUpdate` sobre el recurso `Tickets` puede agregar una nota. Como el endpoint es `POST` (cuyo flag por defecto sería `CanCreate`), el action declara `[RequirePermission(PermissionFlags.CanUpdate)]` explícitamente: agregar una nota modifica un ticket existente, no crea uno. Lo que cambia con esta spec no es quién puede escribir una nota, sino **quién puede leerla después** (sección G).
+- `LogType` recibido debe ser `InternalNote` o `ExternalNote`; cualquier otro valor → `400` (los demás tipos son generados por el sistema, no por el usuario). En la práctica lo rechaza primero `AddTicketNoteCommandValidator` vía `ValidationBehavior`, que responde `400` con `ValidationProblemDetails` (`"Validation failure"`, errores por campo) — **no** con un `Response<T>` que lleve el código `INVALID_LOG_TYPE`. El chequeo `INVALID_LOG_TYPE` del handler se mantiene como defensa por si el pipeline de validación se omite.
 - `IsOnlyForCreatedAndAssigned` se deriva del `LogType`: `true` para `InternalNote`, `false` para `ExternalNote`. No es un campo que el cliente controle directamente.
 - Retorna `Response<TicketLogDto>` (no `TicketDto` completo — el caller ya tiene el ticket abierto, solo necesita confirmar la nota creada).
-- `src/2.Application.DTO/Messaging/Tickets/AddTicketNoteDto.cs` (nuevo, webapi-facing): `{ LogType LogType, string Summary }`.
+- `src/2.Application.DTO/Messaging/Tickets/AddTicketNoteDto.cs` (nuevo, webapi-facing): `{ int LogType, string Summary }`. `LogType` viaja como el entero del enum (`2` = `InternalNote`, `3` = `ExternalNote`) para que la capa DTO no referencie `JOIN.Domain`; el controller lo castea a `LogType` al construir el comando.
 
 ### G. Application — corrección de visibilidad en `GetTicketByIdQueryHandler`
 
@@ -237,7 +237,7 @@ public sealed record AddTicketNoteCommand(Guid TicketId, LogType LogType, string
 5. Cargar `ApplicationUser` de `NewAssignedToUserId`; `null` → `INVALID_ASSIGNED_USER` (400).
 6. Verificar `UserCompany` activo del destino en la empresa (mismo query que ya existía en `CreateTicket`/`UpdateTicket`) → si no, `INVALID_ASSIGNED_USER_TENANT` (400).
 7. `capabilityResolver.ResolveAsync(newAssignedToUserId, companyId)`; si `!CanResolveTicket` → `TARGET_NOT_ELIGIBLE_RESOLVER` (400).
-8. Si `ticket.AssignedToUserId == request.NewAssignedToUserId` → no-op: saltar el paso 9, ir directo al 10.
+8. Si `ticket.AssignedToUserId == request.NewAssignedToUserId` → no-op: saltar los pasos 9 y 10 e ir directo al 11. **No** se llama `UpdateAsync`/`SaveChangesAsync`: sobre una entidad sin cambios EF reporta 0 filas afectadas, y el corte `result <= 0 → REASSIGN_FAILED` del paso 10 convertiría este caso exitoso en un `400`.
 9. `previousAssignedToUserId = ticket.AssignedToUserId; ticket.AssignedToUserId = request.NewAssignedToUserId; ticket.AddLog(actorId, LogType.Reassignment, "Ticket reasignado", newAssignedToUserId: request.NewAssignedToUserId);`
 10. `UpdateAsync` + `SaveChangesAsync`. `result <= 0` → `REASSIGN_FAILED` (400).
 11. `await ticketDtoAssembler.BuildAsync(ticket, company, cancellationToken)` → `Response<TicketDto>.Ok`.
@@ -258,7 +258,7 @@ public sealed record AddTicketNoteCommand(Guid TicketId, LogType LogType, string
 
 1. `CompanyId == Guid.Empty` → `COMPANY_REQUIRED` (401).
 2. `UserId` no parseable → `USER_REQUIRED` (401).
-3. `request.LogType` no es `InternalNote` ni `ExternalNote` → `INVALID_LOG_TYPE` (400).
+3. `request.LogType` no es `InternalNote` ni `ExternalNote` → `INVALID_LOG_TYPE` (400). Defensa redundante: normalmente el validator ya cortó antes (ver Scope F).
 4. Cargar `Ticket`; `null` → `TICKET_NOT_FOUND` (404).
 5. `var isPrivate = request.LogType == LogType.InternalNote; ticket.AddLog(actorId, request.LogType, request.Summary, isOnlyForCreatedAndAssigned: isPrivate);`
 6. `UpdateAsync` + `SaveChangesAsync`. `result <= 0` → `ADD_NOTE_FAILED` (400).
@@ -470,7 +470,8 @@ No incluye `Logs` — eso sigue siendo exclusivo de `GetTicketByIdQueryHandler` 
 
 ### F8 — `AddTicketNote`
 
-- [ ] Retorna 400 `INVALID_LOG_TYPE` si `LogType` no es `InternalNote` ni `ExternalNote`.
+- [ ] Retorna 400 si `LogType` no es `InternalNote` ni `ExternalNote` (vía `ValidationProblemDetails` del validator; el handler conserva `INVALID_LOG_TYPE` como defensa).
+- [ ] `POST /Tickets/{id}/notes` exige `CanUpdate` (no `CanCreate`) sobre `Tickets`.
 - [ ] `InternalNote` persiste `TicketLog.IsOnlyForCreatedAndAssigned = true`.
 - [ ] `ExternalNote` persiste `TicketLog.IsOnlyForCreatedAndAssigned = false`.
 - [ ] Devuelve `Response<TicketLogDto>` con `Summary`, `LogType`, `UserRegisteredName` y `CreatedAt` correctos.
@@ -510,6 +511,9 @@ No incluye `Logs` — eso sigue siendo exclusivo de `GetTicketByIdQueryHandler` 
 - **`FinishTicket` no permite reabrir** (elegido, `TICKET_ALREADY_FINISHED` bloquea todo re-`FinishTicket`) vs. permitir cambiar entre dos status finales distintos. Sin una spec de workflow que defina qué transiciones son válidas entre estados terminales, permitirlo sería inventar una política no pedida. Si negocio necesita "reabrir", es explícitamente una operación distinta (`ReopenTicket`) que amerita su propia spec y su propio gateo.
 - **`TicketDtoAssembler` como refactor incluido en esta spec, no diferido** (elegido) vs. dejar la duplicación y agregar una tercera/cuarta copia. Con 4 handlers necesitando la misma proyección de ~40 líneas, el corte de "no es abstracción prematura" ya se cruzó; postergarlo habría dejado la duplicación en un estado peor que el actual (2 copias) en vez de mejor.
 - **`GetTicketByIdQueryHandler` gana un `INNER JOIN` extra en el segundo `SELECT` en vez de resolver `CreatedByUserId`/`AssignedToUserId` en C# tras leer el primer `SELECT`** (elegido) vs. filtrar los logs en memoria después de traerlos todos. Filtrar en SQL evita traer por la red filas que el viewer no debe ver en absoluto — más allá de la elegancia, es la diferencia entre "el server nunca tuvo el dato en la respuesta" y "el server lo trajo y lo descartó", relevante para datos marcados explícitamente como privados.
+- **`ReassignTicket` al mismo usuario no persiste** (elegido, ajustado durante la implementación) vs. el flujo original que pasaba igual por `UpdateAsync`/`SaveChangesAsync`. Con el flujo original el no-op devolvía `REASSIGN_FAILED` porque EF no afecta filas en una entidad sin cambios.
+- **`AddTicketNoteDto.LogType` como `int`** (elegido, ajustado durante la implementación) vs. el enum `LogType`. Mantiene `JOIN.Application.DTO` libre de referencias a `JOIN.Domain`; el rango válido (2/3) lo garantiza el validator del comando.
+- **`INVALID_LOG_TYPE` como defensa, no como contrato principal** (constatado durante la implementación): `ValidationBehavior` corre antes que el handler y lanza la excepción de validación, así que el cliente recibe `ValidationProblemDetails`. Se documenta así en `CURL_REQUESTS.md` en vez de forzar el código de negocio.
 - **Sin invalidación de cache ni de `RoleManager`**: esta spec no toca roles ni permisos de plataforma, solo datos de `TicketUserCompany` ya gestionados por SPEC 34.
 
 ---
