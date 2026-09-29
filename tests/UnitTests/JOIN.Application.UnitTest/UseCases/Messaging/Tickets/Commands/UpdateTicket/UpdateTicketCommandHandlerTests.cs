@@ -3,6 +3,7 @@ using FluentAssertions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Mappings;
+using JOIN.Application.UseCases.Messaging.Tickets;
 using JOIN.Application.UseCases.Messaging.Tickets.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
@@ -33,22 +34,14 @@ public sealed class UpdateTicketCommandHandlerTests
         // Arrange
         var companyId = _fixture.Create<Guid>();
         var currentUserId = _fixture.Create<Guid>();
-        var assignedUserId = _fixture.Create<Guid>();
-
-        if (assignedUserId == currentUserId)
-        {
-            assignedUserId = Guid.NewGuid();
-        }
 
         var request = CreateValidCommand(
-            id: _fixture.Create<Guid>(),
-            assignedToUserId: assignedUserId);
+            id: _fixture.Create<Guid>());
 
         var entity = CreateExistingTicket(
             companyId: companyId,
             createdByUserId: currentUserId,
-            originalStatusId: Guid.NewGuid(),
-            originalAssignedToUserId: null);
+            originalStatusId: Guid.NewGuid());
 
         var context = CreateContext(companyId, currentUserId);
 
@@ -80,22 +73,6 @@ public sealed class UpdateTicketCommandHandlerTests
             .Setup(x => x.GetAsync(currentUserId))
             .ReturnsAsync(new ApplicationUser { Id = currentUserId, FirstName = "Ana", LastName = "Torres" });
 
-        context.UserRepositoryMock
-            .Setup(x => x.GetAsync(assignedUserId))
-            .ReturnsAsync(new ApplicationUser { Id = assignedUserId, FirstName = "Luis", LastName = "Gomez" });
-
-        context.UserCompanyRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(new[]
-            {
-                new UserCompany
-                {
-                    CompanyId = companyId,
-                    UserId = assignedUserId,
-                    IsDefault = true
-                }
-            });
-
         context.TicketRepositoryMock
             .Setup(x => x.UpdateAsync(It.IsAny<Ticket>()))
             .ReturnsAsync(true);
@@ -121,15 +98,12 @@ public sealed class UpdateTicketCommandHandlerTests
         response.Data.CompanyName.Should().Be("JOIN");
         response.Data.Name.Should().Be(request.Name);
         response.Data.Description.Should().Be(request.Description);
-        response.Data.AssignedToUserId.Should().Be(assignedUserId);
-        response.Data.AssignedToUserName.Should().Be("Luis Gomez");
         response.Data.ChannelName.Should().Be("Portal Web");
         response.Data.TicketStatusId.Should().Be(request.TicketStatusId);
 
         entity.EffortPoints.Should().Be(request.EffortPoints);
-        entity.TicketLogs.Should().HaveCount(2);
         entity.TicketLogs.Should().ContainSingle(x => x.LogType == LogType.StatusChange);
-        entity.TicketLogs.Should().ContainSingle(x => x.LogType == LogType.Reassignment);
+        entity.TicketLogs.Should().NotContain(x => x.LogType == LogType.Reassignment);
 
         context.MapperMock.Verify(x => x.ApplyUpdate(request, entity), Times.Once);
         context.TicketRepositoryMock.Verify(x => x.UpdateAsync(entity), Times.Once);
@@ -152,7 +126,7 @@ public sealed class UpdateTicketCommandHandlerTests
         currentUserServiceMock.SetupGet(x => x.UserId).Returns(_fixture.Create<Guid>().ToString());
 
         var request = CreateValidCommand(id: _fixture.Create<Guid>());
-        var handler = new UpdateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object);
+        var handler = new UpdateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object));
 
         // Act
         var response = await handler.Handle(request, CancellationToken.None);
@@ -181,7 +155,7 @@ public sealed class UpdateTicketCommandHandlerTests
         currentUserServiceMock.SetupGet(x => x.UserId).Returns("invalid-guid");
 
         var request = CreateValidCommand(id: _fixture.Create<Guid>());
-        var handler = new UpdateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object);
+        var handler = new UpdateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object));
 
         // Act
         var response = await handler.Handle(request, CancellationToken.None);
@@ -225,74 +199,6 @@ public sealed class UpdateTicketCommandHandlerTests
         // Assert
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("TICKET_NOT_FOUND");
-
-        context.MapperMock.Verify(x => x.ApplyUpdate(It.IsAny<UpdateTicketCommand>(), It.IsAny<Ticket>()), Times.Never);
-        context.TicketRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<Ticket>()), Times.Never);
-        context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    /// <summary>
-    /// Verifies the error path when the assigned user is not linked to the current tenant.
-    /// This test protects a critical authorization branch before persistence.
-    /// </summary>
-    [Fact]
-    public async Task Handle_WhenAssignedUserIsNotLinkedToTenant_ShouldReturnInvalidAssignedUserTenantError()
-    {
-        // Arrange
-        var companyId = _fixture.Create<Guid>();
-        var currentUserId = _fixture.Create<Guid>();
-        var assignedUserId = _fixture.Create<Guid>();
-
-        var request = CreateValidCommand(
-            id: _fixture.Create<Guid>(),
-            assignedToUserId: assignedUserId);
-
-        var entity = CreateExistingTicket(
-            companyId: companyId,
-            createdByUserId: currentUserId);
-
-        var context = CreateContext(companyId, currentUserId);
-
-        context.CompanyRepositoryMock
-            .Setup(x => x.GetAsync(companyId))
-            .ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
-
-        context.TicketRepositoryMock
-            .Setup(x => x.GetAsync(request.Id))
-            .ReturnsAsync(entity);
-
-        context.StatusRepositoryMock
-            .Setup(x => x.GetAsync(request.TicketStatusId))
-            .ReturnsAsync(new TicketStatus { Name = "In Progress" });
-
-        context.ComplexityRepositoryMock
-            .Setup(x => x.GetAsync(request.TicketComplexityId))
-            .ReturnsAsync(new TicketComplexity { Name = "High" });
-
-        context.TimeUnitRepositoryMock
-            .Setup(x => x.GetAsync(request.TimeUnitId))
-            .ReturnsAsync(new TimeUnit { Name = "Hours" });
-
-        context.ChannelRepositoryMock
-            .Setup(x => x.GetAsync(request.ChannelId))
-            .ReturnsAsync(new CommunicationChannel { Name = "Portal Web" });
-
-        context.UserRepositoryMock
-            .Setup(x => x.GetAsync(assignedUserId))
-            .ReturnsAsync(new ApplicationUser { Id = assignedUserId, FirstName = "Luis", LastName = "Gomez" });
-
-        context.UserCompanyRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(Array.Empty<UserCompany>());
-
-        var handler = context.CreateHandler();
-
-        // Act
-        var response = await handler.Handle(request, CancellationToken.None);
-
-        // Assert
-        response.IsSuccess.Should().BeFalse();
-        response.Message.Should().Be("INVALID_ASSIGNED_USER_TENANT");
 
         context.MapperMock.Verify(x => x.ApplyUpdate(It.IsAny<UpdateTicketCommand>(), It.IsAny<Ticket>()), Times.Never);
         context.TicketRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<Ticket>()), Times.Never);
@@ -374,14 +280,12 @@ public sealed class UpdateTicketCommandHandlerTests
 
         var request = CreateValidCommand(
             id: _fixture.Create<Guid>(),
-            ticketStatusId: statusId,
-            assignedToUserId: null);
+            ticketStatusId: statusId);
 
         var entity = CreateExistingTicket(
             companyId: companyId,
             createdByUserId: currentUserId,
-            originalStatusId: statusId,
-            originalAssignedToUserId: null);
+            originalStatusId: statusId);
 
         var context = CreateContext(companyId, currentUserId);
 
@@ -607,7 +511,6 @@ public sealed class UpdateTicketCommandHandlerTests
             .With(x => x.PersonId, customerId)
             .Without(x => x.ProjectId)
             .Without(x => x.AreaId)
-            .Without(x => x.AssignedToUserId)
             .Without(x => x.PrecedentTicketId)
             .Create();
 
@@ -653,7 +556,6 @@ public sealed class UpdateTicketCommandHandlerTests
             .With(x => x.ProjectId, projectId)
             .Without(x => x.PersonId)
             .Without(x => x.AreaId)
-            .Without(x => x.AssignedToUserId)
             .Without(x => x.PrecedentTicketId)
             .Create();
 
@@ -700,7 +602,6 @@ public sealed class UpdateTicketCommandHandlerTests
             .With(x => x.AreaId, areaId)
             .Without(x => x.PersonId)
             .Without(x => x.ProjectId)
-            .Without(x => x.AssignedToUserId)
             .Without(x => x.PrecedentTicketId)
             .Create();
 
@@ -720,35 +621,6 @@ public sealed class UpdateTicketCommandHandlerTests
 
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("INVALID_AREA");
-    }
-
-    /// <summary>
-    /// Verifies the guard when the optional assigned user does not exist in the repository.
-    /// </summary>
-    [Fact]
-    public async Task Handle_WhenAssignedUserNotFound_ShouldReturnInvalidAssignedUserError()
-    {
-        var companyId = _fixture.Create<Guid>();
-        var currentUserId = _fixture.Create<Guid>();
-        var assignedUserId = _fixture.Create<Guid>();
-
-        var request = CreateValidCommand(id: _fixture.Create<Guid>(), assignedToUserId: assignedUserId);
-        var entity = CreateExistingTicket(companyId, currentUserId);
-        var context = CreateContext(companyId, currentUserId);
-
-        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
-        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
-        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
-        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
-        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
-        context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
-        context.UserRepositoryMock.Setup(x => x.GetAsync(assignedUserId)).ReturnsAsync((ApplicationUser?)null);
-
-        var handler = context.CreateHandler();
-        var response = await handler.Handle(request, CancellationToken.None);
-
-        response.IsSuccess.Should().BeFalse();
-        response.Message.Should().Be("INVALID_ASSIGNED_USER");
     }
 
     /// <summary>
@@ -794,14 +666,12 @@ public sealed class UpdateTicketCommandHandlerTests
 
         var request = CreateValidCommand(
             id: _fixture.Create<Guid>(),
-            ticketStatusId: newStatusId,
-            assignedToUserId: null);
+            ticketStatusId: newStatusId);
 
         var entity = CreateExistingTicket(
             companyId: companyId,
             createdByUserId: currentUserId,
-            originalStatusId: originalStatusId,
-            originalAssignedToUserId: null);
+            originalStatusId: originalStatusId);
 
         var context = CreateContext(companyId, currentUserId);
 
@@ -825,61 +695,11 @@ public sealed class UpdateTicketCommandHandlerTests
     }
 
     /// <summary>
-    /// Verifies that only a Reassignment log is added when only the assigned user changes.
-    /// </summary>
-    [Fact]
-    public async Task Handle_WhenOnlyAssignmentChanges_ShouldAddOnlyReassignmentLog()
-    {
-        var companyId = _fixture.Create<Guid>();
-        var currentUserId = _fixture.Create<Guid>();
-        var originalAssignedUserId = _fixture.Create<Guid>();
-        var newAssignedUserId = _fixture.Create<Guid>();
-        var statusId = _fixture.Create<Guid>();
-
-        var request = CreateValidCommand(
-            id: _fixture.Create<Guid>(),
-            ticketStatusId: statusId,
-            assignedToUserId: newAssignedUserId);
-
-        var entity = CreateExistingTicket(
-            companyId: companyId,
-            createdByUserId: currentUserId,
-            originalStatusId: statusId,
-            originalAssignedToUserId: originalAssignedUserId);
-
-        var context = CreateContext(companyId, currentUserId);
-
-        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
-        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
-        context.StatusRepositoryMock.Setup(x => x.GetAsync(statusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
-        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
-        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
-        context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
-        context.UserRepositoryMock.Setup(x => x.GetAsync(newAssignedUserId)).ReturnsAsync(new ApplicationUser { FirstName = "Luis", LastName = "Gomez" });
-        context.UserCompanyRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(new[]
-        {
-            new UserCompany { CompanyId = companyId, UserId = newAssignedUserId, IsDefault = true }
-        });
-        context.TicketRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Ticket>())).ReturnsAsync(true);
-        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        context.UserRepositoryMock.Setup(x => x.GetAsync(currentUserId)).ReturnsAsync(new ApplicationUser { FirstName = "Ana", LastName = "Torres" });
-        context.MapperMock.Setup(x => x.ApplyUpdate(request, entity)).Callback(() => ApplyRequestToTicket(request, entity));
-
-        var handler = context.CreateHandler();
-        var response = await handler.Handle(request, CancellationToken.None);
-
-        response.IsSuccess.Should().BeTrue();
-        entity.TicketLogs.Should().ContainSingle(x => x.LogType == LogType.Reassignment);
-        entity.TicketLogs.Should().NotContain(x => x.LogType == LogType.StatusChange);
-    }
-
-    /// <summary>
     /// Creates a valid and controlled command for reuse across multiple tests.
     /// The method keeps the setup explicit so each test can focus on the branch it wants to validate.
     /// </summary>
     private UpdateTicketCommand CreateValidCommand(
         Guid id,
-        Guid? assignedToUserId = null,
         Guid? precedentTicketId = null,
         Guid? ticketStatusId = null)
     {
@@ -898,7 +718,6 @@ public sealed class UpdateTicketCommandHandlerTests
             .With(x => x.PersonId, (Guid?)null)
             .With(x => x.ProjectId, (Guid?)null)
             .With(x => x.AreaId, (Guid?)null)
-            .With(x => x.AssignedToUserId, assignedToUserId)
             .With(x => x.PrecedentTicketId, precedentTicketId)
             .Create();
     }
@@ -910,8 +729,7 @@ public sealed class UpdateTicketCommandHandlerTests
     private static Ticket CreateExistingTicket(
         Guid companyId,
         Guid createdByUserId,
-        Guid? originalStatusId = null,
-        Guid? originalAssignedToUserId = null)
+        Guid? originalStatusId = null)
     {
         var entity = new Ticket
         {
@@ -927,7 +745,6 @@ public sealed class UpdateTicketCommandHandlerTests
             TicketComplexityId = Guid.NewGuid(),
             TimeUnitId = Guid.NewGuid(),
             ChannelId = Guid.NewGuid(),
-            AssignedToUserId = originalAssignedToUserId,
             Created = DateTime.UtcNow.AddDays(-1)
         };
 
@@ -954,7 +771,6 @@ public sealed class UpdateTicketCommandHandlerTests
         entity.ProjectId = request.ProjectId;
         entity.AreaId = request.AreaId;
         entity.ChannelId = request.ChannelId;
-        entity.AssignedToUserId = request.AssignedToUserId;
         entity.PrecedentTicketId = request.PrecedentTicketId;
     }
 
@@ -1031,7 +847,8 @@ public sealed class UpdateTicketCommandHandlerTests
             return new UpdateTicketCommandHandler(
                 UnitOfWorkMock.Object,
                 MapperMock.Object,
-                CurrentUserServiceMock.Object);
+                CurrentUserServiceMock.Object,
+                new TicketDtoAssembler(UnitOfWorkMock.Object));
         }
     }
 }

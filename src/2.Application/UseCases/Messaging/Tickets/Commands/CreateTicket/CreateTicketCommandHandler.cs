@@ -18,11 +18,15 @@ namespace JOIN.Application.UseCases.Messaging.Tickets.Commands;
 public sealed class CreateTicketCommandHandler(
     IUnitOfWork unitOfWork,
     ITicketMapper ticketMapper,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    TicketDtoAssembler ticketDtoAssembler,
+    TicketUserCompanyCapabilityResolver capabilityResolver)
     : IRequestHandler<CreateTicketCommand, Response<TicketDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
     private readonly ITicketMapper _ticketMapper = ticketMapper;
+    private readonly TicketDtoAssembler _ticketDtoAssembler = ticketDtoAssembler;
+    private readonly TicketUserCompanyCapabilityResolver _capabilityResolver = capabilityResolver;
 
     /// <summary>
     /// Creates a ticket for the current tenant and returns a flattened ticket projection.
@@ -111,6 +115,17 @@ public sealed class CreateTicketCommandHandler(
             {
                 return Response<TicketDto>.Error("INVALID_ASSIGNED_USER_TENANT", ["The assigned user is not linked to the current company."]);
             }
+
+            // SPEC 35 — only ticket-roster resolvers can receive an initial assignment.
+            var capability = await _capabilityResolver.ResolveAsync(
+                request.AssignedToUserId.Value,
+                currentUserService.CompanyId,
+                cancellationToken);
+
+            if (!capability.CanResolveTicket)
+            {
+                return Response<TicketDto>.Error("INVALID_ASSIGNED_USER_NOT_RESOLVER", ["The assigned user does not have ticket-resolution capability for the current company."]);
+            }
         }
 
         if (request.PrecedentTicketId.HasValue)
@@ -174,82 +189,13 @@ public sealed class CreateTicketCommandHandler(
             return Response<TicketDto>.Error("CREATE_FAILED", ["No records were affected while creating the ticket."]);
         }
 
-        var createdBy = await userRepository.GetAsync(entity.CreatedByUserId);
-        var assignedTo = entity.AssignedToUserId.HasValue
-            ? await userRepository.GetAsync(entity.AssignedToUserId.Value)
-            : null;
-        var status = await statusRepository.GetAsync(entity.TicketStatusId);
-        var complexity = await complexityRepository.GetAsync(entity.TicketComplexityId);
-        var timeUnit = await timeUnitRepository.GetAsync(entity.TimeUnitId);
-        var customer = entity.PersonId.HasValue ? await customerRepository.GetAsync(entity.PersonId.Value) : null;
-        var project = entity.ProjectId.HasValue ? await projectRepository.GetAsync(entity.ProjectId.Value) : null;
-        var area = entity.AreaId.HasValue ? await areaRepository.GetAsync(entity.AreaId.Value) : null;
-        var precedentTicket = entity.PrecedentTicketId.HasValue ? await ticketRepository.GetAsync(entity.PrecedentTicketId.Value) : null;
+        var dto = await _ticketDtoAssembler.BuildAsync(entity, company, cancellationToken);
 
         return new Response<TicketDto>
         {
             IsSuccess = true,
             Message = "Ticket created successfully.",
-            Data = new TicketDto
-            {
-                Id = entity.Id,
-                CompanyId = entity.CompanyId,
-                CompanyName = company.Name,
-                Code = entity.Code,
-                Name = entity.Name,
-                Description = entity.Description,
-                EstimatedTime = entity.EstimatedTime,
-                ConsumedTime = entity.ConsumedTime,
-                EffortPoints = entity.EffortPoints,
-                IsVisibleToExternals = entity.IsVisibleToExternals,
-                TicketStatusId = entity.TicketStatusId,
-                TicketStatusName = status?.Name ?? string.Empty,
-                TicketComplexityId = entity.TicketComplexityId,
-                TicketComplexityName = complexity?.Name ?? string.Empty,
-                TimeUnitId = entity.TimeUnitId,
-                TimeUnitName = timeUnit?.Name ?? string.Empty,
-                PersonId = entity.PersonId,
-                PersonName = ResolvePersonName(customer),
-                ProjectId = entity.ProjectId,
-                ProjectName = project?.Name,
-                AreaId = entity.AreaId,
-                AreaName = area?.Name,
-                ChannelId = entity.ChannelId,
-                ChannelName = channel?.Name ?? string.Empty,
-                CreatedByUserId = entity.CreatedByUserId,
-                CreatedByUserName = ResolveUserName(createdBy),
-                AssignedToUserId = entity.AssignedToUserId,
-                AssignedToUserName = ResolveUserName(assignedTo),
-                PrecedentTicketId = entity.PrecedentTicketId,
-                PrecedentTicketCode = precedentTicket?.Code,
-                CreatedAt = entity.Created
-            }
+            Data = dto
         };
-    }
-
-    private static string? ResolvePersonName(Person? customer)
-    {
-        if (customer is null)
-        {
-            return null;
-        }
-
-        if (!string.IsNullOrWhiteSpace(customer.CommercialName))
-        {
-            return customer.CommercialName;
-        }
-
-        return string.Join(" ", new[] { customer.FirstName, customer.MiddleName, customer.LastName, customer.SecondLastName }
-            .Where(value => !string.IsNullOrWhiteSpace(value)));
-    }
-
-    private static string? ResolveUserName(ApplicationUser? user)
-    {
-        if (user is null)
-        {
-            return null;
-        }
-
-        return string.Join(" ", new[] { user.FirstName, user.LastName }.Where(value => !string.IsNullOrWhiteSpace(value)));
     }
 }

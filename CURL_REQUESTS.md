@@ -780,3 +780,174 @@ All endpoints require the `X-Company-Id` header except `system-wide`. The
 filtered unique index `(UserId, CompanyId) WHERE GcRecord = 0` enforces
 "one active row per user-company pair" at the database level even if a
 concurrent request slips past the in-memory check.
+
+## Tickets — `/api/v1/Tickets` (SPEC 35)
+
+CRUD over support tickets, plus three lifecycle actions introduced by SPEC 35
+(`reassign`, `finish`, `notes`). All endpoints are tenant-scoped and share the
+`Tickets` permission resource (HTTP-verb default flags: GET → CanRead, POST →
+CanCreate, PUT → CanUpdate, DELETE → CanDelete). A token without `CompanyId`
+returns **401** on every endpoint below — including the pre-existing five, which
+previously surfaced it as 400. This is the documented behavior change that landed
+with SPEC 35 (see also `CLAUDE.md`).
+
+Error codes returned by the ticket endpoints map to HTTP status as follows:
+
+| Code | HTTP |
+|------|------|
+| `COMPANY_REQUIRED` / `USER_REQUIRED` | 401 |
+| `TICKET_NOT_FOUND` | 404 |
+| `TICKET_REASSIGN_FORBIDDEN` / `TICKET_FINISH_FORBIDDEN` | 403 |
+| `TARGET_NOT_ELIGIBLE_RESOLVER` / `INVALID_ASSIGNED_USER` / `INVALID_ASSIGNED_USER_TENANT` / `INVALID_ASSIGNED_USER_NOT_RESOLVER` / `INVALID_TICKET_STATUS` / `TICKET_STATUS_NOT_FINAL` / `INVALID_LOG_TYPE` | 400 |
+| `TICKET_ALREADY_FINISHED` / `TICKET_CODE_IN_USE` | 409 |
+
+```bash
+# 1. List (paginated, tenant-scoped, optional filters)
+curl -s "$BASE_URL/api/v1/Tickets?pageNumber=1&pageSize=10" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+# Filter by status, assignee, customer, project, etc.
+curl -s "$BASE_URL/api/v1/Tickets?assignedToUserId=$USER_ID&isVisibleToExternals=true" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+```
+
+```bash
+# 2. Get by id — returns the flattened ticket projection plus a `logs` collection
+#    (filtered by visibility: see SPEC 35 F9).
+curl -s "$BASE_URL/api/v1/Tickets/$ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+# Returns 404 TICKET_NOT_FOUND for cross-tenant ids or missing tickets.
+# Logs marked with IsOnlyForCreatedAndAssigned = 1 are hidden from viewers
+# who are not the creator, not the current assignee, and not a tenant
+# IsSuperAdminTicket.
+```
+
+```bash
+# 3. Create — optional initial assignment; if AssignedToUserId is supplied,
+#    the target must hold CanResolveTicket = 1 in the tenant's TicketUserCompany
+#    roster (otherwise 400 INVALID_ASSIGNED_USER_NOT_RESOLVER).
+curl -s -X POST "$BASE_URL/api/v1/Tickets" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Portal returns 500 on checkout",
+    "description": "Customer cannot complete purchase flow.",
+    "estimatedTime": 4,
+    "consumedTime": 0,
+    "ticketStatusId": "22222222-2222-2222-2222-222222222222",
+    "ticketComplexityId": "33333333-3333-3333-3333-333333333333",
+    "timeUnitId": "44444444-4444-4444-4444-444444444444",
+    "channelId": "55555555-5555-5555-5555-555555555555",
+    "personId": "66666666-6666-6666-6666-666666666666",
+    "assignedToUserId": "77777777-7777-7777-7777-777777777777"
+  }'
+# Returns 201 with Location header pointing to /api/v1/Tickets/{id}.
+# Returns 409 TICKET_CODE_IN_USE when the generated TICK-YYYYMM-XXXX code
+# collides with an existing ticket (rare; retry).
+# Returns 400 INVALID_ASSIGNED_USER / INVALID_ASSIGNED_USER_TENANT /
+#   INVALID_ASSIGNED_USER_NOT_RESOLVER when the destination is not a roster
+#   resolver of the current tenant.
+```
+
+```bash
+# 4. Update — IMPORTANT contract change in SPEC 35: the payload NO LONGER
+#    accepts `assignedToUserId`. Reassignment is the exclusive responsibility
+#    of PUT /Tickets/{id}/reassign. A client that still sends the field
+#    silently has it ignored by deserialization; the ticket's assignee is
+#    preserved unchanged. This is deliberate — see SPEC 35 "Identified risks"
+#    for the migration guidance.
+curl -s -X PUT "$BASE_URL/api/v1/Tickets/$ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Portal returns 500 on checkout (updated)",
+    "description": "Customer cannot complete purchase flow. Triaging.",
+    "estimatedTime": 6,
+    "consumedTime": 1,
+    "ticketStatusId": "22222222-2222-2222-2222-222222222222",
+    "ticketComplexityId": "33333333-3333-3333-3333-333333333333",
+    "timeUnitId": "44444444-4444-4444-4444-444444444444",
+    "channelId": "55555555-5555-5555-5555-555555555555"
+  }'
+# Returns 200 with the updated TicketDto.
+# Returns 404 TICKET_NOT_FOUND for cross-tenant ids.
+```
+
+```bash
+# 5. Soft delete
+curl -s -X DELETE "$BASE_URL/api/v1/Tickets/$ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+```
+
+```bash
+# 6. Reassign — actor must hold IsSuperAdminTicket = 1 for the tenant;
+#    the target must hold CanResolveTicket = 1. Covers both the first
+#    assignment of a previously-unassigned ticket and the reassignment of
+#    one already assigned. Reassigning to the same user is a successful
+#    no-op (no new Reassignment log entry, but the target still has to
+#    pass the same validation gates).
+curl -s -X PUT "$BASE_URL/api/v1/Tickets/$ID/reassign" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "newAssignedToUserId": "77777777-7777-7777-7777-777777777777"
+  }'
+# Returns 200 with the updated TicketDto.
+# Returns 403 TICKET_REASSIGN_FORBIDDEN when the actor lacks IsSuperAdminTicket.
+# Returns 400 INVALID_ASSIGNED_USER / INVALID_ASSIGNED_USER_TENANT /
+#   TARGET_NOT_ELIGIBLE_RESOLVER when the target is not a roster resolver.
+# Returns 404 TICKET_NOT_FOUND for cross-tenant ids.
+```
+
+```bash
+# 7. Finish — transition the ticket to a status with IsFinal = true. The
+#    actor must hold CanFinishTicket = 1 OR IsSuperAdminTicket = 1; the
+#    second flag is the documented bypass for ticket super-admins. A
+#    ticket already in a final status returns 409 (re-finalization is
+#    refused — see SPEC 35 decisions).
+curl -s -X PUT "$BASE_URL/api/v1/Tickets/$ID/finish" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ticketStatusId": "88888888-8888-8888-8888-888888888888",
+    "resolutionSummary": "Customer confirmed fix by phone."
+  }'
+# Returns 200 with the updated TicketDto.
+# Returns 403 TICKET_FINISH_FORBIDDEN when the actor lacks both flags.
+# Returns 400 INVALID_TICKET_STATUS / TICKET_STATUS_NOT_FINAL when the
+#   target status does not exist or is not marked IsFinal.
+# Returns 409 TICKET_ALREADY_FINISHED when the ticket is already in a
+#   final status.
+# `resolutionSummary` is optional (max 500 chars); when blank the audit log
+# entry is recorded with the default text "Ticket finalizado".
+```
+
+```bash
+# 8. Add note — appends a TicketLog row of LogType.InternalNote (2) or
+#    ExternalNote (3). Visibility is derived server-side from the LogType:
+#    internal notes are hidden from third viewers; external notes are
+#    public to every reader of the ticket.
+curl -s -X POST "$BASE_URL/api/v1/Tickets/$ID/notes" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "logType": 2,
+    "summary": "Customer escalated by phone at 14:30."
+  }'
+# Returns 201 with Response<TicketLogDto> (the freshly-created log entry).
+# Returns 400 INVALID_LOG_TYPE when logType is not 2 or 3 (validator
+#   catches it; handler has a defensive duplicate that emits the same code).
+# Returns 404 TICKET_NOT_FOUND for cross-tenant ids.
+# Allowed logType values:
+#   2 = InternalNote  → IsOnlyForCreatedAndAssigned = true  (hidden from third viewers)
+#   3 = ExternalNote  → IsOnlyForCreatedAndAssigned = false (visible to every reader)
+```

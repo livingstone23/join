@@ -62,6 +62,7 @@ public partial class TicketMapper : ITicketMapper
     [MapperIgnoreTarget(nameof(Ticket.Channel))]
     [MapperIgnoreTarget(nameof(Ticket.CreatedByUser))]
     [MapperIgnoreTarget(nameof(Ticket.AssignedToUser))]
+    [MapperIgnoreTarget(nameof(Ticket.AssignedToUserId))]
     [MapperIgnoreTarget(nameof(Ticket.Status))]
     [MapperIgnoreTarget(nameof(Ticket.Complexity))]
     [MapperIgnoreTarget(nameof(Ticket.TimeUnit))]

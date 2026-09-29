@@ -145,12 +145,17 @@ public class Ticket : BaseTenantEntity
     /// <param name="summary">The human-readable summary of the action.</param>
     /// <param name="previousStatusId">The previous workflow status when the log represents a status transition.</param>
     /// <param name="newAssignedToUserId">The new assignee when the log represents a reassignment.</param>
+    /// <param name="isOnlyForCreatedAndAssigned">When <c>true</c>, the log entry is hidden from any viewer
+    /// that is not the ticket creator, the current assignee, or a tenant <c>IsSuperAdminTicket</c>. Used by
+    /// internal notes; defaults to <c>false</c> to preserve the behavior of existing call sites
+    /// (Creation, StatusChange, Reassignment) that all publish to the public log.</param>
     public void AddLog(
         Guid userId,
         LogType logType,
         string summary,
         Guid? previousStatusId = null,
-        Guid? newAssignedToUserId = null)
+        Guid? newAssignedToUserId = null,
+        bool isOnlyForCreatedAndAssigned = false)
     {
         if (userId == Guid.Empty)
         {
@@ -173,7 +178,7 @@ public class Ticket : BaseTenantEntity
             TicketStatusId = TicketStatusId,
             TimeUnitId = TimeUnitId == Guid.Empty ? null : TimeUnitId,
             ConsumedTime = ConsumedTime,
-            IsOnlyForCreatedAndAssigned = false,
+            IsOnlyForCreatedAndAssigned = isOnlyForCreatedAndAssigned,
             NewAssignedToUserId = newAssignedToUserId,
             Created = DateTime.UtcNow,
             CreatedBy = userId.ToString(),

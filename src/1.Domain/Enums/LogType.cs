@@ -31,6 +31,13 @@ public enum LogType
     Reassignment = 4,
 
     /// <summary>
+    /// Represents the finalization of the ticket (transition to a status with <c>IsFinal = true</c>).
+    /// Distinct from <see cref="StatusChange"/> so a report can filter "when was this closed"
+    /// without having to inspect whether the surrounding <c>StatusChange</c> landed on a final status.
+    /// </summary>
+    Finalization = 5,
+
+    /// <summary>
     /// Backward-compatible alias for <see cref="StatusChange"/>.
     /// </summary>
     ChangeStatus = StatusChange,

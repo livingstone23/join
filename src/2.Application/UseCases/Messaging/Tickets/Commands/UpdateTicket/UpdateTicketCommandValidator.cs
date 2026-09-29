@@ -47,10 +47,6 @@ public sealed class UpdateTicketCommandValidator : AbstractValidator<UpdateTicke
         RuleFor(x => x.ChannelId)
             .NotEqual(Guid.Empty).WithMessage("Channel is required.");
 
-        RuleFor(x => x.AssignedToUserId)
-            .Must(value => !value.HasValue || value.Value != Guid.Empty)
-            .WithMessage("Assigned user id is invalid.");
-
         RuleFor(x => x.PersonId)
             .Must(value => !value.HasValue || value.Value != Guid.Empty)
             .WithMessage("Person id is invalid.");

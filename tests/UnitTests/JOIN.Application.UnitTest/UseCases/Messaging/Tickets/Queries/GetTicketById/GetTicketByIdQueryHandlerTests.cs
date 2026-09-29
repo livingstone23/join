@@ -3,6 +3,7 @@ using FluentAssertions;
 using JOIN.Application.Interface;
 using JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Queries.TestDoubles;
 using JOIN.Application.UseCases.Messaging.Tickets.Queries;
+using JOIN.Domain.Enums;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Queries.GetTicketById;
@@ -147,6 +148,239 @@ public sealed class GetTicketByIdQueryHandlerTests
     }
 
     /// <summary>
+    /// Verifies the early exit when the UserId claim is missing or invalid.
+    /// Added in SPEC 35 F9 — the log-visibility filter requires a parseable
+    /// viewer id, so without one the handler must refuse the read entirely.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenUserIdIsInvalid_ShouldReturnUserRequiredError()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var context = new GetTicketByIdQueryHandlerTestContext(companyId);
+        context.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns("not-a-guid");
+
+        var query = new GetTicketByIdQuery(_fixture.Create<Guid>());
+        var handler = context.CreateHandler();
+
+        // Act
+        var response = await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("USER_REQUIRED");
+        context.ConnectionFactoryMock.Verify(x => x.CreateConnection(), Times.Never);
+    }
+
+    /// <summary>
+    /// Verifies that the SQL exposes the public branch of the visibility filter
+    /// (SPEC 35 F9). A row with <c>IsOnlyForCreatedAndAssigned = 0</c> must be
+    /// returned to any viewer with read access to the ticket — this branch is
+    /// the only one that does not depend on identity.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenLogIsPublic_ShouldExposeIsOnlyForCreatedAndAssignedBranch()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var ticketId = _fixture.Create<Guid>();
+        var context = new GetTicketByIdQueryHandlerTestContext(companyId);
+
+        context.Connection.SetResults(
+            CreateTicketDetailResultSet(ticketId, companyId),
+            CreateTicketLogsResultSet());
+
+        var query = new GetTicketByIdQuery(ticketId);
+        var handler = context.CreateHandler();
+
+        // Act
+        await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        context.Connection.LastCommandText.Should().Contain("tl.IsOnlyForCreatedAndAssigned = 0");
+    }
+
+    /// <summary>
+    /// Verifies that the SQL grants the ticket's creator access to private
+    /// (IsOnlyForCreatedAndAssigned = 1) log rows by comparing
+    /// <c>t.CreatedByUserId</c> against the viewer parameter.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenViewerIsCreator_ShouldExposeCreatorBranch()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var ticketId = _fixture.Create<Guid>();
+        var context = new GetTicketByIdQueryHandlerTestContext(companyId);
+
+        context.Connection.SetResults(
+            CreateTicketDetailResultSet(ticketId, companyId),
+            CreateTicketLogsResultSet());
+
+        var query = new GetTicketByIdQuery(ticketId);
+        var handler = context.CreateHandler();
+
+        // Act
+        await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        context.Connection.LastCommandText.Should().Contain("t.CreatedByUserId = @ViewerId");
+    }
+
+    /// <summary>
+    /// Verifies that the SQL grants the current assignee access to private
+    /// log rows by comparing <c>t.AssignedToUserId</c> against the viewer parameter.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenViewerIsAssignee_ShouldExposeAssigneeBranch()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var ticketId = _fixture.Create<Guid>();
+        var context = new GetTicketByIdQueryHandlerTestContext(companyId);
+
+        context.Connection.SetResults(
+            CreateTicketDetailResultSet(ticketId, companyId),
+            CreateTicketLogsResultSet());
+
+        var query = new GetTicketByIdQuery(ticketId);
+        var handler = context.CreateHandler();
+
+        // Act
+        await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        context.Connection.LastCommandText.Should().Contain("t.AssignedToUserId = @ViewerId");
+    }
+
+    /// <summary>
+    /// Verifies that the SQL grants ticket super-admins (a tenant
+    /// <c>IsSuperAdminTicket = 1</c> flag in <c>Messaging.TicketUserCompanies</c>)
+    /// access to private log rows — even when they are neither the creator nor
+    /// the current assignee.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenViewerIsSuperAdmin_ShouldExposeExistsBranch()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var ticketId = _fixture.Create<Guid>();
+        var context = new GetTicketByIdQueryHandlerTestContext(companyId);
+
+        context.Connection.SetResults(
+            CreateTicketDetailResultSet(ticketId, companyId),
+            CreateTicketLogsResultSet());
+
+        var query = new GetTicketByIdQuery(ticketId);
+        var handler = context.CreateHandler();
+
+        // Act
+        await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        context.Connection.LastCommandText.Should().Contain("Messaging.TicketUserCompanies");
+        context.Connection.LastCommandText.Should().Contain("tuc.IsSuperAdminTicket = 1");
+    }
+
+    /// <summary>
+    /// Verifies that all four visibility branches coexist, OR-combined inside
+    /// the WHERE clause. A third viewer — not the creator, not the assignee,
+    /// and not a super-admin — only sees rows where
+    /// <c>IsOnlyForCreatedAndAssigned = 0</c>; every other branch evaluates
+    /// false for them, so private entries stay hidden.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenViewerHasNoPrivilege_ShouldCombineAllBranchesWithOr()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var ticketId = _fixture.Create<Guid>();
+        var context = new GetTicketByIdQueryHandlerTestContext(companyId);
+
+        context.Connection.SetResults(
+            CreateTicketDetailResultSet(ticketId, companyId),
+            CreateTicketLogsResultSet());
+
+        var query = new GetTicketByIdQuery(ticketId);
+        var handler = context.CreateHandler();
+
+        // Act
+        await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        var sql = context.Connection.LastCommandText;
+        var orBranches = new[]
+        {
+            "tl.IsOnlyForCreatedAndAssigned = 0",
+            "t.CreatedByUserId = @ViewerId",
+            "t.AssignedToUserId = @ViewerId",
+            "EXISTS"
+        };
+
+        foreach (var branch in orBranches)
+        {
+            sql.Should().Contain(branch, $"the WHERE clause must expose branch '{branch}'");
+        }
+    }
+
+    /// <summary>
+    /// Verifies that the <c>CASE tl.LogType</c> expression maps the new
+    /// <see cref="LogType.Finalization"/> enum value (5) to the string
+    /// 'Finalization' (SPEC 35 F1/F9).
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenRenderingLogType_ShouldMapValue5ToFinalization()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var ticketId = _fixture.Create<Guid>();
+        var context = new GetTicketByIdQueryHandlerTestContext(companyId);
+
+        context.Connection.SetResults(
+            CreateTicketDetailResultSet(ticketId, companyId),
+            CreateTicketLogsResultSet());
+
+        var query = new GetTicketByIdQuery(ticketId);
+        var handler = context.CreateHandler();
+
+        // Act
+        await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        context.Connection.LastCommandText.Should().Contain("WHEN 5 THEN 'Finalization'");
+    }
+
+    /// <summary>
+    /// Verifies that the handler resolves @ViewerId from the current user and
+    /// forwards it to the connection — without this, the privacy filter would
+    /// compare against a null/zero GUID and silently expose every private log
+    /// row to anyone who can read the ticket.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenExecutingSql_ShouldPassViewerIdParameter()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var viewerId = _fixture.Create<Guid>();
+        var ticketId = _fixture.Create<Guid>();
+        var context = new GetTicketByIdQueryHandlerTestContext(companyId, viewerId);
+
+        context.Connection.SetResults(
+            CreateTicketDetailResultSet(ticketId, companyId),
+            CreateTicketLogsResultSet());
+
+        var query = new GetTicketByIdQuery(ticketId);
+        var handler = context.CreateHandler();
+
+        // Act
+        await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        context.Connection.CapturedParameters.Should().ContainKey("ViewerId");
+        context.Connection.CapturedParameters["ViewerId"].Should().Be(viewerId);
+    }
+
+    /// <summary>
     /// Creates a fake result set containing one flattened ticket detail row.
     /// </summary>
     private static FakeResultSet CreateTicketDetailResultSet(Guid ticketId, Guid companyId)
@@ -211,10 +445,10 @@ public sealed class GetTicketByIdQueryHandlerTests
     /// </summary>
     private sealed class GetTicketByIdQueryHandlerTestContext
     {
-        public GetTicketByIdQueryHandlerTestContext(Guid companyId)
+        public GetTicketByIdQueryHandlerTestContext(Guid companyId, Guid? viewerId = null)
         {
             CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
-            CurrentUserServiceMock.SetupGet(x => x.UserId).Returns(Guid.NewGuid().ToString());
+            CurrentUserServiceMock.SetupGet(x => x.UserId).Returns((viewerId ?? Guid.NewGuid()).ToString());
             CurrentUserServiceMock.SetupGet(x => x.IsAuthenticated).Returns(true);
             ConnectionFactoryMock.Setup(x => x.CreateConnection()).Returns(Connection);
         }

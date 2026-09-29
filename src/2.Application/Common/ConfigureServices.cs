@@ -12,6 +12,7 @@ using JOIN.Application.UseCases.Admin.PersonEmployments;
 using JOIN.Application.UseCases.Admin.PersonBusinessProfiles;
 using JOIN.Application.UseCases.Admin.PersonFinancialProfiles;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies;
+using JOIN.Application.UseCases.Messaging.Tickets;
 using JOIN.Application.Mappings;
 using JOIN.Application.Services.Admin;
 using JOIN.Application.Mappings.Security;
@@ -90,6 +91,8 @@ public static class ConfigureServices
         services.AddScoped<PersonBusinessProfileActiveCoordinator>();
         services.AddScoped<PersonFinancialProfileCurrentCoordinator>();
         services.AddScoped<TicketUserCompanySuperAdminCoordinator>();
+        services.AddScoped<TicketUserCompanyCapabilityResolver>();
+        services.AddScoped<TicketDtoAssembler>();
 
         return services;
     

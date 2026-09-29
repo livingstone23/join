@@ -8,6 +8,9 @@ namespace JOIN.Application.UseCases.Messaging.Tickets.Queries;
 
 /// <summary>
 /// Handles ticket detail queries using Dapper for high-performance reads.
+/// Log rows marked with <c>IsOnlyForCreatedAndAssigned = 1</c> are filtered
+/// server-side: only the ticket's creator, current assignee, or a tenant
+/// <c>IsSuperAdminTicket</c> can read them (SPEC 35 F9).
 /// </summary>
 public sealed class GetTicketByIdQueryHandler(
     ISqlConnectionFactory connectionFactory,
@@ -22,6 +25,15 @@ public sealed class GetTicketByIdQueryHandler(
         if (currentUserService.CompanyId == Guid.Empty)
         {
             return Response<TicketDto>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
+        if (!Guid.TryParse(currentUserService.UserId, out var viewerId))
+        {
+            // SPEC 35 F9 — the log-visibility filter requires a parseable viewer id
+            // because every privacy branch (createdBy/assignedTo/superAdmin) compares
+            // against @ViewerId. Without one, the handler cannot reason about who is
+            // asking and must refuse the read entirely.
+            return Response<TicketDto>.Error("USER_REQUIRED", ["The authenticated user identifier is required."]);
         }
 
         using var connection = connectionFactory.CreateConnection();
@@ -89,6 +101,7 @@ public sealed class GetTicketByIdQueryHandler(
                     WHEN 2 THEN 'InternalNote'
                     WHEN 3 THEN 'ExternalNote'
                     WHEN 4 THEN 'Reassignment'
+                    WHEN 5 THEN 'Finalization'
                     ELSE CONCAT('Unknown(', tl.LogType, ')')
                 END AS LogType,
                 tl.Summary,
@@ -98,19 +111,33 @@ public sealed class GetTicketByIdQueryHandler(
                 ns.Name AS NewStatusName,
                 tl.ConsumedTime
             FROM Support.TicketLogs tl
+            INNER JOIN Messaging.Tickets t ON tl.TicketId = t.Id
             LEFT JOIN Security.Users usr ON tl.UserRegisterLogId = usr.Id
             LEFT JOIN Messaging.TicketStatuses ps ON tl.PreviousStatusId = ps.Id
             LEFT JOIN Messaging.TicketStatuses ns ON tl.TicketStatusId = ns.Id
             WHERE tl.TicketId = @Id
               AND tl.CompanyId = @TenantId
               AND tl.GcRecord = 0
+              AND (
+                    tl.IsOnlyForCreatedAndAssigned = 0
+                    OR t.CreatedByUserId = @ViewerId
+                    OR t.AssignedToUserId = @ViewerId
+                    OR EXISTS (
+                        SELECT 1
+                        FROM Messaging.TicketUserCompanies tuc
+                        WHERE tuc.UserId = @ViewerId
+                          AND tuc.CompanyId = @TenantId
+                          AND tuc.GcRecord = 0
+                          AND tuc.IsSuperAdminTicket = 1
+                    )
+                  )
             ORDER BY tl.Created DESC;
             """;
 
         using var multi = await connection.QueryMultipleAsync(
             new CommandDefinition(
                 sql,
-                new { request.Id, TenantId = currentUserService.CompanyId },
+                new { request.Id, TenantId = currentUserService.CompanyId, ViewerId = viewerId },
                 cancellationToken: cancellationToken));
 
         var ticket = await multi.ReadFirstOrDefaultAsync<TicketDto>();

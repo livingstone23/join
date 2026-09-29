@@ -73,11 +73,6 @@ public record UpdateTicketDto
     public Guid ChannelId { get; init; }
 
     /// <summary>
-    /// Gets or sets the optional assigned user identifier.
-    /// </summary>
-    public Guid? AssignedToUserId { get; init; }
-
-    /// <summary>
     /// Gets or sets the optional precedent ticket identifier.
     /// </summary>
     public Guid? PrecedentTicketId { get; init; }

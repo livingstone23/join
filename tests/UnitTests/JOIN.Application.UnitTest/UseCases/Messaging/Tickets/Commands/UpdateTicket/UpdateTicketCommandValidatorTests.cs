@@ -197,7 +197,6 @@ public sealed class UpdateTicketCommandValidatorTests
     /// Verifies that each optional FK Guid field returns its own invalid message when set to Guid.Empty.
     /// </summary>
     [Theory]
-    [InlineData(nameof(UpdateTicketCommand.AssignedToUserId), "Assigned user id is invalid.")]
     [InlineData(nameof(UpdateTicketCommand.PersonId), "Person id is invalid.")]
     [InlineData(nameof(UpdateTicketCommand.ProjectId), "Project id is invalid.")]
     [InlineData(nameof(UpdateTicketCommand.AreaId), "Area id is invalid.")]
@@ -269,7 +268,6 @@ public sealed class UpdateTicketCommandValidatorTests
         TicketComplexityId = Guid.NewGuid(),
         TimeUnitId = Guid.NewGuid(),
         ChannelId = Guid.NewGuid(),
-        AssignedToUserId = null,
         PersonId = null,
         ProjectId = null,
         AreaId = null,
@@ -295,7 +293,6 @@ public sealed class UpdateTicketCommandValidatorTests
     private static UpdateTicketCommand SetOptionalGuidProperty(UpdateTicketCommand command, string propertyName, Guid value) =>
         propertyName switch
         {
-            nameof(UpdateTicketCommand.AssignedToUserId) => command with { AssignedToUserId = value },
             nameof(UpdateTicketCommand.PersonId) => command with { PersonId = value },
             nameof(UpdateTicketCommand.ProjectId) => command with { ProjectId = value },
             nameof(UpdateTicketCommand.AreaId) => command with { AreaId = value },

@@ -39,7 +39,6 @@ public sealed class TicketMapperTests
         entity.ProjectId.Should().Be(command.ProjectId);
         entity.AreaId.Should().Be(command.AreaId);
         entity.ChannelId.Should().Be(command.ChannelId);
-        entity.AssignedToUserId.Should().Be(command.AssignedToUserId);
         entity.PrecedentTicketId.Should().Be(command.PrecedentTicketId);
 
         entity.Id.Should().NotBeEmpty();
@@ -78,7 +77,6 @@ public sealed class TicketMapperTests
             PersonId = null,
             ProjectId = null,
             AreaId = null,
-            AssignedToUserId = null,
             PrecedentTicketId = null,
             EffortPoints = null
         };
@@ -90,7 +88,6 @@ public sealed class TicketMapperTests
         entity.PersonId.Should().BeNull();
         entity.ProjectId.Should().BeNull();
         entity.AreaId.Should().BeNull();
-        entity.AssignedToUserId.Should().BeNull();
         entity.PrecedentTicketId.Should().BeNull();
         entity.EffortPoints.Should().BeNull();
     }
@@ -152,7 +149,6 @@ public sealed class TicketMapperTests
         ticket.ProjectId.Should().Be(command.ProjectId);
         ticket.AreaId.Should().Be(command.AreaId);
         ticket.ChannelId.Should().Be(command.ChannelId);
-        ticket.AssignedToUserId.Should().Be(command.AssignedToUserId);
         ticket.PrecedentTicketId.Should().Be(command.PrecedentTicketId);
         ticket.Notifications.Should().BeSameAs(originalNotifications);
         ticket.ChildTickets.Should().BeSameAs(originalChildTickets);
@@ -171,7 +167,6 @@ public sealed class TicketMapperTests
             PersonId = null,
             ProjectId = null,
             AreaId = null,
-            AssignedToUserId = null,
             PrecedentTicketId = null,
             EffortPoints = null
         };
@@ -184,7 +179,6 @@ public sealed class TicketMapperTests
         ticket.PersonId.Should().BeNull();
         ticket.ProjectId.Should().BeNull();
         ticket.AreaId.Should().BeNull();
-        ticket.AssignedToUserId.Should().BeNull();
         ticket.PrecedentTicketId.Should().BeNull();
         ticket.EffortPoints.Should().BeNull();
     }
@@ -242,7 +236,6 @@ public sealed class TicketMapperTests
         ProjectId = Guid.NewGuid(),
         AreaId = Guid.NewGuid(),
         ChannelId = Guid.NewGuid(),
-        AssignedToUserId = Guid.NewGuid(),
         PrecedentTicketId = Guid.NewGuid()
     };
 
