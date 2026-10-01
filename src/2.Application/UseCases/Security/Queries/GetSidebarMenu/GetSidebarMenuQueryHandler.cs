@@ -42,6 +42,7 @@ public sealed class GetSidebarMenuQueryHandler(
            AND urc.CompanyId = @CompanyId
            AND urc.GcRecord = 0
         WHERE so.GcRecord = 0
+          AND so.IsVisibleMenu = 1
         GROUP BY
             so.Id,
             so.ModuleId,
@@ -63,7 +64,8 @@ public sealed class GetSidebarMenuQueryHandler(
             so.Name,
             so.Icon,
             so.ControllerName,
-            so.ParentId
+            so.ParentId,
+            so.IsVisibleMenu
         FROM Security.SystemOptions so
         WHERE so.GcRecord = 0
         ORDER BY
@@ -129,6 +131,10 @@ public sealed class GetSidebarMenuQueryHandler(
         var lookup = new Dictionary<Guid, MenuOptionResponse>(rows.Count);
         var optionIndex = allOptions.ToDictionary(option => option.Id);
 
+        // SQL already returns only options flagged IsVisibleMenu; an option whose ancestor
+        // is hidden is dropped too, otherwise it would surface as a root node.
+        rows = rows.Where(row => !IsHiddenFromMenu(row.Id, optionIndex)).ToList();
+
         foreach (var row in rows)
         {
             lookup[row.Id] = new MenuOptionResponse
@@ -166,6 +172,31 @@ public sealed class GetSidebarMenuQueryHandler(
 
         SortTree(roots);
         return roots;
+    }
+
+    /// <summary>
+    /// Walks from the option up to the root; true when the option itself or any
+    /// ancestor is flagged as not visible in the menu.
+    /// </summary>
+    private static bool IsHiddenFromMenu(
+        Guid optionId,
+        IReadOnlyDictionary<Guid, SystemOptionHierarchyRow> optionIndex)
+    {
+        Guid? currentId = optionId;
+        var visited = new HashSet<Guid>();
+        while (currentId.HasValue
+               && visited.Add(currentId.Value)
+               && optionIndex.TryGetValue(currentId.Value, out var option))
+        {
+            if (!option.IsVisibleMenu)
+            {
+                return true;
+            }
+
+            currentId = option.ParentId;
+        }
+
+        return false;
     }
 
     private static void EnsureAncestors(
@@ -225,5 +256,8 @@ public sealed class GetSidebarMenuQueryHandler(
         public string? Icon { get; set; }
         public string? ControllerName { get; set; }
         public Guid? ParentId { get; set; }
+
+        // Defaults to visible so a projection without the column never hides the tree.
+        public bool IsVisibleMenu { get; set; } = true;
     }
 }

@@ -333,6 +333,8 @@ public sealed class UploadTicketDocumentCommandHandlerTests
         var response = await handler.Handle(request, CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
+        response.Data!.CreatedByUserId.Should().Be(currentUserId);
+        response.Data.CreatedByUserName.Should().Be("Ana Torres");
     }
 
     /// <summary>

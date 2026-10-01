@@ -31,7 +31,7 @@ Decisiones acordadas:
 
 - `src/1.Domain/Calendars/CalendarExternalConnection.cs`, `CalendarExternalEventLink.cs`, `CalendarSyncOutboxItem.cs` (nuevos, `BaseTenantEntity`).
 - Enums en `src/1.Domain/Calendars/Enums/`: `CalendarExternalProvider`, `CalendarExternalConnectionStatus`, `CalendarExternalSyncState`, `CalendarSyncOperation`, `CalendarSyncOutboxStatus`.
-- Configuraciones EF en `Configuration/Calendars/`, `DbSet`s, query filters (SPEC 39 o explícitos), FKs `Restrict`, índices filtrados (SPEC 41).
+- Configuraciones EF en `Configuration/Calendars/`, `DbSet`s, líneas `HasQueryFilter` explícitas tenant + soft delete (convención SPEC 39), FKs `Restrict`, índices filtrados (SPEC 41).
 - Migración `AddCalendarExternalSyncStructure`.
 - Tests de configuración: el modelo EF compila y la migración crea las tres tablas con sus índices (prueba de integración con Testcontainers). No hay handlers nuevos, así que no cambia la cobertura del proyecto de unitarios.
 

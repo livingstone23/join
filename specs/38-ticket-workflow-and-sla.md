@@ -5,6 +5,9 @@
 > **Date:** 2026-09-25
 > **Objective:** Cerrar la última brecha del brief — "la gestión del ticket deberá ser parametrizable" — dándole uso real a dos campos que ya existen en el dominio pero que ningún handler consulta hoy: `TicketComplexity.ResolutionTimeUnits` (SLA) y `TicketCompanyDefault.MaxDayTicketInactivity` (inactividad), y agregando una tabla de transiciones de status opcional por empresa (`TicketStatusTransition`) que, cuando se configura, restringe a qué status puede pasar un ticket desde cada status de origen.
 
+
+> **Ajuste por SPEC 47 (2026-10-01):** el menú padre de tickets pasa a llamarse `TicketManagement` (antes `ManejoTickets`), con `ModuleName = "Tickets"` y rutas `/tickets/<recurso-con-guion>` (antes `/ManejoTickets/...`). Si esta spec se implementa **después** de SPEC 47, sus `SystemOptionSeed` usan ese padre, ese módulo y esas rutas. Si se implementa **antes**, usan `ManejoTickets` y `/ManejoTickets/...` como el resto de opciones de tickets, y SPEC 47 las renombra junto con todas las demás (`SystemOptionSeed` no tiene `ModuleName` hasta SPEC 47). Los `ControllerName` no cambian.
+
 ---
 
 ## Por qué existe esta spec y por qué es la más acotada de las cinco
@@ -290,7 +293,7 @@ En la práctica se resuelve con un DTO plano que hereda o compone al existente, 
 ### F7 — Seed
 
 1. Sin datos de ejemplo obligatorios: `TicketStatusTransition` es opt-in por diseño, así que **no** sembrarla para las empresas de desarrollo mantiene el comportamiento sin restricciones, que es el caso más útil para probar el resto del módulo sin fricción.
-2. Agregar el `SystemOptionSeed` de `TicketStatusTransitions` (CRUD completo, grupo `ManejoTickets`) a `GetAdministrativeSystemOptionSeeds()`, **y** las filas de `RoleSystemOptionSeed` en `GetRoleSystemOptionSeeds()` (mismo motivo detallado en SPEC 34 sección H: la `SystemOption` declara el recurso, no otorga permiso a ningún rol fuera de `Admin`/`SuperAdminCompany`):
+2. Agregar el `SystemOptionSeed` de `TicketStatusTransitions` (CRUD completo, grupo `TicketManagement`, `ModuleName = "Tickets"`, ruta `/tickets/ticket-status-transitions`) a `GetAdministrativeSystemOptionSeeds()`, **y** las filas de `RoleSystemOptionSeed` en `GetRoleSystemOptionSeeds()` (mismo motivo detallado en SPEC 34 sección H: la `SystemOption` declara el recurso, no otorga permiso a ningún rol fuera de `Admin`/`SuperAdminCompany`):
    ```csharp
    new("Manager", "TicketStatusTransitions", true, true, false, true, CanDownload: false, CanExport: false, CanExecute: true),
    new("Supervisor", "TicketStatusTransitions", true, false, false, false),

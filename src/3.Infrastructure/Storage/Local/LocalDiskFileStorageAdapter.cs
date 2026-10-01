@@ -81,6 +81,10 @@ public sealed class LocalDiskFileStorageAdapter(
     /// que el resultado siga dentro de la raíz. Lanza
     /// <see cref="InvalidOperationException"/> ante cualquier intento de
     /// path traversal (<c>..</c>, segmentos absolutos, etc.).
+    /// Ambos separadores (<c>/</c> y <c>\</c>) se tratan como separador en
+    /// cualquier plataforma: en Linux/macOS <c>\</c> no lo es para el
+    /// filesystem, y sin normalizar una clave como <c>..\x</c> se aceptaría
+    /// aquí y escaparía de la raíz al migrar el almacenamiento a Windows.
     /// </summary>
     private string ResolveSafePath(string storageKey)
     {
@@ -89,10 +93,20 @@ public sealed class LocalDiskFileStorageAdapter(
             throw new InvalidOperationException("Storage key must not be empty.");
         }
 
-        var root = Path.GetFullPath(_options.RootPath);
-        var combined = Path.GetFullPath(Path.Combine(root, storageKey));
+        var segments = storageKey.Split('/', '\\');
+        if (Path.IsPathRooted(storageKey) || segments.Any(segment => segment == ".."))
+        {
+            throw new InvalidOperationException(
+                $"Storage key '{storageKey}' resolves outside the configured root.");
+        }
 
-        if (!combined.StartsWith(root, StringComparison.Ordinal))
+        var root = Path.GetFullPath(_options.RootPath);
+        var combined = Path.GetFullPath(Path.Combine([root, .. segments]));
+
+        // Compare against "root + separator": a bare StartsWith(root) would also
+        // accept sibling directories sharing the prefix (e.g. "<root>-evil/...").
+        var rootWithSeparator = Path.EndsInDirectorySeparator(root) ? root : root + Path.DirectorySeparatorChar;
+        if (!combined.StartsWith(rootWithSeparator, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Storage key '{storageKey}' resolves outside the configured root.");

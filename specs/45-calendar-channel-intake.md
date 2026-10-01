@@ -1,7 +1,7 @@
 # SPEC 45 — Calendario: ingreso de actividades por canales (agente) y personas pendientes de confirmación
 
 > **Status:** Borrador
-> **Depends on:** SPEC 44 (módulo Calendario: `CalendarEvent`, `CalendarCompany`, `CalendarEventScheduleGuard`, `CalendarEventInitialStatusResolver`, `CalendarEventLogWriter`, tipo `PERSON_REVIEW`, estado `CANCELLED`, `CalendarCompany.RescheduledByOthersStatusCompanyId`).
+> **Depends on:** SPEC 47 (menú y rutas), SPEC 44 (módulo Calendario: `CalendarEvent`, `CalendarCompany`, `CalendarEventScheduleGuard`, `CalendarEventInitialStatusResolver`, `CalendarEventLogWriter`, tipo `PERSON_REVIEW`, estado `CANCELLED`, `CalendarCompany.RescheduledByOthersStatusCompanyId`).
 > **Related:** SPEC 37 (ingesta de tickets por canal — mismo catálogo `CommunicationChannel` y mismo criterio de deduplicación por id de mensaje externo).
 > **Date:** 2026-09-29
 > **Objective:** Permitir que un agente automatizado (n8n) que atiende WhatsApp, correo u otro canal, autenticado vía API como usuario de servicio, identifique a la empresa y a la persona que escribe, registre a la persona si no existe (`Person` + `PersonContact` + `PersonPendingConfirmation`), consulte disponibilidad, y cree, reprograme o anule actividades en el calendario del usuario indicado o del usuario por defecto de la empresa, dejando trazado el canal y el solicitante, y generando una actividad de revisión para que un usuario interno complete los datos de la persona nueva.
@@ -44,7 +44,7 @@ Decisiones acordadas el 2026-09-29:
 ### B. Persistencia
 
 - `Configuration/Admin/PersonPendingConfirmationConfiguration.cs`: `ToTable("PersonPendingConfirmations", "Admin")`, FKs `Restrict`, índices (Data model).
-- `DbSet<PersonPendingConfirmation>` en la sección administrativa del `ApplicationDbContext`; query filter tenant + soft delete (SPEC 39 o línea explícita).
+- `DbSet<PersonPendingConfirmation>` en la sección administrativa del `ApplicationDbContext`; línea `HasQueryFilter` explícita tenant + soft delete en `ConfigureGlobalQueryFilters` (convención SPEC 39).
 - Migración `AddPersonPendingConfirmation`.
 
 ### C. Application — intake del agente (`src/2.Application/UseCases/Calendars/ChannelIntake/`)
@@ -89,6 +89,8 @@ Clase de apoyo **`IntakeRequesterResolver`** (feature-local): normaliza el ident
 Cobertura ≥ 90% en clases nuevas. Detalle en F7.
 
 **Out of scope:**
+
+- **Crear tickets desde el agente o desde WhatsApp** (decisión del usuario, 2026-10-01). Una solicitud de servicio nuevo o de ticket que llega al agente se registra como **actividad** para el usuario por defecto (`DefaultActivityUserId`), que decide si crea el ticket desde JOIN. La creación de tickets por WhatsApp de SPEC 37 queda en pendiente.
 
 - Tabla de números o identificadores por empresa (`CompanyCommunicationChannel`) y autenticación por número exclusivo. El agente opera con su usuario de servicio y `X-Company-Id`.
 - Webhooks directos de proveedores (Twilio, Meta, SendGrid): el agente (n8n) es quien habla con el canal y llama a esta API.
@@ -280,6 +282,8 @@ Handler (`ITransactionalCommand`):
 
 ### Normalización de identificadores (`IntakeRequesterResolver`)
 
+> **Referencia única (2026-10-01):** esta es la regla de búsqueda de personas por teléfono del sistema. Cuando se retome la creación de tickets por WhatsApp (SPEC 37, en pendiente), se reutiliza este resolver (moviéndolo a un lugar compartido de `UseCases/Admin/Persons`) en lugar de la coincidencia exacta que describe la SPEC 37.
+
 - **Teléfono:** el agente envía E.164 (`+50588887777`). `PersonContact.ContactValue` puede tener otros formatos (`8888-7777`, `+505 8888 7777`). La búsqueda compara solo dígitos: `REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ContactValue,' ',''),'-',''),'(',''),')',''),'+','')` contra el E.164 sin `+`, y también contra los últimos 8 dígitos para números guardados sin código de país. Si hay **más de una** persona que coincide → `found = false` con `ambiguous = true`: el agente debe pedir la identificación.
 - **Correo:** comparación exacta sin distinguir mayúsculas y sin espacios.
 - Solo `PersonContact` activos (`IsActive = 1`, `GcRecord = 0`) de tipo `WhatsApp`, `MobilePhone`, `Landline` (teléfono) o `PrimaryEmail`, `AlternativeEmail` (correo), de personas activas de la empresa.
@@ -310,12 +314,12 @@ Al resolver o vincular:
 
 ```csharp
 // SPEC 45 — endpoints del agente de canales. No visible en menú.
-new("CalendarChannelIntake", "/calendar/channel_intake", "@Icons.Material.Filled.SmartToy", "Calendar", "CalendarChannelIntake", true, true, true, false, IsVisibleMenu: false),
+new("CalendarChannelIntake", "/calendar/channel-intake", "@Icons.Material.Filled.SmartToy", "Calendar", "CalendarChannelIntake", true, true, true, false, IsVisibleMenu: false),
 // SPEC 45 — bandeja de personas creadas por canal.
-new("PendingPersons", "/Clientes/pending_persons", "@Icons.Material.Filled.PersonSearch", "Persons", "PersonPendingConfirmations", true, false, true, false),
+new("PendingPersons", "/customers/pending-persons", "@Icons.Material.Filled.PersonSearch", "CustomersMenu", "PersonPendingConfirmations", true, false, true, false),
 ```
 
-Nombres y rutas en inglés con `_` (decisión del usuario, 2026-10-01). `PendingPersons` cuelga del menú existente `Persons`, cuya ruta base `/Clientes` ya está definida.
+Nombres y rutas en inglés con guion (decisión del usuario, 2026-10-01; SPEC 47). `CalendarChannelIntake` declara `ModuleName = "Calendar"`; `PendingPersons` declara `ModuleName = "Customers"` y cuelga del padre `CustomersMenu` (ruta `/customers`), que SPEC 47 renombra desde `Persons`/`/Clientes`.
 
 **`RoleSystemOptions`** (Read, Create, Update, Delete). Las filas referencian el nombre de la opción: `CalendarChannelIntake` y `PendingPersons`:
 
@@ -323,9 +327,11 @@ Nombres y rutas en inglés con `_` (decisión del usuario, 2026-10-01). `Pending
 |---|---|---|
 | SuperAdmin | ✔ ✔ ✔ – | ✔ – ✔ – |
 | Agent | ✔ ✔ ✔ – | – |
-| SuperAdminCompany | – | ✔ – ✔ – |
+| SuperAdminCompany | ✔ ✔ ✔ ✔ (acceso total, SPEC 47 A4) | ✔ ✔ ✔ ✔ (acceso total, SPEC 47 A4) |
 | Manager | – | ✔ – ✔ – |
 | Supervisor | – | ✔ – ✔ – |
+
+**Permisos fuera de `JOIN-001` (decisión del usuario, 2026-10-01; SPEC 47 A3):** la seed de `RoleSystemOptions` solo carga la empresa `JOIN-001`. En cualquier otra empresa, los permisos de este módulo se asignan **a mano** desde la pantalla de roles (SuperAdmin o el `SuperAdminCompany` de la empresa) antes de usarlo; sin ellos, los endpoints responden `403`. Es un paso de despliegue por empresa, documentado en `CURL_REQUESTS.md`.
 
 El agente **no** recibe `CalendarOthers` ni `Persons`: todo lo que necesita pasa por `CalendarChannelIntake`, con reglas más estrictas que las del panel (solo actividades de la persona identificada, sin reabrir estados finales, sin acceso a datos de otras personas).
 

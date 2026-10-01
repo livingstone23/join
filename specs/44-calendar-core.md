@@ -1,7 +1,7 @@
 # SPEC 44 — Módulo Calendario: parametrización, calendarios de usuario y actividades
 
 > **Status:** Borrador
-> **Depends on:** Ninguna para implementarse. Es prerequisito de SPEC 45 (ingreso de actividades por canales / agente) y SPEC 46 (estructura de integración con Google Calendar).
+> **Depends on:** SPEC 47 (`SystemModule.IsBase`, `ModuleName` en `SystemOptionSeed`, rutas con guion y solo SuperAdmin habilita módulos). Es prerequisito de SPEC 45 (ingreso de actividades por canales / agente) y SPEC 46 (estructura de integración con Google Calendar).
 > **Related:** SPEC 41 (índices únicos filtrados por `GcRecord = 0` — mismo patrón en todos los índices de esta spec), SPEC 40 (fork PostgreSQL — la sintaxis de `HasFilter` de esta spec se porta igual que el resto), SPEC 43 (patrón "valores iniciales desde la configuración de la empresa").
 > **Date:** 2026-09-29
 > **Objective:** Crear el módulo Calendario en su propio esquema `Calendar`: un catálogo global de tipos de actividad y de estados que cada empresa habilita y ajusta, la configuración de calendario por empresa (usuario por defecto, horario hábil, zona horaria, feriados), la configuración por usuario (calendario por defecto, horario de contrato, días hábiles, periodos no hábiles), los calendarios de cada usuario y sus actividades (puntuales, de día completo y periódicas), con validación de superposición y de horario hábil, un panel para consultar calendarios de otros usuarios de la misma empresa y todas las APIs que el frontend necesita para las vistas de día, semana y mes.
@@ -67,7 +67,7 @@ Entidades nuevas (detalle campo por campo en **Data model**):
 
 - Configuraciones EF en `Configuration/Calendars/`, todas con `ToTable("<Tabla>", "Calendar")`.
 - `DbSet`s nuevos en `ApplicationDbContext` bajo una sección `// --- 7. CALENDAR MODULE ---`.
-- Query filters: las entidades tenant (`BaseTenantEntity`) quedan cubiertas por el mecanismo genérico de SPEC 39. Si SPEC 39 no está implementada al momento de implementar esta, se agregan las líneas explícitas en `ConfigureGlobalQueryFilters` (tenant + soft delete para las tenant, soft delete para los dos catálogos globales).
+- Query filters: una línea `HasQueryFilter` **explícita** por entidad en `ConfigureGlobalQueryFilters`, en una sección `// Calendar`, siguiendo la convención de SPEC 39 (lista explícita, no mecanismo genérico): tenant + soft delete para las nueve entidades tenant, solo soft delete para `CalendarActivity` y `CalendarStatus`. Si SPEC 39 ya está implementada, su test de guarda obliga a agregarlas.
 - Relaciones con `DeleteBehavior.Restrict` en todas las FK hacia `ApplicationUser`, `CalendarStatusCompany` y `CalendarActivityCompany` (varias rutas de cascada hacia `Users` y `Companies`, mismo motivo que `ConfigureTicketRelationships`).
 - Índices únicos **filtrados** por `[GcRecord] = 0` (patrón SPEC 41), nunca con `GcRecord` en la clave.
 - Migración `AddCalendarModule`.
@@ -121,7 +121,7 @@ Controllers nuevos con `[Route("api/v{version:apiVersion}/[controller]")]`. Endp
 
 ### H. Seed
 
-- `SeedSystemModulesAsync`: nuevo módulo `Calendar` (Description "Calendar and activities module", `fa-solid fa-calendar-days`, `Order = 4`).
+- `SeedSystemModulesAsync`: nuevo módulo `Calendar` (Description "Calendar and activities module", `fa-solid fa-calendar-days`, `Order = 4`, **`IsBase = false`**: es opcional y lo habilita el SuperAdmin por empresa, SPEC 47).
 - Catálogos globales `CalendarActivity` y `CalendarStatus` (valores en **Data model**), idempotentes por `Code`.
 - `GetAdministrativeSystemOptionSeeds()` y `GetRoleSystemOptionSeeds()`: menú y permisos (ver **Permisos**).
 - Empresa maestra `JOIN-001` (solo desarrollo): catálogos de empresa, `CalendarCompany` (usuario por defecto = el SuperAdmin de la empresa, 08:00–17:00, `America/Managua`, estado de reprogramación = `RESCHEDULED`), `CompanyModule` "Calendar" activo y provisión de calendario para los usuarios semilla. Esto permite probar el módulo de punta a punta en Development y en las pruebas de integración.
@@ -586,21 +586,21 @@ Nuevo módulo de menú **Calendario** (`SystemModule`). Recursos (`SystemOption.
 
 ```csharp
 new("Calendar", "/calendar", "@Icons.Material.Filled.CalendarMonth", null, null, false, false, false, false),
-new("MyCalendar", "/calendar/my_calendar", "@Icons.Material.Filled.Today", "Calendar", "Calendar", true, true, true, true),
+new("MyCalendar", "/calendar/my-calendar", "@Icons.Material.Filled.Today", "Calendar", "Calendar", true, true, true, true),
 new("CalendarPanel", "/calendar/panel", "@Icons.Material.Filled.ViewTimeline", "Calendar", "CalendarOthers", true, true, true, true),
-new("ActivityConfirmation", "/calendar/activity_confirmation", "@Icons.Material.Filled.EventAvailable", "Calendar", "CalendarActivityConfirmation", false, false, true, false, IsVisibleMenu: false),
+new("ActivityConfirmation", "/calendar/activity-confirmation", "@Icons.Material.Filled.EventAvailable", "Calendar", "CalendarActivityConfirmation", false, false, true, false, IsVisibleMenu: false),
 new("CalendarSettings", "/calendar/settings", "@Icons.Material.Filled.EditCalendar", "Calendar", "CalendarSettings", true, true, true, true, CanExecute: true),
 new("CalendarCatalogs", "/calendar/catalogs", "@Icons.Material.Filled.Category", "Calendar", "CalendarCatalogs", true, true, true, true),
 ```
 
-Nombres de opción y rutas **en inglés**, en minúsculas y con `_` para separar palabras (decisión del usuario, 2026-10-01). Son definitivos para el frontend.
+Nombres de opción y rutas **en inglés**, en minúsculas y con **guion** para separar palabras, igual que todo el sistema (decisión del usuario, 2026-10-01; ver SPEC 47). Son definitivos para el frontend. Con SPEC 47, cada fila declara además `ModuleName = "Calendar"`.
 
 **Seed de permisos por rol** (`GetRoleSystemOptionSeeds`, flags `Read, Create, Update, Delete`). Las filas de seed referencian el **nombre de la opción**, no el recurso: `Calendar` → opción `MyCalendar`; `CalendarOthers` → `CalendarPanel`; `CalendarActivityConfirmation` → `ActivityConfirmation`; `CalendarSettings` → `CalendarSettings`; `CalendarCatalogs` → `CalendarCatalogs`.
 
 | Rol | Calendar | CalendarOthers | CalendarActivityConfirmation | CalendarSettings | CalendarCatalogs |
 |---|---|---|---|---|---|
 | SuperAdmin | ✔✔✔✔ | ✔✔✔✔ | –, –, ✔, – | ✔✔✔✔ + Execute | ✔✔✔✔ |
-| SuperAdminCompany | ✔✔✔✔ | ✔✔✔✔ | –, –, ✔, – | ✔✔✔✔ + Execute | ✔ – – – |
+| SuperAdminCompany | ✔✔✔✔ | ✔✔✔✔ | ✔✔✔✔ | ✔✔✔✔ + Execute | ✔✔✔✔ |
 | Manager | ✔✔✔✔ | ✔✔✔✔ | –, –, ✔, – | ✔✔✔ – | – |
 | Supervisor | ✔✔✔✔ | ✔✔✔ – | –, –, ✔, – | ✔ – – – | – |
 | Coordinador | ✔✔✔✔ | ✔ – – – | –, –, ✔, – | – | – |
@@ -608,7 +608,9 @@ Nombres de opción y rutas **en inglés**, en minúsculas y con `_` para separar
 
 `Admin`, `Agent` y `Person` no reciben permisos de calendario en esta spec (el `Agent` los recibe en SPEC 45). El administrador de la empresa es **`SuperAdminCompany`** (rol que ya existe y que el sistema usa para la configuración por empresa, p.ej. `CompanyModulesController` y `RolesController`), no `Admin`.
 
-**Verificación en F3:** hoy la seed no tiene filas de `RoleSystemOption` para `SuperAdminCompany` (sus endpoints actuales usan `[Authorize(Roles = "SuperAdminCompany")]`). Confirmar que `DynamicAuthorizationFilter` resuelve los permisos de este rol desde `RoleSystemOption` como los demás roles; si no, documentar cómo obtiene acceso y ajustar la seed de esta spec.
+**Verificado (2026-10-01):** `SuperAdminCompany` y `Admin` están en `PrivilegedRoleNames` (`DatabaseSeeder.cs`): la seed les da acceso total a **todas** las opciones y esa regla se aplica después de la matriz explícita. Por eso no necesitan filas propias en `GetRoleSystemOptionSeeds()`; la fila de la tabla documenta el resultado efectivo.
+
+**Permisos fuera de `JOIN-001` (decisión del usuario, 2026-10-01; SPEC 47 A3):** la seed de `RoleSystemOptions` solo carga la empresa `JOIN-001`. En cualquier otra empresa, los permisos de este módulo se asignan **a mano** desde la pantalla de roles (SuperAdmin o el `SuperAdminCompany` de la empresa) antes de usarlo; sin ellos, los endpoints responden `403`. Es un paso de despliegue por empresa, documentado en `CURL_REQUESTS.md`.
 
 ### Aislamiento del módulo: qué puede modificar cada permiso
 
@@ -786,7 +788,7 @@ Se usa SQL portable (sin funciones de fecha del motor), igual que el resto de la
 Entidades, enums y `CalendarCodes` en `src/1.Domain/Calendars/`.
 
 ### F2 — Persistencia
-Configuraciones EF (`Configuration/Calendars/`), `DbSet`s, query filters (o SPEC 39), relaciones `Restrict`, índices filtrados y migración `AddCalendarModule`. Verificar que la migración crea el esquema `Calendar` y las 11 tablas.
+Configuraciones EF (`Configuration/Calendars/`), `DbSet`s, query filters explícitos (convención SPEC 39), relaciones `Restrict`, índices filtrados y migración `AddCalendarModule`. Verificar que la migración crea el esquema `Calendar` y las 11 tablas.
 
 ### F3 — Seed
 `SystemModule` "Calendar", catálogos globales, `SystemOptions`, `RoleSystemOptions`, `SeedCalendarCatalogsForCompanyAsync` dentro de `SeedDefaultCatalogsForCompanyAsync`, y el seed de desarrollo de `JOIN-001` (`CompanyModule`, `CalendarCompany`, provisión). Canal `WEB` si SPEC 37 todavía no lo sembró.
@@ -870,7 +872,8 @@ Configuraciones EF (`Configuration/Calendars/`), `DbSet`s, query filters (o SPEC
 - **Se descarta `RequiresConfirmationWhenCreatedByAgent`** (propuesta inicial): el estado inicial configurable por tipo cubre ese caso sin un flag extra.
 - **Cinco recursos de permiso: los tres operativos acordados más `CalendarSettings` y `CalendarCatalogs`** (confirmado por el usuario, 2026-10-01). La parametrización tiene permisos propios para que un usuario común no edite la configuración de su empresa, y el catálogo global queda solo para SuperAdmin. Se descartó un único recurso de configuración (mezclaba empresa y catálogo global) y un recurso por pantalla (demasiadas filas en la matriz de roles).
 - **Administrador de empresa = `SuperAdminCompany`** (decisión del usuario, 2026-10-01): es el rol que el sistema ya usa para la configuración por empresa. El resto de la matriz de roles queda como se propuso.
-- **Módulo, opciones de menú y rutas en inglés** (`Calendar`, `/calendar/my_calendar`…), decisión del usuario, 2026-10-01.
+- **Módulo, opciones de menú y rutas en inglés con guion** (`Calendar`, `/calendar/my-calendar`…), decisión del usuario, 2026-10-01, aplicada a todo el sistema en SPEC 47.
+- **`SuperAdminCompany` con acceso total, incluidos los catálogos globales** (SPEC 47, decisión A4): la seed existente da acceso total a todas las opciones a los roles de `PrivilegedRoleNames` (`Admin`, `SuperAdminCompany`) y esa regla se aplica después de la matriz. Se mantiene por decisión del usuario; la fila de la matriz refleja ese resultado.
 - **Sin reglas de transición de estados** (decisión del usuario, SPEC futura con Hangfire). La excepción es técnica: reactivar una anulada revalida choques, para no dejar una superposición inválida.
 - **Estado tras reprogramar por alguien distinto al dueño, parametrizable en `CalendarCompany.RescheduledByOthersStatusCompanyId`** (decisión del usuario, 2026-10-01) vs fijarlo en el código como `RESCHEDULED` o `PENDING`. Cada empresa elige qué estado usar; el seed y la creación de la configuración proponen "Reprogramada". Los handlers leen siempre la configuración y nunca comparan contra el código `RESCHEDULED`.
 - **Repetición como `RRULE` (RFC 5545) con expansión en memoria** (elegido) vs materializar cada ocurrencia como una fila. Guardar la regla es lo que hace Google, permite series sin fin y hace la sincronización de SPEC 46 directa. Materializar simplificaría las consultas, pero multiplica filas, complica "esta y las siguientes" e impide series sin fin. Se acota el costo con el horizonte de 12 meses y el rango máximo de 62 días por consulta.

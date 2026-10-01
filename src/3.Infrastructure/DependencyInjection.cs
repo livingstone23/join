@@ -14,6 +14,7 @@ using JOIN.Infrastructure.Storage.Local;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
 
@@ -94,7 +95,18 @@ public static class DependencyInjection
         // todavía no tiene switch (no hay un segundo adapter concreto; cuando
         // se agregue Azure Blob/S3, este bloque gana la rama correspondiente).
         // ------------------------------------------------------------------
-        services.Configure<FileStorageOptions>(configuration.GetSection("FileStorage:Local"));
+        // A relative RootPath is anchored to the host's ContentRootPath rather than
+        // the process working directory, which differs between `dotnet run`, IIS
+        // and containers and would otherwise scatter attachments across folders.
+        services.AddOptions<FileStorageOptions>()
+            .Bind(configuration.GetSection("FileStorage:Local"))
+            .PostConfigure<IHostEnvironment>((options, environment) =>
+            {
+                if (!Path.IsPathRooted(options.RootPath))
+                {
+                    options.RootPath = Path.Combine(environment.ContentRootPath, options.RootPath);
+                }
+            });
         services.AddScoped<IFileStorageService, LocalDiskFileStorageAdapter>();
 
         return services;

@@ -5,6 +5,10 @@
 > **Date:** 2026-09-25
 > **Objective:** Permitir que un ticket se registre automáticamente cuando llega un mensaje de WhatsApp o un correo a una dirección/número configurado por la empresa, sin sesión de usuario ni token JWT, resolviendo el tenant de forma segura vía un token de webhook único por empresa y canal, y reutilizando toda la infraestructura ya construida en SPEC 34-36 en vez de duplicarla.
 
+
+> **Ajuste por SPEC 47 (2026-10-01):** el menú padre de tickets pasa a llamarse `TicketManagement` (antes `ManejoTickets`), con `ModuleName = "Tickets"` y rutas `/tickets/<recurso-con-guion>` (antes `/ManejoTickets/...`). Si esta spec se implementa **después** de SPEC 47, sus `SystemOptionSeed` usan ese padre, ese módulo y esas rutas. Si se implementa **antes**, usan `ManejoTickets` y `/ManejoTickets/...` como el resto de opciones de tickets, y SPEC 47 las renombra junto con todas las demás (`SystemOptionSeed` no tiene `ModuleName` hasta SPEC 47). Los `ControllerName` no cambian.
+
+> **Ajuste por decisión del usuario (2026-10-01):** la creación de tickets **desde WhatsApp** queda **en pendiente** (sección D `InboundWhatsAppController`, fetch de media de Twilio, sección `Twilio` de `appsettings` y sus tests). No se implementa hasta que se defina el tema de los agentes de canal (relacionado con SPEC 45). Por ahora, un ticket lo crea un usuario con acceso al módulo y permisos asignados (`POST /Tickets`), incluso a nombre de otra persona. El resto de esta spec (correo entrante, `TicketInboundChannel`, `ExternalMessageId`, canales `WEB`/`APP`) no cambia.
 ---
 
 ## Por qué existe esta spec
@@ -55,7 +59,7 @@ Releyendo el brief con cuidado, "web operativa" y "app" no son canales de *inges
 
 ### E. Seed
 
-- `SystemOptionSeed` para `TicketInboundChannels` (CRUD completo, grupo `ManejoTickets`) en `GetAdministrativeSystemOptionSeeds()`, **más** las filas de `RoleSystemOptionSeed` en `GetRoleSystemOptionSeeds()` (mismo motivo detallado en SPEC 34 sección H). Este recurso entrega tokens de webhook, así que el reparto es más restrictivo que el de los catálogos:
+- `SystemOptionSeed` para `TicketInboundChannels` (CRUD completo, grupo `TicketManagement`, `ModuleName = "Tickets"`, ruta `/tickets/ticket-inbound-channels`) en `GetAdministrativeSystemOptionSeeds()`, **más** las filas de `RoleSystemOptionSeed` en `GetRoleSystemOptionSeeds()` (mismo motivo detallado en SPEC 34 sección H). Este recurso entrega tokens de webhook, así que el reparto es más restrictivo que el de los catálogos:
   ```csharp
   new("Manager", "TicketInboundChannels", true, true, false, true, CanDownload: false, CanExport: false, CanExecute: true),
   new("Supervisor", "TicketInboundChannels", true, false, false, false),

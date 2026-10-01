@@ -251,6 +251,60 @@ public sealed class GetSidebarMenuQueryHandlerTests : IDisposable
     }
 
     /// <summary>
+    /// Verifies that the direct-permissions query only returns options flagged as
+    /// visible in the menu (<c>so.IsVisibleMenu = 1</c>).
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldOnlyQueryOptionsVisibleInMenu()
+    {
+        // Arrange
+        SetupAuthenticatedUser();
+        _fakeConnection.SetResults(FakeResultSet.FromRows(MakeSidebarRow(Guid.NewGuid(), "Tickets")));
+
+        var handler = CreateHandler();
+
+        // Act
+        await handler.Handle(new GetSidebarMenuQuery(), CancellationToken.None);
+
+        // Assert — the last command is the hierarchy query; it must project the flag.
+        _fakeConnection.LastCommandText.Should().Contain("so.IsVisibleMenu");
+    }
+
+    /// <summary>
+    /// Verifies that an option whose ancestor is hidden from the menu is dropped,
+    /// instead of being surfaced as a root node.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenAncestorIsHiddenFromMenu_ShouldDropDescendant()
+    {
+        // Arrange — the fake serves the same result set to both the direct-permissions
+        // and the hierarchy query, so each row carries its IsVisibleMenu flag.
+        SetupAuthenticatedUser();
+        var hiddenParentId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var visibleRootId = Guid.NewGuid();
+
+        _fakeConnection.SetResults(FakeResultSet.FromRows(
+            WithVisibility(MakeSidebarRow(childId, "Hidden child", parentId: hiddenParentId), true),
+            WithVisibility(MakeSidebarRow(visibleRootId, "Visible root"), true),
+            WithVisibility(MakeSidebarRow(hiddenParentId, "Hidden group"), false)));
+
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(new GetSidebarMenuQuery(), CancellationToken.None);
+
+        // Assert — the hidden group and everything under it are gone.
+        result.Data.Should().ContainSingle().Which.Id.Should().Be(visibleRootId);
+    }
+
+    private static IDictionary<string, object?> WithVisibility(IDictionary<string, object?> row, bool isVisibleMenu)
+    {
+        row["IsVisibleMenu"] = isVisibleMenu;
+        return row;
+    }
+
+    /// <summary>
     /// Verifies that root nodes are returned sorted alphabetically by Name (ordinal, ignore case).
     /// </summary>
     [Fact]

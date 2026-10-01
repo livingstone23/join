@@ -85,6 +85,7 @@ public sealed class GetTicketDocumentsQueryHandlerTests
         context.Connection.LastCommandText.Should().Contain("ORDER BY td.Created DESC");
         context.Connection.LastCommandText.Should().Contain("WHERE td.TicketId = @TicketId");
         context.Connection.LastCommandText.Should().Contain("AND td.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain("UNIQUEIDENTIFIER", "a non-GUID CreatedBy such as \"System\" must not break the query");
     }
 
     private sealed class GetDocsTestContext

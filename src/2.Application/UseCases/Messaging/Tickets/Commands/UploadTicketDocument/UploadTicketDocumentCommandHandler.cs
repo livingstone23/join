@@ -163,7 +163,7 @@ public sealed class UploadTicketDocumentCommandHandler(
         {
             IsSuccess = true,
             Message = "Ticket document uploaded successfully.",
-            Data = BuildDto(entity, createdByName)
+            Data = BuildDto(entity, actorUserId, createdByName)
         };
     }
 
@@ -179,7 +179,7 @@ public sealed class UploadTicketDocumentCommandHandler(
             .Where(v => !string.IsNullOrWhiteSpace(v)));
     }
 
-    private static TicketDocumentDto BuildDto(JOIN.Domain.Support.TicketDocument entity, string? createdByName) => new()
+    private static TicketDocumentDto BuildDto(JOIN.Domain.Support.TicketDocument entity, Guid createdByUserId, string? createdByName) => new()
     {
         Id = entity.Id,
         TicketId = entity.TicketId,
@@ -188,6 +188,7 @@ public sealed class UploadTicketDocumentCommandHandler(
         OriginalName = entity.OriginalName,
         ContentType = entity.ContentType,
         SizeBytes = entity.SizeBytes,
+        CreatedByUserId = createdByUserId,
         CreatedByUserName = createdByName,
         CreatedAt = entity.Created
     };

@@ -25,9 +25,11 @@ public sealed class GetTicketDocumentsQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        // Note: the CreatedByUserId projection relies on the audit interceptor
-        // storing CreatedBy as the user Guid (it does — see AuditableEntitySaveChangesInterceptor).
-        // JOIN matches it against Security.Users.Id cast from nvarchar.
+        // CreatedBy is the user Guid written by AuditableEntitySaveChangesInterceptor,
+        // but it falls back to "System" when there is no authenticated user (e.g. the
+        // anonymous inbound-channel webhooks). Compare as strings so such rows simply
+        // get no user instead of failing the whole query on a GUID cast; CONCAT keeps
+        // it portable across SQL Server and Postgres.
         const string sql = """
             SELECT
                 td.Id,
@@ -49,7 +51,7 @@ public sealed class GetTicketDocumentsQueryHandler(
                 CONCAT(u.FirstName, ' ', u.LastName) AS CreatedByUserName,
                 td.Created AS CreatedAt
             FROM Support.TicketDocuments td
-            LEFT JOIN Security.Users u ON u.Id = CAST(td.CreatedBy AS UNIQUEIDENTIFIER)
+            LEFT JOIN Security.Users u ON CONCAT(u.Id, '') = td.CreatedBy
             WHERE td.TicketId = @TicketId
               AND td.CompanyId = @TenantId
               AND td.GcRecord = 0

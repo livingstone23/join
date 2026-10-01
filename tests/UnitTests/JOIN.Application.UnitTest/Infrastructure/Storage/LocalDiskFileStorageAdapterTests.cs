@@ -156,6 +156,8 @@ public sealed class LocalDiskFileStorageAdapterTests : IDisposable
     [InlineData("../escape.txt")]
     [InlineData("companyA/../../../etc/escape.txt")]
     [InlineData("..\\windows-escape.txt")]
+    [InlineData("companyA\\..\\..\\escape.txt")]
+    [InlineData("/etc/escape.txt")]
     public async Task SaveAsync_WhenStorageKeyAttemptsPathTraversal_ShouldThrowAndNotWrite(string maliciousKey)
     {
         // Act
@@ -174,5 +176,37 @@ public sealed class LocalDiskFileStorageAdapterTests : IDisposable
         // configured root only — proving the file did not get written there.
         var expectedUnderRoot = Path.GetFullPath(Path.Combine(_rootPath, maliciousKey));
         File.Exists(expectedUnderRoot).Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Verifies the root check compares against "root + separator": a key that
+    /// resolves into a sibling directory sharing the root's name as a prefix
+    /// (e.g. "<root>-evil") must be rejected, not accepted by a bare StartsWith.
+    /// </summary>
+    [Fact]
+    public async Task SaveAsync_WhenKeyTargetsSiblingDirectoryWithSamePrefix_ShouldThrow()
+    {
+        var siblingKey = $"../{Path.GetFileName(_rootPath)}-evil/escape.txt";
+
+        var act = async () => await _adapter.SaveAsync(
+            new MemoryStream(new byte[] { 0x01 }), siblingKey, "text/plain", CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*resolves outside the configured root*");
+        Directory.Exists(_rootPath + "-evil").Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Verifies that backslash separators are normalized on every platform,
+    /// so a legitimate nested key written with "\" lands in nested folders.
+    /// </summary>
+    [Fact]
+    public async Task SaveAsync_WhenKeyUsesBackslashSeparators_ShouldWriteNestedFile()
+    {
+        var result = await _adapter.SaveAsync(
+            new MemoryStream(new byte[] { 0x01, 0x02 }), "companyA\\ticketB\\file.txt", "text/plain", CancellationToken.None);
+
+        result.SizeBytes.Should().Be(2);
+        File.Exists(Path.Combine(_rootPath, "companyA", "ticketB", "file.txt")).Should().BeTrue();
     }
 }
