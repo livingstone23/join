@@ -1,7 +1,7 @@
-# SPEC 44 — Módulo Calendario: parametrización, calendarios de usuario y actividades
+# SPEC 45 — Módulo Calendario: parametrización, calendarios de usuario y actividades
 
 > **Status:** Borrador
-> **Depends on:** SPEC 47 (`SystemModule.IsBase`, `ModuleName` en `SystemOptionSeed`, rutas con guion y solo SuperAdmin habilita módulos). Es prerequisito de SPEC 45 (ingreso de actividades por canales / agente) y SPEC 46 (estructura de integración con Google Calendar).
+> **Depends on:** SPEC 44 (`SystemModule.IsBase`, `ModuleName` en `SystemOptionSeed`, rutas con guion y solo SuperAdmin habilita módulos). Es prerequisito de SPEC 46 (ingreso de actividades por canales / agente) y SPEC 47 (estructura de integración con Google Calendar).
 > **Related:** SPEC 41 (índices únicos filtrados por `GcRecord = 0` — mismo patrón en todos los índices de esta spec), SPEC 40 (fork PostgreSQL — la sintaxis de `HasFilter` de esta spec se porta igual que el resto), SPEC 43 (patrón "valores iniciales desde la configuración de la empresa").
 > **Date:** 2026-09-29
 > **Objective:** Crear el módulo Calendario en su propio esquema `Calendar`: un catálogo global de tipos de actividad y de estados que cada empresa habilita y ajusta, la configuración de calendario por empresa (usuario por defecto, horario hábil, zona horaria, feriados), la configuración por usuario (calendario por defecto, horario de contrato, días hábiles, periodos no hábiles), los calendarios de cada usuario y sus actividades (puntuales, de día completo y periódicas), con validación de superposición y de horario hábil, un panel para consultar calendarios de otros usuarios de la misma empresa y todas las APIs que el frontend necesita para las vistas de día, semana y mes.
@@ -14,8 +14,8 @@ El usuario pidió un calendario por usuario del sistema que funcione como Google
 
 Las dos piezas siguientes se separaron a propósito:
 
-- **SPEC 45** agrega el ingreso por canales (agente de n8n), el registro de personas nuevas (`PersonPendingConfirmation`) y el flujo de revisión.
-- **SPEC 46** deja creadas las entidades y tablas de la integración con Google, sin acciones.
+- **SPEC 46** agrega el ingreso por canales (agente de n8n), el registro de personas nuevas (`PersonPendingConfirmation`) y el flujo de revisión.
+- **SPEC 47** deja creadas las entidades y tablas de la integración con Google, sin acciones.
 
 Hoy el sistema no tiene ninguna entidad de calendario, agenda ni cita. Lo más parecido es el módulo de tickets, del que esta spec reutiliza patrones: catálogo por empresa (`TicketStatus`), configuración por empresa con valores iniciales (`TicketCompanyDefault`, SPEC 43) y bitácora de cambios (`TicketLog`).
 
@@ -121,7 +121,7 @@ Controllers nuevos con `[Route("api/v{version:apiVersion}/[controller]")]`. Endp
 
 ### H. Seed
 
-- `SeedSystemModulesAsync`: nuevo módulo `Calendar` (Description "Calendar and activities module", `fa-solid fa-calendar-days`, `Order = 4`, **`IsBase = false`**: es opcional y lo habilita el SuperAdmin por empresa, SPEC 47).
+- `SeedSystemModulesAsync`: nuevo módulo `Calendar` (Description "Calendar and activities module", `fa-solid fa-calendar-days`, `Order = 4`, **`IsBase = false`**: es opcional y lo habilita el SuperAdmin por empresa, SPEC 44).
 - Catálogos globales `CalendarActivity` y `CalendarStatus` (valores en **Data model**), idempotentes por `Code`.
 - `GetAdministrativeSystemOptionSeeds()` y `GetRoleSystemOptionSeeds()`: menú y permisos (ver **Permisos**).
 - Empresa maestra `JOIN-001` (solo desarrollo): catálogos de empresa, `CalendarCompany` (usuario por defecto = el SuperAdmin de la empresa, 08:00–17:00, `America/Managua`, estado de reprogramación = `RESCHEDULED`), `CompanyModule` "Calendar" activo y provisión de calendario para los usuarios semilla. Esto permite probar el módulo de punta a punta en Development y en las pruebas de integración.
@@ -133,8 +133,8 @@ Controllers nuevos con `[Route("api/v{version:apiVersion}/[controller]")]`. Endp
 
 **Out of scope (specs futuras):**
 
-- Ingreso por canales, agente de n8n, `PersonPendingConfirmation` y flujo de revisión → **SPEC 45**.
-- Entidades de integración con Google Calendar → **SPEC 46**. Acciones de sincronización (OAuth, envío, webhook, worker) → spec posterior a la 46.
+- Ingreso por canales, agente de n8n, `PersonPendingConfirmation` y flujo de revisión → **SPEC 46**.
+- Entidades de integración con Google Calendar → **SPEC 47**. Acciones de sincronización (OAuth, envío, webhook, worker) → spec posterior a la 47.
 - Recordatorios y notificaciones automáticas (Hangfire), cierre automático de actividades vencidas ("Completada") y barridos de estados.
 - Invitados o participantes adicionales en una actividad.
 - Calendarios privados u ocultos dentro de la empresa: todo calendario es visible para quien tiene `CalendarOthers`.
@@ -184,7 +184,7 @@ Es la lista maestra de todos los tipos posibles. Ninguna actividad apunta direct
 
 | Campo | Tipo | Req. | Descripción |
 |---|---|---|---|
-| `Code` | nvarchar(30) | Sí | Código técnico inmutable (`MEETING`). Lo usan la lógica y el agente (SPEC 45). Único entre activos. |
+| `Code` | nvarchar(30) | Sí | Código técnico inmutable (`MEETING`). Lo usan la lógica y el agente (SPEC 46). Único entre activos. |
 | `Name` | nvarchar(100) | Sí | Nombre visible base ("Reunión"). |
 | `Description` | nvarchar(500) | No | Para qué sirve el tipo. |
 | `Color` | nvarchar(7) | Sí | Color hex base (`#1E88E5`). |
@@ -207,7 +207,7 @@ Es la lista maestra de todos los tipos posibles. Ninguna actividad apunta direct
 | `REMINDER` | Recordatorio | 15 | Sí | No | `#8E24AA` |
 | `PERSON_REVIEW` | Revisión de persona | 15 | Sí | No | `#E53935` |
 
-`PERSON_REVIEW` la usa SPEC 45 para avisar al supervisor que revise una persona creada por el agente.
+`PERSON_REVIEW` la usa SPEC 46 para avisar al supervisor que revise una persona creada por el agente.
 
 #### 2. `CalendarActivityCompany` — tipos de actividad habilitados por empresa
 
@@ -253,7 +253,7 @@ Tabla `Calendar.Statuses`. Hereda `BaseAuditableEntity`. **Administra:** SuperAd
 | Code | Name | BlocksTime | IsFinal | Color | Uso por la lógica |
 |---|---|---|---|---|---|
 | `PENDING` | Pendiente de confirmación | Sí | No | `#FDD835` | Estado inicial por defecto al sincronizar catálogos. |
-| `CONFIRMED` | Confirmada | Sí | No | `#43A047` | SPEC 46: solo las confirmadas se sincronizan con Google. |
+| `CONFIRMED` | Confirmada | Sí | No | `#43A047` | SPEC 47: solo las confirmadas se sincronizan con Google. |
 | `RESCHEDULED` | Reprogramada | Sí | No | `#FB8C00` | Valor por defecto de `CalendarCompany.RescheduledByOthersStatusCompanyId` (estado tras una reprogramación hecha por alguien distinto al dueño). |
 | `CANCELLED` | Anulada | **No** | Sí | `#9E9E9E` | Anular. Libera el horario. |
 | `COMPLETED` | Completada | Sí | Sí | `#546E7A` | Se marca a mano (Hangfire a futuro). |
@@ -282,7 +282,7 @@ Tabla `Calendar.CalendarCompanies`. Hereda `BaseTenantEntity`. **Una sola fila p
 
 | Campo | Tipo | Req. | Descripción |
 |---|---|---|---|
-| `DefaultActivityUserId` | Guid FK → Users | Sí | Usuario (típicamente un supervisor) que recibe toda actividad que llega sin destinatario identificado: solicitantes nuevos (servicio nuevo, ticket), correos de quien atiende que no coinciden con ningún usuario, y la revisión de personas creadas por el agente (SPEC 45). Debe pertenecer a la empresa (`UserCompany` activo). |
+| `DefaultActivityUserId` | Guid FK → Users | Sí | Usuario (típicamente un supervisor) que recibe toda actividad que llega sin destinatario identificado: solicitantes nuevos (servicio nuevo, ticket), correos de quien atiende que no coinciden con ningún usuario, y la revisión de personas creadas por el agente (SPEC 46). Debe pertenecer a la empresa (`UserCompany` activo). |
 | `TimeZone` | nvarchar(64) | Sí | Zona IANA (`America/Managua`). Todas las horas del módulo se interpretan en esta zona. Se valida con `TimeZoneInfo.FindSystemTimeZoneById`. |
 | `IsOpen24Hours` | bit | Sí | `true` = la empresa opera las 24 horas. Se ignoran `BusinessHoursStart`/`End`. |
 | `BusinessHoursStart` | time | Condicional | Hora de apertura. Obligatoria si `IsOpen24Hours = 0`. |
@@ -299,7 +299,7 @@ Comentario XML obligatorio de `DefaultActivityUserId` en la entidad:
 /// User (normally a supervisor) who RECEIVES every activity that arrives without an identified
 /// recipient, so they can attend it or redistribute it to another user. Used when:
 /// <list type="bullet">
-///   <item>The channel agent (SPEC 45) registers a request from a NEW requester (a new service,
+///   <item>The channel agent (SPEC 46) registers a request from a NEW requester (a new service,
 ///   a ticket, a first contact) who does not ask for a specific user.</item>
 ///   <item>An existing requester gives the e-mail of the user who attends them, but that e-mail does
 ///   not match (exact, case-insensitive) an active user of this company with a calendar. The activity
@@ -321,7 +321,7 @@ Comentario XML obligatorio de `RescheduledByOthersStatusCompanyId` en la entidad
 /// <summary>
 /// Company-level status (<see cref="CalendarStatusCompany"/>) that the system assigns automatically
 /// to a <see cref="CalendarEvent"/> when its start or end time is changed by someone who is NOT the
-/// owner of the calendar (another user through the calendar panel, or the channel agent of SPEC 45).
+/// owner of the calendar (another user through the calendar panel, or the channel agent of SPEC 46).
 /// Its purpose is to make the owner review and confirm the new date/time.
 /// <para>
 /// NOT applied when: the owner reschedules their own activity (the status is kept), the activity is
@@ -412,7 +412,7 @@ Reglas:
 
 #### 10. `CalendarEvent` — la actividad
 
-Tabla `Calendar.Events`. Hereda `BaseTenantEntity`. **Administra:** el dueño del calendario; otros usuarios con `CalendarOthers`; el agente (SPEC 45). **Pantalla:** vistas día/semana/mes, detalle de actividad, formulario de actividad.
+Tabla `Calendar.Events`. Hereda `BaseTenantEntity`. **Administra:** el dueño del calendario; otros usuarios con `CalendarOthers`; el agente (SPEC 46). **Pantalla:** vistas día/semana/mes, detalle de actividad, formulario de actividad.
 
 **Qué es y cuándo**
 
@@ -435,7 +435,7 @@ Tabla `Calendar.Events`. Hereda `BaseTenantEntity`. **Administra:** el dueño de
 
 | Campo | Tipo | Req. | Descripción |
 |---|---|---|---|
-| `RecurrenceRule` | nvarchar(500) | No | Regla RFC 5545 **sin** el prefijo `RRULE:` (`FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE;COUNT=10`). Nulo = actividad puntual. Solo se aceptan `FREQ` `DAILY`, `WEEKLY`, `MONTHLY` o `YEARLY`, con `INTERVAL`, `BYDAY`, `BYMONTHDAY`, `COUNT` o `UNTIL` (ver Decisiones). Es el mismo formato que usa Google, así SPEC 46 la envía sin traducir. |
+| `RecurrenceRule` | nvarchar(500) | No | Regla RFC 5545 **sin** el prefijo `RRULE:` (`FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE;COUNT=10`). Nulo = actividad puntual. Solo se aceptan `FREQ` `DAILY`, `WEEKLY`, `MONTHLY` o `YEARLY`, con `INTERVAL`, `BYDAY`, `BYMONTHDAY`, `COUNT` o `UNTIL` (ver Decisiones). Es el mismo formato que usa Google, así SPEC 47 la envía sin traducir. |
 | `RecurrenceEndUtc` | datetime2 | No | Calculado por el sistema: fin de la última ocurrencia (a partir de `UNTIL` o `COUNT`). Nulo = sin fin. Sirve para filtrar series en consultas por rango sin expandirlas. |
 | `SeriesMasterId` | Guid FK → CalendarEvent | No | En una **excepción** (una ocurrencia modificada o anulada de una serie), apunta a la actividad maestra. Nulo en actividades puntuales y en maestras. |
 | `OriginalStartUtc` | datetime2 | Condicional | En una excepción: el inicio que la ocurrencia tenía en la serie original. Identifica qué ocurrencia reemplaza. Obligatorio si `SeriesMasterId` tiene valor. |
@@ -450,7 +450,7 @@ Tabla `Calendar.Events`. Hereda `BaseTenantEntity`. **Administra:** el dueño de
 | `OriginType` | int (`CalendarEventOriginType`) | Sí | `User = 1` (usuario de JOIN), `Phone = 2` (número de teléfono o WhatsApp), `Email = 3`, `System = 4` (proceso interno). |
 | `OriginUserId` | Guid FK → Users | No | Usuario de JOIN que la registró (en `OriginType = User`, quien la creó; si vino por el agente, el usuario de servicio del agente). |
 | `OriginIdentifier` | nvarchar(200) | No | Teléfono en formato E.164 o correo del solicitante cuando no es un usuario de JOIN. |
-| `OriginReference` | nvarchar(200) | No | Id externo del mensaje o conversación. Evita duplicados cuando el agente reintenta (SPEC 45). |
+| `OriginReference` | nvarchar(200) | No | Id externo del mensaje o conversación. Evita duplicados cuando el agente reintenta (SPEC 46). |
 
 Índice único filtrado: `(CompanyId, OriginChannelId, OriginReference)` where `OriginReference IS NOT NULL AND GcRecord = 0`.
 
@@ -593,7 +593,7 @@ new("CalendarSettings", "/calendar/settings", "@Icons.Material.Filled.EditCalend
 new("CalendarCatalogs", "/calendar/catalogs", "@Icons.Material.Filled.Category", "Calendar", "CalendarCatalogs", true, true, true, true),
 ```
 
-Nombres de opción y rutas **en inglés**, en minúsculas y con **guion** para separar palabras, igual que todo el sistema (decisión del usuario, 2026-10-01; ver SPEC 47). Son definitivos para el frontend. Con SPEC 47, cada fila declara además `ModuleName = "Calendar"`.
+Nombres de opción y rutas **en inglés**, en minúsculas y con **guion** para separar palabras, igual que todo el sistema (decisión del usuario, 2026-10-01; ver SPEC 44). Son definitivos para el frontend. Con SPEC 44, cada fila declara además `ModuleName = "Calendar"`.
 
 **Seed de permisos por rol** (`GetRoleSystemOptionSeeds`, flags `Read, Create, Update, Delete`). Las filas de seed referencian el **nombre de la opción**, no el recurso: `Calendar` → opción `MyCalendar`; `CalendarOthers` → `CalendarPanel`; `CalendarActivityConfirmation` → `ActivityConfirmation`; `CalendarSettings` → `CalendarSettings`; `CalendarCatalogs` → `CalendarCatalogs`.
 
@@ -606,11 +606,11 @@ Nombres de opción y rutas **en inglés**, en minúsculas y con **guion** para s
 | Coordinador | ✔✔✔✔ | ✔ – – – | –, –, ✔, – | – | – |
 | UsuarioSimple | ✔✔✔✔ | – | –, –, ✔, – | – | – |
 
-`Admin`, `Agent` y `Person` no reciben permisos de calendario en esta spec (el `Agent` los recibe en SPEC 45). El administrador de la empresa es **`SuperAdminCompany`** (rol que ya existe y que el sistema usa para la configuración por empresa, p.ej. `CompanyModulesController` y `RolesController`), no `Admin`.
+`Admin`, `Agent` y `Person` no reciben permisos de calendario en esta spec (el `Agent` los recibe en SPEC 46). El administrador de la empresa es **`SuperAdminCompany`** (rol que ya existe y que el sistema usa para la configuración por empresa, p.ej. `CompanyModulesController` y `RolesController`), no `Admin`.
 
 **Verificado (2026-10-01):** `SuperAdminCompany` y `Admin` están en `PrivilegedRoleNames` (`DatabaseSeeder.cs`): la seed les da acceso total a **todas** las opciones y esa regla se aplica después de la matriz explícita. Por eso no necesitan filas propias en `GetRoleSystemOptionSeeds()`; la fila de la tabla documenta el resultado efectivo.
 
-**Permisos fuera de `JOIN-001` (decisión del usuario, 2026-10-01; SPEC 47 A3):** la seed de `RoleSystemOptions` solo carga la empresa `JOIN-001`. En cualquier otra empresa, los permisos de este módulo se asignan **a mano** desde la pantalla de roles (SuperAdmin o el `SuperAdminCompany` de la empresa) antes de usarlo; sin ellos, los endpoints responden `403`. Es un paso de despliegue por empresa, documentado en `CURL_REQUESTS.md`.
+**Permisos fuera de `JOIN-001` (decisión del usuario, 2026-10-01; SPEC 44 A3):** la seed de `RoleSystemOptions` solo carga la empresa `JOIN-001`. En cualquier otra empresa, los permisos de este módulo se asignan **a mano** desde la pantalla de roles (SuperAdmin o el `SuperAdminCompany` de la empresa) antes de usarlo; sin ellos, los endpoints responden `403`. Es un paso de despliegue por empresa, documentado en `CURL_REQUESTS.md`.
 
 ### Aislamiento del módulo: qué puede modificar cada permiso
 
@@ -623,7 +623,7 @@ Los cinco recursos de esta spec **solo** habilitan endpoints del módulo Calenda
 | `CommunicationChannel`, `Company`, `CompanyModule` | **Solo lectura.** |
 | `InviteUser` / `AddUserCompany` (Security) | Llaman a `CalendarUserProvisioner`, que **solo** agrega filas en `Calendar.UserCalendars` y `Calendar.UserConfigurations`. No cambia nada del usuario ni de su empresa. |
 
-La única excepción es SPEC 45: el agente crea `Person`, `PersonContact` y `PersonPendingConfirmation` con su propio recurso (`CalendarChannelIntake`), solo para personas **nuevas** y sin poder modificar ni borrar personas existentes.
+La única excepción es SPEC 46: el agente crea `Person`, `PersonContact` y `PersonPendingConfirmation` con su propio recurso (`CalendarChannelIntake`), solo para personas **nuevas** y sin poder modificar ni borrar personas existentes.
 
 Se agrega una prueba de arquitectura (F10) que verifica que ningún command handler de `UseCases/Calendars` llama a `GetRepository<T>()` ni a repositorios con nombre de entidades fuera de `JOIN.Domain.Calendars`, salvo para lectura.
 
@@ -727,7 +727,7 @@ El calendario por defecto se cambia con `UserCalendars/{id}/set-default`, no aqu
 | GET | `/CalendarPanel/calendars?userIds` | Calendarios de los usuarios seleccionados (máximo 20 usuarios). |
 | GET | `/CalendarPanel/events?userIds&calendarIds&from&to&activityCompanyIds&statusCompanyIds&includeCancelled` | Igual que `GET /CalendarEvents`, pero para varios usuarios; cada ocurrencia incluye `ownerUserId` y `ownerName`. Máximo 20 usuarios y 62 días. |
 | GET | `/CalendarPanel/events/{id}` y `/CalendarPanel/events/{id}/logs` | Detalle y bitácora de una actividad ajena. |
-| GET | `/CalendarPanel/availability?userId&from&to&activityCompanyId` | Huecos libres del usuario en el rango según R4 y R5, en bloques de la duración del tipo (sirve al panel y al agente de SPEC 45). Rango máximo: 14 días. |
+| GET | `/CalendarPanel/availability?userId&from&to&activityCompanyId` | Huecos libres del usuario en el rango según R4 y R5, en bloques de la duración del tipo (sirve al panel y al agente de SPEC 46). Rango máximo: 14 días. |
 | POST | `/CalendarPanel/events` | Crea en el calendario de otro usuario (`ownerUserId` obligatorio; `calendarId` opcional → el predeterminado del dueño). Aplica R5. |
 | PUT | `/CalendarPanel/events/{id}?scope&occurrenceStartUtc` | Aplica R5 y, si cambia el horario, el estado de `CalendarCompany.RescheduledByOthersStatusCompanyId` (R6). |
 | PATCH | `/CalendarPanel/events/{id}/status?scope&occurrenceStartUtc` | `[PermissionResource("CalendarActivityConfirmation")]` + chequeo de `CalendarOthers.CanUpdate` en el handler. |
@@ -867,16 +867,16 @@ Configuraciones EF (`Configuration/Calendars/`), `DbSet`s, query filters explíc
 - **Namespace `JOIN.Domain.Calendars`** (plural), por el mismo motivo.
 - **Catálogos globales heredan de `BaseAuditableEntity`** (elegido) vs `BaseTenantEntity`. Son la "lista de todas las posibles" y no tienen empresa dueña; seguir la regla "todo hereda de `BaseTenantEntity`" obligaría a inventarles una empresa. Es el mismo criterio de `CommunicationChannel` y `SystemModule`. Todas las demás entidades sí son tenant.
 - **Una fila de `CalendarUserConfiguration` apunta al calendario por defecto** (elegido) vs flag `IsDefault` en `UserCalendar` con índice único filtrado `WHERE IsDefault = 1`. Es la "estructura separada" pedida. El índice único `(CompanyId, UserId)` garantiza la regla sin depender de un filtro por valor (que en PostgreSQL requiere otra sintaxis, SPEC 40), y la misma fila guarda horario y preferencias.
-- **`BlocksTime` e `IsFinal` solo en el catálogo global** (elegido). Definen el comportamiento del sistema (choques, sincronización con Google, barridos futuros). Si cada empresa pudiera cambiarlos, "Anulada" podría bloquear en una empresa y no en otra, y SPEC 46 no podría decidir qué sincronizar. La empresa sí personaliza nombre, color, orden y habilitación.
+- **`BlocksTime` e `IsFinal` solo en el catálogo global** (elegido). Definen el comportamiento del sistema (choques, sincronización con Google, barridos futuros). Si cada empresa pudiera cambiarlos, "Anulada" podría bloquear en una empresa y no en otra, y SPEC 47 no podría decidir qué sincronizar. La empresa sí personaliza nombre, color, orden y habilitación.
 - **Estado inicial en `CalendarActivityCompany`** (elegido) vs en `CalendarCompany`. El usuario definió `CalendarCompany` como una sola fila por empresa, y el estado inicial es **por tipo** de actividad (un recordatorio puede nacer confirmado y una cita pendiente), así que va en la fila del tipo.
 - **Se descarta `RequiresConfirmationWhenCreatedByAgent`** (propuesta inicial): el estado inicial configurable por tipo cubre ese caso sin un flag extra.
 - **Cinco recursos de permiso: los tres operativos acordados más `CalendarSettings` y `CalendarCatalogs`** (confirmado por el usuario, 2026-10-01). La parametrización tiene permisos propios para que un usuario común no edite la configuración de su empresa, y el catálogo global queda solo para SuperAdmin. Se descartó un único recurso de configuración (mezclaba empresa y catálogo global) y un recurso por pantalla (demasiadas filas en la matriz de roles).
 - **Administrador de empresa = `SuperAdminCompany`** (decisión del usuario, 2026-10-01): es el rol que el sistema ya usa para la configuración por empresa. El resto de la matriz de roles queda como se propuso.
-- **Módulo, opciones de menú y rutas en inglés con guion** (`Calendar`, `/calendar/my-calendar`…), decisión del usuario, 2026-10-01, aplicada a todo el sistema en SPEC 47.
-- **`SuperAdminCompany` con acceso total, incluidos los catálogos globales** (SPEC 47, decisión A4): la seed existente da acceso total a todas las opciones a los roles de `PrivilegedRoleNames` (`Admin`, `SuperAdminCompany`) y esa regla se aplica después de la matriz. Se mantiene por decisión del usuario; la fila de la matriz refleja ese resultado.
+- **Módulo, opciones de menú y rutas en inglés con guion** (`Calendar`, `/calendar/my-calendar`…), decisión del usuario, 2026-10-01, aplicada a todo el sistema en SPEC 44.
+- **`SuperAdminCompany` con acceso total, incluidos los catálogos globales** (SPEC 44, decisión A4): la seed existente da acceso total a todas las opciones a los roles de `PrivilegedRoleNames` (`Admin`, `SuperAdminCompany`) y esa regla se aplica después de la matriz. Se mantiene por decisión del usuario; la fila de la matriz refleja ese resultado.
 - **Sin reglas de transición de estados** (decisión del usuario, SPEC futura con Hangfire). La excepción es técnica: reactivar una anulada revalida choques, para no dejar una superposición inválida.
 - **Estado tras reprogramar por alguien distinto al dueño, parametrizable en `CalendarCompany.RescheduledByOthersStatusCompanyId`** (decisión del usuario, 2026-10-01) vs fijarlo en el código como `RESCHEDULED` o `PENDING`. Cada empresa elige qué estado usar; el seed y la creación de la configuración proponen "Reprogramada". Los handlers leen siempre la configuración y nunca comparan contra el código `RESCHEDULED`.
-- **Repetición como `RRULE` (RFC 5545) con expansión en memoria** (elegido) vs materializar cada ocurrencia como una fila. Guardar la regla es lo que hace Google, permite series sin fin y hace la sincronización de SPEC 46 directa. Materializar simplificaría las consultas, pero multiplica filas, complica "esta y las siguientes" e impide series sin fin. Se acota el costo con el horizonte de 12 meses y el rango máximo de 62 días por consulta.
+- **Repetición como `RRULE` (RFC 5545) con expansión en memoria** (elegido) vs materializar cada ocurrencia como una fila. Guardar la regla es lo que hace Google, permite series sin fin y hace la sincronización de SPEC 47 directa. Materializar simplificaría las consultas, pero multiplica filas, complica "esta y las siguientes" e impide series sin fin. Se acota el costo con el horizonte de 12 meses y el rango máximo de 62 días por consulta.
 - **Subconjunto de RRULE** (`FREQ` diaria/semanal/mensual/anual, `INTERVAL`, `BYDAY`, `BYMONTHDAY`, `COUNT`, `UNTIL`). Cubre lo pedido y casos como "lunes y miércoles cada 2 semanas" o "el último viernes del mes" (`BYDAY=-1FR`). Se rechazan `BYHOUR`, `BYSETPOS` y `FREQ` menores a diaria.
 - **Ical.Net detrás de una interfaz, en Infrastructure** (elegido). Application solo depende de Domain y DTO; la librería queda reemplazable.
 - **`OwnerUserId` copiado en `CalendarEvent`** (elegido) vs obtenerlo siempre por join con `UserCalendar`. La validación de choques por usuario es la consulta más frecuente del módulo; el dueño de un calendario es inmutable, así que la copia no puede quedar desactualizada.

@@ -6,7 +6,7 @@
 > **Objective:** Permitir adjuntar documentos a un ticket (creación, gestión o finalización) respetando cupos configurables por empresa — tipo de documento, tamaño máximo, máximo de archivos por ticket y cuota diaria opcional — persistiendo cada adjunto en `TicketDocuments` vinculado al `TicketLog` exacto donde se subió, detrás de una abstracción de almacenamiento (`IFileStorageService`) que hoy resuelve a disco local y queda lista para un adapter de Azure Blob o S3 sin tocar el resto del módulo.
 
 
-> **Ajuste por SPEC 47 (2026-10-01):** esta spec se implementó antes que SPEC 47, así que sus `SystemOptionSeed` (`TicketAttachmentSettings`, `TicketDocuments`) quedaron bajo el padre `ManejoTickets` con rutas `/ManejoTickets/...`, igual que el resto de opciones de tickets. SPEC 47 las renombra junto con todas las demás: padre `TicketManagement`, `ModuleName = "Tickets"` y rutas `/tickets/<recurso-con-guion>` (ver su tabla de opciones de Tickets). Los `ControllerName` no cambian.
+> **Ajuste por SPEC 44 (2026-10-01):** esta spec se implementó antes que SPEC 44, así que sus `SystemOptionSeed` (`TicketAttachmentSettings`, `TicketDocuments`) quedaron bajo el padre `ManejoTickets` con rutas `/ManejoTickets/...`, igual que el resto de opciones de tickets. SPEC 44 las renombra junto con todas las demás: padre `TicketManagement`, `ModuleName = "Tickets"` y rutas `/tickets/<recurso-con-guion>` (ver su tabla de opciones de Tickets). Los `ControllerName` no cambian.
 
 ---
 
@@ -105,7 +105,7 @@ La nota "consultar con agente de IA" del brief pedía explícitamente una decisi
 
 ### G. Seed
 
-- `SystemOptionSeed` en `GetAdministrativeSystemOptionSeeds()` para `TicketAttachmentSettings` (`CanRead/CanCreate/CanUpdate/CanDelete = true`, sin `CanDownload`) y para `TicketDocuments` (los cuatro CRUD en `true` **más** `CanDownload: true` explícito), ambos bajo el grupo de menú `ManejoTickets`, rutas `/ManejoTickets/ticket-attachment-settings` y `/ManejoTickets/ticket-documents` (SPEC 47 los mueve a `TicketManagement`, `ModuleName = "Tickets"`, rutas `/tickets/ticket-attachment-settings` y `/tickets/ticket-documents`).
+- `SystemOptionSeed` en `GetAdministrativeSystemOptionSeeds()` para `TicketAttachmentSettings` (`CanRead/CanCreate/CanUpdate/CanDelete = true`, sin `CanDownload`) y para `TicketDocuments` (los cuatro CRUD en `true` **más** `CanDownload: true` explícito), ambos bajo el grupo de menú `ManejoTickets`, rutas `/ManejoTickets/ticket-attachment-settings` y `/ManejoTickets/ticket-documents` (SPEC 44 los mueve a `TicketManagement`, `ModuleName = "Tickets"`, rutas `/tickets/ticket-attachment-settings` y `/tickets/ticket-documents`).
 - **Y las filas de `RoleSystemOptionSeed` en `GetRoleSystemOptionSeeds()`** (mismo motivo detallado en SPEC 34 sección H: el `SystemOptionSeed` declara el recurso, no otorga permiso a ningún rol; solo `Admin`/`SuperAdminCompany` reciben todo automáticamente):
   ```csharp
   new("Manager", "TicketAttachmentSettings", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -400,7 +400,7 @@ ORDER BY td.Created DESC;
 
 ### F9 — Seed
 
-1. Agregar los dos `SystemOptionSeed` (`TicketAttachmentSettings`, `TicketDocuments` con `CanDownload: true`) a `GetAdministrativeSystemOptionSeeds()`, grupo `ManejoTickets` (SPEC 47 lo renombra a `TicketManagement`, `ModuleName = "Tickets"`, rutas `/tickets/...`).
+1. Agregar los dos `SystemOptionSeed` (`TicketAttachmentSettings`, `TicketDocuments` con `CanDownload: true`) a `GetAdministrativeSystemOptionSeeds()`, grupo `ManejoTickets` (SPEC 44 lo renombra a `TicketManagement`, `ModuleName = "Tickets"`, rutas `/tickets/...`).
 1b. Agregar las seis filas de `RoleSystemOptionSeed` de la sección Scope G a `GetRoleSystemOptionSeeds()`.
 2. Crear `SeedTicketAttachmentSettingsAsync(Guid companyId)`, idempotente, con los valores por defecto de la sección Scope, invocada junto al resto del seed de mensajería de las empresas de desarrollo.
 3. `dotnet build` → 0 errores. Arrancar contra base limpia y confirmar que el seed corre sin error.

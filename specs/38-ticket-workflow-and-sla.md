@@ -6,7 +6,7 @@
 > **Objective:** Cerrar la última brecha del brief — "la gestión del ticket deberá ser parametrizable" — dándole uso real a dos campos que ya existen en el dominio pero que ningún handler consulta hoy: `TicketComplexity.ResolutionTimeUnits` (SLA) y `TicketCompanyDefault.MaxDayTicketInactivity` (inactividad), y agregando una tabla de transiciones de status opcional por empresa (`TicketStatusTransition`) que, cuando se configura, restringe a qué status puede pasar un ticket desde cada status de origen.
 
 
-> **Ajuste por SPEC 47 (2026-10-01):** el menú padre de tickets pasa a llamarse `TicketManagement` (antes `ManejoTickets`), con `ModuleName = "Tickets"` y rutas `/tickets/<recurso-con-guion>` (antes `/ManejoTickets/...`). Si esta spec se implementa **después** de SPEC 47, sus `SystemOptionSeed` usan ese padre, ese módulo y esas rutas. Si se implementa **antes**, usan `ManejoTickets` y `/ManejoTickets/...` como el resto de opciones de tickets, y SPEC 47 las renombra junto con todas las demás (`SystemOptionSeed` no tiene `ModuleName` hasta SPEC 47). Los `ControllerName` no cambian.
+> **Ajuste por SPEC 44 (2026-10-01):** el menú padre de tickets pasa a llamarse `TicketManagement` (antes `ManejoTickets`), con `ModuleName = "Tickets"` y rutas `/tickets/<recurso-con-guion>` (antes `/ManejoTickets/...`). Si esta spec se implementa **después** de SPEC 44, sus `SystemOptionSeed` usan ese padre, ese módulo y esas rutas. Si se implementa **antes**, usan `ManejoTickets` y `/ManejoTickets/...` como el resto de opciones de tickets, y SPEC 44 las renombra junto con todas las demás (`SystemOptionSeed` no tiene `ModuleName` hasta SPEC 44). Los `ControllerName` no cambian.
 
 ---
 

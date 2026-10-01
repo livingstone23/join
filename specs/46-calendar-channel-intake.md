@@ -1,16 +1,17 @@
-# SPEC 45 — Calendario: ingreso de actividades por canales (agente) y personas pendientes de confirmación
+# SPEC 46 — Calendario: ingreso de actividades por canales (agente) y personas pendientes de confirmación
 
 > **Status:** Borrador
-> **Depends on:** SPEC 47 (menú y rutas), SPEC 44 (módulo Calendario: `CalendarEvent`, `CalendarCompany`, `CalendarEventScheduleGuard`, `CalendarEventInitialStatusResolver`, `CalendarEventLogWriter`, tipo `PERSON_REVIEW`, estado `CANCELLED`, `CalendarCompany.RescheduledByOthersStatusCompanyId`).
+> **Depends on:** SPEC 44 (menú y rutas), SPEC 45 (módulo Calendario: `CalendarEvent`, `CalendarCompany`, `CalendarEventScheduleGuard`, `CalendarEventInitialStatusResolver`, `CalendarEventLogWriter`, tipo `PERSON_REVIEW`, estado `CANCELLED`, `CalendarCompany.RescheduledByOthersStatusCompanyId`).
 > **Related:** SPEC 37 (ingesta de tickets por canal — mismo catálogo `CommunicationChannel` y mismo criterio de deduplicación por id de mensaje externo).
 > **Date:** 2026-09-29
 > **Objective:** Permitir que un agente automatizado (n8n) que atiende WhatsApp, correo u otro canal, autenticado vía API como usuario de servicio, identifique a la empresa y a la persona que escribe, registre a la persona si no existe (`Person` + `PersonContact` + `PersonPendingConfirmation`), consulte disponibilidad, y cree, reprograme o anule actividades en el calendario del usuario indicado o del usuario por defecto de la empresa, dejando trazado el canal y el solicitante, y generando una actividad de revisión para que un usuario interno complete los datos de la persona nueva.
 
+> **Etapa (decisión del usuario, 2026-10-01):** WhatsApp y los demás canales con agente se configuran **después** de concluir los módulos de Tickets y Calendar. Esta spec no se implementa hasta entonces; antes de hacerlo se revisa contra el estado final de ambos módulos.
 ---
 
 ## Por qué existe esta spec
 
-El módulo Calendario (SPEC 44) se diseñó para recibir actividades desde canales de comunicación. El caso de uso original:
+El módulo Calendario (SPEC 45) se diseñó para recibir actividades desde canales de comunicación. El caso de uso original:
 
 > "Si un agente por canal de WhatsApp identifica que el usuario necesita crearse una cita para el lunes a las 10 de la mañana por una hora, podrá registrarla con un tema, un breve resumen, el canal que lo creó y quién lo creó (número de teléfono, correo si es por email o un usuario de JOIN)."
 
@@ -56,7 +57,7 @@ Decisiones acordadas el 2026-09-29:
 | Query | `LookupIntakePerson` | Buscar a la persona por teléfono/correo del canal o por identificación. |
 | Command | `RegisterIntakePerson` | Crear `Person` + `PersonContact` + `PersonPendingConfirmation` + actividad de revisión. |
 | Query | `LookupIntakeUserByEmail` | Confirmar, por correo exacto, el usuario que atiende al solicitante. |
-| Query | `GetIntakeAvailability` | Huecos libres de un usuario (reutiliza la lógica de `CalendarPanel/availability` de SPEC 44). |
+| Query | `GetIntakeAvailability` | Huecos libres de un usuario (reutiliza la lógica de `CalendarPanel/availability` de SPEC 45). |
 | Command | `CreateIntakeEvent` | Crear la actividad solicitada. |
 | Query | `GetIntakePersonEvents` | Actividades de la persona (para reprogramar o anular). |
 | Command | `RescheduleIntakeEvent` | Reprogramar una actividad de la persona. |
@@ -183,7 +184,7 @@ Después: "mueve mi cita" / "cancela mi cita"
 
 ## API — `CalendarChannelIntakeController`
 
-Ruta base `api/v1/CalendarChannelIntake`. Todas las operaciones pasan por `CalendarModuleGuard` con `requireCalendarCompany = true` (SPEC 44 R1).
+Ruta base `api/v1/CalendarChannelIntake`. Todas las operaciones pasan por `CalendarModuleGuard` con `requireCalendarCompany = true` (SPEC 45 R1).
 
 | Método | Ruta | Flag | Descripción |
 |---|---|---|---|
@@ -192,7 +193,7 @@ Ruta base `api/v1/CalendarChannelIntake`. Todas las operaciones pasan por `Calen
 | GET | `/persons/lookup?channelCode&identifier` o `?identificationTypeId&identificationNumber` | Read | `{ found, personId?, fullName?, hasPendingConfirmation }`. Devuelve **solo** id y nombre: la persona que escribe no debe poder obtener datos de otra. |
 | POST | `/persons` | Create | Registra persona nueva (ver abajo). |
 | GET | `/users/lookup?email` | Read | Coincidencia **exacta** (sin distinguir mayúsculas) con el correo de un usuario con `UserCompany` activo y calendario en la empresa: `{ found, userId?, fullName? }`. No hay búsqueda por nombre ni listados: el agente solo puede confirmar un correo que la persona ya conoce. |
-| GET | `/availability?userId&from&to&activityCode` | Read | `userId` opcional → usuario por defecto. Rango máximo 14 días. Aplica R4 y R5 de SPEC 44 (el agente nunca es el dueño). Devuelve `[{ startUtc, endUtc }]` en bloques de la duración del tipo, más `timeZone`. |
+| GET | `/availability?userId&from&to&activityCode` | Read | `userId` opcional → usuario por defecto. Rango máximo 14 días. Aplica R4 y R5 de SPEC 45 (el agente nunca es el dueño). Devuelve `[{ startUtc, endUtc }]` en bloques de la duración del tipo, más `timeZone`. |
 | POST | `/events` | Create | Crea la actividad (ver abajo). |
 | GET | `/events?requesterPersonId&from&to` | Read | Actividades **no anuladas** de esa persona desde hoy (rango máximo 90 días): `[{ eventId, occurrenceStartUtc, title, startUtc, endUtc, status, ownerFullName }]`. |
 | PUT | `/events/{id}/reschedule` | Update | `{ requesterPersonId, start, end?, scope?, occurrenceStartUtc?, originChannelCode, originIdentifier, originReference, notes? }`. |
@@ -247,7 +248,7 @@ Validador propio (`RegisterIntakePersonCommandValidator`): las mismas reglas de 
   "isAllDay": false,
   "start": "2026-10-05T10:00:00-06:00",   // o startDate/endDate si isAllDay
   "end": "2026-10-05T11:00:00-06:00",     // opcional → duración del tipo en la empresa
-  "recurrenceRule": null,                 // opcional, mismas reglas que SPEC 44
+  "recurrenceRule": null,                 // opcional, mismas reglas que SPEC 45
   "targetUserEmail": "maria@empresa.com", // opcional: correo de quien atiende al solicitante; sin valor o sin coincidencia → CalendarCompany.DefaultActivityUserId
   "requesterPersonId": "guid",            // obligatorio
   "originChannelCode": "WHATSAPP",
@@ -259,7 +260,7 @@ Validador propio (`RegisterIntakePersonCommandValidator`): las mismas reglas de 
 
 Handler (`ITransactionalCommand`):
 1. Guard de módulo y `CalendarCompany`.
-2. **Deduplicación:** si existe una actividad con el mismo `(CompanyId, OriginChannelId, OriginReference)` → `200 { eventId, isDuplicate: true, status }` sin crear nada. El índice único de SPEC 44 garantiza esto también ante una carrera: una violación de ese índice se captura y se responde igual.
+2. **Deduplicación:** si existe una actividad con el mismo `(CompanyId, OriginChannelId, OriginReference)` → `200 { eventId, isDuplicate: true, status }` sin crear nada. El índice único de SPEC 45 garantiza esto también ante una carrera: una violación de ese índice se captura y se responde igual.
 3. `requesterPersonId`: persona activa de la empresa → si no, `CALENDAR_INVALID_LINK`.
 4. Destinatario:
    - Con `targetUserEmail` que coincide **exactamente** con un usuario con `UserCompany` activo y `CalendarUserConfiguration` en la empresa → ese usuario.
@@ -268,17 +269,17 @@ Handler (`ITransactionalCommand`):
    - La actividad va al **calendario por defecto** del destinatario. La respuesta indica `routedToDefaultUser: true|false`, para que el agente se lo comunique a la persona.
 5. Tipo por `activityCode` → `CalendarActivityCompany` usable → si no, `CALENDAR_ACTIVITY_NOT_ENABLED`.
 6. Estado inicial = `CalendarEventInitialStatusResolver`. El request **no** acepta estado.
-7. `CalendarEventScheduleGuard` con creador ≠ dueño: aplica **R4 (superposición)** y **R5 (horario hábil, días hábiles, ausencias, feriados)**. Con conflicto → `409`/`422` con el código de SPEC 44, para que el agente proponga otro horario (usando `/availability`).
+7. `CalendarEventScheduleGuard` con creador ≠ dueño: aplica **R4 (superposición)** y **R5 (horario hábil, días hábiles, ausencias, feriados)**. Con conflicto → `409`/`422` con el código de SPEC 45, para que el agente proponga otro horario (usando `/availability`).
 8. Guarda la actividad con origen completo y la fila `Created` en `CalendarEventLog` (`ChannelId` = canal de origen, `ActorUserId` = usuario de servicio, `ActorIdentifier` = `originIdentifier`).
 9. `201 { eventId, isDuplicate: false, status: { code, name }, ownerFullName, startUtc, endUtc, timeZone }`.
 
 ### `PUT /events/{id}/reschedule` y `POST /events/{id}/cancel`
 
 - La actividad debe existir en la empresa **y** tener `RequesterPersonId == requesterPersonId` del request → si no, `404 CALENDAR_EVENT_NOT_FOUND`. El agente solo puede tocar actividades de la persona que se identificó en la conversación, nunca actividades internas ni de otras personas.
-- La actividad no debe estar en un estado `IsFinal` → si no, `CALENDAR_INTAKE_EVENT_ALREADY_CLOSED`. El agente no reabre actividades anuladas ni completadas; el usuario interno sí puede (SPEC 44 no tiene reglas de transición).
-- **Reprogramar:** valida R4 y R5 con creador ≠ dueño; el estado pasa al configurado en `CalendarCompany.RescheduledByOthersStatusCompanyId` (SPEC 44 R6; el agente nunca es el dueño); bitácora `Rescheduled`. Con `originReference` repetido en el log para esa actividad → respuesta idempotente sin volver a aplicar.
+- La actividad no debe estar en un estado `IsFinal` → si no, `CALENDAR_INTAKE_EVENT_ALREADY_CLOSED`. El agente no reabre actividades anuladas ni completadas; el usuario interno sí puede (SPEC 45 no tiene reglas de transición).
+- **Reprogramar:** valida R4 y R5 con creador ≠ dueño; el estado pasa al configurado en `CalendarCompany.RescheduledByOthersStatusCompanyId` (SPEC 45 R6; el agente nunca es el dueño); bitácora `Rescheduled`. Con `originReference` repetido en el log para esa actividad → respuesta idempotente sin volver a aplicar.
 - **Anular:** estado `CANCELLED`, `reason` obligatorio → `notes` del log; bitácora `StatusChanged`.
-- Actividades periódicas: `scope` y `occurrenceStartUtc` con las mismas reglas de SPEC 44 R7. Si no se indica `scope`, se asume `ThisOccurrence`.
+- Actividades periódicas: `scope` y `occurrenceStartUtc` con las mismas reglas de SPEC 45 R7. Si no se indica `scope`, se asume `ThisOccurrence`.
 
 ### Normalización de identificadores (`IntakeRequesterResolver`)
 
@@ -313,13 +314,13 @@ Al resolver o vincular:
 **`SystemOptions`** (`GetAdministrativeSystemOptionSeeds`):
 
 ```csharp
-// SPEC 45 — endpoints del agente de canales. No visible en menú.
+// SPEC 46 — endpoints del agente de canales. No visible en menú.
 new("CalendarChannelIntake", "/calendar/channel-intake", "@Icons.Material.Filled.SmartToy", "Calendar", "CalendarChannelIntake", true, true, true, false, IsVisibleMenu: false),
-// SPEC 45 — bandeja de personas creadas por canal.
+// SPEC 46 — bandeja de personas creadas por canal.
 new("PendingPersons", "/customers/pending-persons", "@Icons.Material.Filled.PersonSearch", "CustomersMenu", "PersonPendingConfirmations", true, false, true, false),
 ```
 
-Nombres y rutas en inglés con guion (decisión del usuario, 2026-10-01; SPEC 47). `CalendarChannelIntake` declara `ModuleName = "Calendar"`; `PendingPersons` declara `ModuleName = "Customers"` y cuelga del padre `CustomersMenu` (ruta `/customers`), que SPEC 47 renombra desde `Persons`/`/Clientes`.
+Nombres y rutas en inglés con guion (decisión del usuario, 2026-10-01; SPEC 44). `CalendarChannelIntake` declara `ModuleName = "Calendar"`; `PendingPersons` declara `ModuleName = "Customers"` y cuelga del padre `CustomersMenu` (ruta `/customers`), que SPEC 44 renombra desde `Persons`/`/Clientes`.
 
 **`RoleSystemOptions`** (Read, Create, Update, Delete). Las filas referencian el nombre de la opción: `CalendarChannelIntake` y `PendingPersons`:
 
@@ -327,11 +328,11 @@ Nombres y rutas en inglés con guion (decisión del usuario, 2026-10-01; SPEC 47
 |---|---|---|
 | SuperAdmin | ✔ ✔ ✔ – | ✔ – ✔ – |
 | Agent | ✔ ✔ ✔ – | – |
-| SuperAdminCompany | ✔ ✔ ✔ ✔ (acceso total, SPEC 47 A4) | ✔ ✔ ✔ ✔ (acceso total, SPEC 47 A4) |
+| SuperAdminCompany | ✔ ✔ ✔ ✔ (acceso total, SPEC 44 A4) | ✔ ✔ ✔ ✔ (acceso total, SPEC 44 A4) |
 | Manager | – | ✔ – ✔ – |
 | Supervisor | – | ✔ – ✔ – |
 
-**Permisos fuera de `JOIN-001` (decisión del usuario, 2026-10-01; SPEC 47 A3):** la seed de `RoleSystemOptions` solo carga la empresa `JOIN-001`. En cualquier otra empresa, los permisos de este módulo se asignan **a mano** desde la pantalla de roles (SuperAdmin o el `SuperAdminCompany` de la empresa) antes de usarlo; sin ellos, los endpoints responden `403`. Es un paso de despliegue por empresa, documentado en `CURL_REQUESTS.md`.
+**Permisos fuera de `JOIN-001` (decisión del usuario, 2026-10-01; SPEC 44 A3):** la seed de `RoleSystemOptions` solo carga la empresa `JOIN-001`. En cualquier otra empresa, los permisos de este módulo se asignan **a mano** desde la pantalla de roles (SuperAdmin o el `SuperAdminCompany` de la empresa) antes de usarlo; sin ellos, los endpoints responden `403`. Es un paso de despliegue por empresa, documentado en `CURL_REQUESTS.md`.
 
 El agente **no** recibe `CalendarOthers` ni `Persons`: todo lo que necesita pasa por `CalendarChannelIntake`, con reglas más estrictas que las del panel (solo actividades de la persona identificada, sin reabrir estados finales, sin acceso a datos de otras personas).
 
@@ -346,7 +347,7 @@ Confirmar el comportamiento de `X-Company-Id` para un usuario sin `UserCompany` 
 `PersonPendingConfirmation`, enum, configuración EF, `DbSet`, query filter, migración `AddPersonPendingConfirmation`.
 
 ### F3 — `IntakeRequesterResolver` y consultas de intake
-`GetIntakeCompanies`, `GetIntakeIdentificationTypes`, `LookupIntakePerson`, `LookupIntakeUserByEmail`, `GetIntakeAvailability` (reutiliza el cálculo de SPEC 44), `GetIntakePersonEvents`.
+`GetIntakeCompanies`, `GetIntakeIdentificationTypes`, `LookupIntakePerson`, `LookupIntakeUserByEmail`, `GetIntakeAvailability` (reutiliza el cálculo de SPEC 45), `GetIntakePersonEvents`.
 
 ### F4 — Comandos de intake
 `RegisterIntakePerson`, `CreateIntakeEvent`, `RescheduleIntakeEvent`, `CancelIntakeEvent`, reutilizando `CalendarEventScheduleGuard`, `CalendarEventInitialStatusResolver` y `CalendarEventLogWriter`.
