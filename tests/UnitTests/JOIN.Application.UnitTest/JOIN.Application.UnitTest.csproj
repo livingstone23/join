@@ -7,9 +7,24 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <!--
+    Coverage gate (coverlet.msbuild, activated by /p:CollectCoverage=true in CI).
+    Scoped to JOIN.Application only: this project also references Persistence,
+    Infrastructure and WebApi, whose coverage belongs to the integration tests.
+    Source-generated code under obj/ (Mapperly mappers) is excluded.
+  -->
+  <PropertyGroup>
+    <Include>[JOIN.Application]*</Include>
+    <ExcludeByFile>**/obj/**/*.cs</ExcludeByFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="AutoFixture" Version="4.18.1" />
     <PackageReference Include="coverlet.collector" Version="10.0.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.msbuild" Version="10.0.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>

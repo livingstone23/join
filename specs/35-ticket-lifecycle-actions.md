@@ -1,6 +1,6 @@
 # SPEC 35 — Acciones de ciclo de vida del ticket gateadas por `TicketUserCompany`
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 34 (`TicketUserCompany`, `TicketUserCompanySuperAdminCoordinator`). Requiere que el roster de agentes de tickets ya exista y esté poblado por empresa.
 > **Date:** 2026-09-25
 > **Objective:** Reemplazar la reasignación implícita de `UpdateTicket` por un comando dedicado `ReassignTicket` gateado por `IsSuperAdminTicket`/`CanResolveTicket`, agregar `FinishTicket` gateado por `CanFinishTicket`, agregar `AddTicketNote` para registrar notas internas/externas explícitas, y corregir la fuga de visibilidad de `TicketLog.IsOnlyForCreatedAndAssigned` (hoy grabada pero nunca filtrada en la lectura).
