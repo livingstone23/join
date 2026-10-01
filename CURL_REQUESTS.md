@@ -968,3 +968,153 @@ curl -s -X POST "$BASE_URL/api/v1/Tickets/$ID/notes" \
 #   2 = InternalNote  → IsOnlyForCreatedAndAssigned = true  (hidden from third viewers)
 #   3 = ExternalNote  → IsOnlyForCreatedAndAssigned = false (visible to every reader)
 ```
+
+## TicketAttachmentSettings — `/api/v1/TicketAttachmentSettings` (SPEC 36)
+
+Configuración singleton por empresa de los cupos de adjuntos: tipos permitidos
+(bitmask `DocumentType`), tamaño máximo por archivo, máximo de adjuntos por ticket,
+y cuota diaria opcional. Sin esta fila, **ningún upload funciona** en la
+empresa (respondería `ATTACHMENT_SETTINGS_NOT_CONFIGURED`, 400). Recurso de
+permiso `TicketAttachmentSettings`, separado del recurso `Tickets` para que
+puedan administrarse por separado.
+
+| Code | HTTP |
+|------|------|
+| `COMPANY_REQUIRED` / `USER_REQUIRED` | 401 |
+| `TICKET_ATTACHMENT_SETTINGS_NOT_FOUND` | 404 |
+| `CONFIG_ALREADY_EXISTS` | 409 |
+
+```bash
+# 1. List (tenant-scoped — 0 o 1 fila activa)
+curl -s "$BASE_URL/api/v1/TicketAttachmentSettings" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+```
+
+```bash
+# 2. Cross-tenant list (SuperAdmin only) — paginated, optional CompanyName filter
+curl -s "$BASE_URL/api/v1/TicketAttachmentSettings/system-wide?pageNumber=1&pageSize=20&companyName=JOIN" \
+  -H "Authorization: Bearer $TOKEN"
+# Returns 403 for any role other than SuperAdmin.
+```
+
+```bash
+# 3. Get by id
+curl -s "$BASE_URL/api/v1/TicketAttachmentSettings/$ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+# Returns 404 TICKET_ATTACHMENT_SETTINGS_NOT_FOUND for cross-tenant ids.
+```
+
+```bash
+# 4. Create — AllowedDocumentTypes is the integer bitmask of JOIN.Domain.Enums.DocumentType
+#    (Pdf=1, Word=2, Excel=4, Text=8, Image=16, Other=32). Set to 0 to disable uploads.
+curl -s -X POST "$BASE_URL/api/v1/TicketAttachmentSettings" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "allowedDocumentTypes": 31,
+    "maxFileSizeBytes": 10485760,
+    "maxFilesPerTicket": 10,
+    "maxFilesPerDay": null
+  }'
+# Returns 201 with Location header pointing to /api/v1/TicketAttachmentSettings/{id}.
+# Returns 409 CONFIG_ALREADY_EXISTS when an active row already exists for the tenant.
+```
+
+```bash
+# 5. Update
+curl -s -X PUT "$BASE_URL/api/v1/TicketAttachmentSettings/$ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "allowedDocumentTypes": 15,
+    "maxFileSizeBytes": 5242880,
+    "maxFilesPerTicket": 5,
+    "maxFilesPerDay": 50
+  }'
+# Returns 404 TICKET_ATTACHMENT_SETTINGS_NOT_FOUND for cross-tenant ids.
+```
+
+```bash
+# 6. Soft delete (metadata only; the rows in TicketDocuments are not affected)
+curl -s -X DELETE "$BASE_URL/api/v1/TicketAttachmentSettings/$ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+# The filtered unique index on CompanyId (WHERE GcRecord = 0) lets the same tenant
+# create a fresh row after delete; without the filter the company would be locked
+# out of uploads forever.
+```
+
+## TicketDocuments — nested under Tickets (SPEC 36)
+
+REST endpoints para subir, listar, descargar y borrar documentos adjuntos a un
+ticket. Es la **primera ruta anidada explícita del módulo** — un documento no
+existe sin su ticket, así que la URL refleja esa pertenencia. El recurso de
+permiso `TicketDocuments` es distinto de `Tickets` para que una empresa pueda
+otorgar lectura de tickets sin habilitar automáticamente la descarga de adjuntos.
+El download usa `[RequirePermission(PermissionFlags.CanDownload)]` — primer
+consumidor real de ese flag en el repo (definido en SPEC 12/16).
+
+| Code | HTTP |
+|------|------|
+| `COMPANY_REQUIRED` / `USER_REQUIRED` | 401 |
+| `TICKET_NOT_FOUND` / `TICKET_DOCUMENT_NOT_FOUND` / `FILE_NOT_FOUND_IN_STORAGE` | 404 |
+| `ATTACHMENT_SETTINGS_NOT_CONFIGURED` / `INVALID_TICKET_LOG` / `UNSUPPORTED_DOCUMENT_TYPE` / `DOCUMENT_TYPE_NOT_ALLOWED` / `FILE_TOO_LARGE` | 400 |
+| `MAX_FILES_PER_TICKET_REACHED` | 409 |
+| `DAILY_ATTACHMENT_QUOTA_REACHED` | 429 |
+
+```bash
+# 1. List active documents of a ticket, ordered by Created DESC.
+#    Each row carries the CreatedByUserName projected from Security.Users via
+#    the audit interceptor's CreatedBy (Guid string cast).
+curl -s "$BASE_URL/api/v1/tickets/$TICKET_ID/documents" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+```
+
+```bash
+# 2. Download the binary. [RequirePermission(CanDownload)] — a role with CanRead=true
+#    but CanDownload=false gets 403 even though it can list documents.
+#    Returns 200 with Content-Disposition: attachment; filename="<originalName>".
+#    Returns 404 FILE_NOT_FOUND_IN_STORAGE if the row exists in metadata but the
+#    underlying file is missing from the configured storage root.
+curl -s -o downloaded.pdf \
+  "$BASE_URL/api/v1/tickets/$TICKET_ID/documents/$DOCUMENT_ID/download" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+```
+
+```bash
+# 3. Upload — multipart/form-data. The 'file' field carries the binary; 'ticketLogsId'
+#    is OPTIONAL — when omitted, the handler anchors the document to the most recent
+#    active log of the ticket (the typical "evidence after creation" flow). When
+#    provided, it must belong to the same TicketId (otherwise 400 INVALID_TICKET_LOG).
+#    DocumentType is inferred server-side from the file extension — the client never
+#    sends it. Accepted extensions: .pdf .doc/.docx .xls/.xlsx .txt/.csv
+#    .png/.jpg/.jpeg/.gif .zip (anything else → 400 UNSUPPORTED_DOCUMENT_TYPE).
+curl -s -X POST "$BASE_URL/api/v1/tickets/$TICKET_ID/documents" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -F "file=@./report.pdf;type=application/pdf" \
+  -F "ticketLogsId=$LOG_ID"
+# Returns 201 with Response<TicketDocumentDto>.
+# Returns 400 ATTACHMENT_SETTINGS_NOT_CONFIGURED if the tenant has no TicketAttachmentSettings row.
+# Returns 400 DOCUMENT_TYPE_NOT_ALLOWED if the extension is recognized but excluded by AllowedDocumentTypes.
+# Returns 400 FILE_TOO_LARGE when Length > MaxFileSizeBytes.
+# Returns 409 MAX_FILES_PER_TICKET_REACHED at the configured per-ticket cap.
+# Returns 429 DAILY_ATTACHMENT_QUOTA_REACHED when MaxFilesPerDay is set and reached.
+# Returns 500 UPLOAD_FAILED (rare) when SaveChangesAsync reports 0 rows.
+```
+
+```bash
+# 4. Soft delete — metadata only; the binary stays on disk as evidence of the
+#    ticket lifecycle (spec "Decisions taken and discarded"). The row no longer
+#    appears in GET .../documents but the storage file is preserved.
+curl -s -X DELETE "$BASE_URL/api/v1/tickets/$TICKET_ID/documents/$DOCUMENT_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+# Returns 404 TICKET_DOCUMENT_NOT_FOUND for cross-ticket or cross-tenant ids.
+```

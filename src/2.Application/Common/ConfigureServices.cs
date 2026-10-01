@@ -79,6 +79,7 @@ public static class ConfigureServices
         services.AddScoped<IPersonMapper, PersonMapper>();
         services.AddScoped<ITicketMapper, TicketMapper>();
         services.AddScoped<ITicketCompanyDefaultMapper, TicketCompanyDefaultMapper>();
+        services.AddScoped<ITicketAttachmentSettingsMapper, TicketAttachmentSettingsMapper>();
         services.AddScoped<ISystemOptionMapper, SystemOptionMapper>();
         services.AddScoped<IRoleSystemOptionMapper, RoleSystemOptionMapper>();
         services.AddScoped<IRoleMapper, RoleMapper>();

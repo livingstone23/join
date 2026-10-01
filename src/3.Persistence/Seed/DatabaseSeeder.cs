@@ -232,6 +232,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedIncomeRangesAsync(joinCompanyId);
             await SeedTicketCompanyDefaultsAsync(joinCompanyId, defaultTimeUnitId);
             await SeedTicketUserCompaniesAsync(joinCompanyId);
+            await SeedTicketAttachmentSettingsAsync(joinCompanyId);
+            await SeedTicketAttachmentSettingsAsync(privateCompanyId);
 
             // 7. Entidades operacionales (Clientes)
             await SeedJoinPersonsAsync(joinCompanyId, idTypeId);
@@ -1785,6 +1787,47 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         _logger.LogInformation("JOIN ticket roster seed finished. Inserted: {Inserted}, Skipped: {Skipped}", inserted, skipped);
     }
 
+    /// <summary>
+    /// Sembrado idempotente de la fila singleton de <see cref="TicketAttachmentSettings"/>
+    /// para una empresa del seed de desarrollo. Sin esta fila, ningún upload
+    /// funciona en el ambiente de desarrollo (respondería <c>ATTACHMENT_SETTINGS_NOT_CONFIGURED</c>).
+    /// Los defaults siguen la spec: Pdf | Word | Excel | Text | Image, 10 MB,
+    /// 10 archivos por ticket, sin límite diario.
+    /// </summary>
+    private async Task SeedTicketAttachmentSettingsAsync(Guid companyId)
+    {
+        var existing = await _context.TicketAttachmentSettings
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.GcRecord == 0);
+
+        if (existing is not null)
+        {
+            _logger.LogDebug("Ticket attachment settings already configured for company {CompanyId}; skipping.", companyId);
+            return;
+        }
+
+        const int pdfWordExcelTextImage = (int)(JOIN.Domain.Enums.DocumentType.Pdf
+            | JOIN.Domain.Enums.DocumentType.Word
+            | JOIN.Domain.Enums.DocumentType.Excel
+            | JOIN.Domain.Enums.DocumentType.Text
+            | JOIN.Domain.Enums.DocumentType.Image);
+
+        _context.TicketAttachmentSettings.Add(new TicketAttachmentSettings
+        {
+            CompanyId = companyId,
+            AllowedDocumentTypes = (JOIN.Domain.Enums.DocumentType)pdfWordExcelTextImage,
+            MaxFileSizeBytes = 10L * 1024 * 1024,
+            MaxFilesPerTicket = 10,
+            MaxFilesPerDay = null,
+            Created = DateTime.UtcNow,
+            CreatedBy = "System_Seeder",
+            GcRecord = 0
+        });
+
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Ticket attachment settings seeded for company {CompanyId}.", companyId);
+    }
+
     private async Task SeedJoinTicketsAsync(Guid joinCompanyId)
     {
         var managerUser = await _context.ApplicationUsers
@@ -2678,6 +2721,13 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // SPEC 34 — roster de agentes de tickets por empresa.
         new("TicketUserCompanies", "/ManejoTickets/ticket-user-companies", "@Icons.Material.Filled.SupervisorAccount", "ManejoTickets", "TicketUserCompanies", true, true, true, true),
 
+        // SPEC 36 — attachments de tickets. TicketAttachmentSettings NO usa CanDownload
+        // (no tiene endpoint de descarga propio); TicketDocuments sí, con CanDownload explícito
+        // porque es el único recurso del sistema donde el flag se usa de verdad vía
+        // [RequirePermission(PermissionFlags.CanDownload)] en el endpoint de descarga.
+        new("TicketAttachmentSettings", "/ManejoTickets/ticket-attachment-settings", "@Icons.Material.Filled.SettingsApplications", "ManejoTickets", "TicketAttachmentSettings", true, true, true, true),
+        new("TicketDocuments", "/ManejoTickets/ticket-documents", "@Icons.Material.Filled.AttachFile", "ManejoTickets", "TicketDocuments", true, true, true, true, CanDownload: true),
+
         new("Seguridad", "/security", "@Icons.Material.Filled.Security", null, null, false, false, false, false),
         new("Usuarios", "/security/users", "@Icons.Material.Filled.SupervisedUserCircle", null,"Users", false, false, false, false),
         new("Roles", "/security/roles", "@Icons.Material.Filled.VerifiedUser", null,"Roles", false, false, false, false),
@@ -2811,7 +2861,17 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("UsuarioSimple", "TimeUnits", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "TicketComplexities", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "TicketStatuses", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
-        new("UsuarioSimple", "TicketUserCompanies", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false)
+        new("UsuarioSimple", "TicketUserCompanies", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+
+        // SPEC 36 — adjuntos de tickets por rol. TicketAttachmentSettings es la config
+        // singleton por empresa (no endpoint de descarga propio); TicketDocuments es
+        // el recurso donde CanDownload se usa de verdad.
+        new("Manager", "TicketAttachmentSettings", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "TicketDocuments", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Supervisor", "TicketAttachmentSettings", true, false, false, false),
+        new("Supervisor", "TicketDocuments", true, true, false, false, CanDownload: true),
+        new("UsuarioSimple", "TicketAttachmentSettings", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "TicketDocuments", true, true, false, false, CanDownload: true, CanExport: false, CanExecute: false)
 
     ];
 

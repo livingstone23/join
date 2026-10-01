@@ -108,6 +108,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<TicketLog> TicketLogs => Set<TicketLog>();
     public DbSet<TicketCompanyDefault> TicketCompanyDefaults => Set<TicketCompanyDefault>();
     public DbSet<TicketUserCompany> TicketUserCompanies => Set<TicketUserCompany>();
+    public DbSet<TicketAttachmentSettings> TicketAttachmentSettings => Set<TicketAttachmentSettings>();
+    public DbSet<TicketDocument> TicketDocuments => Set<TicketDocument>();
 
 
 
@@ -174,6 +176,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<TicketLog>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<TicketCompanyDefault>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<TicketUserCompany>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<TicketAttachmentSettings>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<TicketDocument>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
 
         // --- 2. SHARED CATALOGS (SOFT DELETE ONLY) ---

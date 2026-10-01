@@ -10,6 +10,7 @@ using JOIN.Infrastructure.Security;
 using JOIN.Infrastructure.Security.Jwt;
 using JOIN.Infrastructure.Security.Mfa;
 using JOIN.Infrastructure.Messaging.Sms;
+using JOIN.Infrastructure.Storage.Local;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -85,6 +86,16 @@ public static class DependencyInjection
                     // CircuitBreaker, AttemptTimeout, TotalRequestTimeout: preset defaults.
                 });
         }
+
+        // ------------------------------------------------------------------
+        // File storage adapter (SPEC 36) — único adapter implementado en esta
+        // spec: LocalDiskFileStorageAdapter sobre FileStorage:Local:RootPath.
+        // "FileStorage:Provider" se deja documentado en appsettings.json pero
+        // todavía no tiene switch (no hay un segundo adapter concreto; cuando
+        // se agregue Azure Blob/S3, este bloque gana la rama correspondiente).
+        // ------------------------------------------------------------------
+        services.Configure<FileStorageOptions>(configuration.GetSection("FileStorage:Local"));
+        services.AddScoped<IFileStorageService, LocalDiskFileStorageAdapter>();
 
         return services;
     }
