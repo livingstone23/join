@@ -1,7 +1,7 @@
 # SPEC 43 — Valores iniciales del ticket desde `TicketCompanyDefaults`, con estado inicial editable
 
 > **Status:** Borrador
-> **Depends on:** Ninguna para implementarse. Relacionada con SPEC 35 (lifecycle), SPEC 37 (ingesta por canal — su `RegisterInboundTicketCommandHandler` debe usar el mismo resolvedor), SPEC 38 (estados finales solo vía `FinishTicket`) y con las specs de front `join_frontb/specs/17-tickets-nuevo.md` y `19-tickets-configuracion.md`.
+> **Depends on:** Ninguna para implementarse. Relacionada con SPEC 35 (lifecycle), SPEC 48 (ingesta por canal, etapa posterior — su `RegisterInboundTicketCommandHandler` debe usar el mismo resolvedor; antes estaba en SPEC 37), SPEC 38 (estados finales solo vía `FinishTicket`) y con las specs de front `join_frontb/specs/17-tickets-nuevo.md` y `19-tickets-configuracion.md`.
 > **Date:** 2026-09-28
 > **Objective:** Que al crear un ticket el estado sea opcional en el request: si el cliente lo envía, el backend valida que sea un estado activo, no final y de la misma empresa; si no lo envía, aplica `Messaging.TicketCompanyDefaults.TicketStatusDefaultId`.
 
@@ -15,7 +15,7 @@ Surgió al diseñar la pantalla "Nuevo ticket" del front (`join_frontb/SpecPropu
 
 Hoy el backend no soporta bien esta regla:
 
-- `CreateTicketDto`/`CreateTicketCommand` exigen `TicketStatusId` (`CreateTicketCommandValidator`: `NotEqual(Guid.Empty)`). Un cliente que no lo envía (por ejemplo, la ingesta por WhatsApp o correo de SPEC 37) no puede crear un ticket sin buscar el default por su cuenta.
+- `CreateTicketDto`/`CreateTicketCommand` exigen `TicketStatusId` (`CreateTicketCommandValidator`: `NotEqual(Guid.Empty)`). Un cliente que no lo envía (por ejemplo, la ingesta por WhatsApp o correo de SPEC 48, etapa posterior) no puede crear un ticket sin buscar el default por su cuenta.
 - `CreateTicketCommandHandler` valida el estado con `statusRepository.GetAsync(request.TicketStatusId)` **sin filtrar por `CompanyId`, `IsActive` ni `IsFinal`**. Un cliente puede crear un ticket directamente en un estado final (sin log de finalización ni SLA confiable, SPEC 38), en un estado inactivo o en un estado de otra empresa.
 - `TicketCompanyDefault.TicketStatusDefaultId` existe desde `InitialReset` con el comentario *"Default status to be assigned to new tickets if not specified"*, y ningún handler lo lee.
 
@@ -53,7 +53,7 @@ Hoy el backend no soporta bien esta regla:
 - `CreateTicketCompanyDefaultCommandHandler` y `UpdateTicketCompanyDefaultCommandHandler`: si `TicketStatusDefaultId` tiene valor, validar que el estado exista, esté activo, sea de la misma empresa y **no** sea final → si no, `TICKET_STATUS_DEFAULT_INVALID`. Así la configuración nunca apunta a un estado que el resolvedor rechazaría.
 - `DeleteTicketStatus` (existente): hoy devuelve `TICKET_STATUS_IN_USE` si hay tickets que lo usan. Se agrega el mismo bloqueo si el estado es el `TicketStatusDefaultId` de la empresa, con el detalle `"Es el estado inicial configurado en Valores por defecto"` en `errors` (regla de SPEC 42: no se borra un registro con dependencias activas).
 
-### E. Ingesta por canal (SPEC 37)
+### E. Ingesta por canal (SPEC 48, etapa posterior)
 
 - `RegisterInboundTicketCommandHandler` (todavía no implementado) llama a `TicketInitialStatusResolver.ResolveAsync(companyId, null, ct)`: los tickets que entran por WhatsApp o correo quedan siempre en el estado inicial configurado. Se deja la nota en SPEC 37 al aprobar esta spec.
 
@@ -189,11 +189,11 @@ Con SPEC 39 aplicada, los filtros globales ya limitan estas lecturas a la empres
 ## Decisions
 
 - **Los defaults de `TicketCompanyDefaults` son propuestas editables, incluido el estado** (elegido el 2026-09-28; reemplaza la versión anterior de esta spec, que fijaba el estado en el servidor). El usuario que crea el ticket conoce el caso y puede empezar, por ejemplo, directamente en "En progreso".
-- **Estado opcional en el request, con fallback al default** (elegido) en vez de obligatorio. La ingesta por canal (SPEC 37) y cualquier cliente sin pantalla crean tickets sin conocer los estados de la empresa.
+- **Estado opcional en el request, con fallback al default** (elegido) en vez de obligatorio. La ingesta por canal (SPEC 48) y cualquier cliente sin pantalla crean tickets sin conocer los estados de la empresa.
 - **Solo estados activos y no finales al crear** (elegido). Un ticket solo se cierra con `FinishTicket` (SPEC 38), que deja el log de finalización del que depende el SLA. Crear un ticket ya cerrado rompería esa garantía.
 - **Las transiciones no aplican al crear** (elegido). Regulan el paso de un estado de origen a otro; al crear no hay origen. Aplicarlas obligaría a tratar el estado inicial configurado como origen implícito, algo que SPEC 38 no define.
 - **Reutilizar `INVALID_TICKET_STATUS` para el estado enviado** (elegido) en vez de un código nuevo. El front ya lo mapea y el significado es el mismo; solo se endurece la regla.
-- **Resolvedor compartido en vez de lógica en el handler** (elegido). SPEC 37 crea tickets por otra vía y debe aplicar exactamente las mismas reglas.
+- **Resolvedor compartido en vez de lógica en el handler** (elegido). SPEC 48 crea tickets por otra vía y debe aplicar exactamente las mismas reglas.
 - **Descartado:** quitar `TicketStatusId` del DTO y forzar siempre el default (versión anterior de esta spec). No permite que el usuario elija el estado al crear.
 
 ---

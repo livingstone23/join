@@ -1,7 +1,7 @@
 # SPEC 38 — Transiciones de status parametrizables y SLA calculado
 
 > **Status:** Aprobado
-> **Depends on:** SPEC 34 (sin cambios), SPEC 35 (`FinishTicket`, `UpdateTicketCommandHandler`, `TicketDtoAssembler` — los tres reciben modificaciones puntuales), SPEC 36 (sin cambios), SPEC 37 (sin cambios — `RegisterInboundTicketCommandHandler` solo crea tickets, nunca cambia su status después, así que el guard de transiciones de esta spec no lo alcanza).
+> **Depends on:** SPEC 34 (sin cambios), SPEC 35 (`FinishTicket`, `UpdateTicketCommandHandler`, `TicketDtoAssembler` — los tres reciben modificaciones puntuales), SPEC 36 (sin cambios), SPEC 48, antes 37 (no es dependencia: está `Pospuesto`; se menciona porque no requiere cambios — `RegisterInboundTicketCommandHandler` solo crea tickets, nunca cambia su status después, así que el guard de transiciones de esta spec no lo alcanza).
 > **Date:** 2026-09-25
 > **Objective:** Cerrar la última brecha del brief — "la gestión del ticket deberá ser parametrizable" — dándole uso real a dos campos que ya existen en el dominio pero que ningún handler consulta hoy: `TicketComplexity.ResolutionTimeUnits` (SLA) y `TicketCompanyDefault.MaxDayTicketInactivity` (inactividad), y agregando una tabla de transiciones de status opcional por empresa (`TicketStatusTransition`) que, cuando se configura, restringe a qué status puede pasar un ticket desde cada status de origen.
 

@@ -1,6 +1,6 @@
 # SPEC 36 — Adjuntos de ticket: parámetros por empresa, `TicketDocuments` y storage plugueable
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 35 (`TicketLog` es el punto de anclaje de cada adjunto vía `TicketLogsId`; `AddTicketNote` es la vía recomendada para adjuntar evidencia fuera de creación/finalización).
 > **Date:** 2026-09-25
 > **Objective:** Permitir adjuntar documentos a un ticket (creación, gestión o finalización) respetando cupos configurables por empresa — tipo de documento, tamaño máximo, máximo de archivos por ticket y cuota diaria opcional — persistiendo cada adjunto en `TicketDocuments` vinculado al `TicketLog` exacto donde se subió, detrás de una abstracción de almacenamiento (`IFileStorageService`) que hoy resuelve a disco local y queda lista para un adapter de Azure Blob o S3 sin tocar el resto del módulo.
@@ -78,7 +78,7 @@ La nota "consultar con agente de IA" del brief pedía explícitamente una decisi
 ### E. Application — `TicketDocument` (subida, listado, descarga, borrado)
 
 - `src/2.Application.DTO/Messaging/Tickets/TicketDocumentDto.cs` (nuevo): `{ Guid Id, Guid TicketId, Guid TicketLogsId, string DocumentType, string OriginalName, string ContentType, long SizeBytes, Guid? CreatedByUserId, string? CreatedByUserName, DateTime CreatedAt }`. **Sin** `NewName`, `Path` ni `StorageProvider` — son detalle interno de almacenamiento; el cliente descarga por `Id` a través del endpoint dedicado, nunca construye la ruta.
-- `src/2.Application/UseCases/Messaging/Tickets/InboundAttachment.cs` (nuevo): `public sealed record InboundAttachment(Stream Content, string FileName, string ContentType, long Length);` — el shape de "un archivo que entra al sistema", agnóstico de transporte. **Esta spec es la que lo declara**, y SPEC 37 lo consume tal cual para los adjuntos que llegan por WhatsApp/correo (su sección C decía "se declara acá y SPEC 36 puede adoptarlo"; se resolvió al revés para que el tipo viva junto a la entidad que persiste, y para que ambas specs puedan implementarse en el mismo PR sin duplicarlo).
+- `src/2.Application/UseCases/Messaging/Tickets/InboundAttachment.cs` (nuevo): `public sealed record InboundAttachment(Stream Content, string FileName, string ContentType, long Length);` — el shape de "un archivo que entra al sistema", agnóstico de transporte. **Esta spec es la que lo declara**, y SPEC 48 (antes 37, etapa posterior) lo consume tal cual para los adjuntos que llegan por WhatsApp/correo (su sección C decía "se declara acá y SPEC 36 puede adoptarlo"; se resolvió al revés para que el tipo viva junto a la entidad que persiste, y para que ambas specs puedan implementarse en el mismo PR sin duplicarlo).
 - `src/2.Application/UseCases/Messaging/Tickets/Commands/UploadTicketDocument/UploadTicketDocumentCommand.cs`: `sealed record UploadTicketDocumentCommand(Guid TicketId, Guid? TicketLogsId, InboundAttachment File) : ITransactionalCommand<Response<TicketDocumentDto>>`. Recibe el `Stream` dentro de `InboundAttachment`, provisto por el controller (`IFormFile.OpenReadStream()`), no un `IFormFile` — el Application layer no referencia `Microsoft.AspNetCore.Http`, mismo principio que ya mantiene `IEmailService` framework-agnostic.
 - `CommandHandler` (ver flujo completo en Data model) + `CommandValidator` (`File.FileName`/`File.ContentType` `NotEmpty`, `File.Length > 0`, `TicketId != Guid.Empty`).
 - `TicketLogsId` es **opcional**: si se omite, el handler resuelve automáticamente el log activo más reciente del ticket (`ORDER BY Created DESC` límite 1). Esto cubre el caso común —adjuntar evidencia inmediatamente después de crear, reasignar, finalizar o notar un ticket— sin obligar al frontend a hacer un round-trip a `GetTicketById` solo para descubrir el `TicketLogsId` recién generado. Si se provee explícitamente, debe pertenecer al mismo `TicketId` (si no, `400 INVALID_TICKET_LOG`).
@@ -534,6 +534,6 @@ ORDER BY td.Created DESC;
 - Cuota diaria por usuario individual (solo por empresa).
 - Combinar la creación de una nota (`AddTicketNote`, SPEC 35) con la subida de su adjunto en un solo request.
 - Unificar `TicketAttachmentSettings` con `TicketCompanyDefault` en una sola tabla/endpoint.
-- Ingesta multicanal (WhatsApp, correo) — SPEC 37. Workflow/SLA parametrizable — SPEC 38.
+- Ingesta multicanal (WhatsApp, correo) — SPEC 48 (etapa posterior; antes SPEC 37). Workflow/SLA parametrizable — SPEC 38.
 
 Cada uno, si llega, va en su propia spec.

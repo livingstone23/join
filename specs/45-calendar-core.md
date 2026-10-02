@@ -1,7 +1,7 @@
 # SPEC 45 — Módulo Calendario: parametrización, calendarios de usuario y actividades
 
 > **Status:** Borrador
-> **Depends on:** SPEC 44 (`SystemModule.IsBase`, `ModuleName` en `SystemOptionSeed`, rutas con guion y solo SuperAdmin habilita módulos). Es prerequisito de SPEC 46 (ingreso de actividades por canales / agente) y SPEC 47 (estructura de integración con Google Calendar).
+> **Depends on:** SPEC 37 (canal `WEB` como origen de las actividades creadas desde la aplicación), SPEC 49 (bloqueo por módulo en el filtro global), SPEC 44 (`SystemModule.IsBase`, `ModuleName` en `SystemOptionSeed`, rutas con guion y solo SuperAdmin habilita módulos). Es prerequisito de SPEC 46 (ingreso de actividades por canales / agente) y SPEC 47 (estructura de integración con Google Calendar).
 > **Related:** SPEC 41 (índices únicos filtrados por `GcRecord = 0` — mismo patrón en todos los índices de esta spec), SPEC 40 (fork PostgreSQL — la sintaxis de `HasFilter` de esta spec se porta igual que el resto), SPEC 43 (patrón "valores iniciales desde la configuración de la empresa").
 > **Date:** 2026-09-29
 > **Objective:** Crear el módulo Calendario en su propio esquema `Calendar`: un catálogo global de tipos de actividad y de estados que cada empresa habilita y ajusta, la configuración de calendario por empresa (usuario por defecto, horario hábil, zona horaria, feriados), la configuración por usuario (calendario por defecto, horario de contrato, días hábiles, periodos no hábiles), los calendarios de cada usuario y sus actividades (puntuales, de día completo y periódicas), con validación de superposición y de horario hábil, un panel para consultar calendarios de otros usuarios de la misma empresa y todas las APIs que el frontend necesita para las vistas de día, semana y mes.
@@ -101,7 +101,7 @@ Los handlers del panel reutilizan los mismos coordinadores que los de `CalendarE
 
 Clases DI con constructor primario, registradas `Scoped` en `2.Application/Common/ConfigureServices.cs`, en `src/2.Application/UseCases/Calendars/Common/`:
 
-- **`CalendarModuleGuard`**: `Task<Response<CalendarCompanyContext>> EnsureEnabledAsync(Guid companyId, bool requireCalendarCompany, CancellationToken ct)`. Verifica que exista un `CompanyModule` activo para el `SystemModule` "Calendar". Si `requireCalendarCompany` es true, carga también `CalendarCompany` y devuelve un contexto con la zona horaria, el horario hábil y el usuario por defecto. Todos los handlers del módulo lo llaman después del chequeo de `CompanyId`. Errores: `CALENDAR_MODULE_NOT_ENABLED`, `CALENDAR_COMPANY_NOT_CONFIGURED`.
+- **`CalendarCompanyGuard`**: `Task<Response<CalendarCompanyContext>> GetContextAsync(Guid companyId, CancellationToken ct)`. Carga `CalendarCompany` y devuelve un contexto con la zona horaria, el horario hábil, el usuario por defecto y el estado de reprogramación. Lo llaman los handlers que lo necesitan (R1), después del chequeo de `CompanyId`. Error: `CALENDAR_COMPANY_NOT_CONFIGURED`. **No** revisa `CompanyModule`: el bloqueo por módulo lo hace el filtro global de autorización (SPEC 49, ajuste del 2026-10-01; antes este guard se llamaba `CalendarModuleGuard` y hacía ese chequeo).
 - **`CalendarUserProvisioner`**: `Task<bool> EnsureUserCalendarAsync(Guid companyId, Guid userId, CancellationToken ct)`. Si el módulo está activo, `CalendarCompany` existe y el usuario no tiene `CalendarUserConfiguration` en esa empresa, crea un `UserCalendar` con el nombre `CalendarCompany.DefaultCalendarName` y su `CalendarUserConfiguration` con el horario de la empresa y días hábiles L–V. Es idempotente. **No llama a `SaveAsync`**: agrega al `IUnitOfWork` del handler que lo invoca, para que todo se confirme en una sola transacción.
 - **`CalendarUserDefaultCoordinator`**: mantiene la invariante "un calendario por defecto por usuario y empresa" (`SetDefault`, y el bloqueo de borrar o desactivar el calendario por defecto). Sigue el patrón de `PersonAddressDefaultCoordinator`.
 - **`CalendarEventScheduleGuard`**: valida superposición, horario hábil, días hábiles, periodos no hábiles y feriados para una actividad nueva o modificada (reglas completas en **Reglas de negocio**). Devuelve `Response` con el detalle de conflictos.
@@ -501,12 +501,13 @@ Tabla `Calendar.EventLogs`. Hereda `BaseTenantEntity`. Solo lectura desde la API
 
 ### R1. Contexto de empresa y módulo
 
+- **Módulo:** si la empresa no tiene el módulo `Calendar` activo, el filtro global de autorización responde `403 MODULE_NOT_ENABLED` antes de llegar al handler (SPEC 49, con `Modules:EnforceCompanyModules = true`). Los handlers del calendario no repiten ese chequeo.
+
 Todo handler del módulo sigue estos pasos, en orden:
 1. `CompanyId == Guid.Empty` → `COMPANY_REQUIRED`.
-2. `CalendarModuleGuard.EnsureEnabledAsync` → `CALENDAR_MODULE_NOT_ENABLED` si la empresa no tiene el módulo activo.
-3. Los handlers de operación y de configuración de usuario, además → `CALENDAR_COMPANY_NOT_CONFIGURED` si no existe `CalendarCompany`.
+2. Los handlers de operación y de configuración de usuario, además, llaman a `CalendarCompanyGuard` → `CALENDAR_COMPANY_NOT_CONFIGURED` si no existe `CalendarCompany`.
 
-Solo los catálogos globales (SuperAdmin) y la creación de `CalendarCompany` se saltan el paso 3.
+Los catálogos globales (SuperAdmin) y la creación de `CalendarCompany` no ejecutan el paso 2.
 
 ### R2. Dueño y permisos
 
@@ -794,7 +795,7 @@ Configuraciones EF (`Configuration/Calendars/`), `DbSet`s, query filters explíc
 `SystemModule` "Calendar", catálogos globales, `SystemOptions`, `RoleSystemOptions`, `SeedCalendarCatalogsForCompanyAsync` dentro de `SeedDefaultCatalogsForCompanyAsync`, y el seed de desarrollo de `JOIN-001` (`CompanyModule`, `CalendarCompany`, provisión). Canal `WEB` si SPEC 37 todavía no lo sembró.
 
 ### F4 — Servicios comunes
-`CalendarModuleGuard`, `CalendarUserProvisioner`, `CalendarUserDefaultCoordinator`, `CalendarEventInitialStatusResolver`, `CalendarEventLogWriter`, `ICalendarRecurrenceExpander` + `IcalRecurrenceExpander` (Infrastructure, paquete Ical.Net) y `CalendarEventScheduleGuard`. Registro DI.
+`CalendarCompanyGuard`, `CalendarUserProvisioner`, `CalendarUserDefaultCoordinator`, `CalendarEventInitialStatusResolver`, `CalendarEventLogWriter`, `ICalendarRecurrenceExpander` + `IcalRecurrenceExpander` (Infrastructure, paquete Ical.Net) y `CalendarEventScheduleGuard`. Registro DI.
 
 ### F5 — Catálogos globales y de empresa
 `CalendarActivities`, `CalendarStatuses`, `CalendarActivityCompanies`, `CalendarStatusCompanies` (commands, queries, validators, mappers Mapperly, controllers).
@@ -812,7 +813,7 @@ Configuraciones EF (`Configuration/Calendars/`), `DbSet`s, query filters explíc
 `CalendarPanel`: users, calendars, events, availability y las escrituras, con el doble chequeo de permisos en el cambio de estado.
 
 ### F10 — Tests (~110 casos)
-- **Guard / módulo (6):** sin empresa → error; módulo inactivo → `CALENDAR_MODULE_NOT_ENABLED`; sin `CalendarCompany` → `CALENDAR_COMPANY_NOT_CONFIGURED`; catálogos globales no exigen `CalendarCompany`.
+- **Guard (4):** sin empresa → error; sin `CalendarCompany` → `CALENDAR_COMPANY_NOT_CONFIGURED`; contexto completo cuando existe; catálogos globales no exigen `CalendarCompany`. (El bloqueo por módulo se prueba en SPEC 49.)
 - **Provisioner (6):** crea calendario + configuración; idempotente; no hace nada sin módulo o sin `CalendarCompany`; toma el horario de la empresa; lo llaman `InviteUser`, `AddUserCompany` y `CreateCalendarCompany`.
 - **Catálogos (16):** códigos duplicados; borrado bloqueado en uso; códigos de sistema protegidos; habilitar copia valores; habilitar dos veces → error; "usable" exige ambas tablas activas; estado inicial inválido.
 - **CalendarCompany / usuario (16):** `RescheduledByOthersStatusCompanyId` por defecto = `RESCHEDULED` de la empresa; estado de reprogramación no usable → error; horario de cierre ≤ apertura; 24 horas ignora horas; zona inválida; horario de usuario fuera del de la empresa; cambio de horario de empresa con usuarios afectados; `WorkDays` vacío; periodos solapados; `affectedEvents`.
@@ -851,7 +852,7 @@ Configuraciones EF (`Configuration/Calendars/`), `DbSet`s, query filters explíc
 - [ ] Anular exige motivo, conserva la actividad y deja registro en la bitácora; cualquier cambio queda en `CalendarEventLog` con canal y actor.
 - [ ] `GET /CalendarEvents` devuelve lo necesario para las vistas de día, semana y mes en una sola llamada.
 - [ ] El panel solo muestra usuarios de la empresa actual y exige `CalendarOthers`.
-- [ ] Sin el módulo activo en `CompanyModule`, ningún endpoint del módulo permite registrar calendarios ni actividades.
+- [ ] Sin el módulo activo en `CompanyModule` (y con `Modules:EnforceCompanyModules = true`, SPEC 49), ningún endpoint del módulo permite registrar calendarios ni actividades.
 - [ ] Ningún endpoint de esta spec crea, modifica ni borra registros fuera del esquema `Calendar`; las entidades del CRM y de seguridad solo se leen.
 - [ ] Los permisos de administración de la empresa se siembran para `SuperAdminCompany`, no para `Admin`.
 
@@ -880,7 +881,7 @@ Configuraciones EF (`Configuration/Calendars/`), `DbSet`s, query filters explíc
 - **Subconjunto de RRULE** (`FREQ` diaria/semanal/mensual/anual, `INTERVAL`, `BYDAY`, `BYMONTHDAY`, `COUNT`, `UNTIL`). Cubre lo pedido y casos como "lunes y miércoles cada 2 semanas" o "el último viernes del mes" (`BYDAY=-1FR`). Se rechazan `BYHOUR`, `BYSETPOS` y `FREQ` menores a diaria.
 - **Ical.Net detrás de una interfaz, en Infrastructure** (elegido). Application solo depende de Domain y DTO; la librería queda reemplazable.
 - **`OwnerUserId` copiado en `CalendarEvent`** (elegido) vs obtenerlo siempre por join con `UserCalendar`. La validación de choques por usuario es la consulta más frecuente del módulo; el dueño de un calendario es inmutable, así que la copia no puede quedar desactualizada.
-- **Control de módulo propio del Calendario (`CalendarModuleGuard`)** (elegido) vs control global en `DynamicAuthorizationFilter`. `CompanyModule` hoy no se consulta en ningún lado y todavía no está poblado (lo poblará el seeder de módulos base). Activarlo globalmente cortaría el acceso a módulos existentes; queda como spec futura.
+- **Control de módulo en el filtro global (SPEC 49), no en el calendario** (ajuste del 2026-10-01). La primera versión de esta spec tenía un control propio (`CalendarModuleGuard`) porque `CompanyModule` no se consultaba en ningún lado; la SPEC 49 lo resuelve para todos los módulos y el guard del calendario quedó solo con `CalendarCompany`.
 - **Zona horaria en `CalendarCompany`** (elegido) vs columna nueva en `Common.Companies`. La decisión fue "zona por empresa"; guardarla en la configuración del módulo evita tocar `Company`, que no tiene hoy ningún dato de este tipo. Si otro módulo la necesita, se mueve a `Company` en su propia spec.
 - **Empresa 24 horas con `IsOpen24Hours`** (elegido) vs `00:00–00:00` o `00:00–23:59`. Un flag explícito no tiene ambigüedad para el frontend ni pierde el último minuto del día.
 - **R5 no se aplica al dueño.** Decisión del usuario: el dueño siempre puede agendarse (incluso fuera de horario o en vacaciones). R4 (superposición) sí se le aplica, porque protege la consistencia del calendario, no la disponibilidad.

@@ -2,7 +2,7 @@
 
 > **Status:** Borrador
 > **Depends on:** Ninguna para implementarse.
-> **Related:** SPEC 45 (módulo `Calendar`, opcional, y su `CalendarModuleGuard`), SPEC 46 (opciones de menú del agente y de personas pendientes), spec futura "B" (bloqueo de APIs por `CompanyModule` en el filtro global de autorización).
+> **Related:** SPEC 45 (módulo `Calendar`, opcional), SPEC 49 (bloqueo de APIs por módulo e interruptor `Modules:EnforceCompanyModules`, que también condiciona el filtro del menú de esta spec), SPEC 46 (opciones de menú del agente y de personas pendientes), SPEC 49.
 > **Date:** 2026-10-01
 > **Objective:** Dejar `CompanyModule` como la fuente de verdad de qué módulos tiene cada empresa y de qué se pinta en su menú: marcar qué módulos son **base**, conectar cada opción de menú (`SystemOption`) con su **módulo real** (hoy todas cuelgan de "Administracion"), filtrar el menú lateral por los módulos activos de la empresa, restringir al SuperAdmin la habilitación de módulos, y traducir al inglés los nombres de módulos, opciones y rutas, con guion como separador.
 
@@ -26,7 +26,7 @@ Al diseñar el módulo Calendario (SPEC 45) se decidió que un módulo se habili
 | A2 | Cada fila de la seed de opciones declara **su módulo**. La seed corrige el `ModuleId` de las opciones existentes. |
 | A3 | Las empresas nuevas **nacen sin permisos por rol** (`RoleSystemOptions`). El método que los llene es una etapa futura. |
 | A4 | Los roles privilegiados (`Admin`, `SuperAdminCompany`) **mantienen acceso total** a todas las opciones, incluidos los catálogos globales del calendario. |
-| A5 | El **menú lateral** oculta las opciones de los módulos que la empresa no tiene activos. El bloqueo de las APIs queda para la spec B. |
+| A5 | El **menú lateral** oculta las opciones de los módulos que la empresa no tiene activos. El bloqueo de las APIs queda para la SPEC 49, y ambos dependen del interruptor `Modules:EnforceCompanyModules`. |
 | A6 | La asignación automática de módulos base a empresas **nuevas** o a empresas existentes **queda para una etapa futura**. Por ahora se prueba con las empresas existentes. |
 | A7 | **Solo el SuperAdmin** habilita o desactiva módulos de una empresa. `SuperAdminCompany` solo consulta los de su empresa. |
 | A8 | El menú del **SuperAdmin no se filtra**: sigue viendo todas las opciones. |
@@ -153,6 +153,8 @@ Las opciones del calendario declaran `ModuleName = "Calendar"` y usan rutas con 
 
 ### D. Menú lateral (`GetSidebarMenuQueryHandler`)
 
+> **Ajuste por SPEC 49 (2026-10-01):** este filtro se aplica solo con `Modules:EnforceCompanyModules = true`. Con el interruptor apagado, el menú se arma como hoy.
+
 - La consulta de usuarios no SuperAdmin agrega:
 
 ```sql
@@ -202,7 +204,7 @@ INNER JOIN Admin.CompanyModules cm
 
 - **Asignación automática de módulos base** a empresas nuevas (`CreateCompany`) o a empresas existentes cuando un módulo pasa a ser base (A6, etapa futura).
 - **Poblar `RoleSystemOptions`** para empresas nuevas (A3, etapa futura). Hasta entonces, los usuarios de una empresa nueva ven el menú vacío, salvo el SuperAdmin.
-- **Bloqueo de APIs** por `CompanyModule` en `DynamicAuthorizationFilter` → spec B. El Calendario ya tiene su control propio (`CalendarModuleGuard`, SPEC 45).
+- **Bloqueo de APIs** por `CompanyModule` en `DynamicAuthorizationFilter` → **SPEC 49**, que además condiciona el filtro del menú de esta spec al interruptor `Modules:EnforceCompanyModules` (apagado: menú como hoy).
 - Traducir `ControllerName`/recursos de permiso, nombres de tablas o esquemas de base de datos (`Admin`, `Messaging`…).
 - Traducir textos visibles del frontend (etiquetas, títulos): eso es de las specs del front.
 

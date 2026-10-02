@@ -1,8 +1,8 @@
 # SPEC 46 — Calendario: ingreso de actividades por canales (agente) y personas pendientes de confirmación
 
-> **Status:** Borrador
-> **Depends on:** SPEC 44 (menú y rutas), SPEC 45 (módulo Calendario: `CalendarEvent`, `CalendarCompany`, `CalendarEventScheduleGuard`, `CalendarEventInitialStatusResolver`, `CalendarEventLogWriter`, tipo `PERSON_REVIEW`, estado `CANCELLED`, `CalendarCompany.RescheduledByOthersStatusCompanyId`).
-> **Related:** SPEC 37 (ingesta de tickets por canal — mismo catálogo `CommunicationChannel` y mismo criterio de deduplicación por id de mensaje externo).
+> **Status:** Pospuesto
+> **Depends on:** SPEC 44 (menú y rutas), SPEC 49 (bloqueo por módulo), SPEC 45 (módulo Calendario: `CalendarEvent`, `CalendarCompany`, `CalendarEventScheduleGuard`, `CalendarEventInitialStatusResolver`, `CalendarEventLogWriter`, tipo `PERSON_REVIEW`, estado `CANCELLED`, `CalendarCompany.RescheduledByOthersStatusCompanyId`).
+> **Related:** SPEC 48 (ingesta de tickets por canal, etapa posterior; antes SPEC 37 — mismo catálogo `CommunicationChannel` y mismo criterio de deduplicación por id de mensaje externo).
 > **Date:** 2026-09-29
 > **Objective:** Permitir que un agente automatizado (n8n) que atiende WhatsApp, correo u otro canal, autenticado vía API como usuario de servicio, identifique a la empresa y a la persona que escribe, registre a la persona si no existe (`Person` + `PersonContact` + `PersonPendingConfirmation`), consulte disponibilidad, y cree, reprograme o anule actividades en el calendario del usuario indicado o del usuario por defecto de la empresa, dejando trazado el canal y el solicitante, y generando una actividad de revisión para que un usuario interno complete los datos de la persona nueva.
 
@@ -91,7 +91,7 @@ Cobertura ≥ 90% en clases nuevas. Detalle en F7.
 
 **Out of scope:**
 
-- **Crear tickets desde el agente o desde WhatsApp** (decisión del usuario, 2026-10-01). Una solicitud de servicio nuevo o de ticket que llega al agente se registra como **actividad** para el usuario por defecto (`DefaultActivityUserId`), que decide si crea el ticket desde JOIN. La creación de tickets por WhatsApp de SPEC 37 queda en pendiente.
+- **Crear tickets desde el agente o desde WhatsApp** (decisión del usuario, 2026-10-01). Una solicitud de servicio nuevo o de ticket que llega al agente se registra como **actividad** para el usuario por defecto (`DefaultActivityUserId`), que decide si crea el ticket desde JOIN. La creación de tickets por WhatsApp y correo quedó en SPEC 48 (etapa posterior).
 
 - Tabla de números o identificadores por empresa (`CompanyCommunicationChannel`) y autenticación por número exclusivo. El agente opera con su usuario de servicio y `X-Company-Id`.
 - Webhooks directos de proveedores (Twilio, Meta, SendGrid): el agente (n8n) es quien habla con el canal y llama a esta API.
@@ -137,7 +137,7 @@ Ninguno. `Person.GenderId` ya es nullable en la entidad. La obligatoriedad del g
 
 1. El agente es un `ApplicationUser` de servicio con rol **`Agent`**, con `UserCompany` en **cada** empresa que atiende. Obtiene su JWT con el login normal y lo renueva con refresh token.
 2. `GET /CalendarChannelIntake/companies` no requiere empresa: lista las empresas del usuario de servicio que tienen el módulo Calendario activo y `CalendarCompany` configurada. Se marca `[SkipDynamicAuthorization]` y el handler exige rol `Agent` o `SuperAdmin` (`currentUserService.IsInRole`) → si no, `403`.
-3. Una vez identificada la empresa, todas las demás llamadas envían `X-Company-Id`. **Verificación en F1:** confirmar que `ICurrentUserService`/`DynamicAuthorizationFilter` rechazan un `X-Company-Id` de una empresa donde el usuario no tiene `UserCompany` activo. Si hoy no lo hacen, `CalendarModuleGuard` agrega ese chequeo para los endpoints de intake (`CALENDAR_INTAKE_COMPANY_NOT_ALLOWED`).
+3. Una vez identificada la empresa, todas las demás llamadas envían `X-Company-Id`. **Verificación en F1:** confirmar que `ICurrentUserService`/`DynamicAuthorizationFilter` rechazan un `X-Company-Id` de una empresa donde el usuario no tiene `UserCompany` activo. Si hoy no lo hacen, `CalendarCompanyGuard` agrega ese chequeo para los endpoints de intake (`CALENDAR_INTAKE_COMPANY_NOT_ALLOWED`). **Dato a revisar (2026-10-01):** `DynamicAuthorizationFilter` evalúa permisos y módulo (SPEC 49) con el claim `CompanyId` del JWT, no con el header `X-Company-Id`; para un agente que opera en varias empresas hay que confirmar que el claim refleja la empresa elegida (p.ej. cambiando de empresa con el flujo de workspaces y renovando el token) o ajustar el filtro.
 4. `OriginUserId` de toda actividad o log creado por el agente = el usuario de servicio. `OriginIdentifier` / `ActorIdentifier` = teléfono o correo del solicitante.
 
 ---
@@ -184,7 +184,7 @@ Después: "mueve mi cita" / "cancela mi cita"
 
 ## API — `CalendarChannelIntakeController`
 
-Ruta base `api/v1/CalendarChannelIntake`. Todas las operaciones pasan por `CalendarModuleGuard` con `requireCalendarCompany = true` (SPEC 45 R1).
+Ruta base `api/v1/CalendarChannelIntake`. Todas las operaciones pasan por el filtro global de autorización (recurso `CalendarChannelIntake`, módulo `Calendar`, SPEC 49) y por `CalendarCompanyGuard` (SPEC 45 R1).
 
 | Método | Ruta | Flag | Descripción |
 |---|---|---|---|
@@ -283,7 +283,7 @@ Handler (`ITransactionalCommand`):
 
 ### Normalización de identificadores (`IntakeRequesterResolver`)
 
-> **Referencia única (2026-10-01):** esta es la regla de búsqueda de personas por teléfono del sistema. Cuando se retome la creación de tickets por WhatsApp (SPEC 37, en pendiente), se reutiliza este resolver (moviéndolo a un lugar compartido de `UseCases/Admin/Persons`) en lugar de la coincidencia exacta que describe la SPEC 37.
+> **Referencia única (2026-10-01):** esta es la regla de búsqueda de personas por teléfono del sistema. Cuando se retome la creación de tickets por WhatsApp (SPEC 48, etapa posterior), se reutiliza este resolver (moviéndolo a un lugar compartido de `UseCases/Admin/Persons`) en lugar de la coincidencia exacta que describe la SPEC 48.
 
 - **Teléfono:** el agente envía E.164 (`+50588887777`). `PersonContact.ContactValue` puede tener otros formatos (`8888-7777`, `+505 8888 7777`). La búsqueda compara solo dígitos: `REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ContactValue,' ',''),'-',''),'(',''),')',''),'+','')` contra el E.164 sin `+`, y también contra los últimos 8 dígitos para números guardados sin código de país. Si hay **más de una** persona que coincide → `found = false` con `ambiguous = true`: el agente debe pedir la identificación.
 - **Correo:** comparación exacta sin distinguir mayúsculas y sin espacios.

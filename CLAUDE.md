@@ -81,6 +81,16 @@ ASP.NET Core Identity (`ApplicationUser`/`ApplicationRole`, GUID keys) + JWT bea
 - Resource resolution precedence: action-level attribute → class-level attribute → `descriptor.ControllerName` (stripped) → fail-closed (`403`). Fail-closed ensures an unannotated controller with an unstripped class name does not silently open access.
 - The `PermissionService` cache key was bumped to `permissions:v2:{companyId}:{userId}` when the cached snapshot shape changed from 4 to 7 flags; older cache entries are ignored. See `specs/17-permissionresource-optional-and-flag-override-drift-audit.csv` for the controller ↔ seed `ControllerName` audit.
 
+## Specs: consistency before implementing
+
+- `specs/README.md` is the spec index and the source of truth for numbering, statuses (`Borrador`, `Aprobado`, `Implementado`, `Pospuesto`), dependencies and implementation order. Update it in the same change that creates a spec or changes its status, stage or dependencies. Numbers are never reused or reordered; the next free number is listed there.
+- Only the user moves a spec to `Aprobado` or decides a stage (`Pospuesto`). A change of scope or logic sends a spec back to `Borrador` with a "Historia" note; an editorial/consistency fix keeps its status with an "Ajuste por SPEC XX" note.
+- Across repositories, cite specs with a prefix: **BE-NN** (this repo) and **FE-NN** (`join_frontb/specs`). A backend change to routes, permissions or API contracts must update the FE specs that use them in the same change.
+- Before implementing a spec in `specs/`, search later specs that reference it (`grep "SPEC NN" specs/`) and the "Ajuste por SPEC XX" / "Historia" / "Etapa" notes in its header. The most recent spec wins; report inconsistencies before writing code.
+- A spec in status `Pospuesto` is not implemented until the user resumes it; when resumed it is reviewed against the current state and goes back to `Borrador`.
+- Menu and permissions: `SystemOption`/`SystemModule` names and routes are in English with hyphens, and every `SystemOptionSeed` declares its `ModuleName` (SPEC 44). `ControllerName` (the permission resource) is never translated or renamed.
+- Communication channels are compared by `CommunicationChannel.Code` (constants in `CommunicationChannelCodes`, SPEC 37), never by `Name`.
+
 ## Testing gotchas
 
 - `CustomWebApplicationFactory` (`tests/IntegrationTests/CustomWebApplicationFactory.cs`) spins up an ephemeral SQL Server via Testcontainers per fixture and mocks `IEmailService` so nothing hits a real network. Building the host is guarded by a static `_hostBuildLock`: Serilog's `Log.Logger` is a static singleton, and `Program.Main` (re-invoked by every `WebApplicationFactory<Program>` instance) reassigns and freezes it — concurrent factory construction across xUnit test classes throws `InvalidOperationException: The logger is already frozen` without that lock. Keep the lock if you touch this file.
