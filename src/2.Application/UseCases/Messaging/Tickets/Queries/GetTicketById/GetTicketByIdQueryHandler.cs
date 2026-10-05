@@ -94,7 +94,7 @@ public sealed class GetTicketByIdQueryHandler(
             INNER JOIN Messaging.TicketComplexities tc ON t.TicketComplexityId = tc.Id
             INNER JOIN Messaging.TimeUnits tu ON t.TimeUnitId = tu.Id
             INNER JOIN Messaging.TimeUnits tcu ON tc.TimeUnitId = tcu.Id
-            LEFT JOIN Support.TicketCompanyDefaults tcd ON tcd.CompanyId = t.CompanyId AND tcd.GcRecord = 0
+            LEFT JOIN Messaging.TicketCompanyDefaults tcd ON tcd.CompanyId = t.CompanyId AND tcd.GcRecord = 0
             LEFT JOIN Admin.Persons c ON t.PersonId = c.Id
             LEFT JOIN Admin.Projects p ON t.ProjectId = p.Id
             LEFT JOIN Admin.Areas a ON t.AreaId = a.Id

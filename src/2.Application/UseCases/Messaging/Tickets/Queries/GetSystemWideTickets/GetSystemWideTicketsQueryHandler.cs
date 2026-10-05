@@ -137,7 +137,7 @@ public sealed class GetSystemWideTicketsQueryHandler(
             INNER JOIN Messaging.TicketStatuses ts ON t.TicketStatusId = ts.Id
             INNER JOIN Messaging.TicketComplexities tc ON t.TicketComplexityId = tc.Id
             INNER JOIN Messaging.TimeUnits tcu ON tc.TimeUnitId = tcu.Id
-            LEFT JOIN Support.TicketCompanyDefaults tcd ON tcd.CompanyId = t.CompanyId AND tcd.GcRecord = 0
+            LEFT JOIN Messaging.TicketCompanyDefaults tcd ON tcd.CompanyId = t.CompanyId AND tcd.GcRecord = 0
             LEFT JOIN Admin.Persons c ON t.PersonId = c.Id
             LEFT JOIN Security.Users au ON t.AssignedToUserId = au.Id
             {whereClause}

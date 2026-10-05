@@ -800,6 +800,7 @@ Error codes returned by the ticket endpoints map to HTTP status as follows:
 | `TICKET_NOT_FOUND` | 404 |
 | `TICKET_REASSIGN_FORBIDDEN` / `TICKET_FINISH_FORBIDDEN` | 403 |
 | `TARGET_NOT_ELIGIBLE_RESOLVER` / `INVALID_ASSIGNED_USER` / `INVALID_ASSIGNED_USER_TENANT` / `INVALID_ASSIGNED_USER_NOT_RESOLVER` / `INVALID_TICKET_STATUS` / `TICKET_STATUS_NOT_FINAL` / `INVALID_LOG_TYPE` | 400 |
+| `USE_FINISH_TICKET_FOR_FINAL_STATUS` / `TICKET_STATUS_TRANSITION_NOT_ALLOWED` (SPEC 37) | 400 |
 | `TICKET_ALREADY_FINISHED` | 409 |
 | `REASSIGN_FAILED` / `FINISH_FAILED` / `ADD_NOTE_FAILED` (save affected no rows) | 400 |
 
@@ -807,6 +808,20 @@ A request that fails FluentValidation (e.g. empty ids, `logType` other than 2 or
 `summary` over 1000 chars) never reaches the handler: it returns **400** with a
 `ValidationProblemDetails` body (`title: "Validation failure"`, per-field `errors`)
 instead of a `Response<T>` with a business code.
+
+Since SPEC 37, every ticket read (`GET /Tickets`, `GET /Tickets/{id}`,
+`GET /Tickets/system-wide`) and every write that returns a `TicketDto`
+(create, update, reassign, finish) carries four computed, read-only fields:
+
+| Field | Meaning |
+|-------|---------|
+| `slaDueAt` | `createdAt + TicketComplexity.ResolutionTimeUnits × TimeUnit.Code` hours, using the time unit **of the complexity** (never the ticket's own `timeUnitId`). |
+| `isSlaBreached` | Open ticket: `now > slaDueAt`. Ticket in a final status: judged against its `Finalization` log instant (falls back to `lastActivityAt` for tickets closed before SPEC 37), so it never flips later. |
+| `lastActivityAt` | Most recent `TicketLog` instant (falls back to `createdAt`). |
+| `isInactive` | Open ticket with no activity for more than `TicketCompanyDefaults.MaxDayTicketInactivity` days. Always `false` for final statuses or when the tenant has no threshold. |
+
+These fields are informational only: no job notifies, escalates or reassigns
+on them, and they cannot be used as list filters.
 
 ```bash
 # 1. List (paginated, tenant-scoped, optional filters)
@@ -890,6 +905,11 @@ curl -s -X PUT "$BASE_URL/api/v1/Tickets/$ID" \
   }'
 # Returns 200 with the updated TicketDto.
 # Returns 404 TICKET_NOT_FOUND for cross-tenant ids.
+# Returns 400 INVALID_TICKET_STATUS when ticketStatusId belongs to another tenant.
+# Returns 400 USE_FINISH_TICKET_FOR_FINAL_STATUS when the target status is
+#   IsFinal — closing a ticket only goes through PUT /Tickets/{id}/finish (SPEC 37).
+# Returns 400 TICKET_STATUS_TRANSITION_NOT_ALLOWED when the tenant's transition
+#   rules for the current status do not list the target (SPEC 37).
 ```
 
 ```bash
@@ -940,6 +960,9 @@ curl -s -X PUT "$BASE_URL/api/v1/Tickets/$ID/finish" \
 #   target status does not exist or is not marked IsFinal.
 # Returns 409 TICKET_ALREADY_FINISHED when the ticket is already in a
 #   final status.
+# Returns 400 TICKET_STATUS_TRANSITION_NOT_ALLOWED when the tenant configured
+#   transition rules for the current status and the target is not listed
+#   (SPEC 37 — see TicketStatusTransitions below).
 # `resolutionSummary` is optional (max 500 chars); when blank the audit log
 # entry is recorded with the default text "Ticket finalizado".
 ```
@@ -967,6 +990,68 @@ curl -s -X POST "$BASE_URL/api/v1/Tickets/$ID/notes" \
 # Allowed logType values:
 #   2 = InternalNote  → IsOnlyForCreatedAndAssigned = true  (hidden from third viewers)
 #   3 = ExternalNote  → IsOnlyForCreatedAndAssigned = false (visible to every reader)
+```
+
+## TicketStatusTransitions — `/api/v1/TicketStatusTransitions` (SPEC 37)
+
+Optional per-tenant rules that restrict which status a ticket may move to from
+a given source status. Opt-in per source status: with **no** rule for a source
+status every destination stays allowed; once at least one rule exists for it,
+only the listed destinations are allowed. The rules apply to
+`PUT /Tickets/{id}` and `PUT /Tickets/{id}/finish`. Moving a ticket to a status
+with `IsFinal = true` is only possible through `finish`; `PUT /Tickets/{id}`
+returns `400 USE_FINISH_TICKET_FOR_FINAL_STATUS`.
+
+Permission resource `TicketStatusTransitions`. There is no update endpoint by
+design: the `(fromStatusId, toStatusId)` pair is the rule's identity, so delete
+and create a new rule instead.
+
+| Code | HTTP |
+|------|------|
+| `COMPANY_REQUIRED` | 401 |
+| `TICKET_STATUS_TRANSITION_NOT_FOUND` | 404 |
+| `INVALID_FROM_STATUS` / `INVALID_TO_STATUS` / `SAME_STATUS_TRANSITION` | 400 |
+| `TICKET_STATUS_TRANSITION_DUPLICATE` | 409 |
+
+```bash
+# 1. List rules (optionally only those leaving one source status)
+curl -s "$BASE_URL/api/v1/TicketStatusTransitions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+curl -s "$BASE_URL/api/v1/TicketStatusTransitions?fromStatusId=$FROM_STATUS_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+# Returns 200 with Response<IEnumerable<TicketStatusTransitionDto>>:
+#   id, fromStatusId, fromStatusName, toStatusId, toStatusName, createdAt.
+```
+
+```bash
+# 2. Create a rule — both statuses must exist and belong to the tenant.
+curl -s -X POST "$BASE_URL/api/v1/TicketStatusTransitions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fromStatusId": "11111111-1111-1111-1111-111111111111",
+    "toStatusId": "22222222-2222-2222-2222-222222222222"
+  }'
+# Returns 201 with Response<TicketStatusTransitionDto>.
+# Returns 400 INVALID_FROM_STATUS / INVALID_TO_STATUS for unknown or
+#   cross-tenant statuses.
+# Returns 409 TICKET_STATUS_TRANSITION_DUPLICATE when the pair already exists.
+# fromStatusId == toStatusId is rejected by the validator first: 400 with a
+#   ValidationProblemDetails body carrying "SAME_STATUS_TRANSITION".
+```
+
+```bash
+# 3. Delete a rule (soft delete). Removing the last rule of a source status
+#    makes that status unrestricted again.
+curl -s -X DELETE "$BASE_URL/api/v1/TicketStatusTransitions/$ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+# Returns 200 with Response<Guid>.
+# Returns 404 TICKET_STATUS_TRANSITION_NOT_FOUND for missing or cross-tenant ids.
 ```
 
 ## TicketAttachmentSettings — `/api/v1/TicketAttachmentSettings` (SPEC 36)

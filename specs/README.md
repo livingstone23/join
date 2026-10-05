@@ -73,7 +73,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 34 | `TicketUserCompany`: roster de agentes de tickets | Implementado | — |
 | 35 | Acciones de ciclo de vida del ticket | Implementado | 34 |
 | 36 | Adjuntos de ticket: parámetros, `TicketDocuments` y storage | Implementado | 35 |
-| 37 | Transiciones de status parametrizables y SLA | Aprobado | 34, 35, 36 |
+| 37 | Transiciones de status parametrizables y SLA | Implementado | 34, 35, 36 |
 | 38 | Consolidación de query filters globales | Borrador | 30 |
 | 39 | Fork `main_postgresql` | Borrador | — |
 | 40 | Índices únicos filtrados por soft-delete | Borrador | — |
