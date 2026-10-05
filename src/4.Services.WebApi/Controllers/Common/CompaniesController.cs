@@ -161,10 +161,11 @@ public class CompaniesController(IMediator mediator, ICurrentUserService current
     /// <param name="cancellationToken">Token used to cancel the request while the delete command is executing.</param>
     /// <returns>A standardized response containing the identifier of the deleted company.</returns>
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {

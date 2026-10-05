@@ -77,6 +77,28 @@ public sealed class GetRegionByIdQueryHandlerTests
     }
 
     /// <summary>
+    /// SPEC 38: short-circuit with COMPANY_REQUIRED when the token carries no CompanyId.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTokenHasNoCompanyId_ShouldReturnCompanyRequiredError()
+    {
+        var context = new GetRegionByIdQueryTestContext();
+        var handler = context.CreateHandler();
+        // SPEC 38: setup AFTER CreateHandler because Moq's last-wins semantics would otherwise
+        // overwrite this Guid.Empty setup with the handler-context default.
+        context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.Empty);
+
+        var response = await handler.Handle(new GetRegionByIdQuery(Guid.NewGuid()), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("COMPANY_REQUIRED");
+        response.Errors.Should().Contain("The authenticated token must contain a valid CompanyId claim.");
+
+        context.Connection.LastCommandText.Should().BeNullOrWhiteSpace(
+            "no SQL should reach the connection when the token has no CompanyId claim");
+    }
+
+    /// <summary>
     /// Holds the reusable mocks and fake connection used by the detail query tests.
     /// </summary>
     private sealed class GetRegionByIdQueryTestContext
@@ -88,10 +110,13 @@ public sealed class GetRegionByIdQueryHandlerTests
 
         public Mock<ISqlConnectionFactory> ConnectionFactoryMock { get; } = new();
         public FakeDbConnection Connection { get; } = new();
+        public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
 
         public GetRegionByIdQueryHandler CreateHandler()
         {
-            return new GetRegionByIdQueryHandler(ConnectionFactoryMock.Object);
+            // SPEC 38: tests supply a stable tenant id so r.CompanyId = @TenantId matches.
+            CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.NewGuid());
+            return new GetRegionByIdQueryHandler(ConnectionFactoryMock.Object, CurrentUserServiceMock.Object);
         }
     }
 }

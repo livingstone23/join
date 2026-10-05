@@ -50,6 +50,8 @@ public class UnitOfWork : IUnitOfWork
     public IPersonBusinessProfileRepository PersonBusinessProfiles => (IPersonBusinessProfileRepository)GetRepository<PersonBusinessProfile>();
     public IPersonFinancialProfileRepository PersonFinancialProfiles => (IPersonFinancialProfileRepository)GetRepository<PersonFinancialProfile>();
     public IRoleSystemOptionsRepository RoleSystemOptions => (IRoleSystemOptionsRepository)GetRepository<RoleSystemOption>();
+    public ICompanyModuleRepository CompanyModules => new CompanyModuleRepository(_dbContext);
+    public IUserCompanyRepository UserCompanies => new UserCompanyRepository(_dbContext);
 
     // --- 2. DYNAMIC REPOSITORY FACTORY ---
     public IGenericRepository<TEntity> GetRepository<TEntity>() where TEntity : class

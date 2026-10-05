@@ -1,6 +1,8 @@
 using AutoFixture;
 using FluentAssertions;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.Interface.Persistence.Admin;
 using JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
@@ -42,6 +44,7 @@ public sealed class UpdateCompanyModulesCommandHandlerTests
     {
         var context = new UpdateCompanyModulesCommandTestContext();
         var request = CreateValidCommand(_fixture.Create<Guid>(), _fixture.Create<Guid>());
+        context.SetActiveTenant(request.CompanyId);
         context.CompanyRepositoryMock.Setup(x => x.GetAsync(request.CompanyId)).ReturnsAsync((Company?)null);
 
         var handler = context.CreateHandler();
@@ -60,14 +63,15 @@ public sealed class UpdateCompanyModulesCommandHandlerTests
     {
         var context = new UpdateCompanyModulesCommandTestContext();
         var request = CreateValidCommand(_fixture.Create<Guid>(), _fixture.Create<Guid>());
+        context.SetActiveTenant(request.CompanyId);
 
         context.CompanyRepositoryMock
             .Setup(x => x.GetAsync(request.CompanyId))
             .ReturnsAsync(new Company { Name = "JOIN" });
 
-        context.CompanyModuleRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(Array.Empty<CompanyModule>());
+        context.CompanyModuleNamedRepositoryMock
+            .Setup(x => x.GetByIdForUpdateAsync(request.Id, request.CompanyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((CompanyModule?)null);
 
         var handler = context.CreateHandler();
         var response = await handler.Handle(request, CancellationToken.None);
@@ -96,14 +100,15 @@ public sealed class UpdateCompanyModulesCommandHandlerTests
         };
 
         var request = CreateValidCommand(entity.Id, companyId) with { IsActive = true };
+        context.SetActiveTenant(request.CompanyId);
 
         context.CompanyRepositoryMock
             .Setup(x => x.GetAsync(request.CompanyId))
             .ReturnsAsync(new Company { Name = "JOIN" });
 
-        context.CompanyModuleRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(new[] { entity });
+        context.CompanyModuleNamedRepositoryMock
+            .Setup(x => x.GetByIdForUpdateAsync(request.Id, request.CompanyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(entity);
 
         context.UnitOfWorkMock
             .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -138,14 +143,15 @@ public sealed class UpdateCompanyModulesCommandHandlerTests
         };
 
         var request = CreateValidCommand(entity.Id, companyId) with { IsActive = true };
+        context.SetActiveTenant(request.CompanyId);
 
         context.CompanyRepositoryMock
             .Setup(x => x.GetAsync(request.CompanyId))
             .ReturnsAsync(new Company { Name = "JOIN CRM" });
 
-        context.CompanyModuleRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(new[] { entity });
+        context.CompanyModuleNamedRepositoryMock
+            .Setup(x => x.GetByIdForUpdateAsync(request.Id, request.CompanyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(entity);
 
         context.ModuleRepositoryMock
             .Setup(x => x.GetAsync(moduleId))
@@ -204,10 +210,24 @@ public sealed class UpdateCompanyModulesCommandHandlerTests
         public Mock<IGenericRepository<Company>> CompanyRepositoryMock { get; } = new();
         public Mock<IGenericRepository<CompanyModule>> CompanyModuleRepositoryMock { get; } = new();
         public Mock<IGenericRepository<SystemModule>> ModuleRepositoryMock { get; } = new();
+        public Mock<ICompanyModuleRepository> CompanyModuleNamedRepositoryMock { get; } = new();
+        public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
 
         public UpdateCompanyModulesCommandHandler CreateHandler()
         {
-            return new UpdateCompanyModulesCommandHandler(UnitOfWorkMock.Object);
+            // SPEC 38: tenant comes from the token via TenantResolver. Tests set the token tenant
+            // with SetActiveTenant(companyId) to align it with the request's CompanyId.
+            CurrentUserServiceMock.Setup(x => x.IsInRole(It.IsAny<string>())).Returns(false);
+            UnitOfWorkMock.Setup(x => x.CompanyModules).Returns(CompanyModuleNamedRepositoryMock.Object);
+            return new UpdateCompanyModulesCommandHandler(UnitOfWorkMock.Object, CurrentUserServiceMock.Object);
+        }
+
+        /// <summary>
+        /// Aligns the mocked token tenant with the request's CompanyId.
+        /// </summary>
+        public void SetActiveTenant(Guid companyId)
+        {
+            CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
         }
     }
 }

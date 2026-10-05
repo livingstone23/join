@@ -11,12 +11,17 @@ namespace JOIN.Application.UseCases.Common.Companies.Queries;
 
 /// <summary>
 /// Handles paginated company queries using Dapper.
+/// SPEC 38: SuperAdmin sees every active company; everyone else (SuperAdminCompany, Manager, …)
+/// is forced to the CompanyId of the token — a SuperAdminCompany must not be able to enumerate
+/// other companies in the platform.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create DB-agnostic read connections.</param>
 /// <param name="paginationOptions">Configurable pagination defaults shared across paged endpoints.</param>
+/// <param name="currentUserService">Resolves the caller's tenant and role for the tenant-scope guard.</param>
 public class GetCompaniesPagedQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetCompaniesPagedQuery, Response<PagedResult<CompanyListItemDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -36,6 +41,24 @@ public class GetCompaniesPagedQueryHandler(
         parameters.Add("PageSize", sanitizedPageSize);
 
         var whereBuilder = new StringBuilder("WHERE c.GcRecord = 0");
+
+        // SPEC 38: non-SuperAdmin is locked to its own tenant. The endpoint stays open to the
+        // SuperAdminCompany role in the controller, but the query result is restricted here so
+        // a SuperAdminCompany of A cannot list companies B, C, … from the platform.
+        var isSuperAdmin = currentUserService.IsInRole("SuperAdmin");
+        if (!isSuperAdmin)
+        {
+            var tenantId = currentUserService.CompanyId;
+            if (tenantId == Guid.Empty)
+            {
+                return Response<PagedResult<CompanyListItemDto>>.Error(
+                    "INVALID_COMPANY_ID",
+                    ["Authenticated token must contain a valid CompanyId claim."]);
+            }
+
+            whereBuilder.Append(" AND c.Id = @TenantId");
+            parameters.Add("TenantId", tenantId);
+        }
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {

@@ -2,6 +2,7 @@ using FluentAssertions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Admin;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.UseCases.Admin.Customers.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
@@ -75,8 +76,14 @@ public sealed class CreateCustomerCommandHandlerTests
         context.SetupUser();
         context.UserCompanyRepositoryMock.Setup(x => x.GetAllAsync())
             .ReturnsAsync([new UserCompany { UserId = UserId, CompanyId = Guid.NewGuid() }]);
+        // SPEC 38: build the handler LAST so the negative IsActiveMemberAsync setup wins over
+        // the default true from CreateHandler (Moq last-write semantics).
+        var handler = context.CreateHandler();
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.IsActiveMemberAsync(UserId, CompanyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
 
-        var response = await context.CreateHandler().Handle(Command(), CancellationToken.None);
+        var response = await handler.Handle(Command(), CancellationToken.None);
 
         response.Message.Should().Be("INVALID_USER");
         response.Errors.Should().Contain("User is not linked to the current company.");
@@ -165,6 +172,7 @@ public sealed class CreateCustomerCommandHandlerTests
         public Mock<IGenericRepository<ApplicationUser>> UserRepositoryMock { get; } = new();
         public Mock<IGenericRepository<UserCompany>> UserCompanyRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Customer>> CustomerRepositoryMock { get; } = new();
+        public Mock<IUserCompanyRepository> UserCompanyNamedRepositoryMock { get; } = new();
 
         public void SetupCompany()
             => CompanyRepositoryMock.Setup(x => x.GetAsync(CompanyId))
@@ -202,6 +210,15 @@ public sealed class CreateCustomerCommandHandlerTests
         }
 
         public CreateCustomerCommandHandler CreateHandler()
-            => new(UnitOfWorkMock.Object, CurrentUserServiceMock.Object, CodeGeneratorMock.Object);
+        {
+            // SPEC 38: tenant membership check via the named repo. Default to "linked" so
+            // existing happy-path tests keep passing; tests that need "not linked" override.
+            UserCompanyNamedRepositoryMock
+                .Setup(x => x.IsActiveMemberAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            UnitOfWorkMock.Setup(x => x.UserCompanies).Returns(UserCompanyNamedRepositoryMock.Object);
+
+            return new(UnitOfWorkMock.Object, CurrentUserServiceMock.Object, CodeGeneratorMock.Object);
+        }
     }
 }

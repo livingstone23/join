@@ -2,6 +2,7 @@ using AutoFixture;
 using FluentAssertions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.UseCases.Security.UserCompanies.Commands.SetDefaultCompany;
 using JOIN.Domain.Security;
 using Moq;
@@ -24,8 +25,8 @@ public sealed class SetDefaultCompanyCommandHandlerTests
         var context = new SetDefaultCompanyCommandTestContext();
         var request = new SetDefaultCompanyCommand(_fixture.Create<Guid>(), _fixture.Create<Guid>());
 
-        context.RepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserCompany>());
 
         var handler = context.CreateHandler();
@@ -49,8 +50,8 @@ public sealed class SetDefaultCompanyCommandHandlerTests
         var userId = _fixture.Create<Guid>();
         var request = new SetDefaultCompanyCommand(userId, _fixture.Create<Guid>());
 
-        context.RepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[]
             {
                 new UserCompany
@@ -97,8 +98,8 @@ public sealed class SetDefaultCompanyCommandHandlerTests
             IsDefault = false
         };
 
-        context.RepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { currentDefault, targetLink });
 
         var handler = context.CreateHandler();
@@ -133,8 +134,8 @@ public sealed class SetDefaultCompanyCommandHandlerTests
             IsDefault = true
         };
 
-        context.RepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { existingDefault });
 
         var handler = context.CreateHandler();
@@ -162,10 +163,15 @@ public sealed class SetDefaultCompanyCommandHandlerTests
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
         public Mock<IGenericRepository<UserCompany>> RepositoryMock { get; } = new();
+        public Mock<IUserCompanyRepository> UserCompanyNamedRepositoryMock { get; } = new();
         public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
 
         public SetDefaultCompanyCommandHandler CreateHandler()
         {
+            // SPEC 38: read the user's active memberships through the named repo. Each test
+            // arranges its own GetActiveByUserIdAsync setup before invoking the handler.
+            UnitOfWorkMock.Setup(x => x.UserCompanies).Returns(UserCompanyNamedRepositoryMock.Object);
+
             return new SetDefaultCompanyCommandHandler(UnitOfWorkMock.Object, AuditLoggerMock.Object);
         }
     }

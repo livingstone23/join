@@ -1,6 +1,7 @@
 using JOIN.Application.DTO.Security;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Domain.Common;
 using JOIN.Domain.Security;
 using Microsoft.AspNetCore.Identity;
@@ -41,8 +42,7 @@ public class AuthenticatedSessionIssuer(
     {
         var isSuperAdmin = user.IsSuperAdmin || await _userManager.IsInRoleAsync(user, "SuperAdmin");
 
-        var userCompanies = (await _unitOfWork.GetRepository<UserCompany>().GetAllAsync())
-            .Where(link => link.UserId == user.Id)
+        var userCompanies = (await _unitOfWork.UserCompanies.GetActiveByUserIdAsync(user.Id, cancellationToken))
             .OrderByDescending(link => link.IsDefault)
             .ThenBy(link => link.Created)
             .ToList();

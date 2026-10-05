@@ -2,6 +2,7 @@ using AutoFixture;
 using FluentAssertions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.UseCases.Security.Auth.Refresh;
 using JOIN.Domain.Common;
 using JOIN.Domain.Security;
@@ -65,7 +66,7 @@ public sealed class RefreshTokenCommandHandlerTests
                     ExpiryDate = DateTime.UtcNow.AddDays(2),
                     IsRevoked = true
                 }
-            }.AsEnumerable());
+            });
 
         var handler = context.CreateHandler();
 
@@ -100,7 +101,7 @@ public sealed class RefreshTokenCommandHandlerTests
                     ExpiryDate = DateTime.UtcNow.AddMinutes(-1),
                     IsRevoked = false
                 }
-            }.AsEnumerable());
+            });
 
         var handler = context.CreateHandler();
 
@@ -236,8 +237,8 @@ public sealed class RefreshTokenCommandHandlerTests
             .Setup(x => x.InsertAsync(It.IsAny<UserRefreshToken>()))
             .ReturnsAsync(true);
 
-        context.UserCompanyRepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[]
             {
                 new UserCompany
@@ -247,7 +248,7 @@ public sealed class RefreshTokenCommandHandlerTests
                     IsDefault = true,
                     Created = DateTime.UtcNow
                 }
-            }.AsEnumerable());
+            });
 
         context.UserRoleCompanyRepositoryMock
             .Setup(x => x.GetAllAsync())
@@ -259,14 +260,14 @@ public sealed class RefreshTokenCommandHandlerTests
                     CompanyId = companyId,
                     RoleId = roleId
                 }
-            }.AsEnumerable());
+            });
 
         context.RoleRepositoryMock
             .Setup(x => x.GetAllAsync())
             .ReturnsAsync(new[]
             {
                 new ApplicationRole { Id = roleId, Name = "Admin" }
-            }.AsEnumerable());
+            });
 
         context.TokenGeneratorMock
             .Setup(x => x.GenerateRefreshTokenString())
@@ -343,8 +344,8 @@ public sealed class RefreshTokenCommandHandlerTests
             .Setup(x => x.InsertAsync(It.IsAny<UserRefreshToken>()))
             .ReturnsAsync(true);
 
-        context.UserCompanyRepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserCompany>());
 
         context.UserRoleCompanyRepositoryMock
@@ -357,14 +358,14 @@ public sealed class RefreshTokenCommandHandlerTests
                     CompanyId = assignedCompanyId,
                     RoleId = roleId
                 }
-            }.AsEnumerable());
+            });
 
         context.RoleRepositoryMock
             .Setup(x => x.GetAllAsync())
             .ReturnsAsync(new[]
             {
                 new ApplicationRole { Id = roleId, Name = "Reader" }
-            }.AsEnumerable());
+            });
 
         context.TokenGeneratorMock
             .Setup(x => x.GenerateToken(
@@ -416,8 +417,8 @@ public sealed class RefreshTokenCommandHandlerTests
             .Setup(x => x.InsertAsync(It.IsAny<UserRefreshToken>()))
             .ReturnsAsync(true);
 
-        context.UserCompanyRepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserCompany>());
 
         context.UserRoleCompanyRepositoryMock
@@ -577,6 +578,7 @@ public sealed class RefreshTokenCommandHandlerTests
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
         public Mock<IGenericRepository<UserRefreshToken>> RefreshTokenRepositoryMock { get; } = new();
         public Mock<IGenericRepository<UserCompany>> UserCompanyRepositoryMock { get; } = new();
+        public Mock<IUserCompanyRepository> UserCompanyNamedRepositoryMock { get; } = new();
         public Mock<IGenericRepository<UserRoleCompany>> UserRoleCompanyRepositoryMock { get; } = new();
         public Mock<IGenericRepository<ApplicationRole>> RoleRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Company>> CompanyRepositoryMock { get; } = new();
@@ -585,6 +587,13 @@ public sealed class RefreshTokenCommandHandlerTests
 
         public RefreshTokenCommandHandler CreateHandler()
         {
+            // SPEC 38: memberships now via the named repo (scoped by UserId). Default empty;
+            // tests that need a list override GetActiveByUserIdAsync.
+            UserCompanyNamedRepositoryMock
+                .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Array.Empty<UserCompany>());
+            UnitOfWorkMock.Setup(x => x.UserCompanies).Returns(UserCompanyNamedRepositoryMock.Object);
+
             return new RefreshTokenCommandHandler(
                 UserManagerMock.Object,
                 TokenGeneratorMock.Object,

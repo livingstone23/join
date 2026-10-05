@@ -102,6 +102,7 @@ public sealed class GetCompaniesPagedQueryHandlerTests
 
         public Mock<ISqlConnectionFactory> ConnectionFactoryMock { get; } = new();
         public FakeDbConnection Connection { get; }
+        public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public IOptions<PaginationSettings> PaginationOptions { get; } = Options.Create(new PaginationSettings
         {
             DefaultPageNumber = 1,
@@ -112,7 +113,10 @@ public sealed class GetCompaniesPagedQueryHandlerTests
 
         public GetCompaniesPagedQueryHandler CreateHandler()
         {
-            return new GetCompaniesPagedQueryHandler(ConnectionFactoryMock.Object, PaginationOptions);
+            // SPEC 38: existing tests treat the caller as a real SuperAdmin so the assertions
+            // about the open WHERE clause continue to hold without tenant scoping.
+            CurrentUserServiceMock.Setup(x => x.IsInRole(It.IsAny<string>())).Returns(true);
+            return new GetCompaniesPagedQueryHandler(ConnectionFactoryMock.Object, PaginationOptions, CurrentUserServiceMock.Object);
         }
     }
 }

@@ -2,6 +2,7 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Security.Workspaces;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Domain.Common;
 using JOIN.Domain.Exceptions;
 using JOIN.Domain.Security;
@@ -38,8 +39,7 @@ public sealed class SwitchCompanyCommandHandler(
 
         var isSuperAdmin = user.IsSuperAdmin || await userManager.IsInRoleAsync(user, "SuperAdmin");
 
-        var userCompanies = (await unitOfWork.GetRepository<UserCompany>().GetAllAsync())
-            .Where(link => link.UserId == user.Id)
+        var userCompanies = (await unitOfWork.UserCompanies.GetActiveByUserIdAsync(user.Id, cancellationToken))
             .ToList();
 
         var roleAssignments = (await unitOfWork.GetRepository<UserRoleCompany>().GetAllAsync())

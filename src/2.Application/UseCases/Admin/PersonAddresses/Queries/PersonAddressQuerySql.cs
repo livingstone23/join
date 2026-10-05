@@ -30,7 +30,7 @@ internal static class PersonAddressQuerySql
         FROM Admin.PersonAddresses a
         LEFT JOIN Common.StreetTypes st ON a.StreetTypeId = st.Id
         LEFT JOIN Common.Countries cn ON a.CountryId = cn.Id
-        LEFT JOIN Admin.Regions re ON a.RegionId = re.Id
+        LEFT JOIN Admin.Regions re ON a.RegionId = re.Id AND re.CompanyId = @TenantId
         LEFT JOIN Common.Provinces pr ON a.ProvinceId = pr.Id
         LEFT JOIN Common.Municipalities mu ON a.MunicipalityId = mu.Id
         """;

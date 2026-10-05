@@ -154,12 +154,17 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
     /// <summary>
     /// Applies global filters to all relevant entities.
+    /// Explicit list — every BaseTenantEntity MUST appear in section 1 (or be justified as an exception
+    /// in section 3). The guard test in GlobalQueryFiltersGuardTests fails if this contract is broken.
+    /// See SPEC 38.
     /// </summary>
     private void ConfigureGlobalQueryFilters(ModelBuilder builder)
     {
         // --- 1. TENANT-SPECIFIC & SOFT DELETE ENTITIES ---
         // These entities MUST belong to the current Company and NOT be deleted.
-        
+        // Enforces RFC: CompanyId == _currentUserService.CompanyId, strict — no SuperAdmin bypass.
+        // Cross-tenant reads must use .IgnoreQueryFilters() with an explicit CompanyId filter.
+
         // Administrative / Persons
         builder.Entity<Person>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<PersonAddress>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
@@ -167,7 +172,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<Project>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<Area>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<UserCommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
-        
+
+        // Administrative / Catalog rows that are tenant-owned (each company maintains its own list)
+        builder.Entity<Customer>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<Gender>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<Industry>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<TaxRegime>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<IncomeRange>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<Region>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<PersonBusinessProfile>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<PersonEmployment>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<PersonFinancialProfile>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+
         // Messaging / Tickets
         builder.Entity<Ticket>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<TicketStatus>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
@@ -181,44 +197,68 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<TicketDocument>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<TicketStatusTransition>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
+        // Security / Tenant-scoped config
+        // RoleCompany & CompanyModule carry CompanyId and are tenant-owned. SuperAdmin cross-tenant reads
+        // must call .IgnoreQueryFilters() and apply an explicit CompanyId == tenantId filter.
+        builder.Entity<RoleCompany>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CompanyModule>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<RoleSystemOption>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+
 
         // --- 2. SHARED CATALOGS (SOFT DELETE ONLY) ---
         // These are global or system-wide catalogs where we only care if they are deleted.
+        // All authenticated users see the same rows; CompanyId is irrelevant.
 
         // Common Module
         builder.Entity<Company>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<Country>().HasQueryFilter(e => e.GcRecord == 0);
-        builder.Entity<Region>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<Province>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<Municipality>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<StreetType>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<CommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0);
-        
+
         // Admin / Support Catalogs
         builder.Entity<EntityStatus>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<IdentificationType>().HasQueryFilter(e => e.GcRecord == 0);
-        
-        // System Configuration
+
+        // System Configuration (catalog of modules; the tenant-scoped link lives in CompanyModule above)
         builder.Entity<SystemModule>().HasQueryFilter(e => e.GcRecord == 0);
-        builder.Entity<CompanyModule>().HasQueryFilter(e => e.GcRecord == 0);
-        
+
 
 
         // --- 3. SECURITY & INTERSECTION ENTITIES (SOFT DELETE) ---
         // These link users to tenants or customers and should respect the delete flag.
-        
+
+        // UserCompany is the only tenant-scoped entity WITHOUT a CompanyId query filter (justified):
+        //  login still has no CompanyId claim, and we need to read a user's memberships in all of his
+        //  companies to pick a default (also on refresh and SwitchCompany). Every read filters by UserId
+        //  (and CompanyId when applicable) at the query, never in memory. See IUserCompanyRepository.
         builder.Entity<UserCompany>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<UserPerson>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<UserRefreshToken>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<UserRoleCompany>().HasQueryFilter(e => e.GcRecord == 0);
-        builder.Entity<RoleCompany>().HasQueryFilter(e => e.GcRecord == 0);
-        builder.Entity<RoleSystemOption>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<SystemOption>().HasQueryFilter(e => e.GcRecord == 0);
-        
-        
-        // Note: UserConnectionLog typically doesn't need Soft Delete as it's an audit trail,
-        // but if it inherits from BaseAuditableEntity, add it here:
-        // builder.Entity<UserConnectionLog>().HasQueryFilter(e => e.GcRecord == 0);
+
+        // Audit trail. UserConnectionLog inherits BaseAuditableEntity (has GcRecord); SPEC 30 moved
+        // active vs. revoked sessions to GcRecord. Soft-delete only — no CompanyId because the log
+        // records the user, not a tenant; sessions are read by UserId.
+        builder.Entity<UserConnectionLog>().HasQueryFilter(e => e.GcRecord == 0);
+
+        // Security / Identity audit rows. None of these are tenant-scoped (they belong to a User, not a Company);
+        // they only need soft-delete so revoked/used codes don't appear in active lookups.
+        builder.Entity<EmailOtpEnableCode>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<MfaLoginChallenge>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<PhoneVerificationCode>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<UserMfaRecoveryCode>().HasQueryFilter(e => e.GcRecord == 0);
+
+        // ApplicationRole (Identity) — global, soft-delete only. Roles are seeded by DatabaseSeeder
+        // and never tenant-owned; deletion marks the role retired.
+        builder.Entity<ApplicationRole>().HasQueryFilter(e => e.GcRecord == 0);
+
+        // ApplicationUser (Identity) intentionally has NO query filter (no .HasQueryFilter call here).
+        // Justified: CreateTicket/UpdateTicket resolve CreatedByUserName/AssignedToUserName via
+        // GetRepository<ApplicationUser>().GetAsync(id); a filter would surface null for tickets whose
+        // author or assignee was later soft-deleted. Product decision deferred (SPEC 38 out-of-scope).
     }
 
     /// <summary>

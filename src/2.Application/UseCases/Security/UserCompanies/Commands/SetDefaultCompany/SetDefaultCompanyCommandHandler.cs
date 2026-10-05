@@ -28,8 +28,7 @@ public sealed class SetDefaultCompanyCommandHandler(
     public async Task<Response<Guid>> Handle(SetDefaultCompanyCommand request, CancellationToken cancellationToken)
     {
         var repository = _unitOfWork.GetRepository<UserCompany>();
-        var userCompanies = (await repository.GetAllAsync())
-            .Where(link => link.UserId == request.UserId)
+        var userCompanies = (await _unitOfWork.UserCompanies.GetActiveByUserIdAsync(request.UserId, cancellationToken))
             .ToList();
 
         if (userCompanies.Count == 0)

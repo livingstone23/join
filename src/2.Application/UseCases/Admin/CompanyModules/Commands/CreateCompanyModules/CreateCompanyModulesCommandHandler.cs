@@ -1,5 +1,6 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
@@ -9,12 +10,16 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 
 /// <summary>
 /// Handles company module assignment creation commands using the transactional write stack.
+/// SPEC 38: only SuperAdmin can create; the target CompanyId is resolved via TenantResolver
+/// so cross-tenant writes honor an explicit override only when the caller is a real SuperAdmin.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
-public sealed class CreateCompanyModulesCommandHandler(IUnitOfWork unitOfWork)
+/// <param name="currentUserService">Resolves the JWT-driven tenant and role context.</param>
+public sealed class CreateCompanyModulesCommandHandler(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
     : IRequestHandler<CreateCompanyModulesCommand, Response<CompanyModuleDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     /// <summary>
     /// Creates a new system module assignment for the specified tenant company.
@@ -29,9 +34,11 @@ public sealed class CreateCompanyModulesCommandHandler(IUnitOfWork unitOfWork)
             return Response<CompanyModuleDto>.Error("INVALID_COMPANY_ID", ["CompanyId is required."]);
         }
 
+        // SPEC 38: tenant scope = explicit request.CompanyId only for SuperAdmin, otherwise the token's tenant.
+        var tenantId = TenantResolver.Resolve(_currentUserService, request.CompanyId);
+
         var companyRepository = _unitOfWork.GetRepository<Company>();
         var moduleRepository = _unitOfWork.GetRepository<SystemModule>();
-        var companyModuleRepository = _unitOfWork.GetRepository<CompanyModule>();
 
         var company = await companyRepository.GetAsync(request.CompanyId);
         if (company is null)
@@ -45,11 +52,10 @@ public sealed class CreateCompanyModulesCommandHandler(IUnitOfWork unitOfWork)
             return Response<CompanyModuleDto>.Error("SYSTEM_MODULE_NOT_FOUND", ["The specified ModuleId does not exist."]);
         }
 
-        var existingAssignments = await companyModuleRepository.GetAllAsync();
-        var assignmentInUse = existingAssignments.Any(x =>
-            x.CompanyId == request.CompanyId
-            && x.ModuleId == request.ModuleId
-            && x.GcRecord == 0);
+        // Use the named repo (IgnoreQueryFilters + explicit tenant filter) so SuperAdmin can
+        // create a CompanyModule for any tenant the controller authorized via TenantResolver.
+        var assignmentInUse = await _unitOfWork.CompanyModules
+            .ExistsActiveAssignmentAsync(tenantId, request.ModuleId, tenantId, cancellationToken);
 
         if (assignmentInUse)
         {
@@ -58,12 +64,12 @@ public sealed class CreateCompanyModulesCommandHandler(IUnitOfWork unitOfWork)
 
         var entity = new CompanyModule
         {
-            CompanyId = request.CompanyId,
+            CompanyId = tenantId,
             ModuleId = request.ModuleId,
             IsActive = request.IsActive
         };
 
-        await companyModuleRepository.InsertAsync(entity);
+        await _unitOfWork.GetRepository<CompanyModule>().InsertAsync(entity);
         var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
         if (result <= 0)
         {

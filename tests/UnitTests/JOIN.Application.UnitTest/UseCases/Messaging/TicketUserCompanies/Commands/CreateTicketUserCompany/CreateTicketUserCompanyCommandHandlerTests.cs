@@ -2,6 +2,7 @@ using AutoFixture;
 using FluentAssertions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Commands.CreateTicketUserCompany;
 using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
@@ -52,8 +53,13 @@ public sealed class CreateTicketUserCompanyCommandHandlerTests
         var userId = _fixture.Create<Guid>();
         context.UserRepositoryMock.Setup(x => x.GetAsync(userId)).ReturnsAsync(new ApplicationUser { Id = userId, Email = "user@join.com" });
         context.UserCompanyRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<UserCompany>());
-
+        // SPEC 38: build the handler LAST so the negative IsActiveMemberAsync setup wins over
+        // the default true from CreateHandler (Moq last-write semantics).
         var handler = context.CreateHandler();
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.IsActiveMemberAsync(userId, companyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
         var response = await handler.Handle(CreateValidCommand(userId: userId), CancellationToken.None);
 
         response.IsSuccess.Should().BeFalse();
@@ -184,9 +190,20 @@ public sealed class CreateTicketUserCompanyCommandHandlerTests
         public Mock<IGenericRepository<ApplicationUser>> UserRepositoryMock { get; } = new();
         public Mock<IGenericRepository<UserCompany>> UserCompanyRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Company>> CompanyRepositoryMock { get; } = new();
+        public Mock<IUserCompanyRepository> UserCompanyNamedRepositoryMock { get; } = new();
 
         public CreateTicketUserCompanyCommandHandler CreateHandler()
-            => new(UnitOfWorkMock.Object, CurrentUserServiceMock.Object);
+        {
+            // SPEC 38: tenant membership check now goes through the named repo. Default to
+            // "linked" so the happy-path tests keep passing; the negative test overrides
+            // IsActiveMemberAsync to return false.
+            UserCompanyNamedRepositoryMock
+                .Setup(x => x.IsActiveMemberAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            UnitOfWorkMock.Setup(x => x.UserCompanies).Returns(UserCompanyNamedRepositoryMock.Object);
+
+            return new(UnitOfWorkMock.Object, CurrentUserServiceMock.Object);
+        }
 
         private static void SetupRepository<TEntity>(Mock<IUnitOfWork> unitOfWorkMock, Mock<IGenericRepository<TEntity>> repositoryMock)
             where TEntity : class

@@ -1,6 +1,6 @@
 # SPEC 38 — Consolidación de query filters globales (soft-delete + tenant) en `ApplicationDbContext`
 
-> **Status:** Borrador
+> **Status:** Implementado
 > **Depends on:** SPEC 30 (`UserConnectionLog` ganó `GcRecord` ahí; esta spec cierra el lado EF que quedó pendiente). Establece la convención que deben seguir las specs 34 en adelante del módulo de tickets (`TicketUserCompany`, `TicketAttachmentSettings`, `TicketDocument`, `TicketInboundChannel`, `TicketStatusTransition` — ninguna existe todavía en el dominio).
 > **Date:** 2026-09-28
 > **Objective:** Mantener `ApplicationDbContext.ConfigureGlobalQueryFilters` como lista explícita (una línea `HasQueryFilter` por entidad, agrupada por sección), completarla con las entidades tenant-scoped que hoy no tienen filtro (incluida `Region`), alinear `UserConnectionLog` con SPEC 30, y agregar un test de guarda que falle cuando una entidad nueva quede sin filtro.

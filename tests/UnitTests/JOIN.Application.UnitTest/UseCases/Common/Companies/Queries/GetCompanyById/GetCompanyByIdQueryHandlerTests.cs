@@ -89,10 +89,14 @@ public sealed class GetCompanyByIdQueryHandlerTests
 
         public Mock<ISqlConnectionFactory> ConnectionFactoryMock { get; } = new();
         public FakeDbConnection Connection { get; } = new();
+        public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
 
         public GetCompanyByIdQueryHandler CreateHandler()
         {
-            return new GetCompanyByIdQueryHandler(ConnectionFactoryMock.Object);
+            // SPEC 38: tests below treat the caller as a real SuperAdmin so the existing assertions
+            // about the Dapper query (WHERE c.Id = @Id) continue to hold without tenant scoping.
+            CurrentUserServiceMock.Setup(x => x.IsInRole(It.IsAny<string>())).Returns(true);
+            return new GetCompanyByIdQueryHandler(ConnectionFactoryMock.Object, CurrentUserServiceMock.Object);
         }
     }
 }

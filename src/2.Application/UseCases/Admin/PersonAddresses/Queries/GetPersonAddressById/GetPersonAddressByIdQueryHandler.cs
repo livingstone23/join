@@ -42,7 +42,7 @@ public sealed class GetPersonAddressByIdQueryHandler(
         var sql = $"""
             {PersonAddressQuerySql.SelectWithCatalogNames}
             WHERE a.Id = @Id
-              AND a.CompanyId = @CompanyId
+              AND a.CompanyId = @TenantId
               AND a.GcRecord = 0;
             """;
 
@@ -52,7 +52,7 @@ public sealed class GetPersonAddressByIdQueryHandler(
                 new
                 {
                     request.Id,
-                    CompanyId = currentUserService.CompanyId
+                    TenantId = currentUserService.CompanyId
                 },
                 cancellationToken: cancellationToken));
 

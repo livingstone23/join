@@ -55,7 +55,7 @@ public sealed class PersonAddressQueryHandlersTests
         response.Data.ProvinceName.Should().Be("Panama Oeste");
         response.Data.MunicipalityName.Should().Be("Arraijan");
         response.Data.CreatedAt.Should().Be("2026-05-01 10:30");
-        context.Connection.CapturedParameters["CompanyId"].Should().Be(CompanyId);
+        context.Connection.CapturedParameters["TenantId"].Should().Be(CompanyId);
     }
 
     [Fact]

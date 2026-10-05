@@ -11,12 +11,16 @@ namespace JOIN.Application.UseCases.Common.Provinces.Queries;
 
 /// <summary>
 /// Handles paginated province queries using Dapper for high-performance reads.
+/// SPEC 38: the LEFT JOIN to Admin.Regions is now scoped by tenant + soft-delete so a
+/// province whose RegionId points to another company's region does not leak the RegionName.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
 /// <param name="paginationOptions">Configurable pagination defaults for the province listing endpoint.</param>
+/// <param name="currentUserService">Resolves the active tenant for the Region LEFT JOIN.</param>
 public sealed class GetProvincesQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetProvincesQuery, Response<PagedResult<ProvinceDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -37,6 +41,9 @@ public sealed class GetProvincesQueryHandler(
         var parameters = new DynamicParameters();
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
+
+        var tenantId = currentUserService.CompanyId;
+        parameters.Add("TenantId", tenantId);
 
         var whereBuilder = new StringBuilder("WHERE p.GcRecord = 0");
 
@@ -77,6 +84,7 @@ public sealed class GetProvincesQueryHandler(
             LEFT JOIN Admin.Regions r
                 ON r.Id = p.RegionId
                AND r.GcRecord = 0
+               AND r.CompanyId = @TenantId
             {whereClause}
             ORDER BY p.Created DESC, p.Name ASC
             {GetPaginationClause(connection)};
@@ -89,6 +97,7 @@ public sealed class GetProvincesQueryHandler(
             LEFT JOIN Admin.Regions r
                 ON r.Id = p.RegionId
                AND r.GcRecord = 0
+               AND r.CompanyId = @TenantId
             {whereClause};
             """;
 
