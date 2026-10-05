@@ -2,6 +2,7 @@ using Dapper;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
 using JOIN.Application.Interface;
+using JOIN.Domain.Messaging;
 using MediatR;
 
 namespace JOIN.Application.UseCases.Messaging.Tickets.Queries;
@@ -11,6 +12,8 @@ namespace JOIN.Application.UseCases.Messaging.Tickets.Queries;
 /// Log rows marked with <c>IsOnlyForCreatedAndAssigned = 1</c> are filtered
 /// server-side: only the ticket's creator, current assignee, or a tenant
 /// <c>IsSuperAdminTicket</c> can read them (SPEC 35 F9).
+/// SLA / inactivity are computed in C# via <see cref="TicketSlaCalculator"/>
+/// to keep the math portable across DB providers (SPEC 37 F6).
 /// </summary>
 public sealed class GetTicketByIdQueryHandler(
     ISqlConnectionFactory connectionFactory,
@@ -76,12 +79,22 @@ public sealed class GetTicketByIdQueryHandler(
                 END AS AssignedToUserName,
                 t.PrecedentTicketId,
                 pt.Code AS PrecedentTicketCode,
-                t.Created AS CreatedAt
+                t.Created AS CreatedAt,
+                ts.IsFinal AS IsFinalStatus,
+                tc.ResolutionTimeUnits,
+                tcu.Code AS ComplexityTimeUnitCode,
+                tcd.MaxDayTicketInactivity,
+                (SELECT MAX(tl.Created) FROM Support.TicketLogs tl
+                    WHERE tl.TicketId = t.Id AND tl.GcRecord = 0) AS LastActivityAt,
+                (SELECT MAX(tl2.Created) FROM Support.TicketLogs tl2
+                    WHERE tl2.TicketId = t.Id AND tl2.LogType = 5 AND tl2.GcRecord = 0) AS FinishedAt
             FROM Messaging.Tickets t
             LEFT JOIN Common.Companies co ON t.CompanyId = co.Id
             INNER JOIN Messaging.TicketStatuses ts ON t.TicketStatusId = ts.Id
             INNER JOIN Messaging.TicketComplexities tc ON t.TicketComplexityId = tc.Id
             INNER JOIN Messaging.TimeUnits tu ON t.TimeUnitId = tu.Id
+            INNER JOIN Messaging.TimeUnits tcu ON tc.TimeUnitId = tcu.Id
+            LEFT JOIN Support.TicketCompanyDefaults tcd ON tcd.CompanyId = t.CompanyId AND tcd.GcRecord = 0
             LEFT JOIN Admin.Persons c ON t.PersonId = c.Id
             LEFT JOIN Admin.Projects p ON t.ProjectId = p.Id
             LEFT JOIN Admin.Areas a ON t.AreaId = a.Id
@@ -140,12 +153,60 @@ public sealed class GetTicketByIdQueryHandler(
                 new { request.Id, TenantId = currentUserService.CompanyId, ViewerId = viewerId },
                 cancellationToken: cancellationToken));
 
-        var ticket = await multi.ReadFirstOrDefaultAsync<TicketDto>();
+        var row = await multi.ReadFirstOrDefaultAsync<TicketSlaRow>();
 
-        if (ticket is null)
+        if (row is null)
         {
             return Response<TicketDto>.Error("TICKET_NOT_FOUND", ["Ticket not found for the current company."]);
         }
+
+        var sla = TicketSlaCalculator.Compute(
+            row.CreatedAt,
+            row.ResolutionTimeUnits,
+            row.ComplexityTimeUnitCode,
+            row.LastActivityAt ?? row.CreatedAt,
+            row.FinishedAt,
+            row.IsFinalStatus,
+            row.MaxDayTicketInactivity,
+            nowUtc: DateTime.UtcNow);
+
+        var ticket = new TicketDto
+        {
+            Id = row.Id,
+            CompanyId = row.CompanyId,
+            CompanyName = row.CompanyName,
+            Code = row.Code,
+            Name = row.Name,
+            Description = row.Description,
+            EstimatedTime = row.EstimatedTime,
+            ConsumedTime = row.ConsumedTime,
+            IsVisibleToExternals = row.IsVisibleToExternals,
+            TicketStatusId = row.TicketStatusId,
+            TicketStatusName = row.TicketStatusName,
+            TicketComplexityId = row.TicketComplexityId,
+            TicketComplexityName = row.TicketComplexityName,
+            TimeUnitId = row.TimeUnitId,
+            TimeUnitName = row.TimeUnitName,
+            PersonId = row.PersonId,
+            PersonName = row.PersonName,
+            ProjectId = row.ProjectId,
+            ProjectName = row.ProjectName,
+            AreaId = row.AreaId,
+            AreaName = row.AreaName,
+            ChannelId = row.ChannelId,
+            ChannelName = row.ChannelName,
+            CreatedByUserId = row.CreatedByUserId,
+            CreatedByUserName = row.CreatedByUserName,
+            AssignedToUserId = row.AssignedToUserId,
+            AssignedToUserName = row.AssignedToUserName,
+            PrecedentTicketId = row.PrecedentTicketId,
+            PrecedentTicketCode = row.PrecedentTicketCode,
+            CreatedAt = row.CreatedAt,
+            SlaDueAt = sla.SlaDueAt,
+            IsSlaBreached = sla.IsSlaBreached,
+            LastActivityAt = sla.LastActivityAt,
+            IsInactive = sla.IsInactive
+        };
 
         ticket.Logs = (await multi.ReadAsync<TicketLogDto>()).AsList();
 
@@ -155,5 +216,52 @@ public sealed class GetTicketByIdQueryHandler(
             Message = "Ticket retrieved successfully.",
             Data = ticket
         };
+    }
+
+    /// <summary>
+    /// Flat row that combines every <see cref="TicketDto"/> column with the
+    /// raw SLA inputs that have no destination on the DTO and feed
+    /// <see cref="TicketSlaCalculator.Compute"/> instead.
+    /// </summary>
+    private sealed class TicketSlaRow
+    {
+        public Guid Id { get; init; }
+        public Guid CompanyId { get; init; }
+        public string? CompanyName { get; init; }
+        public string Code { get; init; } = string.Empty;
+        public string Name { get; init; } = string.Empty;
+        public string Description { get; init; } = string.Empty;
+        public decimal EstimatedTime { get; init; }
+        public decimal ConsumedTime { get; init; }
+        public bool IsVisibleToExternals { get; init; }
+        public Guid TicketStatusId { get; init; }
+        public string TicketStatusName { get; init; } = string.Empty;
+        public Guid TicketComplexityId { get; init; }
+        public string TicketComplexityName { get; init; } = string.Empty;
+        public Guid TimeUnitId { get; init; }
+        public string TimeUnitName { get; init; } = string.Empty;
+        public Guid? PersonId { get; init; }
+        public string? PersonName { get; init; }
+        public Guid? ProjectId { get; init; }
+        public string? ProjectName { get; init; }
+        public Guid? AreaId { get; init; }
+        public string? AreaName { get; init; }
+        public Guid ChannelId { get; init; }
+        public string ChannelName { get; init; } = string.Empty;
+        public Guid CreatedByUserId { get; init; }
+        public string CreatedByUserName { get; init; } = string.Empty;
+        public Guid? AssignedToUserId { get; init; }
+        public string? AssignedToUserName { get; init; }
+        public Guid? PrecedentTicketId { get; init; }
+        public string? PrecedentTicketCode { get; init; }
+        public DateTime CreatedAt { get; init; }
+
+        // --- SLA raw inputs (SPEC 37 F6) ---
+        public bool IsFinalStatus { get; init; }
+        public int ResolutionTimeUnits { get; init; }
+        public int ComplexityTimeUnitCode { get; init; }
+        public int? MaxDayTicketInactivity { get; init; }
+        public DateTime? LastActivityAt { get; init; }
+        public DateTime? FinishedAt { get; init; }
     }
 }

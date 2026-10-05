@@ -9,6 +9,7 @@ using JOIN.Domain.Common;
 using JOIN.Domain.Enums;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
+using JOIN.Domain.Support;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Commands.ReassignTicket;
@@ -455,6 +456,11 @@ public sealed class ReassignTicketCommandHandlerTests
             SetupRepository(UnitOfWorkMock, ProjectRepositoryMock);
             SetupRepository(UnitOfWorkMock, AreaRepositoryMock);
             SetupRepository(UnitOfWorkMock, ChannelRepositoryMock);
+            SetupRepository(UnitOfWorkMock, TicketLogRepositoryMock);
+            SetupRepository(UnitOfWorkMock, TicketCompanyDefaultRepositoryMock);
+            // Default: no logs / no inactivity default — SLA inputs default to zero.
+            TicketLogRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketLog>());
+            TicketCompanyDefaultRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketCompanyDefault>());
         }
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
@@ -471,6 +477,8 @@ public sealed class ReassignTicketCommandHandlerTests
         public Mock<IGenericRepository<Project>> ProjectRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Area>> AreaRepositoryMock { get; } = new();
         public Mock<IGenericRepository<CommunicationChannel>> ChannelRepositoryMock { get; } = new();
+        public Mock<IGenericRepository<TicketLog>> TicketLogRepositoryMock { get; } = new();
+        public Mock<IGenericRepository<TicketCompanyDefault>> TicketCompanyDefaultRepositoryMock { get; } = new();
 
         public ReassignTicketCommandHandler CreateHandler()
         {

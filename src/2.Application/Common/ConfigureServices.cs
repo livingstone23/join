@@ -93,6 +93,7 @@ public static class ConfigureServices
         services.AddScoped<PersonFinancialProfileCurrentCoordinator>();
         services.AddScoped<TicketUserCompanySuperAdminCoordinator>();
         services.AddScoped<TicketUserCompanyCapabilityResolver>();
+        services.AddScoped<TicketStatusTransitionGuard>();
         services.AddScoped<TicketDtoAssembler>();
         services.AddScoped<TicketCodeGenerator>();
 

@@ -19,12 +19,14 @@ public sealed class UpdateTicketCommandHandler(
     IUnitOfWork unitOfWork,
     ITicketMapper ticketMapper,
     ICurrentUserService currentUserService,
-    TicketDtoAssembler ticketDtoAssembler)
+    TicketDtoAssembler ticketDtoAssembler,
+    TicketStatusTransitionGuard transitionGuard)
     : IRequestHandler<UpdateTicketCommand, Response<TicketDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
     private readonly ITicketMapper _ticketMapper = ticketMapper;
     private readonly TicketDtoAssembler _ticketDtoAssembler = ticketDtoAssembler;
+    private readonly TicketStatusTransitionGuard _transitionGuard = transitionGuard;
 
     /// <summary>
     /// Updates an existing ticket in the current tenant context.
@@ -64,7 +66,8 @@ public sealed class UpdateTicketCommandHandler(
             return Response<TicketDto>.Error("TICKET_NOT_FOUND", ["Ticket not found for the current company."]);
         }
 
-        if (await statusRepository.GetAsync(request.TicketStatusId) is null)
+        var targetStatus = await statusRepository.GetAsync(request.TicketStatusId);
+        if (targetStatus is null || targetStatus.CompanyId != currentUserService.CompanyId)
         {
             return Response<TicketDto>.Error("INVALID_TICKET_STATUS", ["The provided ticket status does not exist or is inactive."]);
         }
@@ -116,6 +119,32 @@ public sealed class UpdateTicketCommandHandler(
         // Reassignment is no longer handled here — see SPEC 35 / ReassignTicketCommand.
         var previousStatusId = entity.TicketStatusId;
         var statusChanged = previousStatusId != request.TicketStatusId;
+
+        if (statusChanged)
+        {
+            // Only FinishTicket may move a ticket to a final status (SPEC 37):
+            // that path also produces the LogType.Finalization log the SLA
+            // calculator uses as the breach reference instant.
+            if (targetStatus.IsFinal)
+            {
+                return Response<TicketDto>.Error(
+                    "USE_FINISH_TICKET_FOR_FINAL_STATUS",
+                    ["Use the FinishTicket endpoint to move a ticket to a final status."]);
+            }
+
+            var transitionAllowed = await _transitionGuard.IsAllowedAsync(
+                currentUserService.CompanyId,
+                previousStatusId,
+                request.TicketStatusId,
+                cancellationToken);
+
+            if (!transitionAllowed)
+            {
+                return Response<TicketDto>.Error(
+                    "TICKET_STATUS_TRANSITION_NOT_ALLOWED",
+                    ["The requested status transition is not allowed by the current tenant's rules."]);
+            }
+        }
 
         _ticketMapper.ApplyUpdate(request, entity);
         entity.EffortPoints = request.EffortPoints;

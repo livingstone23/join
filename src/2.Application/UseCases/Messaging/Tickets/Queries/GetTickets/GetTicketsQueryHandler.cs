@@ -4,6 +4,7 @@ using Dapper;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
 using JOIN.Application.Interface;
+using JOIN.Domain.Messaging;
 using MediatR;
 using Microsoft.Extensions.Options;
 
@@ -11,6 +12,8 @@ namespace JOIN.Application.UseCases.Messaging.Tickets.Queries;
 
 /// <summary>
 /// Handles paginated ticket queries using Dapper for high-performance reads.
+/// SLA / inactivity are computed in C# via <see cref="JOIN.Domain.Messaging.TicketSlaCalculator"/>
+/// to keep the math portable across DB providers (SPEC 37 F6).
 /// </summary>
 public sealed class GetTicketsQueryHandler(
     ISqlConnectionFactory connectionFactory,
@@ -122,11 +125,21 @@ public sealed class GetTicketsQueryHandler(
                     WHEN au.Id IS NULL THEN NULL
                     ELSE CONCAT(au.FirstName, ' ', au.LastName)
                 END AS AssignedToUserName,
-                t.Created AS CreatedAt
+                t.Created AS CreatedAt,
+                ts.IsFinal AS IsFinalStatus,
+                tc.ResolutionTimeUnits,
+                tcu.Code AS ComplexityTimeUnitCode,
+                tcd.MaxDayTicketInactivity,
+                (SELECT MAX(tl.Created) FROM Support.TicketLogs tl
+                    WHERE tl.TicketId = t.Id AND tl.GcRecord = 0) AS LastActivityAt,
+                (SELECT MAX(tl2.Created) FROM Support.TicketLogs tl2
+                    WHERE tl2.TicketId = t.Id AND tl2.LogType = 5 AND tl2.GcRecord = 0) AS FinishedAt
             FROM Messaging.Tickets t
             LEFT JOIN Common.Companies co ON t.CompanyId = co.Id
             INNER JOIN Messaging.TicketStatuses ts ON t.TicketStatusId = ts.Id
             INNER JOIN Messaging.TicketComplexities tc ON t.TicketComplexityId = tc.Id
+            INNER JOIN Messaging.TimeUnits tcu ON tc.TimeUnitId = tcu.Id
+            LEFT JOIN Support.TicketCompanyDefaults tcd ON tcd.CompanyId = t.CompanyId AND tcd.GcRecord = 0
             LEFT JOIN Admin.Persons c ON t.PersonId = c.Id
             LEFT JOIN Security.Users au ON t.AssignedToUserId = au.Id
             {whereClause}
@@ -141,7 +154,45 @@ public sealed class GetTicketsQueryHandler(
         using var multi = await connection.QueryMultipleAsync(
             new CommandDefinition(sql, parameters, cancellationToken: cancellationToken));
 
-        var items = (await multi.ReadAsync<TicketListItemDto>()).AsList();
+        var rows = (await multi.ReadAsync<TicketSlaRow>()).AsList();
+
+        var nowUtc = DateTime.UtcNow;
+        var items = new List<TicketListItemDto>(rows.Count);
+        foreach (var row in rows)
+        {
+            var sla = TicketSlaCalculator.Compute(
+                row.CreatedAt,
+                row.ResolutionTimeUnits,
+                row.ComplexityTimeUnitCode,
+                row.LastActivityAt ?? row.CreatedAt,
+                row.FinishedAt,
+                row.IsFinalStatus,
+                row.MaxDayTicketInactivity,
+                nowUtc);
+
+            items.Add(new TicketListItemDto
+            {
+                Id = row.Id,
+                CompanyId = row.CompanyId,
+                CompanyName = row.CompanyName,
+                Code = row.Code,
+                Name = row.Name,
+                TicketStatusId = row.TicketStatusId,
+                TicketStatusName = row.TicketStatusName,
+                TicketComplexityId = row.TicketComplexityId,
+                TicketComplexityName = row.TicketComplexityName,
+                PersonId = row.PersonId,
+                PersonName = row.PersonName,
+                AssignedToUserId = row.AssignedToUserId,
+                AssignedToUserName = row.AssignedToUserName,
+                CreatedAt = row.CreatedAt,
+                SlaDueAt = sla.SlaDueAt,
+                IsSlaBreached = sla.IsSlaBreached,
+                LastActivityAt = sla.LastActivityAt,
+                IsInactive = sla.IsInactive
+            });
+        }
+
         var totalCount = await multi.ReadSingleAsync<int>();
 
         return new Response<PagedResult<TicketListItemDto>>
@@ -157,6 +208,38 @@ public sealed class GetTicketsQueryHandler(
                 TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)sanitizedPageSize)
             }
         };
+    }
+
+    /// <summary>
+    /// Flat row that combines every <see cref="TicketListItemDto"/> column with the
+    /// raw SLA inputs that have no destination on the DTO and feed
+    /// <see cref="TicketSlaCalculator.Compute"/> instead. Dapper materializes a single
+    /// object per row, so the multi-mapping overload is unnecessary here.
+    /// </summary>
+    private sealed class TicketSlaRow
+    {
+        public Guid Id { get; init; }
+        public Guid CompanyId { get; init; }
+        public string? CompanyName { get; init; }
+        public string Code { get; init; } = string.Empty;
+        public string Name { get; init; } = string.Empty;
+        public Guid TicketStatusId { get; init; }
+        public string TicketStatusName { get; init; } = string.Empty;
+        public Guid TicketComplexityId { get; init; }
+        public string TicketComplexityName { get; init; } = string.Empty;
+        public Guid? PersonId { get; init; }
+        public string? PersonName { get; init; }
+        public Guid? AssignedToUserId { get; init; }
+        public string? AssignedToUserName { get; init; }
+        public DateTime CreatedAt { get; init; }
+
+        // --- SLA raw inputs (SPEC 37 F6) ---
+        public bool IsFinalStatus { get; init; }
+        public int ResolutionTimeUnits { get; init; }
+        public int ComplexityTimeUnitCode { get; init; }
+        public int? MaxDayTicketInactivity { get; init; }
+        public DateTime? LastActivityAt { get; init; }
+        public DateTime? FinishedAt { get; init; }
     }
 
     private static string GetPaginationClause(IDbConnection connection)

@@ -19,13 +19,15 @@ public sealed class FinishTicketCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
     TicketUserCompanyCapabilityResolver capabilityResolver,
-    TicketDtoAssembler ticketDtoAssembler)
+    TicketDtoAssembler ticketDtoAssembler,
+    TicketStatusTransitionGuard transitionGuard)
     : IRequestHandler<FinishTicketCommand, Response<TicketDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
     private readonly ICurrentUserService _currentUserService = currentUserService;
     private readonly TicketUserCompanyCapabilityResolver _capabilityResolver = capabilityResolver;
     private readonly TicketDtoAssembler _ticketDtoAssembler = ticketDtoAssembler;
+    private readonly TicketStatusTransitionGuard _transitionGuard = transitionGuard;
 
     public async Task<Response<TicketDto>> Handle(
         FinishTicketCommand request,
@@ -60,7 +62,7 @@ public sealed class FinishTicketCommandHandler(
 
         var statusRepository = _unitOfWork.GetRepository<TicketStatus>();
         var targetStatus = await statusRepository.GetAsync(request.TicketStatusId);
-        if (targetStatus is null)
+        if (targetStatus is null || targetStatus.CompanyId != tenantId)
         {
             return Response<TicketDto>.Error("INVALID_TICKET_STATUS", ["The target ticket status does not exist or is inactive."]);
         }
@@ -82,6 +84,19 @@ public sealed class FinishTicketCommandHandler(
         }
 
         var previousStatusId = entity.TicketStatusId;
+        var transitionAllowed = await _transitionGuard.IsAllowedAsync(
+            tenantId,
+            previousStatusId,
+            request.TicketStatusId,
+            cancellationToken);
+
+        if (!transitionAllowed)
+        {
+            return Response<TicketDto>.Error(
+                "TICKET_STATUS_TRANSITION_NOT_ALLOWED",
+                ["The requested status transition is not allowed by the current tenant's rules."]);
+        }
+
         entity.TicketStatusId = request.TicketStatusId;
         entity.LastModified = DateTime.UtcNow;
         entity.LastModifiedBy = actorUserId.ToString();

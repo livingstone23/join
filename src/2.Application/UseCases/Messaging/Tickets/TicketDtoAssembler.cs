@@ -2,8 +2,10 @@ using JOIN.Application.DTO.Messaging;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
+using JOIN.Domain.Enums;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
+using JOIN.Domain.Support;
 
 namespace JOIN.Application.UseCases.Messaging.Tickets;
 
@@ -13,6 +15,9 @@ namespace JOIN.Application.UseCases.Messaging.Tickets;
 /// <c>UpdateTicketCommandHandler</c>. Resolves every related entity (status,
 /// complexity, time unit, customer, project, area, channel, creator, assignee,
 /// precedent ticket) by id and composes the DTO.
+/// Also computes SLA / inactivity via <see cref="TicketSlaCalculator"/> so every write
+/// path (create, update, reassign, finish) returns a DTO identical to the read queries
+/// (SPEC 37 F6).
 /// </summary>
 public sealed class TicketDtoAssembler(IUnitOfWork unitOfWork)
 {
@@ -32,6 +37,8 @@ public sealed class TicketDtoAssembler(IUnitOfWork unitOfWork)
         var areaRepository = unitOfWork.GetRepository<Area>();
         var channelRepository = unitOfWork.GetRepository<CommunicationChannel>();
         var ticketRepository = unitOfWork.GetRepository<Ticket>();
+        var ticketLogRepository = unitOfWork.GetRepository<TicketLog>();
+        var ticketCompanyDefaultRepository = unitOfWork.GetRepository<TicketCompanyDefault>();
 
         var createdBy = await userRepository.GetAsync(entity.CreatedByUserId);
         var assignedTo = entity.AssignedToUserId.HasValue
@@ -47,6 +54,47 @@ public sealed class TicketDtoAssembler(IUnitOfWork unitOfWork)
         var precedentTicket = entity.PrecedentTicketId.HasValue
             ? await ticketRepository.GetAsync(entity.PrecedentTicketId.Value)
             : null;
+
+        // --- SLA / inactivity inputs (SPEC 37 F6) ---
+        var ticketCompanyDefaults = await ticketCompanyDefaultRepository.GetAllAsync();
+        var maxDayTicketInactivity = ticketCompanyDefaults
+            .Where(x => x.GcRecord == 0 && x.CompanyId == entity.CompanyId)
+            .Select(x => (int?)x.MaxDayTicketInactivity)
+            .FirstOrDefault();
+
+        // CRITICAL: the SLA multiplier comes from the TimeUnit pointed at by the
+        // complexity (TicketComplexity.TimeUnitId), not from the ticket's own
+        // TimeUnitId. Reusing the ticket's unit would silently mis-scale SLA by
+        // a factor of 24 when the two differ.
+        var complexityTimeUnit = complexity is not null
+            ? await timeUnitRepository.GetAsync(complexity.TimeUnitId)
+            : null;
+        var complexityTimeUnitCode = complexityTimeUnit?.Code ?? 0;
+
+        var ticketLogs = await ticketLogRepository.GetAllAsync();
+        var logsForTicket = ticketLogs
+            .Where(x => x.GcRecord == 0 && x.TicketId == entity.Id)
+            .ToList();
+
+        var lastActivityAt = logsForTicket.Count > 0
+            ? logsForTicket.Max(x => x.Created)
+            : entity.Created;
+
+        var finishedAt = logsForTicket
+            .Where(x => (int)x.LogType == (int)LogType.Finalization)
+            .Select(x => (DateTime?)x.Created)
+            .DefaultIfEmpty(null)
+            .Max();
+
+        var sla = TicketSlaCalculator.Compute(
+            entity.Created,
+            complexity?.ResolutionTimeUnits ?? 0,
+            complexityTimeUnitCode,
+            lastActivityAt,
+            finishedAt,
+            status?.IsFinal ?? false,
+            maxDayTicketInactivity,
+            nowUtc: DateTime.UtcNow);
 
         return new TicketDto
         {
@@ -80,7 +128,11 @@ public sealed class TicketDtoAssembler(IUnitOfWork unitOfWork)
             AssignedToUserName = ResolveUserName(assignedTo),
             PrecedentTicketId = entity.PrecedentTicketId,
             PrecedentTicketCode = precedentTicket?.Code,
-            CreatedAt = entity.Created
+            CreatedAt = entity.Created,
+            SlaDueAt = sla.SlaDueAt,
+            IsSlaBreached = sla.IsSlaBreached,
+            LastActivityAt = sla.LastActivityAt,
+            IsInactive = sla.IsInactive
         };
     }
 

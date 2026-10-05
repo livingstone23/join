@@ -10,6 +10,7 @@ using JOIN.Domain.Common;
 using JOIN.Domain.Enums;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
+using JOIN.Domain.Support;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Commands.UpdateTicket;
@@ -55,7 +56,7 @@ public sealed class UpdateTicketCommandHandlerTests
 
         context.StatusRepositoryMock
             .Setup(x => x.GetAsync(request.TicketStatusId))
-            .ReturnsAsync(new TicketStatus { Name = "In Progress" });
+            .ReturnsAsync(new TicketStatus { Name = "In Progress", CompanyId = companyId });
 
         context.ComplexityRepositoryMock
             .Setup(x => x.GetAsync(request.TicketComplexityId))
@@ -126,7 +127,7 @@ public sealed class UpdateTicketCommandHandlerTests
         currentUserServiceMock.SetupGet(x => x.UserId).Returns(_fixture.Create<Guid>().ToString());
 
         var request = CreateValidCommand(id: _fixture.Create<Guid>());
-        var handler = new UpdateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object));
+        var handler = new UpdateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketStatusTransitionGuard(unitOfWorkMock.Object));
 
         // Act
         var response = await handler.Handle(request, CancellationToken.None);
@@ -155,7 +156,7 @@ public sealed class UpdateTicketCommandHandlerTests
         currentUserServiceMock.SetupGet(x => x.UserId).Returns("invalid-guid");
 
         var request = CreateValidCommand(id: _fixture.Create<Guid>());
-        var handler = new UpdateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object));
+        var handler = new UpdateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketStatusTransitionGuard(unitOfWorkMock.Object));
 
         // Act
         var response = await handler.Handle(request, CancellationToken.None);
@@ -237,7 +238,7 @@ public sealed class UpdateTicketCommandHandlerTests
 
         context.StatusRepositoryMock
             .Setup(x => x.GetAsync(request.TicketStatusId))
-            .ReturnsAsync(new TicketStatus { Name = "In Progress" });
+            .ReturnsAsync(new TicketStatus { Name = "In Progress", CompanyId = companyId });
 
         context.ComplexityRepositoryMock
             .Setup(x => x.GetAsync(request.TicketComplexityId))
@@ -299,7 +300,7 @@ public sealed class UpdateTicketCommandHandlerTests
 
         context.StatusRepositoryMock
             .Setup(x => x.GetAsync(request.TicketStatusId))
-            .ReturnsAsync(new TicketStatus { Name = "In Progress" });
+            .ReturnsAsync(new TicketStatus { Name = "In Progress", CompanyId = companyId });
 
         context.ComplexityRepositoryMock
             .Setup(x => x.GetAsync(request.TicketComplexityId))
@@ -426,7 +427,7 @@ public sealed class UpdateTicketCommandHandlerTests
 
         context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
         context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
-        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open", CompanyId = companyId });
         context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync((TicketComplexity?)null);
 
         var handler = context.CreateHandler();
@@ -450,7 +451,7 @@ public sealed class UpdateTicketCommandHandlerTests
 
         context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
         context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
-        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open", CompanyId = companyId });
         context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
         context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync((TimeUnit?)null);
 
@@ -475,7 +476,7 @@ public sealed class UpdateTicketCommandHandlerTests
 
         context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
         context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
-        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open", CompanyId = companyId });
         context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
         context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
         context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync((CommunicationChannel?)null);
@@ -519,7 +520,7 @@ public sealed class UpdateTicketCommandHandlerTests
 
         context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
         context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
-        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open", CompanyId = companyId });
         context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
         context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
         context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
@@ -564,7 +565,7 @@ public sealed class UpdateTicketCommandHandlerTests
 
         context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
         context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
-        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open", CompanyId = companyId });
         context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
         context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
         context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
@@ -610,7 +611,7 @@ public sealed class UpdateTicketCommandHandlerTests
 
         context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
         context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
-        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open", CompanyId = companyId });
         context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
         context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
         context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
@@ -641,7 +642,7 @@ public sealed class UpdateTicketCommandHandlerTests
         context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
         context.TicketRepositoryMock.Setup(x => x.GetAsync(ticketId)).ReturnsAsync(entity);
         context.TicketRepositoryMock.Setup(x => x.GetAsync(precedentId)).ReturnsAsync((Ticket?)null);
-        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open" });
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Open", CompanyId = companyId });
         context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
         context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
         context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
@@ -677,7 +678,7 @@ public sealed class UpdateTicketCommandHandlerTests
 
         context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
         context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
-        context.StatusRepositoryMock.Setup(x => x.GetAsync(newStatusId)).ReturnsAsync(new TicketStatus { Name = "Closed" });
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(newStatusId)).ReturnsAsync(new TicketStatus { Name = "Closed", CompanyId = companyId });
         context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
         context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
         context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
@@ -692,6 +693,117 @@ public sealed class UpdateTicketCommandHandlerTests
         response.IsSuccess.Should().BeTrue();
         entity.TicketLogs.Should().ContainSingle(x => x.LogType == LogType.StatusChange);
         entity.TicketLogs.Should().NotContain(x => x.LogType == LogType.Reassignment);
+    }
+
+    /// <summary>
+    /// SPEC 37 — guards against <c>UpdateTicket</c> moving a ticket to a status flagged
+    /// <c>IsFinal = true</c>. The handler must reject with
+    /// <c>USE_FINISH_TICKET_FOR_FINAL_STATUS</c> and never call
+    /// <c>ITicketMapper.ApplyUpdate</c>, because closing a ticket must go through
+    /// <c>FinishTicket</c> (the only path that produces the
+    /// <c>LogType.Finalization</c> log the SLA calculator uses).
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTargetStatusIsFinal_ShouldReturnUseFinishTicketError_AndSkipApplyUpdate()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var originalStatusId = Guid.NewGuid();
+        var newStatusId = Guid.NewGuid();
+        var request = CreateValidCommand(id: _fixture.Create<Guid>(), ticketStatusId: newStatusId);
+
+        var entity = CreateExistingTicket(companyId: companyId, createdByUserId: currentUserId, originalStatusId: originalStatusId);
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(newStatusId))
+            .ReturnsAsync(new TicketStatus { Name = "Closed", IsFinal = true, CompanyId = companyId });
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
+        context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("USE_FINISH_TICKET_FOR_FINAL_STATUS");
+        context.MapperMock.Verify(x => x.ApplyUpdate(It.IsAny<UpdateTicketCommand>(), It.IsAny<Ticket>()), Times.Never);
+    }
+
+    /// <summary>
+    /// SPEC 37 — when the target status is non-final but the configured transition
+    /// rules forbid moving from the existing status to the requested one, the
+    /// handler rejects with <c>TICKET_STATUS_TRANSITION_NOT_ALLOWED</c> and persists
+    /// nothing.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTransitionNotAllowedByGuard_ShouldReturnTransitionNotAllowed_AndPersistNothing()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var originalStatusId = Guid.NewGuid();
+        var newStatusId = Guid.NewGuid();
+        var request = CreateValidCommand(id: _fixture.Create<Guid>(), ticketStatusId: newStatusId);
+
+        var entity = CreateExistingTicket(companyId: companyId, createdByUserId: currentUserId, originalStatusId: originalStatusId);
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(newStatusId))
+            .ReturnsAsync(new TicketStatus { Name = "InProgress", IsFinal = false, CompanyId = companyId });
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
+        context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
+        // A rule for the source status that does NOT include the requested destination.
+        context.TicketStatusTransitionRepositoryMock.Setup(x => x.GetAllAsync())
+            .ReturnsAsync(new[]
+            {
+                new TicketStatusTransition { CompanyId = companyId, FromStatusId = originalStatusId, ToStatusId = Guid.NewGuid() }
+            });
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("TICKET_STATUS_TRANSITION_NOT_ALLOWED");
+        context.TicketRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<Ticket>()), Times.Never);
+    }
+
+    /// <summary>
+    /// SPEC 37 — the guard must not interfere when no transition rules are
+    /// configured for the source status (the default state for every tenant at
+    /// deploy time). Behavior matches the previous UpdateTicket handler.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenNoTransitionRulesConfigured_ShouldSucceedAsBefore()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var currentUserId = _fixture.Create<Guid>();
+        var originalStatusId = Guid.NewGuid();
+        var newStatusId = Guid.NewGuid();
+        var request = CreateValidCommand(id: _fixture.Create<Guid>(), ticketStatusId: newStatusId);
+
+        var entity = CreateExistingTicket(companyId: companyId, createdByUserId: currentUserId, originalStatusId: originalStatusId);
+        var context = CreateContext(companyId, currentUserId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(request.Id)).ReturnsAsync(entity);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(newStatusId))
+            .ReturnsAsync(new TicketStatus { Name = "InProgress", IsFinal = false, CompanyId = companyId });
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(request.TicketComplexityId)).ReturnsAsync(new TicketComplexity { Name = "High" });
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(request.TimeUnitId)).ReturnsAsync(new TimeUnit { Name = "Hours" });
+        context.ChannelRepositoryMock.Setup(x => x.GetAsync(request.ChannelId)).ReturnsAsync(new CommunicationChannel { Name = "Portal" });
+        context.TicketRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Ticket>())).ReturnsAsync(true);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        context.UserRepositoryMock.Setup(x => x.GetAsync(currentUserId)).ReturnsAsync(new ApplicationUser { FirstName = "Ana", LastName = "Torres" });
+        context.MapperMock.Setup(x => x.ApplyUpdate(request, entity)).Callback(() => ApplyRequestToTicket(request, entity));
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
     }
 
     /// <summary>
@@ -825,6 +937,14 @@ public sealed class UpdateTicketCommandHandlerTests
             SetupRepository(UnitOfWorkMock, AreaRepositoryMock);
             SetupRepository(UnitOfWorkMock, UserRepositoryMock);
             SetupRepository(UnitOfWorkMock, UserCompanyRepositoryMock);
+            SetupRepository(UnitOfWorkMock, TicketStatusTransitionRepositoryMock);
+            // Default: no transition rules configured — guard should allow any transition.
+            TicketStatusTransitionRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketStatusTransition>());
+            SetupRepository(UnitOfWorkMock, TicketLogRepositoryMock);
+            SetupRepository(UnitOfWorkMock, TicketCompanyDefaultRepositoryMock);
+            // Default: no ticket logs / no inactivity default for the tenant.
+            TicketLogRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketLog>());
+            TicketCompanyDefaultRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketCompanyDefault>());
         }
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
@@ -841,6 +961,9 @@ public sealed class UpdateTicketCommandHandlerTests
         public Mock<IGenericRepository<Area>> AreaRepositoryMock { get; } = CreateRepositoryMock<Area>();
         public Mock<IGenericRepository<ApplicationUser>> UserRepositoryMock { get; } = CreateRepositoryMock<ApplicationUser>();
         public Mock<IGenericRepository<UserCompany>> UserCompanyRepositoryMock { get; } = CreateRepositoryMock<UserCompany>();
+        public Mock<IGenericRepository<TicketStatusTransition>> TicketStatusTransitionRepositoryMock { get; } = CreateRepositoryMock<TicketStatusTransition>();
+        public Mock<IGenericRepository<TicketLog>> TicketLogRepositoryMock { get; } = CreateRepositoryMock<TicketLog>();
+        public Mock<IGenericRepository<TicketCompanyDefault>> TicketCompanyDefaultRepositoryMock { get; } = CreateRepositoryMock<TicketCompanyDefault>();
 
         public UpdateTicketCommandHandler CreateHandler()
         {
@@ -848,7 +971,8 @@ public sealed class UpdateTicketCommandHandlerTests
                 UnitOfWorkMock.Object,
                 MapperMock.Object,
                 CurrentUserServiceMock.Object,
-                new TicketDtoAssembler(UnitOfWorkMock.Object));
+                new TicketDtoAssembler(UnitOfWorkMock.Object),
+                new TicketStatusTransitionGuard(UnitOfWorkMock.Object));
         }
     }
 }

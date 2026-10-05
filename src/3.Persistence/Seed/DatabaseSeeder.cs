@@ -2728,6 +2728,11 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("TicketAttachmentSettings", "/ManejoTickets/ticket-attachment-settings", "@Icons.Material.Filled.SettingsApplications", "ManejoTickets", "TicketAttachmentSettings", true, true, true, true),
         new("TicketDocuments", "/ManejoTickets/ticket-documents", "@Icons.Material.Filled.AttachFile", "ManejoTickets", "TicketDocuments", true, true, true, true, CanDownload: true),
 
+        // SPEC 37 — transiciones de status parametrizables (sub-recurso de configuración de Ticket).
+        // CanUpdate queda en false por diseño: el par (FromStatusId, ToStatusId) es la identidad
+        // de la regla, no un dato editable — el endpoint "Update" no existe (ver Scope).
+        new("TicketStatusTransitions", "/ManejoTickets/ticket-status-transitions", "@Icons.Material.Filled.SyncAlt", "ManejoTickets", "TicketStatusTransitions", true, true, false, true),
+
         new("Seguridad", "/security", "@Icons.Material.Filled.Security", null, null, false, false, false, false),
         new("Usuarios", "/security/users", "@Icons.Material.Filled.SupervisedUserCircle", null,"Users", false, false, false, false),
         new("Roles", "/security/roles", "@Icons.Material.Filled.VerifiedUser", null,"Roles", false, false, false, false),
@@ -2804,6 +2809,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "TicketStatuses", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "TicketCompanyDefaults", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "TicketUserCompanies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        // SPEC 37 — Manager gestiona transiciones (CanExecute para escenarios donde aplique).
+        new("Manager", "TicketStatusTransitions", true, true, false, true, CanDownload: false, CanExport: false, CanExecute: true),
         new("Manager", "Seguridad", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Usuarios", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Roles", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -2837,6 +2844,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "TicketComplexities", true, true, true, false),
         new("Supervisor", "TicketStatuses", true, true, true, false),
         new("Supervisor", "TicketUserCompanies", true, false, false, false),
+        // SPEC 37 — Supervisor solo lee el catálogo de transiciones configuradas.
+        new("Supervisor", "TicketStatusTransitions", true, false, false, false),
 
         // `UsuarioSimple` receives read-only access to selected administrative options while the remaining entries stay restricted by default.
         new("UsuarioSimple", "Administracion", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
@@ -2862,6 +2871,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("UsuarioSimple", "TicketComplexities", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "TicketStatuses", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "TicketUserCompanies", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        // SPEC 37 — UsuarioSimple solo lee, sin Download/Export/Execute.
+        new("UsuarioSimple", "TicketStatusTransitions", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
 
         // SPEC 36 — adjuntos de tickets por rol. TicketAttachmentSettings es la config
         // singleton por empresa (no endpoint de descarga propio); TicketDocuments es

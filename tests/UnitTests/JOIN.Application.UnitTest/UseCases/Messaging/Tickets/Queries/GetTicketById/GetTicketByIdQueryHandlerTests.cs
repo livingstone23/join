@@ -3,6 +3,7 @@ using FluentAssertions;
 using JOIN.Application.Interface;
 using JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Queries.TestDoubles;
 using JOIN.Application.UseCases.Messaging.Tickets.Queries;
+using FakeResultSet = JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Queries.TestDoubles.FakeResultSet;
 using JOIN.Domain.Enums;
 using Moq;
 
@@ -463,5 +464,146 @@ public sealed class GetTicketByIdQueryHandlerTests
                 ConnectionFactoryMock.Object,
                 CurrentUserServiceMock.Object);
         }
+    }
+
+    /// <summary>
+    /// SPEC 37 — the four SLA/inactivity fields on the DTO must be populated by
+    /// the handler. A ticket whose SLA due instant is in the past and that has
+    /// not been finalized must surface <c>IsSlaBreached = true</c>.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenSlaDueInPastAndTicketOpen_ShouldReturnIsSlaBreachedTrue()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var ticketId = _fixture.Create<Guid>();
+        var createdAt = DateTime.UtcNow.AddHours(-200);
+        var complexityTimeUnitId = Guid.NewGuid();
+        var ticketStatusId = Guid.NewGuid();
+        var context = new GetTicketByIdQueryHandlerTestContext(companyId);
+
+        context.Connection.SetResults(
+            CreateTicketDetailResultSetWithSla(
+                ticketId: ticketId,
+                companyId: companyId,
+                ticketStatusId: ticketStatusId,
+                complexityTimeUnitId: complexityTimeUnitId,
+                createdAt: createdAt,
+                resolutionTimeUnits: 3,
+                complexityTimeUnitCode: 24, // Día
+                isFinalStatus: false,
+                maxDayTicketInactivity: (int?)null,
+                lastActivityAt: createdAt.AddHours(1),
+                finishedAt: null),
+            CreateTicketLogsResultSet());
+
+        var query = new GetTicketByIdQuery(ticketId);
+        var handler = context.CreateHandler();
+
+        var response = await handler.Handle(query, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        response.Data!.IsSlaBreached.Should().BeTrue();
+        response.Data.SlaDueAt.Should().Be(createdAt.AddHours(72));
+    }
+
+    /// <summary>
+    /// Discriminating test for SPEC 37: the SLA multiplier MUST come from the
+    /// <c>TimeUnit</c> of the complexity (<c>tcu.Code</c>), not from the ticket's
+    /// own <c>TimeUnit</c>. A ticket whose complexity points at <c>Día</c> (Code 24)
+    /// with <c>ResolutionTimeUnits = 3</c> must produce <c>SlaDueAt = Created + 72h</c>,
+    /// regardless of the ticket's own time-unit code.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenComplexityUsesDayButTicketUsesHour_ShouldUseComplexityTimeUnitForSla()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var ticketId = _fixture.Create<Guid>();
+        var createdAt = DateTime.UtcNow.AddHours(-10);
+        var complexityTimeUnitId = Guid.NewGuid();
+        var ticketStatusId = Guid.NewGuid();
+        var context = new GetTicketByIdQueryHandlerTestContext(companyId);
+
+        context.Connection.SetResults(
+            CreateTicketDetailResultSetWithSla(
+                ticketId: ticketId,
+                companyId: companyId,
+                ticketStatusId: ticketStatusId,
+                complexityTimeUnitId: complexityTimeUnitId,
+                createdAt: createdAt,
+                resolutionTimeUnits: 3,
+                complexityTimeUnitCode: 24, // Día (the complexity unit) drives SLA
+                isFinalStatus: false,
+                maxDayTicketInactivity: (int?)null,
+                lastActivityAt: createdAt.AddHours(1),
+                finishedAt: null),
+            CreateTicketLogsResultSet());
+
+        var query = new GetTicketByIdQuery(ticketId);
+        var handler = context.CreateHandler();
+
+        var response = await handler.Handle(query, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        // Complexity uses Día (24), resolution = 3 → SlaDueAt = Created + 72h, NOT + 3h.
+        response.Data!.SlaDueAt.Should().Be(createdAt.AddHours(72));
+    }
+
+    /// <summary>
+    /// Extended result set that supplies every column the SPEC 37 SELECT requires
+    /// (including the new raw SLA inputs). Used by the SLA tests above.
+    /// </summary>
+    private static FakeResultSet CreateTicketDetailResultSetWithSla(
+        Guid ticketId,
+        Guid companyId,
+        Guid ticketStatusId,
+        Guid complexityTimeUnitId,
+        DateTime createdAt,
+        int resolutionTimeUnits,
+        int complexityTimeUnitCode,
+        bool isFinalStatus,
+        int? maxDayTicketInactivity,
+        DateTime? lastActivityAt,
+        DateTime? finishedAt)
+    {
+        return FakeResultSet.FromRows(
+            new Dictionary<string, object?>
+            {
+                ["Id"] = ticketId,
+                ["CompanyId"] = companyId,
+                ["CompanyName"] = "JOIN",
+                ["Code"] = "TICK-202604-1001",
+                ["Name"] = "Portal issue",
+                ["Description"] = "A sample ticket for detail retrieval.",
+                ["EstimatedTime"] = 8m,
+                ["ConsumedTime"] = 2m,
+                ["IsVisibleToExternals"] = true,
+                ["TicketStatusId"] = ticketStatusId,
+                ["TicketStatusName"] = "Open",
+                ["TicketComplexityId"] = Guid.NewGuid(),
+                ["TicketComplexityName"] = "High",
+                ["TimeUnitId"] = Guid.NewGuid(),
+                ["TimeUnitName"] = "Hours",
+                ["PersonId"] = Guid.NewGuid(),
+                ["PersonName"] = "Contoso",
+                ["ProjectId"] = Guid.NewGuid(),
+                ["ProjectName"] = "CRM Rollout",
+                ["AreaId"] = Guid.NewGuid(),
+                ["AreaName"] = "Support",
+                ["ChannelId"] = Guid.NewGuid(),
+                ["ChannelName"] = "Portal Web",
+                ["CreatedByUserId"] = Guid.NewGuid(),
+                ["CreatedByUserName"] = "Ana Torres",
+                ["AssignedToUserId"] = Guid.NewGuid(),
+                ["AssignedToUserName"] = "Luis Gomez",
+                ["PrecedentTicketId"] = Guid.NewGuid(),
+                ["PrecedentTicketCode"] = "TICK-202604-0999",
+                ["CreatedAt"] = createdAt,
+                ["IsFinalStatus"] = isFinalStatus,
+                ["ResolutionTimeUnits"] = resolutionTimeUnits,
+                ["ComplexityTimeUnitCode"] = complexityTimeUnitCode,
+                ["MaxDayTicketInactivity"] = maxDayTicketInactivity,
+                ["LastActivityAt"] = lastActivityAt,
+                ["FinishedAt"] = finishedAt
+            });
     }
 }

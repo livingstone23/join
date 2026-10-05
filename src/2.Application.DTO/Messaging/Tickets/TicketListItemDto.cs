@@ -76,4 +76,26 @@ public record TicketListItemDto
     /// Gets the creation date in UTC.
     /// </summary>
     public DateTime CreatedAt { get; init; }
+
+    /// <summary>
+    /// Gets the SLA due instant, computed as <c>CreatedAt + (TicketComplexity.ResolutionTimeUnits × TimeUnit.Code of TicketComplexity.TimeUnitId)</c> hours.
+    /// </summary>
+    public DateTime SlaDueAt { get; init; }
+
+    /// <summary>
+    /// Gets whether the ticket is currently past its SLA — for finished tickets,
+    /// evaluated against the finalization instant rather than "now".
+    /// </summary>
+    public bool IsSlaBreached { get; init; }
+
+    /// <summary>
+    /// Gets the timestamp of the most recent ticket log entry.
+    /// </summary>
+    public DateTime LastActivityAt { get; init; }
+
+    /// <summary>
+    /// Gets whether the ticket is inactive per the tenant's <c>MaxDayTicketInactivity</c>.
+    /// Never <c>true</c> for tickets in a final status.
+    /// </summary>
+    public bool IsInactive { get; init; }
 }

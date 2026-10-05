@@ -5,8 +5,10 @@ using JOIN.Application.UseCases.Messaging.Tickets;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
+using JOIN.Domain.Enums;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
+using JOIN.Domain.Support;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Messaging.Tickets;
@@ -177,6 +179,114 @@ public sealed class TicketDtoAssemblerTests
         context.TicketRepositoryMock.Verify(x => x.GetAsync(It.IsAny<Guid>()), Times.Never);
     }
 
+    /// <summary>
+    /// SPEC 37 — the assembler must compute the four SLA/inactivity fields identically
+    /// to the read queries. A ticket created two hours ago with no activity log, a
+    /// complexity pointing at <c>Día</c> (Code 24) with <c>ResolutionTimeUnits = 3</c>,
+    /// and no inactivity threshold must surface <c>SlaDueAt = Created + 72h</c> and
+    /// <c>IsSlaBreached = false</c>.
+    /// </summary>
+    [Fact]
+    public async Task BuildAsync_ShouldComputeSlaAndInactivityFields()
+    {
+        // Arrange
+        var context = new TicketDtoAssemblerTestContext();
+        var companyId = _fixture.Create<Guid>();
+        var company = new Company { Name = "JOIN" };
+        SetEntityId(company, companyId);
+        var ticket = CreateTicket(companyId, includeOptionalRelations: false);
+        ticket.Created = DateTime.UtcNow.AddHours(-1);
+
+        var status = new TicketStatus { Name = "Open", IsFinal = false };
+        SetEntityId(status, ticket.TicketStatusId);
+        var complexityTimeUnitId = Guid.NewGuid();
+        var complexity = new TicketComplexity
+        {
+            Name = "High",
+            ResolutionTimeUnits = 3,
+            TimeUnitId = complexityTimeUnitId
+        };
+        SetEntityId(complexity, ticket.TicketComplexityId);
+        var complexityTimeUnit = new TimeUnit { Name = "Día", Code = 24 };
+        SetEntityId(complexityTimeUnit, complexityTimeUnitId);
+        var timeUnit = new TimeUnit { Name = "Hora", Code = 1 };
+        SetEntityId(timeUnit, ticket.TimeUnitId);
+        var channel = new CommunicationChannel { Name = "Portal" };
+        SetEntityId(channel, ticket.ChannelId);
+        var creator = new ApplicationUser { FirstName = "Ana", LastName = "Torres" };
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(company);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(ticket.TicketStatusId)).ReturnsAsync(status);
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(ticket.TicketComplexityId)).ReturnsAsync(complexity);
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(ticket.TimeUnitId)).ReturnsAsync(timeUnit);
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(complexityTimeUnitId)).ReturnsAsync(complexityTimeUnit);
+        context.ChannelRepositoryMock.Setup(x => x.GetAsync(ticket.ChannelId)).ReturnsAsync(channel);
+        context.UserRepositoryMock.Setup(x => x.GetAsync(ticket.CreatedByUserId)).ReturnsAsync(creator);
+        context.TicketLogRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketLog>());
+        context.TicketCompanyDefaultRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketCompanyDefault>());
+
+        // Act
+        var dto = await context.CreateAssembler().BuildAsync(ticket, company, CancellationToken.None);
+
+        // Assert
+        dto.SlaDueAt.Should().Be(ticket.Created.AddHours(72));
+        dto.IsSlaBreached.Should().BeFalse();
+        dto.IsInactive.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Discriminating test: the assembler must use the <c>TimeUnit</c> of the
+    /// complexity, NOT the <c>TimeUnit</c> of the ticket. Both units are loaded
+    /// via <c>IGenericRepository&lt;TimeUnit&gt;.GetAsync</c> on distinct ids —
+    /// swapping them silently produces an SLA 24× too short.
+    /// </summary>
+    [Fact]
+    public async Task BuildAsync_ShouldUseComplexityTimeUnit_NotTicketTimeUnit()
+    {
+        // Arrange
+        var context = new TicketDtoAssemblerTestContext();
+        var companyId = _fixture.Create<Guid>();
+        var company = new Company { Name = "JOIN" };
+        SetEntityId(company, companyId);
+        var ticket = CreateTicket(companyId, includeOptionalRelations: false);
+        ticket.Created = DateTime.UtcNow.AddHours(-1);
+
+        var status = new TicketStatus { Name = "Open", IsFinal = false };
+        SetEntityId(status, ticket.TicketStatusId);
+        var complexityTimeUnitId = Guid.NewGuid();
+        var complexity = new TicketComplexity
+        {
+            Name = "High",
+            ResolutionTimeUnits = 3,
+            TimeUnitId = complexityTimeUnitId
+        };
+        SetEntityId(complexity, ticket.TicketComplexityId);
+        var complexityTimeUnit = new TimeUnit { Name = "Día", Code = 24 };
+        SetEntityId(complexityTimeUnit, complexityTimeUnitId);
+        var ticketTimeUnit = new TimeUnit { Name = "Hora", Code = 1 };
+        SetEntityId(ticketTimeUnit, ticket.TimeUnitId);
+        var channel = new CommunicationChannel { Name = "Portal" };
+        SetEntityId(channel, ticket.ChannelId);
+        var creator = new ApplicationUser { FirstName = "Ana", LastName = "Torres" };
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(company);
+        context.StatusRepositoryMock.Setup(x => x.GetAsync(ticket.TicketStatusId)).ReturnsAsync(status);
+        context.ComplexityRepositoryMock.Setup(x => x.GetAsync(ticket.TicketComplexityId)).ReturnsAsync(complexity);
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(ticket.TimeUnitId)).ReturnsAsync(ticketTimeUnit);
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(complexityTimeUnitId)).ReturnsAsync(complexityTimeUnit);
+        context.ChannelRepositoryMock.Setup(x => x.GetAsync(ticket.ChannelId)).ReturnsAsync(channel);
+        context.UserRepositoryMock.Setup(x => x.GetAsync(ticket.CreatedByUserId)).ReturnsAsync(creator);
+        context.TicketLogRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketLog>());
+        context.TicketCompanyDefaultRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketCompanyDefault>());
+
+        // Act
+        var dto = await context.CreateAssembler().BuildAsync(ticket, company, CancellationToken.None);
+
+        // Assert
+        dto.TimeUnitName.Should().Be("Hora"); // ticket unit (effort tracking)
+        dto.SlaDueAt.Should().Be(ticket.Created.AddHours(72)); // complexity unit (SLA)
+    }
+
     private Ticket CreateTicket(Guid companyId, bool includeOptionalRelations = true) => new()
     {
         CompanyId = companyId,
@@ -227,6 +337,8 @@ public sealed class TicketDtoAssemblerTests
             SetupRepository(UnitOfWorkMock, PersonRepositoryMock);
             SetupRepository(UnitOfWorkMock, ProjectRepositoryMock);
             SetupRepository(UnitOfWorkMock, AreaRepositoryMock);
+            SetupRepository(UnitOfWorkMock, TicketLogRepositoryMock);
+            SetupRepository(UnitOfWorkMock, TicketCompanyDefaultRepositoryMock);
         }
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
@@ -240,6 +352,8 @@ public sealed class TicketDtoAssemblerTests
         public Mock<IGenericRepository<Person>> PersonRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Project>> ProjectRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Area>> AreaRepositoryMock { get; } = new();
+        public Mock<IGenericRepository<TicketLog>> TicketLogRepositoryMock { get; } = new();
+        public Mock<IGenericRepository<TicketCompanyDefault>> TicketCompanyDefaultRepositoryMock { get; } = new();
 
         public TicketDtoAssembler CreateAssembler() => new(UnitOfWorkMock.Object);
 

@@ -1,9 +1,11 @@
+using System.Linq;
 using AutoFixture;
 using FluentAssertions;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
 using JOIN.Application.Interface;
 using JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Queries.TestDoubles;
+using FakeResultSet = JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Queries.TestDoubles.FakeResultSet;
 using JOIN.Application.UseCases.Messaging.Tickets.Queries;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -212,5 +214,118 @@ public sealed class GetTicketsQueryHandlerTests
                 CurrentUserServiceMock.Object,
                 PaginationOptions);
         }
+    }
+
+    /// <summary>
+    /// SPEC 37 — list-level SLA propagation. A ticket whose SLA due instant is in the
+    /// past and that has not been finalized must surface <c>IsSlaBreached = true</c>
+    /// in the <see cref="TicketListItemDto"/>.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenSlaDueInPastAndTicketOpen_ShouldReturnIsSlaBreachedTrue()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var context = new GetTicketsQueryHandlerTestContext(companyId, useNpgsqlConnection: false);
+        var createdAt = DateTime.UtcNow.AddHours(-200);
+        var ticketId = Guid.NewGuid();
+        var ticketStatusId = Guid.NewGuid();
+
+        context.Connection.SetResults(
+            CreateTicketItemsResultSetWithSla(
+                ticketId: ticketId,
+                companyId: companyId,
+                ticketStatusId: ticketStatusId,
+                createdAt: createdAt,
+                resolutionTimeUnits: 3,
+                complexityTimeUnitCode: 24,
+                isFinalStatus: false,
+                maxDayTicketInactivity: (int?)null,
+                lastActivityAt: createdAt.AddHours(1),
+                finishedAt: null),
+            FakeResultSet.FromScalar(1));
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(new GetTicketsQuery(), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        response.Data!.Items.Should().HaveCount(1);
+        response.Data.Items.First().IsSlaBreached.Should().BeTrue();
+        response.Data.Items.First().SlaDueAt.Should().Be(createdAt.AddHours(72));
+    }
+
+    /// <summary>
+    /// Discriminating test for SPEC 37 at the listing path: the SLA multiplier
+    /// must come from the complexity's <c>TimeUnit.Code</c>, never from the
+    /// ticket's own <c>TimeUnitId</c>. With a complexity unit of <c>Día</c> (24)
+    /// and <c>ResolutionTimeUnits = 3</c>, <c>SlaDueAt = Created + 72h</c>.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenComplexityUsesDayButTicketUsesHour_ShouldUseComplexityTimeUnitForSla()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var context = new GetTicketsQueryHandlerTestContext(companyId, useNpgsqlConnection: false);
+        var createdAt = DateTime.UtcNow.AddHours(-10);
+
+        context.Connection.SetResults(
+            CreateTicketItemsResultSetWithSla(
+                ticketId: Guid.NewGuid(),
+                companyId: companyId,
+                ticketStatusId: Guid.NewGuid(),
+                createdAt: createdAt,
+                resolutionTimeUnits: 3,
+                complexityTimeUnitCode: 24,
+                isFinalStatus: false,
+                maxDayTicketInactivity: (int?)null,
+                lastActivityAt: createdAt.AddHours(1),
+                finishedAt: null),
+            FakeResultSet.FromScalar(1));
+
+        var handler = context.CreateHandler();
+        var response = await handler.Handle(new GetTicketsQuery(), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        response.Data!.Items.First().SlaDueAt.Should().Be(createdAt.AddHours(72));
+    }
+
+    /// <summary>
+    /// Extended <see cref="TicketListItemDto"/> row with the raw SLA inputs
+    /// the SPEC 37 SELECT requires. Used by the SLA tests above.
+    /// </summary>
+    private static FakeResultSet CreateTicketItemsResultSetWithSla(
+        Guid ticketId,
+        Guid companyId,
+        Guid ticketStatusId,
+        DateTime createdAt,
+        int resolutionTimeUnits,
+        int complexityTimeUnitCode,
+        bool isFinalStatus,
+        int? maxDayTicketInactivity,
+        DateTime? lastActivityAt,
+        DateTime? finishedAt)
+    {
+        return FakeResultSet.FromRows(
+            new Dictionary<string, object?>
+            {
+                ["Id"] = ticketId,
+                ["CompanyId"] = companyId,
+                ["CompanyName"] = "JOIN",
+                ["Code"] = "TICK-202604-0001",
+                ["Name"] = "Printer issue",
+                ["TicketStatusId"] = ticketStatusId,
+                ["TicketStatusName"] = "Open",
+                ["TicketComplexityId"] = Guid.NewGuid(),
+                ["TicketComplexityName"] = "High",
+                ["PersonId"] = Guid.NewGuid(),
+                ["PersonName"] = "Contoso",
+                ["AssignedToUserId"] = Guid.NewGuid(),
+                ["AssignedToUserName"] = "Ana Torres",
+                ["CreatedAt"] = createdAt,
+                ["IsFinalStatus"] = isFinalStatus,
+                ["ResolutionTimeUnits"] = resolutionTimeUnits,
+                ["ComplexityTimeUnitCode"] = complexityTimeUnitCode,
+                ["MaxDayTicketInactivity"] = maxDayTicketInactivity,
+                ["LastActivityAt"] = lastActivityAt,
+                ["FinishedAt"] = finishedAt
+            });
     }
 }

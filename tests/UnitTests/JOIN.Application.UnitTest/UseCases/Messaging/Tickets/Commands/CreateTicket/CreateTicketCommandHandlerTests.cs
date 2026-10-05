@@ -9,6 +9,7 @@ using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
+using JOIN.Domain.Support;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Commands.CreateTicket;
@@ -58,6 +59,8 @@ public sealed class CreateTicketCommandHandlerTests
         var areaRepositoryMock = CreateRepositoryMock<Area>();
         var userRepositoryMock = CreateRepositoryMock<ApplicationUser>();
         var ticketCompanyDefaultRepositoryMock = CreateRepositoryMock<TicketCompanyDefault>();
+        var ticketLogRepositoryMock = CreateRepositoryMock<TicketLog>();
+        ticketLogRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketLog>());
 
         companyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(company);
         statusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(status);
@@ -82,6 +85,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, areaRepositoryMock);
         SetupRepository(unitOfWorkMock, userRepositoryMock);
         SetupRepository(unitOfWorkMock, ticketCompanyDefaultRepositoryMock);
+        SetupRepository(unitOfWorkMock, ticketLogRepositoryMock);
 
         var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
@@ -135,6 +139,8 @@ public sealed class CreateTicketCommandHandlerTests
         var areaRepositoryMock = CreateRepositoryMock<Area>();
         var userRepositoryMock = CreateRepositoryMock<ApplicationUser>();
         var ticketCompanyDefaultRepositoryMock = CreateRepositoryMock<TicketCompanyDefault>();
+        var ticketLogRepositoryMock = CreateRepositoryMock<TicketLog>();
+        ticketLogRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketLog>());
 
         companyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
         statusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Abierto" });
@@ -154,6 +160,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, areaRepositoryMock);
         SetupRepository(unitOfWorkMock, userRepositoryMock);
         SetupRepository(unitOfWorkMock, ticketCompanyDefaultRepositoryMock);
+        SetupRepository(unitOfWorkMock, ticketLogRepositoryMock);
 
         var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
@@ -202,6 +209,8 @@ public sealed class CreateTicketCommandHandlerTests
         var areaRepositoryMock = CreateRepositoryMock<Area>();
         var userRepositoryMock = CreateRepositoryMock<ApplicationUser>();
         var ticketCompanyDefaultRepositoryMock = CreateRepositoryMock<TicketCompanyDefault>();
+        var ticketLogRepositoryMock = CreateRepositoryMock<TicketLog>();
+        ticketLogRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketLog>());
 
         companyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
         statusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Abierto" });
@@ -227,6 +236,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, areaRepositoryMock);
         SetupRepository(unitOfWorkMock, userRepositoryMock);
         SetupRepository(unitOfWorkMock, ticketCompanyDefaultRepositoryMock);
+        SetupRepository(unitOfWorkMock, ticketLogRepositoryMock);
 
         var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
@@ -266,6 +276,8 @@ public sealed class CreateTicketCommandHandlerTests
         var areaRepositoryMock = CreateRepositoryMock<Area>();
         var userRepositoryMock = CreateRepositoryMock<ApplicationUser>();
         var ticketCompanyDefaultRepositoryMock = CreateRepositoryMock<TicketCompanyDefault>();
+        var ticketLogRepositoryMock = CreateRepositoryMock<TicketLog>();
+        ticketLogRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketLog>());
 
         companyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
         statusRepositoryMock.Setup(x => x.GetAsync(request.TicketStatusId)).ReturnsAsync(new TicketStatus { Name = "Abierto" });
@@ -289,6 +301,7 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, areaRepositoryMock);
         SetupRepository(unitOfWorkMock, userRepositoryMock);
         SetupRepository(unitOfWorkMock, ticketCompanyDefaultRepositoryMock);
+        SetupRepository(unitOfWorkMock, ticketLogRepositoryMock);
 
         var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));
 
@@ -809,6 +822,8 @@ public sealed class CreateTicketCommandHandlerTests
         SetupRepository(unitOfWorkMock, ticketRepositoryMock);
 
         var ticketCompanyDefaultRepositoryMock = CreateRepositoryMock<TicketCompanyDefault>();
+        var ticketLogRepositoryMock = CreateRepositoryMock<TicketLog>();
+        ticketLogRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketLog>());
         ticketCompanyDefaultRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(new[]
         {
             new TicketCompanyDefault
@@ -821,6 +836,7 @@ public sealed class CreateTicketCommandHandlerTests
             }
         });
         SetupRepository(unitOfWorkMock, ticketCompanyDefaultRepositoryMock);
+        SetupRepository(unitOfWorkMock, ticketLogRepositoryMock);
 
         var userRepositoryMock = CreateRepositoryMock<ApplicationUser>();
         userRepositoryMock.Setup(x => x.GetAsync(currentUserId)).ReturnsAsync(createdByUser);
