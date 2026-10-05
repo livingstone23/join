@@ -6,7 +6,7 @@
 > **Objective:** Permitir adjuntar documentos a un ticket (creación, gestión o finalización) respetando cupos configurables por empresa — tipo de documento, tamaño máximo, máximo de archivos por ticket y cuota diaria opcional — persistiendo cada adjunto en `TicketDocuments` vinculado al `TicketLog` exacto donde se subió, detrás de una abstracción de almacenamiento (`IFileStorageService`) que hoy resuelve a disco local y queda lista para un adapter de Azure Blob o S3 sin tocar el resto del módulo.
 
 
-> **Ajuste por SPEC 44 (2026-10-01):** esta spec se implementó antes que SPEC 44, así que sus `SystemOptionSeed` (`TicketAttachmentSettings`, `TicketDocuments`) quedaron bajo el padre `ManejoTickets` con rutas `/ManejoTickets/...`, igual que el resto de opciones de tickets. SPEC 44 las renombra junto con todas las demás: padre `TicketManagement`, `ModuleName = "Tickets"` y rutas `/tickets/<recurso-con-guion>` (ver su tabla de opciones de Tickets). Los `ControllerName` no cambian.
+> **Ajuste por SPEC 43 (2026-10-01):** esta spec se implementó antes que SPEC 43, así que sus `SystemOptionSeed` (`TicketAttachmentSettings`, `TicketDocuments`) quedaron bajo el padre `ManejoTickets` con rutas `/ManejoTickets/...`, igual que el resto de opciones de tickets. SPEC 43 las renombra junto con todas las demás: padre `TicketManagement`, `ModuleName = "Tickets"` y rutas `/tickets/<recurso-con-guion>` (ver su tabla de opciones de Tickets). Los `ControllerName` no cambian.
 
 ---
 
@@ -78,7 +78,7 @@ La nota "consultar con agente de IA" del brief pedía explícitamente una decisi
 ### E. Application — `TicketDocument` (subida, listado, descarga, borrado)
 
 - `src/2.Application.DTO/Messaging/Tickets/TicketDocumentDto.cs` (nuevo): `{ Guid Id, Guid TicketId, Guid TicketLogsId, string DocumentType, string OriginalName, string ContentType, long SizeBytes, Guid? CreatedByUserId, string? CreatedByUserName, DateTime CreatedAt }`. **Sin** `NewName`, `Path` ni `StorageProvider` — son detalle interno de almacenamiento; el cliente descarga por `Id` a través del endpoint dedicado, nunca construye la ruta.
-- `src/2.Application/UseCases/Messaging/Tickets/InboundAttachment.cs` (nuevo): `public sealed record InboundAttachment(Stream Content, string FileName, string ContentType, long Length);` — el shape de "un archivo que entra al sistema", agnóstico de transporte. **Esta spec es la que lo declara**, y SPEC 48 (antes 37, etapa posterior) lo consume tal cual para los adjuntos que llegan por WhatsApp/correo (su sección C decía "se declara acá y SPEC 36 puede adoptarlo"; se resolvió al revés para que el tipo viva junto a la entidad que persiste, y para que ambas specs puedan implementarse en el mismo PR sin duplicarlo).
+- `src/2.Application/UseCases/Messaging/Tickets/InboundAttachment.cs` (nuevo): `public sealed record InboundAttachment(Stream Content, string FileName, string ContentType, long Length);` — el shape de "un archivo que entra al sistema", agnóstico de transporte. **Esta spec es la que lo declara**, y SPEC 47 (antes 99, etapa posterior) lo consume tal cual para los adjuntos que llegan por WhatsApp/correo (su sección C decía "se declara acá y SPEC 36 puede adoptarlo"; se resolvió al revés para que el tipo viva junto a la entidad que persiste, y para que ambas specs puedan implementarse en el mismo PR sin duplicarlo).
 - `src/2.Application/UseCases/Messaging/Tickets/Commands/UploadTicketDocument/UploadTicketDocumentCommand.cs`: `sealed record UploadTicketDocumentCommand(Guid TicketId, Guid? TicketLogsId, InboundAttachment File) : ITransactionalCommand<Response<TicketDocumentDto>>`. Recibe el `Stream` dentro de `InboundAttachment`, provisto por el controller (`IFormFile.OpenReadStream()`), no un `IFormFile` — el Application layer no referencia `Microsoft.AspNetCore.Http`, mismo principio que ya mantiene `IEmailService` framework-agnostic.
 - `CommandHandler` (ver flujo completo en Data model) + `CommandValidator` (`File.FileName`/`File.ContentType` `NotEmpty`, `File.Length > 0`, `TicketId != Guid.Empty`).
 - `TicketLogsId` es **opcional**: si se omite, el handler resuelve automáticamente el log activo más reciente del ticket (`ORDER BY Created DESC` límite 1). Esto cubre el caso común —adjuntar evidencia inmediatamente después de crear, reasignar, finalizar o notar un ticket— sin obligar al frontend a hacer un round-trip a `GetTicketById` solo para descubrir el `TicketLogsId` recién generado. Si se provee explícitamente, debe pertenecer al mismo `TicketId` (si no, `400 INVALID_TICKET_LOG`).
@@ -105,7 +105,7 @@ La nota "consultar con agente de IA" del brief pedía explícitamente una decisi
 
 ### G. Seed
 
-- `SystemOptionSeed` en `GetAdministrativeSystemOptionSeeds()` para `TicketAttachmentSettings` (`CanRead/CanCreate/CanUpdate/CanDelete = true`, sin `CanDownload`) y para `TicketDocuments` (los cuatro CRUD en `true` **más** `CanDownload: true` explícito), ambos bajo el grupo de menú `ManejoTickets`, rutas `/ManejoTickets/ticket-attachment-settings` y `/ManejoTickets/ticket-documents` (SPEC 44 los mueve a `TicketManagement`, `ModuleName = "Tickets"`, rutas `/tickets/ticket-attachment-settings` y `/tickets/ticket-documents`).
+- `SystemOptionSeed` en `GetAdministrativeSystemOptionSeeds()` para `TicketAttachmentSettings` (`CanRead/CanCreate/CanUpdate/CanDelete = true`, sin `CanDownload`) y para `TicketDocuments` (los cuatro CRUD en `true` **más** `CanDownload: true` explícito), ambos bajo el grupo de menú `ManejoTickets`, rutas `/ManejoTickets/ticket-attachment-settings` y `/ManejoTickets/ticket-documents` (SPEC 43 los mueve a `TicketManagement`, `ModuleName = "Tickets"`, rutas `/tickets/ticket-attachment-settings` y `/tickets/ticket-documents`).
 - **Y las filas de `RoleSystemOptionSeed` en `GetRoleSystemOptionSeeds()`** (mismo motivo detallado en SPEC 34 sección H: el `SystemOptionSeed` declara el recurso, no otorga permiso a ningún rol; solo `Admin`/`SuperAdminCompany` reciben todo automáticamente):
   ```csharp
   new("Manager", "TicketAttachmentSettings", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -400,7 +400,7 @@ ORDER BY td.Created DESC;
 
 ### F9 — Seed
 
-1. Agregar los dos `SystemOptionSeed` (`TicketAttachmentSettings`, `TicketDocuments` con `CanDownload: true`) a `GetAdministrativeSystemOptionSeeds()`, grupo `ManejoTickets` (SPEC 44 lo renombra a `TicketManagement`, `ModuleName = "Tickets"`, rutas `/tickets/...`).
+1. Agregar los dos `SystemOptionSeed` (`TicketAttachmentSettings`, `TicketDocuments` con `CanDownload: true`) a `GetAdministrativeSystemOptionSeeds()`, grupo `ManejoTickets` (SPEC 43 lo renombra a `TicketManagement`, `ModuleName = "Tickets"`, rutas `/tickets/...`).
 1b. Agregar las seis filas de `RoleSystemOptionSeed` de la sección Scope G a `GetRoleSystemOptionSeeds()`.
 2. Crear `SeedTicketAttachmentSettingsAsync(Guid companyId)`, idempotente, con los valores por defecto de la sección Scope, invocada junto al resto del seed de mensajería de las empresas de desarrollo.
 3. `dotnet build` → 0 errores. Arrancar contra base limpia y confirmar que el seed corre sin error.
@@ -534,6 +534,6 @@ ORDER BY td.Created DESC;
 - Cuota diaria por usuario individual (solo por empresa).
 - Combinar la creación de una nota (`AddTicketNote`, SPEC 35) con la subida de su adjunto en un solo request.
 - Unificar `TicketAttachmentSettings` con `TicketCompanyDefault` en una sola tabla/endpoint.
-- Ingesta multicanal (WhatsApp, correo) — SPEC 48 (etapa posterior; antes SPEC 37). Workflow/SLA parametrizable — SPEC 38.
+- Ingesta multicanal (WhatsApp, correo) — SPEC 47 (etapa posterior; antes SPEC 99). Workflow/SLA parametrizable — SPEC 37.
 
 Cada uno, si llega, va en su propia spec.

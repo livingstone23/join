@@ -1,4 +1,4 @@
-# SPEC 39 — Consolidación de query filters globales (soft-delete + tenant) en `ApplicationDbContext`
+# SPEC 38 — Consolidación de query filters globales (soft-delete + tenant) en `ApplicationDbContext`
 
 > **Status:** Borrador
 > **Depends on:** SPEC 30 (`UserConnectionLog` ganó `GcRecord` ahí; esta spec cierra el lado EF que quedó pendiente). Establece la convención que deben seguir las specs 34 en adelante del módulo de tickets (`TicketUserCompany`, `TicketAttachmentSettings`, `TicketDocument`, `TicketInboundChannel`, `TicketStatusTransition` — ninguna existe todavía en el dominio).
@@ -9,7 +9,7 @@
 
 ## Por qué existe esta spec
 
-Al revisar el módulo de tickets (SPEC 34-38) se auditó `ConfigureGlobalQueryFilters` contra las entidades reales del dominio y aparecieron tres problemas:
+Al revisar el módulo de tickets (SPEC 34-37 y 99) se auditó `ConfigureGlobalQueryFilters` contra las entidades reales del dominio y aparecieron tres problemas:
 
 1. **9 entidades `BaseTenantEntity` no tienen ningún filtro EF**: `Region`, `Customer`, `Gender`, `Industry`, `TaxRegime`, `IncomeRange`, `PersonBusinessProfile`, `PersonEmployment`, `PersonFinancialProfile`. Todas son datos propios de cada empresa: el `AuditableEntitySaveChangesInterceptor` les asigna el `CompanyId` del token al insertar, y sus índices únicos incluyen `CompanyId`. Solo les falta la línea en el método.
 2. **`Region` tiene fuga real de tenant en lectura.** A diferencia de las otras 8 (cuyos handlers Dapper ya filtran `CompanyId = @TenantId`), `GetRegionsQueryHandler` y `GetRegionByIdQueryHandler` solo filtran `GcRecord = 0`: un Manager de la empresa A ve hoy las regiones de la empresa B. Además, `CreateRegionCommandHandler` valida unicidad de nombre/código con `GetAllAsync()` sobre **todas** las empresas, contradiciendo el índice único `(CompanyId, CountryId, Name, GcRecord)`.
@@ -221,7 +221,7 @@ El mensaje de error nombra la entidad y apunta a esta spec. La verificación de 
 |--------|------------|
 | Filas existentes con `CompanyId = Guid.Empty` en alguna de las 9 entidades dejan de ser visibles. | F0 las cuenta antes de mergear; se reasignan con script de datos si hace falta. |
 | Registros que ya apuntan a un catálogo de otra empresa (género, región, industria, régimen fiscal, rango de ingresos) pierden el dato o, en perfiles con `INNER JOIN`, desaparecen del listado. | Auditoría de referencias cruzadas en F0; decisión explícita antes de mergear. |
-| Una lectura EF de estas entidades desde un proceso sin usuario (job en segundo plano, seeder) devuelve vacío porque `CompanyId == Guid.Empty`. | Mismo comportamiento que ya tienen `Ticket`/`Person`. Esos procesos deben usar Dapper o `.IgnoreQueryFilters()` con `CompanyId` explícito (ya es el caso del seeder). Relevante para la rutina de inactividad de SPEC 40. |
+| Una lectura EF de estas entidades desde un proceso sin usuario (job en segundo plano, seeder) devuelve vacío porque `CompanyId == Guid.Empty`. | Mismo comportamiento que ya tienen `Ticket`/`Person`. Esos procesos deben usar Dapper o `.IgnoreQueryFilters()` con `CompanyId` explícito (ya es el caso del seeder). Relevante para la rutina de inactividad de SPEC 39. |
 | `Province.RegionId` de una provincia global apunta a una región privada de una empresa. | Mitigado en lectura por F2.2 (`RegionName = null` para otras empresas). Resolución definitiva en la spec futura de `ProvinceWithRegion`/`MunicipalityWithRegion`. |
 | El SuperAdmin espera ver todo sin cambiar de empresa en pantallas que leen vía EF. | Las lecturas son Dapper con `TenantResolver`; las escrituras operan sobre la empresa activa (`SwitchCompany`). Documentado en "Modelo de tenant". |
 | Tests existentes que mezclaban tenants en estas entidades cambian de resultado. | F3b los identifica antes de implementar; cada ajuste se documenta en el PR. |
@@ -233,4 +233,4 @@ El mensaje de error nombra la entidad y apunta a esta spec. La verificación de 
 - Tablas `ProvinceWithRegion` / `MunicipalityWithRegion` con `CompanyId` y deprecación de `Province.RegionId` — spec futura.
 - Decidir si `ApplicationUser` debe filtrarse — decisión de producto diferida.
 - Mecanismo de filtros por reflexión o interfaces marcadoras en el dominio.
-- La rutina de notificación por inactividad de tickets — **SPEC 40**.
+- La rutina de notificación por inactividad de tickets — **SPEC 39**.

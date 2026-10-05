@@ -1,8 +1,8 @@
-# SPEC 41 — Índices únicos filtrados por soft-delete (sacar `GcRecord` de las claves únicas)
+# SPEC 40 — Índices únicos filtrados por soft-delete (sacar `GcRecord` de las claves únicas)
 
 > **Status:** Borrador
-> **Depends on:** Ninguna. Es prerequisito de SPEC 42 (restauración de registros borrados), que necesita que la unicidad aplique solo a registros activos.
-> **Related:** SPEC 39 (query filters), SPEC 40 (fork PostgreSQL — la sintaxis de `HasFilter` es específica del proveedor).
+> **Depends on:** Ninguna. Es prerequisito de SPEC 41 (restauración de registros borrados), que necesita que la unicidad aplique solo a registros activos.
+> **Related:** SPEC 38 (query filters), SPEC 39 (fork PostgreSQL — la sintaxis de `HasFilter` es específica del proveedor).
 > **Date:** 2026-09-28
 > **Objective:** Reemplazar los 14 índices únicos que incluyen `GcRecord` como columna de la clave por índices únicos **filtrados** (`WHERE GcRecord = 0`), el patrón que el sistema ya usa en otros 7 índices, para que la unicidad aplique solo a registros activos y los registros borrados nunca choquen entre sí.
 
@@ -76,7 +76,7 @@ builder.HasIndex(g => new { g.CompanyId, g.Name })
 
 **Out of scope:**
 
-- **Sintaxis PostgreSQL.** `[GcRecord] = 0` es sintaxis de SQL Server; en PostgreSQL es `"GcRecord" = 0`. Los 7 índices filtrados existentes ya tienen este problema — se resuelve para los 21 en SPEC 40, no acá.
+- **Sintaxis PostgreSQL.** `[GcRecord] = 0` es sintaxis de SQL Server; en PostgreSQL es `"GcRecord" = 0`. Los 7 índices filtrados existentes ya tienen este problema — se resuelve para los 21 en SPEC 39, no acá.
 - **Índices no únicos con `GcRecord`** (por ejemplo `TicketLog (CompanyId, TicketId, GcRecord)`, `PersonBusinessProfile (CompanyId, PersonId, GcRecord)`): son índices de rendimiento, no generan colisiones. No se tocan.
 - **`CustomerConfiguration.cs:64` con `UserId` nullable.** SQL Server trata los `NULL` como iguales en índices únicos, así que dos clientes activos de la misma persona sin usuario chocan. Es el comportamiento actual y no cambia con esta spec; si no es el deseado, se decide aparte.
 - Cambiar el valor de `GcRecord` al borrar (por ejemplo, a un timestamp único). Descartado: el índice filtrado resuelve el problema sin tocar el dominio ni el significado de `GcRecord` que usan las queries Dapper.
@@ -127,5 +127,5 @@ builder.HasIndex(g => new { g.CompanyId, g.Name })
 |--------|------------|
 | Algún test o handler compara el nombre del índice viejo al capturar `DbUpdateException`. | F3.3 los busca por nombre antes de mergear. |
 | El `Down()` de la migración falla si ya hay borrados duplicados del mismo día. | Documentado. El rollback reintroduciría el bug; si se necesita, limpiar duplicados antes. |
-| La sintaxis de `HasFilter` no funciona en PostgreSQL. | Fuera de alcance; SPEC 40 la resuelve para los 21 índices filtrados. |
-| SPEC 42 restaura un registro borrado cuando ya existe uno activo con la misma clave → violación del índice filtrado. | SPEC 42 exige validar el duplicado activo antes de restaurar y devolver un error de negocio, no un 500. |
+| La sintaxis de `HasFilter` no funciona en PostgreSQL. | Fuera de alcance; SPEC 39 la resuelve para los 21 índices filtrados. |
+| SPEC 41 restaura un registro borrado cuando ya existe uno activo con la misma clave → violación del índice filtrado. | SPEC 41 exige validar el duplicado activo antes de restaurar y devolver un error de negocio, no un 500. |

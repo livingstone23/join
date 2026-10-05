@@ -1,7 +1,7 @@
 # SPEC 34 — `TicketUserCompany`: roster de agentes de tickets por empresa
 
 > **Status:** Implementado
-> **Depends on:** Nada (primera spec del módulo de tickets extendido). Precede a SPEC 35 (acciones de ciclo de vida gateadas por esta entidad), SPEC 36 (adjuntos), SPEC 37 (ingesta multicanal) y SPEC 38 (workflow/SLA parametrizable).
+> **Depends on:** Nada (primera spec del módulo de tickets extendido). Precede a SPEC 35 (acciones de ciclo de vida gateadas por esta entidad), SPEC 36 (adjuntos), SPEC 99 (ingesta multicanal) y SPEC 37 (workflow/SLA parametrizable).
 > **Date:** 2026-09-25
 > **Objective:** Crear la entidad `TicketUserCompany` (vínculo `User` ↔ `Company` con los flags `IsSuperAdminTicket`, `CanFinishTicket`, `CanResolveTicket`) que define, por empresa, qué usuarios están habilitados para gestionar tickets y con qué nivel de autoridad, junto con un `TicketUserCompaniesController` (CRUD tenant-scoped) y la invariante "al menos un `IsSuperAdminTicket` activo por empresa una vez que el roster está poblado".
 
@@ -515,6 +515,6 @@ Genera `Messaging.TicketUserCompanies` con:
 - Endpoint `GET /TicketUserCompanies/me`.
 - Auditoría vía `IAuditLogger` (SPEC 29) sobre esta entidad.
 - Notificaciones al otorgar/quitar un flag.
-- Tabla de parámetros de adjuntos, `TicketDocuments`, ingesta multicanal, workflow/SLA parametrizable — SPECs 36, 37, 38 respectivamente.
+- Tabla de parámetros de adjuntos, `TicketDocuments`, ingesta multicanal, workflow/SLA parametrizable — SPECs 36, 99, 37 respectivamente.
 
 Cada uno, si llega, va en su propia spec.

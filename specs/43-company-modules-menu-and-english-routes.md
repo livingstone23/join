@@ -1,8 +1,8 @@
-# SPEC 44 — Módulos por empresa: módulos base, opciones conectadas a su módulo, menú filtrado y rutas en inglés
+# SPEC 43 — Módulos por empresa: módulos base, opciones conectadas a su módulo, menú filtrado y rutas en inglés
 
 > **Status:** Borrador
 > **Depends on:** Ninguna para implementarse.
-> **Related:** SPEC 45 (módulo `Calendar`, opcional), SPEC 49 (bloqueo de APIs por módulo e interruptor `Modules:EnforceCompanyModules`, que también condiciona el filtro del menú de esta spec), SPEC 46 (opciones de menú del agente y de personas pendientes), SPEC 49.
+> **Related:** SPEC 44 (módulo `Calendar`, opcional), SPEC 48 (bloqueo de APIs por módulo e interruptor `Modules:EnforceCompanyModules`, que también condiciona el filtro del menú de esta spec), SPEC 45 (opciones de menú del agente y de personas pendientes), SPEC 48.
 > **Date:** 2026-10-01
 > **Objective:** Dejar `CompanyModule` como la fuente de verdad de qué módulos tiene cada empresa y de qué se pinta en su menú: marcar qué módulos son **base**, conectar cada opción de menú (`SystemOption`) con su **módulo real** (hoy todas cuelgan de "Administracion"), filtrar el menú lateral por los módulos activos de la empresa, restringir al SuperAdmin la habilitación de módulos, y traducir al inglés los nombres de módulos, opciones y rutas, con guion como separador.
 
@@ -10,7 +10,7 @@
 
 ## Por qué existe esta spec
 
-Al diseñar el módulo Calendario (SPEC 45) se decidió que un módulo se habilita por empresa y que, sin el módulo activo, la empresa no puede usarlo. La revisión del código (2026-10-01) mostró que hoy `CompanyModule` no gobierna nada:
+Al diseñar el módulo Calendario (SPEC 44) se decidió que un módulo se habilita por empresa y que, sin el módulo activo, la empresa no puede usarlo. La revisión del código (2026-10-01) mostró que hoy `CompanyModule` no gobierna nada:
 
 1. **`SeedCompanyModulesAsync`** (`DatabaseSeeder.cs`) asigna **todos** los módulos activos a **todas** las empresas activas, y solo en la seed inicial. No existe el concepto de módulo base u opcional.
 2. **Todas las `SystemOptions` se guardan con `ModuleId` = "Administracion"** (`SeedSystemOptionsAsync` busca ese módulo y lo asigna a cada opción), sin importar si la opción es de Tickets, Clientes o Seguridad. La relación opción → módulo no significa nada.
@@ -22,11 +22,11 @@ Al diseñar el módulo Calendario (SPEC 45) se decidió que un módulo se habili
 
 | # | Decisión |
 |---|---|
-| A1 | Los módulos son **base** u **opcionales**. Se agrega `SystemModule.IsBase`. Por ahora se marcan como base los cuatro módulos existentes; `Calendar` (SPEC 45) es opcional. La seed asigna a las empresas **solo los módulos base**. |
+| A1 | Los módulos son **base** u **opcionales**. Se agrega `SystemModule.IsBase`. Por ahora se marcan como base los cuatro módulos existentes; `Calendar` (SPEC 44) es opcional. La seed asigna a las empresas **solo los módulos base**. |
 | A2 | Cada fila de la seed de opciones declara **su módulo**. La seed corrige el `ModuleId` de las opciones existentes. |
 | A3 | Las empresas nuevas **nacen sin permisos por rol** (`RoleSystemOptions`). El método que los llene es una etapa futura. |
 | A4 | Los roles privilegiados (`Admin`, `SuperAdminCompany`) **mantienen acceso total** a todas las opciones, incluidos los catálogos globales del calendario. |
-| A5 | El **menú lateral** oculta las opciones de los módulos que la empresa no tiene activos. El bloqueo de las APIs queda para la SPEC 49, y ambos dependen del interruptor `Modules:EnforceCompanyModules`. |
+| A5 | El **menú lateral** oculta las opciones de los módulos que la empresa no tiene activos. El bloqueo de las APIs queda para la SPEC 48, y ambos dependen del interruptor `Modules:EnforceCompanyModules`. |
 | A6 | La asignación automática de módulos base a empresas **nuevas** o a empresas existentes **queda para una etapa futura**. Por ahora se prueba con las empresas existentes. |
 | A7 | **Solo el SuperAdmin** habilita o desactiva módulos de una empresa. `SuperAdminCompany` solo consulta los de su empresa. |
 | A8 | El menú del **SuperAdmin no se filtra**: sigue viendo todas las opciones. |
@@ -71,7 +71,7 @@ public bool IsBase { get; set; }
 | `Administracion` | `Administration` | Administrative management module | Sí | 1 |
 | `Clientes` | `Customers` | Customer management module | Sí | 2 |
 | `Tickets` | `Tickets` | Ticket management module | Sí | 3 |
-| — (SPEC 45) | `Calendar` | Calendar and activities module | **No** | 4 |
+| — (SPEC 44) | `Calendar` | Calendar and activities module | **No** | 4 |
 | `Seguridad` | `Security` | Security module | Sí | 99 |
 
 - **Renombre sin duplicar:** se agrega un mapa `LegacySystemModuleNames` (`Administracion` → `Administration`, `Clientes` → `Customers`, `Seguridad` → `Security`). Antes de buscar por nombre nuevo, la seed busca por el nombre anterior y, si lo encuentra, **actualiza la fila existente** (mismo `Id`, así `CompanyModules` y `SystemOptions` siguen apuntando bien).
@@ -142,9 +142,9 @@ Las opciones de seguridad que hoy tienen `ParentName = null` pasan a colgar del 
 
 Todas las filas que referencian un nombre de opción traducido se actualizan (`"Paises"` → `"Countries"`, `"Compañias"` → `"Companies"`, `"Administracion"` → `"Administration"`, `"ManejoTickets"` → `"TicketManagement"`, `"Persons"` (padre) → `"CustomersMenu"`, `"Clientes"` → `"Persons"`, etc.). Los permisos de cada rol no cambian.
 
-**C6. Calendario (SPEC 45 y 46)**
+**C6. Calendario (SPEC 44 y 45)**
 
-Las opciones del calendario declaran `ModuleName = "Calendar"` y usan rutas con guion: `/calendar/my-calendar`, `/calendar/panel`, `/calendar/activity-confirmation`, `/calendar/settings`, `/calendar/catalogs`, `/calendar/channel-intake`. `PendingPersons` usa `ModuleName = "Customers"`, padre `CustomersMenu` y ruta `/customers/pending-persons`. Esta spec deja actualizadas la SPEC 45 y la 45.
+Las opciones del calendario declaran `ModuleName = "Calendar"` y usan rutas con guion: `/calendar/my-calendar`, `/calendar/panel`, `/calendar/activity-confirmation`, `/calendar/settings`, `/calendar/catalogs`, `/calendar/channel-intake`. `PendingPersons` usa `ModuleName = "Customers"`, padre `CustomersMenu` y ruta `/customers/pending-persons`. Esta spec deja actualizadas la SPEC 44 y la 45.
 
 **C7. Checksum y re-seed de desarrollo**
 
@@ -153,7 +153,7 @@ Las opciones del calendario declaran `ModuleName = "Calendar"` y usan rutas con 
 
 ### D. Menú lateral (`GetSidebarMenuQueryHandler`)
 
-> **Ajuste por SPEC 49 (2026-10-01):** este filtro se aplica solo con `Modules:EnforceCompanyModules = true`. Con el interruptor apagado, el menú se arma como hoy.
+> **Ajuste por SPEC 48 (2026-10-01):** este filtro se aplica solo con `Modules:EnforceCompanyModules = true`. Con el interruptor apagado, el menú se arma como hoy.
 
 - La consulta de usuarios no SuperAdmin agrega:
 
@@ -204,7 +204,7 @@ INNER JOIN Admin.CompanyModules cm
 
 - **Asignación automática de módulos base** a empresas nuevas (`CreateCompany`) o a empresas existentes cuando un módulo pasa a ser base (A6, etapa futura).
 - **Poblar `RoleSystemOptions`** para empresas nuevas (A3, etapa futura). Hasta entonces, los usuarios de una empresa nueva ven el menú vacío, salvo el SuperAdmin.
-- **Bloqueo de APIs** por `CompanyModule` en `DynamicAuthorizationFilter` → **SPEC 49**, que además condiciona el filtro del menú de esta spec al interruptor `Modules:EnforceCompanyModules` (apagado: menú como hoy).
+- **Bloqueo de APIs** por `CompanyModule` en `DynamicAuthorizationFilter` → **SPEC 48**, que además condiciona el filtro del menú de esta spec al interruptor `Modules:EnforceCompanyModules` (apagado: menú como hoy).
 - Traducir `ControllerName`/recursos de permiso, nombres de tablas o esquemas de base de datos (`Admin`, `Messaging`…).
 - Traducir textos visibles del frontend (etiquetas, títulos): eso es de las specs del front.
 
@@ -228,7 +228,7 @@ Filtro de la sección D, padres sin hijos ocultos, invalidación de cache por em
 Autorización de la sección E, filtro de empresa para `SuperAdminCompany`, `IsBase` en DTOs, invalidación de cache al activar o desactivar.
 
 ### F6 — Specs y frontend
-Actualizar SPEC 45 y 46 (rutas con guion, `ModuleName`, matriz de roles según A4). Revisar las referencias a nombres de opción en `join_frontb` (sección G).
+Actualizar SPEC 44 y 45 (rutas con guion, `ModuleName`, matriz de roles según A4). Revisar las referencias a nombres de opción en `join_frontb` (sección G).
 
 ### F7 — Tests y verificación
 Unitarios e integración de la sección H. `dotnet build` sin warnings nuevos; arrancar en Development contra una base existente y verificar en el menú de un usuario no SuperAdmin que solo aparecen los módulos activos de su empresa. Al terminar, detener la API.
@@ -256,7 +256,7 @@ Unitarios e integración de la sección H. `dotnet build` sin warnings nuevos; a
 - **Datos en la seed, no en la migración** (elegido): la seed ya es idempotente y ya se ejecuta después de cada migración. Una migración con SQL de datos duplicaría la lógica de nombres.
 - **`ControllerName` intacto** (elegido): es el contrato de permisos. Traducir solo `Name` y `Route` no afecta la autorización.
 - **Padre `CustomersMenu`** (elegido) para liberar el nombre `Persons` a la pantalla de personas, que es el recurso real (`ControllerName = "Persons"`).
-- **Acceso total de `Admin` y `SuperAdminCompany`** (A4): se mantiene la regla `PrivilegedRoleNames`. Como consecuencia, `SuperAdminCompany` tiene escritura sobre `CalendarCatalogs` (catálogo global del calendario); la SPEC 45 se corrige para reflejarlo.
+- **Acceso total de `Admin` y `SuperAdminCompany`** (A4): se mantiene la regla `PrivilegedRoleNames`. Como consecuencia, `SuperAdminCompany` tiene escritura sobre `CalendarCatalogs` (catálogo global del calendario); la SPEC 44 se corrige para reflejarlo.
 - **Habilitar módulos solo SuperAdmin** (A7) vs mantener a `SuperAdminCompany`: habilitar un módulo es una decisión del dueño del sistema, no de cada empresa.
 - **Menú del SuperAdmin sin filtro** (A8): administra el sistema completo, incluido habilitar módulos.
 
@@ -270,7 +270,7 @@ Unitarios e integración de la sección H. `dotnet build` sin warnings nuevos; a
 | Con el filtro del menú, usuarios de empresas con asignaciones incompletas en `CompanyModule` dejan de ver opciones que hoy ven. | Las empresas existentes recibieron todos los módulos en la seed inicial y C2 no quita asignaciones. Antes de desplegar, consultar las empresas activas sin los cuatro módulos base y completarlas a mano desde `CompanyModules` (SuperAdmin). |
 | Una empresa nueva queda sin módulos ni permisos hasta que existan los procesos de A3 y A6. | Documentado: por ahora se prueba con las empresas existentes. El SuperAdmin puede asignar módulos a mano desde `CompanyModules`. |
 | Referencias del frontend a nombres de opción en español. | Revisión explícita en F6 (sección G). |
-| `SuperAdminCompany` puede editar catálogos globales del calendario que afectan a todas las empresas (consecuencia de A4). | Decisión aceptada por el usuario; queda documentada en SPEC 45 y en esta spec. |
+| `SuperAdminCompany` puede editar catálogos globales del calendario que afectan a todas las empresas (consecuencia de A4). | Decisión aceptada por el usuario; queda documentada en SPEC 44 y en esta spec. |
 
 ---
 

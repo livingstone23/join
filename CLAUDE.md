@@ -88,8 +88,8 @@ ASP.NET Core Identity (`ApplicationUser`/`ApplicationRole`, GUID keys) + JWT bea
 - Across repositories, cite specs with a prefix: **BE-NN** (this repo) and **FE-NN** (`join_frontb/specs`). A backend change to routes, permissions or API contracts must update the FE specs that use them in the same change.
 - Before implementing a spec in `specs/`, search later specs that reference it (`grep "SPEC NN" specs/`) and the "Ajuste por SPEC XX" / "Historia" / "Etapa" notes in its header. The most recent spec wins; report inconsistencies before writing code.
 - A spec in status `Pospuesto` is not implemented until the user resumes it; when resumed it is reviewed against the current state and goes back to `Borrador`.
-- Menu and permissions: `SystemOption`/`SystemModule` names and routes are in English with hyphens, and every `SystemOptionSeed` declares its `ModuleName` (SPEC 44). `ControllerName` (the permission resource) is never translated or renamed.
-- Communication channels are compared by `CommunicationChannel.Code` (constants in `CommunicationChannelCodes`, SPEC 37), never by `Name`.
+- Menu and permissions: `SystemOption`/`SystemModule` names and routes are in English with hyphens, and every `SystemOptionSeed` declares its `ModuleName` (SPEC 43). `ControllerName` (the permission resource) is never translated or renamed.
+- Communication channels are compared by `CommunicationChannel.Code` (constants in `CommunicationChannelCodes`, SPEC 99), never by `Name`.
 
 ## Testing gotchas
 

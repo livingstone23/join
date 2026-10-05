@@ -2,15 +2,16 @@
 
 Índice de todas las specs de este repositorio. Se actualiza **en el mismo cambio** que crea una spec o le cambia el estado, la etapa o las dependencias.
 
-Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeración. Para evitar ambigüedad, entre repositorios se citan con prefijo: **BE-44** (esta carpeta) y **FE-15** (frontend). Dentro de una misma carpeta basta "SPEC 44".
+Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeración. Para evitar ambigüedad, entre repositorios se citan con prefijo: **BE-43** (esta carpeta) y **FE-15** (frontend). Dentro de una misma carpeta basta "SPEC 43".
 
 ---
 
 ## Reglas
 
 ### Numeración
-- Una spec nueva toma el **siguiente número libre** (hoy: **50**).
-- Los números **no se reutilizan ni se reordenan**. Si una spec se divide, la parte que sale toma un número nuevo y ambas lo dicen en su encabezado (ejemplo: SPEC 37 → SPEC 48).
+- Una spec nueva toma el **siguiente número libre** (hoy: **49**).
+- Los números **no se reutilizan ni se reordenan**. Si una spec se divide, la parte que sale toma un número nuevo y ambas lo dicen en su encabezado (ejemplo: SPEC 99 → SPEC 47).
+- **Excepción autorizada (2026-10-05):** por decisión del usuario se renumeró una sola vez: la 37 (canales `WEB`/`APP`) pasó a **99** y las 38–49 bajaron un número (38→37 … 49→48). Las referencias se actualizaron en ambos repositorios. Una spec citada con su número anterior en un commit o conversación previa a esa fecha debe traducirse con esta tabla.
 - El nombre del archivo es `NN-tema-en-ingles.md` y el título empieza con `# SPEC NN — `.
 
 ### Estados
@@ -71,20 +72,20 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 33 | Centralización de `PaginationSettings` | Implementado | — |
 | 34 | `TicketUserCompany`: roster de agentes de tickets | Implementado | — |
 | 35 | Acciones de ciclo de vida del ticket | Implementado | 34 |
-| 36 | Adjuntos de ticket: parámetros, `TicketDocuments` y storage | Aprobado | 35 |
-| 37 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
-| 38 | Transiciones de status parametrizables y SLA | Aprobado | 34, 35, 36 |
-| 39 | Consolidación de query filters globales | Borrador | 30 |
-| 40 | Fork `main_postgresql` | Borrador | — |
-| 41 | Índices únicos filtrados por soft-delete | Borrador | — |
-| 42 | Visibilidad de registros borrados y restauración para SuperAdmin | Borrador | 39, 41 |
-| 43 | Valores iniciales del ticket desde `TicketCompanyDefaults` | Borrador | — |
-| 44 | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Borrador | — |
-| 45 | Módulo Calendario: parametrización, calendarios y actividades | Borrador | 37, 44, 49 |
-| 46 | Calendario: ingreso por canales (agente) y personas pendientes | **Pospuesto** | 44, 45, 49 |
-| 47 | Calendario: estructura para sincronizar con Google Calendar | Borrador | 45 |
-| 48 | Ingesta de tickets por WhatsApp y correo | **Pospuesto** | 34, 35, 36, 37, 43, 44 |
-| 49 | Bloqueo de APIs y menú por módulo activo de la empresa | Borrador | 44 |
+| 36 | Adjuntos de ticket: parámetros, `TicketDocuments` y storage | Implementado | 35 |
+| 37 | Transiciones de status parametrizables y SLA | Aprobado | 34, 35, 36 |
+| 38 | Consolidación de query filters globales | Borrador | 30 |
+| 39 | Fork `main_postgresql` | Borrador | — |
+| 40 | Índices únicos filtrados por soft-delete | Borrador | — |
+| 41 | Visibilidad de registros borrados y restauración para SuperAdmin | Borrador | 38, 40 |
+| 42 | Valores iniciales del ticket desde `TicketCompanyDefaults` | Borrador | — |
+| 43 | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Borrador | — |
+| 44 | Módulo Calendario: parametrización, calendarios y actividades | Borrador | 99, 43, 48 |
+| 45 | Calendario: ingreso por canales (agente) y personas pendientes | **Pospuesto** | 43, 44, 48 |
+| 46 | Calendario: estructura para sincronizar con Google Calendar | Borrador | 44 |
+| 47 | Ingesta de tickets por WhatsApp y correo | **Pospuesto** | 34, 35, 36, 99, 42, 43 |
+| 48 | Bloqueo de APIs y menú por módulo activo de la empresa | Borrador | 43 |
+| 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
 
 ---
 
@@ -92,17 +93,17 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 
 Orden sugerido de implementación (cada uno requiere `Aprobado`):
 
-1. **37** — canales `WEB`/`APP` (lo necesitan 43 y 45).
-2. **44** — módulos base, opciones conectadas a su módulo, rutas en inglés.
-3. **49** — bloqueo por módulo e interruptor `Modules:EnforceCompanyModules`.
-4. **43** — estado inicial del ticket.
-5. **36** y **38** — adjuntos (resto pendiente) y flujo de estados/SLA, ya aprobadas.
-6. **45** — calendario base.
-7. **47** — estructura de Google Calendar.
+1. **99** — canales `WEB`/`APP` (lo necesitan 42 y 44).
+2. **43** — módulos base, opciones conectadas a su módulo, rutas en inglés.
+3. **48** — bloqueo por módulo e interruptor `Modules:EnforceCompanyModules`.
+4. **42** — estado inicial del ticket.
+5. **37** — flujo de estados y SLA, ya aprobada.
+6. **44** — calendario base.
+7. **46** — estructura de Google Calendar.
 
-En paralelo, sin dependencias con lo anterior: **39 → 41 → 42** (query filters, índices filtrados, restauración) y **40** (fork PostgreSQL, que deberá portar los índices filtrados y el SQL nuevo de 44, 45, 47 y 49).
+En paralelo, sin dependencias con lo anterior: **38 → 40 → 41** (query filters, índices filtrados, restauración) y **39** (fork PostgreSQL, que deberá portar los índices filtrados y el SQL nuevo de 43, 44, 46 y 48).
 
-**Etapa posterior** (`Pospuesto`): **46** (agente de canales del calendario) y **48** (tickets por WhatsApp y correo), después de concluir Tickets y Calendar.
+**Etapa posterior** (`Pospuesto`): **45** (agente de canales del calendario) y **47** (tickets por WhatsApp y correo), después de concluir Tickets y Calendar.
 
 ---
 
@@ -112,12 +113,12 @@ Decisiones o verificaciones que no tienen spec propia todavía:
 
 | Origen | Pendiente |
 |---|---|
-| 44 (A3) | Método para poblar `RoleSystemOptions` de una empresa nueva. Hoy solo `JOIN-001` tiene permisos sembrados; las demás se configuran a mano. |
-| 44 (A6) | Asignación automática de módulos base a empresas nuevas y existentes. |
-| 46 | `DynamicAuthorizationFilter` usa el claim `CompanyId` del JWT, no `X-Company-Id`: definir cómo opera un agente en varias empresas. |
-| 46 | Proceso de limpieza de personas con pendiente `Discarded`. |
-| 45 | Recordatorios y tareas automáticas (Hangfire): avisos, cierre de actividades vencidas, barridos de estados. |
-| 47 | Acciones de sincronización con Google (OAuth, envío, webhook, worker). |
-| 45 | Mejoras diferidas del calendario: invitados, calendarios privados, turnos nocturnos, permisos de medio día. |
-| 42 | Al implementarla, incluir las entidades del calendario (45, 46, 47). |
+| 43 (A3) | Método para poblar `RoleSystemOptions` de una empresa nueva. Hoy solo `JOIN-001` tiene permisos sembrados; las demás se configuran a mano. |
+| 43 (A6) | Asignación automática de módulos base a empresas nuevas y existentes. |
+| 45 | `DynamicAuthorizationFilter` usa el claim `CompanyId` del JWT, no `X-Company-Id`: definir cómo opera un agente en varias empresas. |
+| 45 | Proceso de limpieza de personas con pendiente `Discarded`. |
+| 44 | Recordatorios y tareas automáticas (Hangfire): avisos, cierre de actividades vencidas, barridos de estados. |
+| 46 | Acciones de sincronización con Google (OAuth, envío, webhook, worker). |
+| 44 | Mejoras diferidas del calendario: invitados, calendarios privados, turnos nocturnos, permisos de medio día. |
+| 41 | Al implementarla, incluir las entidades del calendario (44, 45, 46). |
 | Proceso | Script de verificación de consistencia de specs (referencias inexistentes, nombres retirados, dependencias de specs pospuestas, specs fuera del índice). |

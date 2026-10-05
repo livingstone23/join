@@ -1,12 +1,14 @@
-# SPEC 37 — Canales internos `WEB` y `APP` en el catálogo de canales
+# SPEC 99 — Canales internos `WEB` y `APP` en el catálogo de canales
 
 > **Status:** Borrador
 > **Depends on:** Ninguna.
-> **Related:** SPEC 45 (el calendario registra como origen `WEB` las actividades creadas desde la aplicación), SPEC 48 (ingesta de tickets por WhatsApp y correo, etapa posterior — contenido que antes estaba en esta spec).
-> **Date:** 2026-10-01 (reescrita; la versión original del 2026-09-25 se movió a SPEC 48)
+> **Related:** SPEC 44 (el calendario registra como origen `WEB` las actividades creadas desde la aplicación), SPEC 47 (ingesta de tickets por WhatsApp y correo, etapa posterior — contenido que antes estaba en esta spec).
+> **Date:** 2026-10-01 (reescrita; la versión original del 2026-09-25 se movió a SPEC 47)
 > **Objective:** Agregar al catálogo `Common.CommunicationChannels` los canales internos `Web` (`WEB`) y `App` (`APP`), para que un ticket o una actividad creados desde la propia aplicación queden registrados con su origen real, y usar `WEB` como canal por defecto de los tickets en la seed de desarrollo.
 
-> **Historia (2026-10-01):** esta spec se llamaba "Ingesta multicanal: WhatsApp y correo entrante crean tickets" y estaba **Aprobada**. Por decisión del usuario, la creación automática de tickets desde canales externos (WhatsApp **y** correo) queda para una etapa posterior, junto con los agentes de canal. Todo ese diseño se movió sin cambios de fondo a **SPEC 48**. Aquí queda solo la parte que se necesita ya. Por el cambio de alcance, vuelve a **Borrador**.
+> **Numeración (2026-10-05):** esta spec fue la **SPEC 37** hasta el 2026-10-05; se renumeró a 99 por decisión del usuario (ver `specs/README.md`).
+
+> **Historia (2026-10-01):** esta spec se llamaba "Ingesta multicanal: WhatsApp y correo entrante crean tickets" y estaba **Aprobada**. Por decisión del usuario, la creación automática de tickets desde canales externos (WhatsApp **y** correo) queda para una etapa posterior, junto con los agentes de canal. Todo ese diseño se movió sin cambios de fondo a **SPEC 47**. Aquí queda solo la parte que se necesita ya. Por el cambio de alcance, vuelve a **Borrador**.
 
 ---
 
@@ -17,12 +19,12 @@ El catálogo de canales sembrado hoy (`SeedCommunicationChannelsAsync`) tiene `S
 Consecuencias actuales:
 
 - `Ticket.ChannelId` es obligatorio. Un ticket creado por un usuario desde JOIN queda etiquetado con un proveedor que no intervino; en la seed de desarrollo, `TicketCompanyDefault.ChannelDefaultId` apunta a `WHATSAPP`. Cualquier reporte de "tickets por canal" queda falseado.
-- SPEC 45 (calendario) necesita `WEB` como `OriginChannelId` de las actividades creadas desde la aplicación.
+- SPEC 44 (calendario) necesita `WEB` como `OriginChannelId` de las actividades creadas desde la aplicación.
 
 Decisiones del usuario (2026-10-01) que acotan esta spec:
 
 - Por ahora, **los tickets los crea un usuario** con acceso al módulo y permisos, desde JOIN (`POST /Tickets`). Puede crearlos a nombre de otra persona (`PersonId`, ya soportado).
-- WhatsApp y correo como canales de **ingesta automática** se configuran después de concluir los módulos de Tickets y Calendar (SPEC 48, SPEC 46).
+- WhatsApp y correo como canales de **ingesta automática** se configuran después de concluir los módulos de Tickets y Calendar (SPEC 47, SPEC 45).
 
 Un usuario que registra a mano un ticket por una persona que llamó o escribió por WhatsApp puede seguir eligiendo `WhatsApp` como canal: el catálogo describe **por dónde llegó la solicitud**, no quién la tecleó. `WEB` es el valor por defecto cuando la solicitud nace en la propia aplicación.
 
@@ -47,7 +49,7 @@ new() { Name = "App", Provider = "Internal", Code = "APP", IsActive = true, Crea
 
 ### B. Constantes
 
-- `src/1.Domain/Common/CommunicationChannelCodes.cs` (nuevo): `public static class CommunicationChannelCodes { public const string Web = "WEB"; public const string App = "APP"; public const string WhatsApp = "WHATSAPP"; public const string SendGrid = "SENDGRID"; public const string Telegram = "TELEGRAM"; public const string Twilio = "TWILIO"; }`. La seed de esta spec, SPEC 45 y SPEC 48 usan estas constantes en vez de literales.
+- `src/1.Domain/Common/CommunicationChannelCodes.cs` (nuevo): `public static class CommunicationChannelCodes { public const string Web = "WEB"; public const string App = "APP"; public const string WhatsApp = "WHATSAPP"; public const string SendGrid = "SENDGRID"; public const string Telegram = "TELEGRAM"; public const string Twilio = "TWILIO"; }`. La seed de esta spec, SPEC 44 y SPEC 47 usan estas constantes en vez de literales.
 
 ### C. Tests
 
@@ -55,11 +57,11 @@ new() { Name = "App", Provider = "Internal", Code = "APP", IsActive = true, Crea
 
 **Out of scope:**
 
-- **Ingesta automática de tickets por WhatsApp y correo** (`TicketInboundChannel`, webhooks, `ExternalMessageId`) → **SPEC 48**, etapa posterior.
+- **Ingesta automática de tickets por WhatsApp y correo** (`TicketInboundChannel`, webhooks, `ExternalMessageId`) → **SPEC 47**, etapa posterior.
 - **Reasignar el canal de tickets existentes.** Los tickets creados antes de esta spec conservan su `ChannelId`; no hay forma confiable de saber cuáles nacieron en la aplicación. Los reportes por canal son confiables desde el despliegue de esta spec.
-- **Corregir `Provider = "Meta"` de la fila `WhatsApp`.** La seed es idempotente por `Name` y no actualiza filas existentes; se revisa en SPEC 48, que es donde el transporte real importa.
-- **Índice único de `Ticket.Code`.** Ya es `(CompanyId, Code)` en el código. **No** se filtra por `GcRecord`: `TicketCodeGenerator` cuenta también los tickets borrados al calcular la secuencia y nunca reutiliza un código, así que mantener los borrados en el índice garantiza que restaurar un ticket (SPEC 42) no choque con otro.
-- Cambios en el frontend: el formulario de nuevo ticket ya precarga el canal desde `TicketCompanyDefault` (SPEC 43 / front 17).
+- **Corregir `Provider = "Meta"` de la fila `WhatsApp`.** La seed es idempotente por `Name` y no actualiza filas existentes; se revisa en SPEC 47, que es donde el transporte real importa.
+- **Índice único de `Ticket.Code`.** Ya es `(CompanyId, Code)` en el código. **No** se filtra por `GcRecord`: `TicketCodeGenerator` cuenta también los tickets borrados al calcular la secuencia y nunca reutiliza un código, así que mantener los borrados en el índice garantiza que restaurar un ticket (SPEC 41) no choque con otro.
+- Cambios en el frontend: el formulario de nuevo ticket ya precarga el canal desde `TicketCompanyDefault` (SPEC 42 / front 17).
 
 ---
 
@@ -88,7 +90,7 @@ new() { Name = "App", Provider = "Internal", Code = "APP", IsActive = true, Crea
 
 ## Decisions taken and discarded
 
-- **Reducir la 37 y mover la ingesta a SPEC 48** (decisión del usuario, 2026-10-01) vs posponer la 37 completa. Los canales internos se necesitan ya (SPEC 45 y la etiqueta correcta de los tickets creados desde la aplicación); la ingesta externa no.
+- **Reducir la 99 y mover la ingesta a SPEC 47** (decisión del usuario, 2026-10-01) vs posponer la 99 completa. Los canales internos se necesitan ya (SPEC 44 y la etiqueta correcta de los tickets creados desde la aplicación); la ingesta externa no.
 - **Sembrar `App` aunque hoy no se use** (elegido): completa los cuatro canales que pidió el brief original (WhatsApp, web operativa, correo, app) con una línea idempotente.
 - **Sin filtrar por `GcRecord` el índice de `Ticket.Code`** (elegido, corrige la versión original de esta spec): ver Out of scope.
 

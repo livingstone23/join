@@ -1,8 +1,8 @@
-# SPEC 49 — Bloqueo de APIs y menú por módulo activo de la empresa (`CompanyModule`)
+# SPEC 48 — Bloqueo de APIs y menú por módulo activo de la empresa (`CompanyModule`)
 
 > **Status:** Borrador
-> **Depends on:** SPEC 44 (`SystemModule.IsBase`, cada `SystemOption` conectada a su módulo real, menú filtrado, solo SuperAdmin habilita módulos).
-> **Related:** SPEC 45 (el calendario deja de revisar el módulo por su cuenta), SPEC 46 (endpoints del agente).
+> **Depends on:** SPEC 43 (`SystemModule.IsBase`, cada `SystemOption` conectada a su módulo real, menú filtrado, solo SuperAdmin habilita módulos).
+> **Related:** SPEC 44 (el calendario deja de revisar el módulo por su cuenta), SPEC 45 (endpoints del agente).
 > **Date:** 2026-10-01
 > **Objective:** Que una empresa no pueda usar las APIs de un módulo que no tiene activo en `Admin.CompanyModules`, respondiendo `403` con el código `MODULE_NOT_ENABLED`, con un único interruptor de configuración que enciende a la vez el bloqueo de APIs y el filtro del menú, y un endpoint de diagnóstico para revisar las empresas antes de encenderlo.
 
@@ -10,19 +10,19 @@
 
 ## Por qué existe esta spec
 
-Con la SPEC 44, cada opción de menú queda conectada a su módulo y el menú se filtra por los módulos activos de la empresa. Pero las **APIs** siguen abiertas: `DynamicAuthorizationFilter` solo pregunta a `PermissionService` si el rol del usuario tiene el permiso sobre el recurso (`SystemOption.ControllerName`), sin mirar si la empresa tiene el módulo. Un usuario que conozca la URL puede usar un módulo que su empresa no contrató, si su rol tiene el permiso.
+Con la SPEC 43, cada opción de menú queda conectada a su módulo y el menú se filtra por los módulos activos de la empresa. Pero las **APIs** siguen abiertas: `DynamicAuthorizationFilter` solo pregunta a `PermissionService` si el rol del usuario tiene el permiso sobre el recurso (`SystemOption.ControllerName`), sin mirar si la empresa tiene el módulo. Un usuario que conozca la URL puede usar un módulo que su empresa no contrató, si su rol tiene el permiso.
 
-Hasta ahora, el Calendario (SPEC 45) resolvía esto por su cuenta con `CalendarModuleGuard`. Esta spec lo resuelve para **todos** los módulos en un solo lugar.
+Hasta ahora, el Calendario (SPEC 44) resolvía esto por su cuenta con `CalendarModuleGuard`. Esta spec lo resuelve para **todos** los módulos en un solo lugar.
 
 ## Decisiones acordadas (2026-10-01)
 
 | # | Decisión |
 |---|---|
 | B1 | Respuesta `403` con ProblemDetails y código **`MODULE_NOT_ENABLED`**, que incluye el nombre del módulo. El frontend puede mostrar "Tu empresa no tiene habilitado el módulo X" en lugar de un "sin permiso" genérico. |
-| B2 | El **SuperAdmin no se bloquea**: sigue sin restricción, igual que su menú (SPEC 44 A8). |
-| B3 | El Calendario **quita** su chequeo propio de módulo. Su guard se queda solo con lo que es del calendario: exigir `CalendarCompany` y devolver su contexto. Se ajusta la SPEC 45. |
+| B2 | El **SuperAdmin no se bloquea**: sigue sin restricción, igual que su menú (SPEC 43 A8). |
+| B3 | El Calendario **quita** su chequeo propio de módulo. Su guard se queda solo con lo que es del calendario: exigir `CalendarCompany` y devolver su contexto. Se ajusta la SPEC 44. |
 | B4 | El bloqueo se enciende con un **interruptor de configuración**. Se despliega apagado, se revisan las empresas con un endpoint de diagnóstico y se enciende cuando todo está en orden. |
-| B5 | **Un solo interruptor** controla el bloqueo de APIs **y** el filtro del menú de la SPEC 44. Encendido: menú filtrado y APIs bloqueadas. Apagado: todo como hoy. Menú y APIs nunca se contradicen. |
+| B5 | **Un solo interruptor** controla el bloqueo de APIs **y** el filtro del menú de la SPEC 43. Encendido: menú filtrado y APIs bloqueadas. Apagado: todo como hoy. Menú y APIs nunca se contradicen. |
 
 ---
 
@@ -38,7 +38,7 @@ Hasta ahora, el Calendario (SPEC 45) resolvía esto por su cuenta con `CalendarM
 /// <summary>
 /// Controls whether the system enforces Admin.CompanyModules: when true, a company can only see in the menu
 /// and call the APIs of modules that are active for it (and active globally). When false, CompanyModules is
-/// ignored for both menu and APIs (behavior before SPEC 49). SuperAdmin is never restricted.
+/// ignored for both menu and APIs (behavior before SPEC 48). SuperAdmin is never restricted.
 /// Deploy with false, review GET /CompanyModules/diagnostics, then switch to true.
 /// </summary>
 public sealed class ModuleEnforcementSettings
@@ -107,14 +107,14 @@ if (_moduleSettings.Value.EnforceCompanyModules)
 - `instance` y `traceId` los completa la configuración global de ProblemDetails que ya existe en `Program.cs`.
 - Con el interruptor apagado, el filtro se comporta exactamente como hoy.
 
-### D. Menú lateral (ajuste a SPEC 44)
+### D. Menú lateral (ajuste a SPEC 43)
 
-- El filtro por `SystemModules`/`CompanyModules` que agrega SPEC 44 en `GetSidebarMenuQueryHandler` se aplica **solo** si `EnforceCompanyModules = true`. Con el interruptor apagado, el menú se arma como hoy (B5).
+- El filtro por `SystemModules`/`CompanyModules` que agrega SPEC 43 en `GetSidebarMenuQueryHandler` se aplica **solo** si `EnforceCompanyModules = true`. Con el interruptor apagado, el menú se arma como hoy (B5).
 - El SuperAdmin sigue viendo todo en ambos casos.
 
 ### E. Invalidación de cache
 
-- Al crear, actualizar (activar o desactivar) o borrar un `CompanyModule`: se elimina `company-modules:v1:{companyId}` y, como ya define SPEC 44, el cache de menú y permisos de los usuarios de esa empresa.
+- Al crear, actualizar (activar o desactivar) o borrar un `CompanyModule`: se elimina `company-modules:v1:{companyId}` y, como ya define SPEC 43, el cache de menú y permisos de los usuarios de esa empresa.
 - Al cambiar `SystemModule.IsActive` o el `ModuleId`/`ControllerName` de una `SystemOption` (SuperAdmin), el cambio afecta a todas las empresas. `IMemoryCache` no permite borrar por prefijo, así que se usa un **token de versión global**: `PermissionService` guarda un `CancellationTokenSource` compartido, todas las entradas `company-modules:*` se crean con `AddExpirationToken(...)`, y esos handlers llaman a `IPermissionService.InvalidateModuleCacheForAllCompanies()`, que cancela el token y crea uno nuevo.
 - Cambiar el valor del interruptor requiere reiniciar la API (se lee con `IOptions`, no `IOptionsMonitor`): es un cambio de despliegue, no de operación diaria.
 
@@ -139,25 +139,25 @@ if (_moduleSettings.Value.EnforceCompanyModules)
 
 - Solo lista empresas activas con al menos un problema; si la lista viene vacía, se puede encender el interruptor sin cortar accesos a módulos base.
 - `usersWithPermissionsInDisabledModules` indica a cuántos usuarios les cambiaría la experiencia al encender el bloqueo (verían `MODULE_NOT_ENABLED` donde hoy entran).
-- Es solo lectura: completar los módulos que falten se hace a mano desde `CompanyModules` (SuperAdmin), porque la asignación automática es una etapa futura (SPEC 44 A6).
+- Es solo lectura: completar los módulos que falten se hace a mano desde `CompanyModules` (SuperAdmin), porque la asignación automática es una etapa futura (SPEC 43 A6).
 
-### G. Ajustes a SPEC 45 y SPEC 46
+### G. Ajustes a SPEC 44 y SPEC 45
 
-- **SPEC 45:** `CalendarModuleGuard` pasa a llamarse **`CalendarCompanyGuard`**. Ya no consulta `CompanyModule` ni devuelve `CALENDAR_MODULE_NOT_ENABLED`; solo exige `CalendarCompany` (`CALENDAR_COMPANY_NOT_CONFIGURED`) y devuelve su contexto. La regla R1 y los tests del guard se ajustan. El bloqueo por módulo lo hace el filtro global de esta spec.
-- `CalendarUserProvisioner` (SPEC 45) **sigue** revisando si el módulo Calendar está activo antes de crear calendarios. No es una regla de autorización: decide si crear datos, y se ejecuta desde `InviteUser`/`AddUserCompany`, que no son endpoints del calendario.
-- **SPEC 46:** las operaciones del agente pasan por el filtro global (recurso `CalendarChannelIntake`, módulo `Calendar`) y por `CalendarCompanyGuard`. `GET /CalendarChannelIntake/companies` (`[SkipDynamicAuthorization]`) sigue filtrando en su consulta las empresas con el módulo Calendar activo.
+- **SPEC 44:** `CalendarModuleGuard` pasa a llamarse **`CalendarCompanyGuard`**. Ya no consulta `CompanyModule` ni devuelve `CALENDAR_MODULE_NOT_ENABLED`; solo exige `CalendarCompany` (`CALENDAR_COMPANY_NOT_CONFIGURED`) y devuelve su contexto. La regla R1 y los tests del guard se ajustan. El bloqueo por módulo lo hace el filtro global de esta spec.
+- `CalendarUserProvisioner` (SPEC 44) **sigue** revisando si el módulo Calendar está activo antes de crear calendarios. No es una regla de autorización: decide si crear datos, y se ejecuta desde `InviteUser`/`AddUserCompany`, que no son endpoints del calendario.
+- **SPEC 45:** las operaciones del agente pasan por el filtro global (recurso `CalendarChannelIntake`, módulo `Calendar`) y por `CalendarCompanyGuard`. `GET /CalendarChannelIntake/companies` (`[SkipDynamicAuthorization]`) sigue filtrando en su consulta las empresas con el módulo Calendar activo.
 
 ### H. Tests
 
 - **Filtro (unitarios o integración liviana):** interruptor apagado → sin cambios de comportamiento; encendido + módulo activo → pasa al chequeo de permisos; encendido + módulo inactivo para la empresa → `403 MODULE_NOT_ENABLED` con el nombre del módulo, aunque el rol tenga el permiso; módulo inactivo globalmente (`SystemModule.IsActive = false`) → `403`; SuperAdmin con módulo inactivo → pasa; recurso sin `SystemOption` → no se bloquea por módulo; recurso presente en dos módulos con uno activo → pasa; `[SkipDynamicAuthorization]` → no se evalúa.
 - **`GetModuleAccessAsync`:** normalización de nombres (mismos casos que `HasPermissionAsync`), cache por empresa, invalidación por empresa y global.
-- **Menú:** con el interruptor apagado no filtra; encendido filtra (complementa los tests de SPEC 44).
+- **Menú:** con el interruptor apagado no filtra; encendido filtra (complementa los tests de SPEC 43).
 - **Diagnóstico:** empresa sin un módulo base aparece; empresa completa no aparece; conteo de usuarios afectados; solo SuperAdmin.
 - **Integración:** con el interruptor encendido, un usuario `Manager` de una empresa con `Tickets` desactivado recibe `403 MODULE_NOT_ENABLED` en `GET /api/v1/Tickets`, y al reactivarlo vuelve a `200` sin reiniciar (invalidación de cache).
 
 **Out of scope:**
 
-- Asignar automáticamente módulos base a empresas nuevas o existentes (SPEC 44 A6, etapa futura). El diagnóstico solo informa.
+- Asignar automáticamente módulos base a empresas nuevas o existentes (SPEC 43 A6, etapa futura). El diagnóstico solo informa.
 - Cambiar el interruptor en caliente sin reiniciar (`IOptionsMonitor`).
 - Bloquear por módulo los endpoints `[AllowAnonymous]` o `[SkipDynamicAuthorization]`.
 - Mensajes traducidos en el frontend (se definen en las specs del front).
@@ -176,13 +176,13 @@ if (_moduleSettings.Value.EnforceCompanyModules)
 Paso nuevo en `DynamicAuthorizationFilter` (sección C).
 
 ### F4 — Menú e invalidación
-Condicionar el filtro de SPEC 44 al interruptor. Invalidación en `CompanyModules`, `SystemModules` y `SystemOptions` (sección E).
+Condicionar el filtro de SPEC 43 al interruptor. Invalidación en `CompanyModules`, `SystemModules` y `SystemOptions` (sección E).
 
 ### F5 — Diagnóstico
 `GetCompanyModulesDiagnosticsQuery` (Dapper) y endpoint en `CompanyModulesController`.
 
-### F6 — SPEC 45 / 46
-Renombrar y simplificar el guard del calendario en las specs (y en el código, si la SPEC 45 ya está implementada).
+### F6 — SPEC 44 / 45
+Renombrar y simplificar el guard del calendario en las specs (y en el código, si la SPEC 44 ya está implementada).
 
 ### F7 — Tests y verificación
 Tests de la sección H. `dotnet build` sin warnings nuevos, `dotnet test` con el gate de 90%. En Development: con el interruptor apagado, todo igual; con el interruptor encendido, desactivar `Tickets` para la empresa privada y verificar `403 MODULE_NOT_ENABLED` y el menú sin tickets para un usuario no SuperAdmin. Detener la API al terminar.
@@ -203,7 +203,7 @@ Tests de la sección H. `dotnet build` sin warnings nuevos, `dotnet test` con el
 
 ## Decisions taken and discarded
 
-- **Chequeo de módulo en el filtro global** (elegido) vs que cada módulo lo haga en sus handlers. Un solo lugar, la misma respuesta para todos los módulos y cero código repetido; es lo que la SPEC 45 dejó anotado como pendiente.
+- **Chequeo de módulo en el filtro global** (elegido) vs que cada módulo lo haga en sus handlers. Un solo lugar, la misma respuesta para todos los módulos y cero código repetido; es lo que la SPEC 44 dejó anotado como pendiente.
 - **Módulo antes que permiso** (elegido): el mensaje correcto para "tu empresa no tiene el módulo" no depende del rol del usuario.
 - **Un recurso habilitado si alguno de sus módulos está activo** (elegido): un mismo `ControllerName` puede aparecer en opciones de distintos módulos; bloquearlo si uno de ellos está inactivo cortaría accesos legítimos del otro.
 - **Recurso sin `SystemOption` = no limitado por módulo** (elegido): el chequeo de permisos ya lo rechaza (no hay `RoleSystemOption` posible), así que bloquearlo también por módulo no agrega nada.
@@ -217,6 +217,6 @@ Tests de la sección H. `dotnet build` sin warnings nuevos, `dotnet test` con el
 | Riesgo | Mitigación |
 |---|---|
 | Encender el interruptor corta el acceso de empresas a las que les falta un módulo base en `CompanyModules`. | Se despliega apagado (B4). El diagnóstico (sección F) muestra las empresas y usuarios afectados; se completan a mano antes de encender. |
-| Una opción de menú mal asociada a su módulo (si falló la corrección de SPEC 44) bloquea un recurso que debería estar habilitado. | La SPEC 44 corrige el `ModuleId` de todas las opciones en la seed y su prueba de integración lo verifica. El diagnóstico se revisa antes de encender. |
+| Una opción de menú mal asociada a su módulo (si falló la corrección de SPEC 43) bloquea un recurso que debería estar habilitado. | La SPEC 43 corrige el `ModuleId` de todas las opciones en la seed y su prueba de integración lo verifica. El diagnóstico se revisa antes de encender. |
 | El cache de módulos queda desactualizado en un despliegue con varias instancias (cache en memoria por instancia). | Mismo límite que ya tiene el cache de permisos (`permissions:v2`), con la misma expiración. Si el sistema pasa a varias instancias, ambos caches se mueven a un cache distribuido en una spec aparte. |
-| Con el interruptor apagado, el Calendario ya no tiene control de módulo (B3). | Sigue protegido por permisos: fuera de `JOIN-001` no hay `RoleSystemOptions` del calendario hasta que se asignen a mano (SPEC 45). Encender el interruptor es el paso previo a usar el calendario como módulo contratable. |
+| Con el interruptor apagado, el Calendario ya no tiene control de módulo (B3). | Sigue protegido por permisos: fuera de `JOIN-001` no hay `RoleSystemOptions` del calendario hasta que se asignen a mano (SPEC 44). Encender el interruptor es el paso previo a usar el calendario como módulo contratable. |

@@ -1,7 +1,7 @@
-# SPEC 42 — Visibilidad de registros borrados y restauración para SuperAdmin
+# SPEC 41 — Visibilidad de registros borrados y restauración para SuperAdmin
 
 > **Status:** Borrador
-> **Depends on:** SPEC 39 (query filters completos — define qué es "de empresa" y qué es "global"), SPEC 41 (índices únicos filtrados — la unicidad debe aplicar solo a activos para poder restaurar sin colisiones).
+> **Depends on:** SPEC 38 (query filters completos — define qué es "de empresa" y qué es "global"), SPEC 40 (índices únicos filtrados — la unicidad debe aplicar solo a activos para poder restaurar sin colisiones).
 > **Date:** 2026-09-28
 > **Objective:** Permitir que el rol Identity `SuperAdmin` vea registros activos **y** borrados (`GcRecord > 0`) de todas las entidades, y que pueda restaurar un registro borrado (`GcRecord → 0`), sin abrir ninguna fuga de datos entre empresas para el resto de los roles. Se implementa por etapas.
 
@@ -11,7 +11,7 @@
 
 Hoy ningún rol puede ver ni recuperar un registro borrado:
 
-- Los filtros globales de EF (SPEC 39) y todas las queries Dapper excluyen `GcRecord > 0` sin excepción, incluso para el SuperAdmin (por ejemplo `GetUsersWithRolesQueryHandler`, `UserManagementReportQueryHelper`: `WHERE u.GcRecord = 0`).
+- Los filtros globales de EF (SPEC 38) y todas las queries Dapper excluyen `GcRecord > 0` sin excepción, incluso para el SuperAdmin (por ejemplo `GetUsersWithRolesQueryHandler`, `UserManagementReportQueryHelper`: `WHERE u.GcRecord = 0`).
 - Los métodos `Reactivate()` que existen (`Person`, `Gender`, `Industry`, `Customer`, etc.) cambian `IsActive`, **no** `GcRecord`. "Inactivo" (visible, marcado como no activo) y "borrado" (oculto) son conceptos distintos, y el segundo no tiene vuelta atrás.
 - `GenericRepository.GetIncludingDeletedAsync` (`src/3.Persistence/Repositories/GenericRepository.cs:58`) ya existe, pero ignora **todos** los filtros — también el de tenant. Usarlo sin controles es una fuga.
 
@@ -24,7 +24,7 @@ Hoy ningún rol puede ver ni recuperar un registro borrado:
 | Cualquier rol excepto `SuperAdmin` | Solo su `CompanyId` del token | Todos los activos | Nunca |
 | `SuperAdmin` (rol Identity) | **Una empresa por request**: su empresa activa, u otra si la pide explícitamente (`TenantResolver`). Única excepción: el catálogo de empresas, donde ve todas. | Todos | Solo si lo pide explícitamente (`IncludeDeleted = true`) |
 
-- "Global" significa exactamente las entidades sin `CompanyId` que SPEC 39 clasifica como catálogo global: `Company`, `Country`, `Province`, `Municipality`, `StreetType`, `CommunicationChannel`, `IdentificationType`, `EntityStatus`, `SystemModule`, `SystemOption`. Nada más es visible entre empresas.
+- "Global" significa exactamente las entidades sin `CompanyId` que SPEC 38 clasifica como catálogo global: `Company`, `Country`, `Province`, `Municipality`, `StreetType`, `CommunicationChannel`, `IdentificationType`, `EntityStatus`, `SystemModule`, `SystemOption`. Nada más es visible entre empresas.
 - `IncludeDeleted` se **ignora silenciosamente** para cualquier rol que no sea `SuperAdmin` (mismo criterio que `TenantResolver` con `CompanyId`): el request no puede ampliar lo que el token permite.
 - El rol `SuperAdminCompany` (administrador de una empresa) **no** es `SuperAdmin`: no ve borrados ni otras empresas.
 - Mostrar borrados es opt-in por request, no un comportamiento por defecto del SuperAdmin: así los selectores de uso diario ("asignar ticket a…", "elegir género") nunca muestran registros borrados, ni siquiera a él.
@@ -48,7 +48,7 @@ Hoy ningún rol puede ver ni recuperar un registro borrado:
   3. **Tenant:** si la entidad es `BaseTenantEntity`, compara `entity.CompanyId` con `TenantResolver.Resolve(currentUser, request.CompanyId)`; si no coincide → `NOT_FOUND` (no `FORBIDDEN`, para no confirmar la existencia de un registro de otra empresa).
   4. Si ya está activa → `Response.Error("NOT_DELETED")`.
   5. **Padre borrado:** ejecuta el chequeo que le pasa el handler (por ejemplo, un `PersonContact` no se restaura si su `Person` está borrada) → `PARENT_DELETED`.
-  6. **Duplicado activo:** ejecuta el chequeo que le pasa el handler contra la misma clave natural del índice único filtrado de SPEC 41 → `ACTIVE_DUPLICATE_EXISTS` (error de negocio, nunca un 500 por violación de índice).
+  6. **Duplicado activo:** ejecuta el chequeo que le pasa el handler contra la misma clave natural del índice único filtrado de SPEC 40 → `ACTIVE_DUPLICATE_EXISTS` (error de negocio, nunca un 500 por violación de índice).
   7. `entity.Restore()` + `SaveChangesAsync`.
 
 ### C. Application — por entidad (convención CQRS)
@@ -85,7 +85,7 @@ Verificado en el código (2026-09-28):
 - **`DeletePerson` deja de borrar direcciones y contactos junto con la persona.** Direcciones, contactos, cliente, empleos, perfil de negocio y perfil financiero activos bloquean el borrado de la persona. Es un cambio de comportamiento respecto de hoy: los tests existentes de `DeletePersonCommandHandler` que esperan el borrado conjunto se actualizan como parte de la Etapa 2.
 - Borrar un hijo sigue sin afectar al padre (sin cambios).
 
-Este patrón ya existe en la mayoría de los catálogos: `DeleteGender`, `DeleteIndustry`, `DeleteRegion`, `DeleteTaxRegime`, `DeleteIncomeRange`, `DeleteProject`, `DeleteTicketStatus` y `DeleteProvince` devuelven `<ENTIDAD>_IN_USE` si el registro está referenciado. **No** lo tienen hoy: `DeleteArea`, `DeleteCountry`, `DeleteCompany` y `DeletePerson`. Esta spec lo extiende a todo padre con hijos: cada etapa, antes de implementar, inventaría las relaciones padre → hijo de sus entidades y alinea sus handlers `Delete<Entidad>`. `DeleteCompany` (solo SuperAdmin, SPEC 39) queda bloqueado mientras la empresa tenga membresías o registros activos.
+Este patrón ya existe en la mayoría de los catálogos: `DeleteGender`, `DeleteIndustry`, `DeleteRegion`, `DeleteTaxRegime`, `DeleteIncomeRange`, `DeleteProject`, `DeleteTicketStatus` y `DeleteProvince` devuelven `<ENTIDAD>_IN_USE` si el registro está referenciado. **No** lo tienen hoy: `DeleteArea`, `DeleteCountry`, `DeleteCompany` y `DeletePerson`. Esta spec lo extiende a todo padre con hijos: cada etapa, antes de implementar, inventaría las relaciones padre → hijo de sus entidades y alinea sus handlers `Delete<Entidad>`. `DeleteCompany` (solo SuperAdmin, SPEC 38) queda bloqueado mientras la empresa tenga membresías o registros activos.
 
 Reglas para esta spec:
 
@@ -133,7 +133,7 @@ Son las entidades más simples: sin padre (salvo `Province → Country`, `Munici
 
 ### Etapa 4 — Tickets
 
-`Ticket`, `TicketNotification`, `TicketCompanyDefault`, y las entidades de SPEC 34-38 que ya estén implementadas.
+`Ticket`, `TicketNotification`, `TicketCompanyDefault`, y las entidades de SPEC 34-37 y 99 que ya estén implementadas.
 
 - `TicketLog` no se restaura (sección E).
 - Restaurar un `Ticket` genera una entrada en `TicketLog` (auditoría del ticket).
@@ -152,7 +152,7 @@ Test de integración parametrizado sobre todos los endpoints `GET` de listado:
 - Autenticado como **SuperAdmin** (empresa activa A) con `?includeDeleted=true` → ve el activo y el borrado de A, no el de B.
 - Autenticado como **SuperAdmin** con `?includeDeleted=true&companyId=B` → ve el de B.
 
-Este test también cubre el hueco que SPEC 39 dejó abierto: una query Dapper nueva sin `CompanyId = @TenantId` falla aquí. Cada etapa agrega sus endpoints a la parametrización.
+Este test también cubre el hueco que SPEC 38 dejó abierto: una query Dapper nueva sin `CompanyId = @TenantId` falla aquí. Cada etapa agrega sus endpoints a la parametrización.
 
 ### Tests por entidad (cada etapa)
 

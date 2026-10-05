@@ -1,25 +1,25 @@
-# SPEC 48 — Ingesta de tickets por canales externos: WhatsApp y correo (etapa posterior)
+# SPEC 47 — Ingesta de tickets por canales externos: WhatsApp y correo (etapa posterior)
 
 > **Status:** Pospuesto
-> **Depends on:** SPEC 34 (`TicketUserCompany` — el `IsSuperAdminTicket` de la empresa es quien figura como autor de un ticket ingresado por canal externo), SPEC 35 (`TicketDtoAssembler`), SPEC 36 (`IFileStorageService`, `TicketAttachmentSettings`, `InboundAttachment` — ya implementado), SPEC 37 (canales internos `WEB`/`APP`), SPEC 43 (`TicketInitialStatusResolver`), SPEC 44 (menú `TicketManagement`, rutas `/tickets/...`).
-> **Related:** SPEC 46 (agente de canales del calendario; la forma en que conviven el agente y la ingesta directa se decide al retomar esta spec).
-> **Date:** 2026-10-01 (contenido original de SPEC 37, 2026-09-25)
+> **Depends on:** SPEC 34 (`TicketUserCompany` — el `IsSuperAdminTicket` de la empresa es quien figura como autor de un ticket ingresado por canal externo), SPEC 35 (`TicketDtoAssembler`), SPEC 36 (`IFileStorageService`, `TicketAttachmentSettings`, `InboundAttachment` — ya implementado), SPEC 99 (canales internos `WEB`/`APP`), SPEC 42 (`TicketInitialStatusResolver`), SPEC 43 (menú `TicketManagement`, rutas `/tickets/...`).
+> **Related:** SPEC 45 (agente de canales del calendario; la forma en que conviven el agente y la ingesta directa se decide al retomar esta spec).
+> **Date:** 2026-10-01 (contenido original de SPEC 99, 2026-09-25)
 > **Objective:** Permitir que un ticket se registre automáticamente cuando llega un mensaje de WhatsApp o un correo a una dirección/número configurado por la empresa, sin sesión de usuario ni token JWT, resolviendo el tenant de forma segura vía un token de webhook único por empresa y canal.
 
-> **Origen y etapa (decisión del usuario, 2026-10-01):** este diseño estaba en la SPEC 37 (aprobada el 2026-09-25). Se movió aquí sin cambios de fondo porque la creación automática de tickets desde canales externos —**WhatsApp y correo**— queda para una **etapa posterior**, después de concluir los módulos de Tickets y Calendar y junto con la definición de los agentes de canal (SPEC 46). Hasta entonces, los tickets los crean usuarios con acceso al módulo y permisos (`POST /Tickets`, que ya acepta `PersonId` para crear a nombre de otra persona). Al retomarla, se revisa completa contra el estado final de ambos módulos y vuelve a aprobarse.
+> **Origen y etapa (decisión del usuario, 2026-10-01):** este diseño estaba en la SPEC 99 (aprobada el 2026-09-25). Se movió aquí sin cambios de fondo porque la creación automática de tickets desde canales externos —**WhatsApp y correo**— queda para una **etapa posterior**, después de concluir los módulos de Tickets y Calendar y junto con la definición de los agentes de canal (SPEC 45). Hasta entonces, los tickets los crean usuarios con acceso al módulo y permisos (`POST /Tickets`, que ya acepta `PersonId` para crear a nombre de otra persona). Al retomarla, se revisa completa contra el estado final de ambos módulos y vuelve a aprobarse.
 >
 > **Ya no forman parte de esta spec:**
-> - Los canales internos `WEB` y `APP` → SPEC 37.
-> - El índice único de `Ticket.Code`: ya es `(CompanyId, Code)` en el código. **No** se filtra por `GcRecord`, porque `TicketCodeGenerator` cuenta también los tickets borrados y nunca reutiliza un código; mantener los borrados en el índice garantiza que restaurar un ticket (SPEC 42) no choque.
+> - Los canales internos `WEB` y `APP` → SPEC 99.
+> - El índice único de `Ticket.Code`: ya es `(CompanyId, Code)` en el código. **No** se filtra por `GcRecord`, porque `TicketCodeGenerator` cuenta también los tickets borrados y nunca reutiliza un código; mantener los borrados en el índice garantiza que restaurar un ticket (SPEC 41) no choque.
 > - `InboundAttachment`: ya existe (SPEC 36).
 >
-> **Al retomarla:** la búsqueda de personas por teléfono debe reutilizar el `IntakeRequesterResolver` de SPEC 46 (normalización por dígitos) en vez de la coincidencia exacta descrita abajo, y el estado inicial del ticket sale de `TicketInitialStatusResolver` (SPEC 43).
+> **Al retomarla:** la búsqueda de personas por teléfono debe reutilizar el `IntakeRequesterResolver` de SPEC 45 (normalización por dígitos) en vez de la coincidencia exacta descrita abajo, y el estado inicial del ticket sale de `TicketInitialStatusResolver` (SPEC 42).
 
 ---
 
 ## Por qué existe esta spec
 
-Es la cuarta y última pieza *core* del módulo de tickets extendido antes de SPEC 38 (workflow/SLA, la de alcance más abierto, evaluada aparte). El brief la pide explícitamente:
+Es la cuarta y última pieza *core* del módulo de tickets extendido antes de SPEC 37 (workflow/SLA, la de alcance más abierto, evaluada aparte). El brief la pide explícitamente:
 
 > "Habrán diferentes canales para registrarlos: WhatsApp, web operativa, correo, app; una vez registrado se gestionará por la web."
 
@@ -336,6 +336,6 @@ Attachments        = cada parte de archivo del multipart
 - Rate limiting / anti-spam.
 - Otros proveedores de WhatsApp o correo entrante más allá de Twilio/SendGrid.
 - Reintentos automáticos de descarga de adjuntos fallidos.
-- Workflow/SLA parametrizable — SPEC 38.
+- Workflow/SLA parametrizable — SPEC 37.
 
 Cada uno, si llega, va en su propia spec.

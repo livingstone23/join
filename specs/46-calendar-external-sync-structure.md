@@ -1,7 +1,7 @@
-# SPEC 47 — Calendario: estructura de datos para sincronizar con calendarios externos (Google Calendar)
+# SPEC 46 — Calendario: estructura de datos para sincronizar con calendarios externos (Google Calendar)
 
 > **Status:** Borrador
-> **Depends on:** SPEC 45 (`CalendarEvent`, `UserCalendar`, estados `CONFIRMED`/`CANCELLED`).
+> **Depends on:** SPEC 44 (`CalendarEvent`, `UserCalendar`, estados `CONFIRMED`/`CANCELLED`).
 > **Date:** 2026-09-29
 > **Objective:** Dejar creadas, en el esquema `Calendar`, las entidades, enums, configuraciones EF y la migración que necesita la sincronización de actividades de JOIN con el calendario de Google de cada usuario: la conexión de la cuenta externa, la relación entre una actividad de JOIN y su copia externa, y la cola de cambios pendientes de enviar. Esta spec **no** implementa acciones (OAuth, llamadas a la API de Google, webhook ni worker); documenta las reglas que esas acciones deberán cumplir para que la estructura quede correcta desde ahora.
 
@@ -31,7 +31,7 @@ Decisiones acordadas:
 
 - `src/1.Domain/Calendars/CalendarExternalConnection.cs`, `CalendarExternalEventLink.cs`, `CalendarSyncOutboxItem.cs` (nuevos, `BaseTenantEntity`).
 - Enums en `src/1.Domain/Calendars/Enums/`: `CalendarExternalProvider`, `CalendarExternalConnectionStatus`, `CalendarExternalSyncState`, `CalendarSyncOperation`, `CalendarSyncOutboxStatus`.
-- Configuraciones EF en `Configuration/Calendars/`, `DbSet`s, líneas `HasQueryFilter` explícitas tenant + soft delete (convención SPEC 39), FKs `Restrict`, índices filtrados (SPEC 41).
+- Configuraciones EF en `Configuration/Calendars/`, `DbSet`s, líneas `HasQueryFilter` explícitas tenant + soft delete (convención SPEC 38), FKs `Restrict`, índices filtrados (SPEC 40).
 - Migración `AddCalendarExternalSyncStructure`.
 - Tests de configuración: el modelo EF compila y la migración crea las tres tablas con sus índices (prueba de integración con Testcontainers). No hay handlers nuevos, así que no cambia la cobertura del proyecto de unitarios.
 
@@ -39,7 +39,7 @@ Decisiones acordadas:
 
 - Proyecto de Google Cloud, pantalla de consentimiento OAuth, credenciales y configuración.
 - Endpoints para vincular y desvincular la cuenta (`/CalendarExternalConnections/google/authorize`, callback, `DELETE`).
-- Encolar cambios desde los handlers de SPEC 45 y 46.
+- Encolar cambios desde los handlers de SPEC 44 y 45.
 - Worker (Hangfire) que procesa la cola, llamadas a Google Calendar API v3, webhook de notificaciones push (`events.watch`) y sincronización incremental.
 - DTOs, controllers, permisos y menús de la integración.
 
@@ -134,7 +134,7 @@ Los ítems `Done` y `Superseded` se purgan pasados 30 días (tarea de mantenimie
    - `Created >= ConnectedUtc`;
    - y su estado es `CONFIRMED`.
 2. **Cuándo se borra en Google.** Si una actividad sincronizada deja de cumplir la regla 1 (anulada, vuelve a pendiente o reprogramada por otro, cambia de calendario, se borra), se encola `Delete` y el vínculo queda `Unlinked`. Si vuelve a `CONFIRMED`, se encola `Upsert` y se crea de nuevo.
-3. **Series.** La maestra se envía con su `RRULE` tal cual (SPEC 45 guarda el formato de Google). Las excepciones se envían como instancias modificadas o canceladas de la serie en Google (`recurringEventId` + `originalStartTime`), con su propio `CalendarExternalEventLink`.
+3. **Series.** La maestra se envía con su `RRULE` tal cual (SPEC 44 guarda el formato de Google). Las excepciones se envían como instancias modificadas o canceladas de la serie en Google (`recurringEventId` + `originalStartTime`), con su propio `CalendarExternalEventLink`.
 4. **Cambios que vienen de Google.** Solo se procesan eventos con `extendedProperties.private.joinEventId`. Se aplican título, descripción, lugar, horario y cancelación. Si el horario cambia, pasa por `CalendarEventScheduleGuard` **como dueño** (sin R5, con R4). Si genera un choque, no se aplica, se marca `Conflict` y se reenvía la versión de JOIN.
 5. **Conflicto.** Se compara `ExternalUpdatedUtc` (Google) con `CalendarEvent.LastModified` (JOIN): gana el más reciente. El perdedor se sobrescribe y queda registrado en `CalendarEventLog` (canal = `GOOGLE_CALENDAR`, ver punto siguiente).
 6. **Canal.** La spec de acciones siembra el `CommunicationChannel` `Google Calendar` (`Code = "GOOGLE_CALENDAR"`, `Provider = "Google"`) para registrar como origen los cambios que llegan desde Google.
