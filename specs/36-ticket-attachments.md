@@ -6,6 +6,8 @@
 > **Objective:** Permitir adjuntar documentos a un ticket (creación, gestión o finalización) respetando cupos configurables por empresa — tipo de documento, tamaño máximo, máximo de archivos por ticket y cuota diaria opcional — persistiendo cada adjunto en `TicketDocuments` vinculado al `TicketLog` exacto donde se subió, detrás de una abstracción de almacenamiento (`IFileStorageService`) que hoy resuelve a disco local y queda lista para un adapter de Azure Blob o S3 sin tocar el resto del módulo.
 
 
+> **Ajuste por SPEC 49 (2026-10-06):** SPEC 49 agrega los adapters de Azure Blob, Amazon S3 y Cloudflare R2 que esta spec dejó fuera, conecta la resolución del proveedor por fila (`StorageProvider`) en la subida y la descarga, quita `.gif` del tipo `Image`, y cambia los tipos sembrados por defecto a `Pdf | Word | Excel | Image` (sin `Text`). Lo que esta spec dice sobre esos puntos queda reemplazado por SPEC 49 cuando se implemente.
+
 > **Ajuste por SPEC 43 (2026-10-01):** esta spec se implementó antes que SPEC 43, así que sus `SystemOptionSeed` (`TicketAttachmentSettings`, `TicketDocuments`) quedaron bajo el padre `ManejoTickets` con rutas `/ManejoTickets/...`, igual que el resto de opciones de tickets. SPEC 43 las renombra junto con todas las demás: padre `TicketManagement`, `ModuleName = "Tickets"` y rutas `/tickets/<recurso-con-guion>` (ver su tabla de opciones de Tickets). Los `ControllerName` no cambian.
 
 ---
