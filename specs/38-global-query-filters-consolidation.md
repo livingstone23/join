@@ -199,19 +199,19 @@ El mensaje de error nombra la entidad y apunta a esta spec. La verificación de 
 
 ## Acceptance criteria
 
-- [ ] `Region`, `Customer`, `Gender`, `Industry`, `TaxRegime`, `IncomeRange`, `PersonBusinessProfile`, `PersonEmployment`, `PersonFinancialProfile` tienen filtro `GcRecord == 0 && CompanyId == tenant`.
-- [ ] `UserConnectionLog` tiene filtro `GcRecord == 0`; el comentario desactualizado se eliminó.
-- [ ] `RoleCompany` y `CompanyModule` tienen filtro `GcRecord == 0 && CompanyId == tenant`; la edición de `RoleCompany` de otra empresa por el SuperAdmin sigue funcionando.
-- [ ] `UserCompany` es la única `BaseTenantEntity` sin filtro de tenant, con comentario que lo justifica, y ninguna lectura suya carga la tabla completa.
-- [ ] `Province` y `Municipality` mantienen solo `GcRecord == 0` (globales).
-- [ ] `ApplicationUser` sigue sin filtro, con comentario.
-- [ ] Las queries Dapper de Region filtran por tenant; las de Province, `PersonAddressQuerySql` y `GetPersonById` no exponen regiones de otra empresa.
-- [ ] La auditoría de F0 (filas con `CompanyId = Guid.Empty` y referencias cruzadas entre empresas) está documentada en el PR, con la decisión tomada si hubo casos.
-- [ ] `SuperAdminCompany` solo ve su propia empresa y los módulos de su empresa; no puede borrar empresas ni crear/modificar/borrar módulos. Solo `SuperAdmin` puede (sección D).
-- [ ] El test de guarda F3.1 pasa y falla si se borra cualquier línea de `ConfigureGlobalQueryFilters`.
-- [ ] Los 8 casos de F3.2 pasan contra SQL Server real.
-- [ ] Gate de cobertura de `JOIN.Application.UnitTest` ≥ 90%.
-- [ ] Toda spec futura (34 en adelante) que agregue una entidad `IAuditableEntity` incluye su línea en `ConfigureGlobalQueryFilters`; el test de guarda lo exige.
+- [x] `Region`, `Customer`, `Gender`, `Industry`, `TaxRegime`, `IncomeRange`, `PersonBusinessProfile`, `PersonEmployment`, `PersonFinancialProfile` tienen filtro `GcRecord == 0 && CompanyId == tenant`. *(verificado por F3.1 guard test + F3.2 #1, #4 — `ApplicationDbContext.ConfigureGlobalQueryFilters` sección 1)*
+- [x] `UserConnectionLog` tiene filtro `GcRecord == 0`; el comentario desactualizado se eliminó. *(sección 3 del DbContext, F3.2 #7 — `UserConnectionLog_SoftDeletedRows_AreHiddenByFilter`)*
+- [x] `RoleCompany` y `CompanyModule` tienen filtro `GcRecord == 0 && CompanyId == tenant`; la edición de `RoleCompany` de otra empresa por el SuperAdmin sigue funcionando. *(`RoleCompanyRepository.GetByIdForUpdateAsync` y `CompanyModuleRepository` usan `.IgnoreQueryFilters()` + filtro explícito por CompanyId; sección E del spec)*
+- [x] `UserCompany` es la única `BaseTenantEntity` sin filtro de tenant, con comentario que lo justifica, y ninguna lectura suya carga la tabla completa. *(sección 3 del DbContext con comentario; `IUserCompanyRepository` con `GetActiveByUserIdAsync` / `IsActiveMemberAsync`; F3.2 #5)*
+- [x] `Province` y `Municipality` mantienen solo `GcRecord == 0` (globales). *(sección 2 del DbContext)*
+- [x] `ApplicationUser` sigue sin filtro, con comentario. *(líneas 258-261 del DbContext; F3.2 #8 confirma que un usuario soft-deleted sigue siendo devuelto por `Find`)*
+- [x] Las queries Dapper de Region filtran por tenant; las de Province, `PersonAddressQuerySql` y `GetPersonById` no exponen regiones de otra empresa. *(F3.2 #2 `Region_GetRegionsEndpoint_AsManagerOfA_DoesNotLeakB` y F3.2 #6 `Province_WithRegionIdOfAnotherCompany_ReturnsNullRegionName`)*
+- [ ] La auditoría de F0 (filas con `CompanyId = Guid.Empty` y referencias cruzadas entre empresas) está documentada en el PR, con la decisión tomada si hubo casos. *(**pendiente** — `docs/migrations/spec-38-data-audit.sql` listo; falta ejecutarlo contra la DB de dev y pegar conteo en el PR)*
+- [ ] `SuperAdminCompany` solo ve su propia empresa y los módulos de su empresa; no puede borrar empresas ni crear/modificar/borrar módulos. Solo `SuperAdmin` puede (sección D). *(**pendiente** — code-side listo, falta smoke manual + validación con `join_frontb` para endpoints `DELETE /companies/{id}` y POST/PUT/DELETE `/company-modules`)*
+- [x] El test de guarda F3.1 pasa y falla si se borra cualquier línea de `ConfigureGlobalQueryFilters`. *(`GlobalQueryFiltersGuardTests.AuditableEntities_MustHaveQueryFilter` y `BaseTenantEntities_MustHaveCompanyIdInQueryFilter` corren en integration suite)*
+- [x] Los 8 casos de F3.2 pasan contra SQL Server real. *(26/26 integration tests verdes; 5 fixes de test aplicados: scope override, IsoCode único, password en CreateAsync, FK válida para revoked, JWT en HTTP path)*
+- [x] Gate de cobertura de `JOIN.Application.UnitTest` ≥ 90%. *(90.87% línea, 82.84% branch, 90.25% method con `LANG=en_US.UTF-8` — **requiere** fix de locale en CI; ver "Risks" abajo)*
+- [x] Toda spec futura (34 en adelante) que agregue una entidad `IAuditableEntity` incluye su línea en `ConfigureGlobalQueryFilters`; el test de guarda lo exige. *(F3.1 falla el build si se omite la línea — la convención queda enforceable)*
 
 ---
 
@@ -234,3 +234,42 @@ El mensaje de error nombra la entidad y apunta a esta spec. La verificación de 
 - Decidir si `ApplicationUser` debe filtrarse — decisión de producto diferida.
 - Mecanismo de filtros por reflexión o interfaces marcadoras en el dominio.
 - La rutina de notificación por inactividad de tickets — **SPEC 39**.
+
+---
+
+## Implementation notes (post-merge 2026-10-06)
+
+### Locale del runner CI
+
+La suite de unit tests contiene 12 aserciones sobre mensajes localizados de `FluentValidation`
+(`Validate_WhenNameIsEmpty_ShouldHaveValidationError` y `_WhenNameIsWhitespace` en
+`IdentificationType`, `Project`, `Area`, `EntityStatus`). Esas aserciones usan la versión
+inglesa (`"must not be empty"`) y **fallan en runners con `LANG=es_*`** porque
+`FluentValidation` resuelve los mensajes desde `ResourceManager` con la cultura del thread.
+Ningún test del propio spec 38 introduce estos fallos — son deuda pre-existente.
+
+Cuando los 12 tests fallan, **Coverlet aborta la generación del reporte `coverage.cobertura.xml`**
+y la métrica reportada por CI es 0% — no es real. Con `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`:
+
+- `main`: 90.99% línea, 82.93% branch, 90.39% method
+- `spec-38-global-query-filters-consolidation`: **90.87% línea, 82.84% branch, 90.25% method**
+
+Diferencial -0.12pp / -0.09pp / -0.14pp — pasa el threshold de 90% línea.
+
+**Acción recomendada antes de que CI bloquee el merge**: añadir
+`LANG=en_US.UTF-8` y `LC_ALL=en_US.UTF-8` al `env:` del step de tests en
+`.github/workflows/ci.yml`, o forzar `CultureInfo.InvariantCulture` en
+`JOIN.Application.UnitTest` vía `[assembly: NeutralResourcesLanguage("en-US")]` o
+`Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture` en un
+`AssemblyInitialize`. Es deuda separada del spec 38 — abrir issue aparte.
+
+### Helpers añadidos al fixture de integration tests
+
+`tests/IntegrationTests/TestCurrentUserService.cs` (nuevo) reemplaza `ICurrentUserService`
+dentro del `WebApplicationFactory<CreateOverride>` para que los scopes EF sin
+`HttpContext` (los usados por `CreateScopeAsCompany`) puedan setear `CompanyIdOverride`
+sin tener que construir un HTTP request. El HTTP path real sigue funcionando con la
+misma semántica de producción (JWT claim > X-Company-Id header). El
+`CreateAuthenticatedClientAsync(companyId)` registra un user, lo asigna a la empresa y
+le da el rol `SuperAdmin` para bypassear el `DynamicAuthorizationFilter` en los tests
+F3.2.2 y F3.2.6 que llaman HTTP endpoints autenticados.

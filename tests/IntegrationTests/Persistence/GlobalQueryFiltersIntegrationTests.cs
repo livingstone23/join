@@ -5,6 +5,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using JOIN.Application.Common;
+using JOIN.Application.DTO.Security;
+using JOIN.Application.UseCases.Security.Auth.Login;
+using JOIN.Application.UseCases.Security.Auth.Register;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
@@ -66,8 +70,12 @@ public sealed class GlobalQueryFiltersIntegrationTests : IClassFixture<CustomWeb
         await SeedRegionAsync(companyA, countryId, "Norte-A");
         await SeedRegionAsync(companyB, countryId, "Norte-B");
 
-        using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Company-Id", companyA.ToString());
+        // The Region endpoint is gated by DynamicAuthorizationFilter, which requires a JWT
+        // (ClaimTypes.NameIdentifier + a non-empty CompanyId claim) — bare X-Company-Id
+        // header returns 401. Authenticate as a SuperAdmin user scoped to companyA so the
+        // filter bypasses its permission check and resolves the Dapper tenant from the
+        // JWT's CompanyId claim.
+        using var client = await CreateAuthenticatedClientAsync(companyA);
 
         var response = await client.GetAsync("/api/v1/regions?PageSize=50");
         response.IsSuccessStatusCode.Should().BeTrue();
@@ -141,6 +149,10 @@ public sealed class GlobalQueryFiltersIntegrationTests : IClassFixture<CustomWeb
     {
         var (companyA, companyB) = await SeedTwoCompaniesAsync();
         var userId = await SeedUserAsync();
+        // The soft-deleted row needs a CompanyId that (a) satisfies the FK to Security.Companies
+        // and (b) does not collide with the (UserId, CompanyId) unique index on the two active
+        // rows above — so it has to belong to a third company.
+        var companyC = await SeedExtraCompanyAsync();
 
         await using var scope = CreateScopeAsCompany(companyA);
         scope.Context.UserCompanies.Add(new UserCompany
@@ -162,7 +174,7 @@ public sealed class GlobalQueryFiltersIntegrationTests : IClassFixture<CustomWeb
         var revoked = new UserCompany
         {
             UserId = userId,
-            CompanyId = Guid.NewGuid(),
+            CompanyId = companyC,
             IsDefault = false,
             GcRecord = 20240101, // soft-deleted
             CreatedBy = nameof(GlobalQueryFiltersIntegrationTests)
@@ -211,8 +223,7 @@ public sealed class GlobalQueryFiltersIntegrationTests : IClassFixture<CustomWeb
             provinceId = province.Id;
         }
 
-        using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Company-Id", companyA.ToString());
+        using var client = await CreateAuthenticatedClientAsync(companyA);
 
         var response = await client.GetAsync($"/api/v1/provinces/{provinceId}");
         response.IsSuccessStatusCode.Should().BeTrue();
@@ -313,21 +324,65 @@ public sealed class GlobalQueryFiltersIntegrationTests : IClassFixture<CustomWeb
         return (companyA.Id, companyB.Id);
     }
 
+    private async Task<Guid> SeedExtraCompanyAsync()
+    {
+        await using var seedScope = _factory.Services.CreateAsyncScope();
+        var seedDb = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var company = new Company
+        {
+            Name = $"JOIN-C-{Guid.NewGuid():N}".Substring(0, 18),
+            TaxId = $"RUCC{Guid.NewGuid():N}".Substring(0, 16),
+            IsActive = true,
+            GcRecord = BaseAuditableEntity.ActiveGcRecord,
+            CreatedBy = nameof(GlobalQueryFiltersIntegrationTests)
+        };
+        seedDb.Companies.Add(company);
+        await seedDb.SaveChangesAsync();
+        return company.Id;
+    }
+
     private async Task<Guid> SeedUserAsync()
     {
         await using var seedScope = _factory.Services.CreateAsyncScope();
         var userManager = seedScope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var seedDb = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var userId = Guid.NewGuid();
+        // The previous version derived UserName / Email from the full GUID and truncated
+        // the email with .Substring(0, 30), which lopped off the @ and domain half —
+        // UserManager's default email validator then rejected the row silently (CreateAsync
+        // returns IdentityResult.Failed, doesn't throw) and every downstream FK exploded.
+        // Keep both fields short and complete.
+        var shortTag = Guid.NewGuid().ToString("N").Substring(0, 8);
         var identityUser = new ApplicationUser
         {
             Id = userId,
-            UserName = $"user-{userId:N}".Substring(0, 20),
-            Email = $"u{userId:N}@integration.test".Substring(0, 30),
+            UserName = $"u{shortTag}",
+            Email = $"u{shortTag}@t.local",
             EmailConfirmed = true,
             IsActive = true,
             GcRecord = BaseAuditableEntity.ActiveGcRecord
         };
-        await userManager.CreateAsync(identityUser);
+        // Password is required by UserManager<ApplicationUser> — CreateAsync(identityUser)
+        // without one returns IdentityResult.Failed but does not throw, leaving the user
+        // unpersisted and breaking every downstream FK (UserConnectionLog, UserCompany,
+        // ApplicationUser.FindByIdAsync). Assert on the result so a future policy change
+        // surfaces here instead of as a confusing FK violation downstream.
+        var result = await userManager.CreateAsync(identityUser, "Integration!Pass123");
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"SeedUserAsync failed to persist user {userId}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+        }
+
+        // Confirm the row is actually in the database — guards against a future code path
+        // where CreateAsync returns Success but the change tracker is rolled back.
+        var fromDatabase = await seedDb.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        if (fromDatabase is null)
+        {
+            throw new InvalidOperationException(
+                $"SeedUserAsync: user {userId} not visible to a fresh DbContext read after CreateAsync.");
+        }
+
         return userId;
     }
 
@@ -335,10 +390,15 @@ public sealed class GlobalQueryFiltersIntegrationTests : IClassFixture<CustomWeb
     {
         await using var seedScope = _factory.Services.CreateAsyncScope();
         var seedDb = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        // xUnit runs the tests in this class sequentially against the same Testcontainers
+        // SQL Server (one fixture per class), so a hard-coded "TL" IsoCode collides with
+        // the unique index IX_Countries_IsoCode on every invocation after the first.
+        // Use a unique IsoCode per call to keep each test self-contained.
+        var isoCode = $"T{Guid.NewGuid():N}".Substring(0, 10);
         var country = new Country
         {
-            Name = "Testland",
-            IsoCode = "TL",
+            Name = $"Testland-{Guid.NewGuid():N}".Substring(0, 24),
+            IsoCode = isoCode,
             GcRecord = BaseAuditableEntity.ActiveGcRecord,
             CreatedBy = nameof(GlobalQueryFiltersIntegrationTests)
         };
@@ -388,13 +448,83 @@ public sealed class GlobalQueryFiltersIntegrationTests : IClassFixture<CustomWeb
 
     private TestScope CreateScopeAsCompany(Guid companyId)
     {
-        // SPEC 38 note: in this fixture the production HttpContext-based ICurrentUserService
-        // is wired into DI. EF reads inside a single scope evaluate the filter against the
-        // service's CompanyId. Tests that require a precise token-driven tenant scope use the
-        // HTTP path (F3.2.2, F3.2.6) which sets X-Company-Id directly. Pure EF tests rely
-        // on the spec contract (rows hidden when scoped to the seeded tenant).
+        // SPEC 38 note: the production HttpContext-based ICurrentUserService is wired into
+        // DI. EF reads inside a single scope evaluate the filter against the service's
+        // CompanyId — but scopes created via Services.CreateAsyncScope() have no
+        // HttpContext, so without help every tenant filter evaluates to Guid.Empty and
+        // hides every row. The TestCurrentUserService registered in
+        // CustomWebApplicationFactory exposes a per-scope CompanyIdOverride that this
+        // helper sets before resolving the DbContext, so EF reads inside the scope see
+        // the right tenant. Tests that need a precise token-driven tenant scope over the
+        // HTTP path (F3.2.2, F3.2.6) keep their existing X-Company-Id header flow — the
+        // override is ignored when an HttpContext is present.
         var scope = _factory.Services.CreateAsyncScope();
+        var testCurrentUser = scope.ServiceProvider.GetRequiredService<TestCurrentUserService>();
+        testCurrentUser.CompanyIdOverride = companyId;
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         return new TestScope(scope, context);
+    }
+
+    /// <summary>
+    /// Registers a fresh user, seeds the <see cref="UserCompany"/> link to
+    /// <paramref name="companyId"/>, assigns the <c>SuperAdmin</c> role so
+    /// <see cref="JOIN.Services.WebApi.Filters.DynamicAuthorizationFilter"/> bypasses
+    /// its permission check, and returns an <see cref="HttpClient"/> pre-loaded with
+    /// the resulting bearer token. The token's <c>CompanyId</c> claim carries
+    /// <paramref name="companyId"/>, so Dapper handlers with a tenant predicate see the
+    /// right scope without needing a header fallback.
+    /// </summary>
+    private async Task<HttpClient> CreateAuthenticatedClientAsync(Guid companyId)
+    {
+        const string password = "Integration!Pass123";
+        var email = $"u{Guid.NewGuid():N}@t.local";
+
+        using var unauthClient = _factory.CreateClient();
+        var registerResponse = await unauthClient.PostAsJsonAsync(
+            "/api/v1/users/register",
+            new RegisterCommand
+            {
+                Email = email,
+                Password = password,
+                FirstName = "Test",
+                LastName = "User",
+            });
+        registerResponse.EnsureSuccessStatusCode();
+
+        await using (var seedScope = _factory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var userManager = seedScope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+            var registeredUser = await userManager.FindByEmailAsync(email);
+            registeredUser.Should().NotBeNull();
+
+            seedDb.UserCompanies.Add(new UserCompany
+            {
+                UserId = registeredUser!.Id,
+                CompanyId = companyId,
+                IsDefault = true,
+                GcRecord = BaseAuditableEntity.ActiveGcRecord,
+                CreatedBy = nameof(GlobalQueryFiltersIntegrationTests)
+            });
+            (await userManager.AddToRoleAsync(registeredUser, "SuperAdmin"))
+                .Succeeded.Should().BeTrue();
+            await seedDb.SaveChangesAsync();
+        }
+
+        var loginResponse = await unauthClient.PostAsJsonAsync(
+            "/api/v1/users/login",
+            new LoginCommand { Email = email, Password = password });
+        loginResponse.EnsureSuccessStatusCode();
+
+        var loginPayload = await loginResponse.Content.ReadFromJsonAsync<Response<LoginResponse>>();
+        loginPayload!.Data!.Token.Should().NotBeNullOrWhiteSpace();
+
+        var authClient = _factory.CreateClient();
+        authClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", loginPayload.Data.Token);
+        authClient.DefaultRequestHeaders.Add("X-Company-Id", companyId.ToString());
+
+        return authClient;
     }
 }
