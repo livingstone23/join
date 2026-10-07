@@ -143,7 +143,7 @@ public sealed class GetEntityStatusQueryHandlerTests
 
     /// <summary>
     /// Verifies that an empty result set still produces a valid paged response.
-    /// This covers the SQL Server pagination branch and the empty collection path.
+    /// This covers the LIMIT/OFFSET pagination clause and the empty collection path.
     /// </summary>
     [Fact]
     public async Task Handle_WhenNoStatusesMatch_ShouldReturnEmptyPagedResult()
@@ -181,7 +181,7 @@ public sealed class GetEntityStatusQueryHandlerTests
         response.Data.PageSize.Should().Be(5);
         response.Data.TotalCount.Should().Be(0);
         response.Data.TotalPages.Should().Be(0);
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.CapturedParameters["CompanyId"].Should().Be(companyId);
         context.Connection.CapturedParameters["Offset"].Should().Be(5);
         context.Connection.CapturedParameters["PageSize"].Should().Be(5);

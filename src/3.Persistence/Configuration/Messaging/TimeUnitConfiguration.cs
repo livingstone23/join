@@ -62,7 +62,7 @@ public class TimeUnitConfiguration : IEntityTypeConfiguration<TimeUnit>
         builder.HasIndex(p => new { p.CompanyId, p.Name })
             .HasDatabaseName("UX_TimeUnits_Company_Name")
             .IsUnique()
-            .HasFilter("[GcRecord] = 0");
+            .HasFilter("\"gcrecord\" = 0");
 
         // Apply a soft-delete filter to automatically exclude records marked as deleted.
         builder.HasQueryFilter(a => a.GcRecord == 0);

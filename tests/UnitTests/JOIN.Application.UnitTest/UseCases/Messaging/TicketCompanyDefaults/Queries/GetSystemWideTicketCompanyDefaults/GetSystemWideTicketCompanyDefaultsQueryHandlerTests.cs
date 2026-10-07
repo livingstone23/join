@@ -96,7 +96,7 @@ public sealed class GetSystemWideTicketCompanyDefaultsQueryHandlerTests
 
     /// <summary>
     /// Verifies that an empty result set still returns a valid paged payload
-    /// while using the SQL Server pagination branch.
+    /// while using the LIMIT/OFFSET pagination clause.
     /// </summary>
     [Fact]
     public async Task Handle_WhenNoConfigurationsMatch_ShouldReturnEmptyPagedResult()
@@ -146,7 +146,7 @@ public sealed class GetSystemWideTicketCompanyDefaultsQueryHandlerTests
         response.Data.TotalCount.Should().Be(0);
         response.Data.TotalPages.Should().Be(0);
 
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.CapturedParameters["Offset"].Should().Be(5);
         context.Connection.CapturedParameters["PageSize"].Should().Be(5);
     }

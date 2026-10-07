@@ -74,7 +74,7 @@ public sealed class GetSystemOptionByIdQueryHandlerTests
         response.Data.IsVisibleMenu.Should().BeTrue();
         response.Data.OrderMenu.Should().Be(3);
 
-        context.Connection.LastCommandText.Should().Contain("INNER JOIN [Admin].[SystemModules] m ON m.Id = o.ModuleId");
+        context.Connection.LastCommandText.Should().Contain("INNER JOIN Admin.SystemModules m ON m.Id = o.ModuleId");
         context.Connection.LastCommandText.Should().Contain("LEFT JOIN Security.SystemOptions p ON p.Id = o.ParentId");
         context.Connection.LastCommandText.Should().Contain("o.CanDownload");
         context.Connection.LastCommandText.Should().Contain("o.CanExport");

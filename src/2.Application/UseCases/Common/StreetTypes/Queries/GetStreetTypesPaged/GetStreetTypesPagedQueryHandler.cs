@@ -54,7 +54,7 @@ public class GetStreetTypesPagedQueryHandler(
             FROM Common.StreetTypes st
             {whereClause}
             ORDER BY st.Created DESC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Common.StreetTypes st
@@ -81,12 +81,4 @@ public class GetStreetTypesPagedQueryHandler(
             }
         };
     }
-
-    /// <summary>
-    /// Resolves a provider-compatible pagination clause.
-    /// </summary>
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

@@ -23,7 +23,7 @@ public sealed class PhoneVerificationCodeRepository(ISqlConnectionFactory connec
         var gcStamp = int.Parse(utcNow.ToString("yyyyMMdd"));
 
         const string sql = """
-            UPDATE [Security].[PhoneVerificationCodes]
+            UPDATE Security.PhoneVerificationCodes
             SET GcRecord = @gcStamp,
                 LastModified = @utcNow
             WHERE UserId = @userId
@@ -43,7 +43,7 @@ public sealed class PhoneVerificationCodeRepository(ISqlConnectionFactory connec
         ArgumentNullException.ThrowIfNull(code);
 
         const string sql = """
-            INSERT INTO [Security].[PhoneVerificationCodes]
+            INSERT INTO Security.PhoneVerificationCodes
                 (Id, UserId, PhoneNumber, CodeHash, ExpiresAtUtc, UsedAtUtc, AttemptCount, Created, CreatedBy, LastModified, LastModifiedBy, GcRecord)
             VALUES
                 (@Id, @UserId, @PhoneNumber, @CodeHash, @ExpiresAtUtc, @UsedAtUtc, @AttemptCount, @Created, @CreatedBy, @LastModified, @LastModifiedBy, @GcRecord);
@@ -57,7 +57,7 @@ public sealed class PhoneVerificationCodeRepository(ISqlConnectionFactory connec
     public async Task<PhoneVerificationCode?> GetLatestActiveByUserAsync(Guid userId, DateTime utcNow, CancellationToken ct)
     {
         const string sql = """
-            SELECT TOP (1)
+            SELECT
                 Id,
                 UserId,
                 PhoneNumber,
@@ -65,12 +65,13 @@ public sealed class PhoneVerificationCodeRepository(ISqlConnectionFactory connec
                 ExpiresAtUtc,
                 UsedAtUtc,
                 AttemptCount
-            FROM [Security].[PhoneVerificationCodes]
+            FROM Security.PhoneVerificationCodes
             WHERE UserId = @userId
               AND UsedAtUtc IS NULL
               AND ExpiresAtUtc >= @utcNow
               AND GcRecord = 0
-            ORDER BY ExpiresAtUtc DESC, Id DESC;
+            ORDER BY ExpiresAtUtc DESC, Id DESC
+            LIMIT 1;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -82,7 +83,7 @@ public sealed class PhoneVerificationCodeRepository(ISqlConnectionFactory connec
     public async Task<bool> MarkUsedAsync(Guid codeId, DateTime utcNow, CancellationToken ct)
     {
         const string sql = """
-            UPDATE [Security].[PhoneVerificationCodes]
+            UPDATE Security.PhoneVerificationCodes
             SET UsedAtUtc = @utcNow,
                 LastModified = @utcNow
             WHERE Id = @codeId
@@ -100,14 +101,14 @@ public sealed class PhoneVerificationCodeRepository(ISqlConnectionFactory connec
     public async Task<int> IncrementAttemptAsync(Guid codeId, DateTime utcNow, CancellationToken ct)
     {
         const string sql = """
-            UPDATE [Security].[PhoneVerificationCodes]
+            UPDATE Security.PhoneVerificationCodes
             SET AttemptCount = AttemptCount + 1,
                 LastModified = @utcNow
             WHERE Id = @codeId
               AND UsedAtUtc IS NULL
               AND GcRecord = 0;
 
-            SELECT AttemptCount FROM [Security].[PhoneVerificationCodes] WHERE Id = @codeId;
+            SELECT AttemptCount FROM Security.PhoneVerificationCodes WHERE Id = @codeId;
             """;
 
         using var connection = _connectionFactory.CreateConnection();

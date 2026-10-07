@@ -78,7 +78,7 @@ public sealed class GetGendersQueryHandler(
                AND c.GcRecord = 0
             {whereClause}
             ORDER BY g.Code ASC, g.Name ASC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Admin.Genders g
@@ -108,9 +108,4 @@ public sealed class GetGendersQueryHandler(
             }
         };
     }
-
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

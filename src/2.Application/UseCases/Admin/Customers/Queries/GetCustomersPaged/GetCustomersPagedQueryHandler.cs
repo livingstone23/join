@@ -68,9 +68,9 @@ public sealed class GetCustomersPagedQueryHandler(
                     CASE
                         WHEN p.PersonType = 1 THEN LTRIM(RTRIM(CONCAT(
                             p.FirstName, ' ',
-                            ISNULL(p.MiddleName + ' ', ''),
-                            ISNULL(p.LastName, ''), ' ',
-                            ISNULL(p.SecondLastName, ''))))
+                            COALESCE(p.MiddleName || ' ', ''),
+                            COALESCE(p.LastName, ''), ' ',
+                            COALESCE(p.SecondLastName, ''))))
                         ELSE COALESCE(NULLIF(p.CommercialName, ''), p.FirstName, '')
                     END
                 ) LIKE @PersonName
@@ -90,7 +90,7 @@ public sealed class GetCustomersPagedQueryHandler(
             {CustomerQuerySql.SelectProjection}
             {whereClause}
             ORDER BY cust.Created DESC, cust.CustomerCode ASC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Admin.Customers cust
@@ -123,9 +123,4 @@ public sealed class GetCustomersPagedQueryHandler(
             }
         };
     }
-
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

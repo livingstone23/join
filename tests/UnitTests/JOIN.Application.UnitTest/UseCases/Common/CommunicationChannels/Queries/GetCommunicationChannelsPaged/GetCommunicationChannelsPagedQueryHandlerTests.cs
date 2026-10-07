@@ -75,10 +75,10 @@ public sealed class GetCommunicationChannelsPagedQueryHandlerTests
     }
 
     /// <summary>
-    /// Verifies that empty results are handled correctly with SQL Server OFFSET/FETCH syntax.
+    /// Verifies that empty results are handled correctly with LIMIT/OFFSET pagination.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenNoChannelsMatchWithSqlServer_ShouldReturnEmptyPagedResult()
+    public async Task Handle_WhenNoChannelsMatch_ShouldReturnEmptyPagedResult()
     {
         // Arrange
         var context = new GetCommunicationChannelsPagedQueryTestContext(useNpgsqlConnection: false);
@@ -106,7 +106,7 @@ public sealed class GetCommunicationChannelsPagedQueryHandlerTests
         response.Data.TotalCount.Should().Be(0);
         response.Data.TotalPages.Should().Be(0);
 
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
     }
 
     /// <summary>

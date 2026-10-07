@@ -22,7 +22,7 @@ public sealed class UserMfaRecoveryCodeRepository(ISqlConnectionFactory connecti
         ArgumentNullException.ThrowIfNull(codes);
 
         const string sql = """
-            INSERT INTO [Security].[UserMfaRecoveryCodes]
+            INSERT INTO Security.UserMfaRecoveryCodes
                 (Id, UserId, CodeHash, CreatedAtUtc, UsedAtUtc, Created, CreatedBy, LastModified, LastModifiedBy, GcRecord)
             VALUES
                 (@Id, @UserId, @CodeHash, @CreatedAtUtc, @UsedAtUtc, @Created, @CreatedBy, @LastModified, @LastModifiedBy, @GcRecord);
@@ -64,7 +64,7 @@ public sealed class UserMfaRecoveryCodeRepository(ISqlConnectionFactory connecti
                 CodeHash,
                 CreatedAtUtc,
                 UsedAtUtc
-            FROM [Security].[UserMfaRecoveryCodes]
+            FROM Security.UserMfaRecoveryCodes
             WHERE UserId = @userId
               AND UsedAtUtc IS NULL
               AND GcRecord = 0
@@ -81,7 +81,7 @@ public sealed class UserMfaRecoveryCodeRepository(ISqlConnectionFactory connecti
     public async Task<bool> MarkUsedAsync(Guid codeId, DateTime utcNow, CancellationToken ct)
     {
         const string sql = """
-            UPDATE [Security].[UserMfaRecoveryCodes]
+            UPDATE Security.UserMfaRecoveryCodes
             SET UsedAtUtc = @utcNow,
                 LastModified = @utcNow
             WHERE Id = @codeId
@@ -102,7 +102,7 @@ public sealed class UserMfaRecoveryCodeRepository(ISqlConnectionFactory connecti
         var gcStamp = int.Parse(utcNow.ToString("yyyyMMdd"));
 
         const string sql = """
-            UPDATE [Security].[UserMfaRecoveryCodes]
+            UPDATE Security.UserMfaRecoveryCodes
             SET GcRecord = @gcStamp,
                 LastModified = @utcNow
             WHERE UserId = @userId

@@ -43,8 +43,8 @@ public sealed class RoleSystemOptionsRepository(
                       AND rso.RoleId = @RoleId
                       AND rso.SystemOptionId = @SystemOptionId
                       AND rso.GcRecord = 0
-                ) THEN CAST(1 AS bit)
-                ELSE CAST(0 AS bit)
+                ) THEN CAST(1 AS boolean)
+                ELSE CAST(0 AS boolean)
             END
             """;
 
@@ -149,7 +149,7 @@ public sealed class RoleSystemOptionsRepository(
                 LastModified,
                 LastModifiedBy,
                 GcRecord
-            FROM [Security].[RoleSystemOptions]
+            FROM Security.RoleSystemOptions
             WHERE RoleId = @RoleId
               AND CompanyId = @CompanyId
               AND GcRecord = 0;
@@ -176,7 +176,7 @@ public sealed class RoleSystemOptionsRepository(
 
         const string roleSql = """
             SELECT Name
-            FROM [Security].[Roles]
+            FROM Security.Roles
             WHERE Id = @RoleId AND GcRecord = 0;
             """;
         var roleName = await connection.QuerySingleOrDefaultAsync<string?>(
@@ -190,7 +190,7 @@ public sealed class RoleSystemOptionsRepository(
             SELECT
                 m.Id   AS ModuleId,
                 m.Name AS ModuleName,
-                m.[Order] AS ModuleOrder,
+                m."order" AS ModuleOrder,
                 o.Id   AS OptionId,
                 o.Name AS OptionName,
                 o.Route AS OptionRoute,
@@ -202,26 +202,26 @@ public sealed class RoleSystemOptionsRepository(
                 o.CanDownload AS SupportCanDownload,
                 o.CanExport   AS SupportCanExport,
                 o.CanExecute  AS SupportCanExecute,
-                ISNULL(rso.CanRead,     0) AS GrantedCanRead,
-                ISNULL(rso.CanCreate,   0) AS GrantedCanCreate,
-                ISNULL(rso.CanUpdate,   0) AS GrantedCanUpdate,
-                ISNULL(rso.CanDelete,   0) AS GrantedCanDelete,
-                ISNULL(rso.CanDownload, 0) AS GrantedCanDownload,
-                ISNULL(rso.CanExport,   0) AS GrantedCanExport,
-                ISNULL(rso.CanExecute,  0) AS GrantedCanExecute
-            FROM [Admin].[SystemModules] m
-            INNER JOIN [Security].[SystemOptions] o
+                COALESCE(rso.CanRead,     FALSE) AS GrantedCanRead,
+                COALESCE(rso.CanCreate,   FALSE) AS GrantedCanCreate,
+                COALESCE(rso.CanUpdate,   FALSE) AS GrantedCanUpdate,
+                COALESCE(rso.CanDelete,   FALSE) AS GrantedCanDelete,
+                COALESCE(rso.CanDownload, FALSE) AS GrantedCanDownload,
+                COALESCE(rso.CanExport,   FALSE) AS GrantedCanExport,
+                COALESCE(rso.CanExecute,  FALSE) AS GrantedCanExecute
+            FROM Admin.SystemModules m
+            INNER JOIN Security.SystemOptions o
                 ON o.ModuleId = m.Id AND o.GcRecord = 0
-            LEFT JOIN [Security].[RoleSystemOptions] rso
+            LEFT JOIN Security.RoleSystemOptions rso
                 ON rso.SystemOptionId = o.Id
                AND rso.RoleId = @RoleId
                AND rso.CompanyId = @CompanyId
                AND rso.GcRecord = 0
-            WHERE m.GcRecord = 0 AND m.IsActive = 1
+            WHERE m.GcRecord = 0 AND m.IsActive = TRUE
             ORDER BY
-                ISNULL(m.[Order], 2147483647) ASC,
+                COALESCE(m."order", 2147483647) ASC,
                 m.Name ASC,
-                ISNULL(o.OrderMenu, 2147483647) ASC,
+                COALESCE(o.OrderMenu, 2147483647) ASC,
                 o.Name ASC;
             """;
 
@@ -305,8 +305,9 @@ public sealed class RoleSystemOptionsRepository(
         {
             const string existingSql = """
                 SELECT Id, SystemOptionId
-                FROM [Security].[RoleSystemOptions] WITH (UPDLOCK, HOLDLOCK)
-                WHERE RoleId = @RoleId AND CompanyId = @CompanyId AND GcRecord = 0;
+                FROM Security.RoleSystemOptions
+                WHERE RoleId = @RoleId AND CompanyId = @CompanyId AND GcRecord = 0
+                FOR UPDATE;
                 """;
 
             var existing = (await connection.QueryAsync<(Guid Id, Guid SystemOptionId)>(
@@ -320,7 +321,7 @@ public sealed class RoleSystemOptionsRepository(
             var removed = new List<Guid>();
 
             const string insertSql = """
-                INSERT INTO [Security].[RoleSystemOptions]
+                INSERT INTO Security.RoleSystemOptions
                     (Id, CompanyId, RoleId, SystemOptionId,
                      CanRead, CanCreate, CanUpdate, CanDelete,
                      CanDownload, CanExport, CanExecute,
@@ -335,7 +336,7 @@ public sealed class RoleSystemOptionsRepository(
                 """;
 
             const string updateSql = """
-                UPDATE [Security].[RoleSystemOptions]
+                UPDATE Security.RoleSystemOptions
                 SET CanRead = @CanRead,
                     CanCreate = @CanCreate,
                     CanUpdate = @CanUpdate,
@@ -345,15 +346,15 @@ public sealed class RoleSystemOptionsRepository(
                     CanExecute = @CanExecute,
                     IsVisibleMenu = @IsVisibleMenu,
                     OrderMenu = @OrderMenu,
-                    LastModified = SYSUTCDATETIME(),
+                    LastModified = NOW(),
                     LastModifiedBy = @LastModifiedBy
                 WHERE Id = @Id;
                 """;
 
             const string softDeleteSql = """
-                UPDATE [Security].[RoleSystemOptions]
+                UPDATE Security.RoleSystemOptions
                 SET GcRecord = 1,
-                    LastModified = SYSUTCDATETIME(),
+                    LastModified = NOW(),
                     LastModifiedBy = @LastModifiedBy
                 WHERE Id = @Id;
                 """;

@@ -60,7 +60,7 @@ public sealed class GetSystemWideTicketUserCompaniesQueryHandlerTests
         response.Data.Items.Should().HaveCount(2);
         context.Connection.LastCommandText.Should().NotContain("@TenantId");
         context.Connection.LastCommandText.Should().Contain("WHERE tuc.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
     }
 
     [Fact]

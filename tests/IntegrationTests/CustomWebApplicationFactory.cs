@@ -59,7 +59,9 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     // assignment before factory A's <c>ILoggerFactory</c> resolution freezes it — A's freeze
     // then collides with B's later freeze of the same instance:
     // <c>InvalidOperationException: The logger is already frozen.</c>
-    private static readonly object _hostBuildLock = new();
+    // Internal (not private) so PostgreSqlWebApplicationFactory (SPEC 39) serializes on the SAME
+    // lock — both factories race on the one process-wide Log.Logger.
+    internal static readonly object _hostBuildLock = new();
 
     /// <summary>
     /// Resets <see cref="Log.Logger"/> to a fresh empty instance before each host build so

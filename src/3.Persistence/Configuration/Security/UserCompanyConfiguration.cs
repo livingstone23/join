@@ -37,15 +37,11 @@ public class UserCompanyConfiguration : IEntityTypeConfiguration<UserCompany>
             .IsUnique();
 
         // Filtered Unique Index: A user can only have one ACTIVE default company.
-        // SQL Server syntax:
+        // PostgreSQL syntax (main_postgresql, SPEC 39):
         builder.HasIndex(uc => uc.UserId)
             .HasDatabaseName("UX_UserCompanies_UserId_Default")
             .IsUnique()
-            .HasFilter("[IsDefault] = 1 AND [GcRecord] = 0");
-
-        // PostgreSQL note:
-        // Use the following filter instead when generating provider-specific migrations:
-        // .HasFilter("\"IsDefault\" = TRUE AND \"GcRecord\" = 0");
+            .HasFilter("\"isdefault\" = TRUE AND \"gcrecord\" = 0");
 
         // 4. Relationships (Foreign Keys & Delete Behaviors)
         

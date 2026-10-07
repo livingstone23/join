@@ -27,7 +27,7 @@ public sealed class DesignTimeApplicationDbContextFactory : IDesignTimeDbContext
             ?? throw new InvalidOperationException("The 'DefaultConnection' connection string is not configured.");
 
         var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-        optionsBuilder.UseSqlServer(
+        optionsBuilder.UseNpgsql(
             connectionString,
             builder => builder.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
 

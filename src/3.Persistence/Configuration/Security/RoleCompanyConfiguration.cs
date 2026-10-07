@@ -29,7 +29,7 @@ public class RoleCompanyConfiguration : IEntityTypeConfiguration<RoleCompany>
         // Filtered to GcRecord = 0 so soft-deleted rows do not block resurrection.
         builder.HasIndex(rc => new { rc.RoleId, rc.CompanyId })
             .IsUnique()
-            .HasFilter("[GcRecord] = 0");
+            .HasFilter("\"gcrecord\" = 0");
 
         // 4. Relationships (Foreign Keys & Delete Behaviors)
 

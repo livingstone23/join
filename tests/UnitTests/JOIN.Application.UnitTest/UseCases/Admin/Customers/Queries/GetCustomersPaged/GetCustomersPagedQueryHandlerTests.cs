@@ -75,7 +75,7 @@ public sealed class GetCustomersPagedQueryHandlerTests
 
         response.Data!.Items.Should().BeEmpty();
         response.Data.TotalPages.Should().Be(0);
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
     }
 
     private sealed class TestContext

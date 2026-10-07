@@ -62,7 +62,7 @@ public class TicketStatusTransitionConfiguration : IEntityTypeConfiguration<Tick
         builder.HasIndex(p => new { p.CompanyId, p.FromStatusId, p.ToStatusId })
             .HasDatabaseName("UX_TicketStatusTransitions_Company_From_To")
             .IsUnique()
-            .HasFilter("[GcRecord] = 0");
+            .HasFilter("\"gcrecord\" = 0");
 
         builder.HasQueryFilter(a => a.GcRecord == 0);
     }

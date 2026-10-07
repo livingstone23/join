@@ -61,7 +61,7 @@ public sealed class GetIndustriesQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenNothingMatches_ShouldReturnEmptyPageWithSqlServerPagination()
+    public async Task Handle_WhenNothingMatches_ShouldReturnEmptyPageWithLimitOffsetPagination()
     {
         var context = new TestContext(CompanyId, useNpgsql: false);
         context.Connection.SetResults(
@@ -73,7 +73,7 @@ public sealed class GetIndustriesQueryHandlerTests
         response.IsSuccess.Should().BeTrue();
         response.Data!.Items.Should().BeEmpty();
         response.Data.TotalPages.Should().Be(0);
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
     }
 
     private sealed class TestContext

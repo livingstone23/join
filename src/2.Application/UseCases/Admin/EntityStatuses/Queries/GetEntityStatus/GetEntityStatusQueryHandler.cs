@@ -109,7 +109,7 @@ public sealed class GetEntityStatusQueryHandler(
             FROM Admin.EntityStatuses es
             {whereClause}
             ORDER BY es.Code ASC, es.Name ASC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Admin.EntityStatuses es
@@ -136,14 +136,4 @@ public sealed class GetEntityStatusQueryHandler(
             }
         };
     }
-
-    /// <summary>
-    /// Resolves a provider-compatible pagination clause.
-    /// </summary>
-    /// <param name="connection">The active database connection.</param>
-    /// <returns>The pagination SQL fragment for the current provider.</returns>
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

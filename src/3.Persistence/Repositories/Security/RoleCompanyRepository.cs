@@ -40,8 +40,8 @@ public sealed class RoleCompanyRepository(
                 r.IsSystemDefault,
                 rc.CreatedBy,
                 rc.Created
-            FROM [Security].[RoleCompanies] rc
-            INNER JOIN [Security].[Roles] r
+            FROM Security.RoleCompanies rc
+            INNER JOIN Security.Roles r
                 ON rc.RoleId = r.Id AND r.GcRecord = 0
             WHERE rc.Id = @Id
               AND rc.CompanyId = @TenantId
@@ -64,21 +64,16 @@ public sealed class RoleCompanyRepository(
     {
         var offset = (page - 1) * pageSize;
 
-        // Cross-DB pagination: SQL Server uses OFFSET/FETCH NEXT, Postgres uses LIMIT/OFFSET.
-        var paginationClause = _dbContext.Database.ProviderName?.Contains("PostgreSQL", StringComparison.OrdinalIgnoreCase) == true
-            ? "LIMIT @pageSize OFFSET @offset"
-            : "OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY";
-
         var whereClause = """
             WHERE rc.CompanyId = @TenantId
               AND rc.GcRecord = 0
               AND (@roleIdFilter IS NULL OR rc.RoleId = @roleIdFilter)
               AND (@isActive IS NULL
-                   OR ((@isActive = 1 AND rc.GcRecord = 0)
-                       OR (@isActive = 0 AND rc.GcRecord <> 0)))
+                   OR ((@isActive = TRUE AND rc.GcRecord = 0)
+                       OR (@isActive = FALSE AND rc.GcRecord <> 0)))
             """;
 
-        var countSql = $"SELECT COUNT(*) FROM [Security].[RoleCompanies] rc {whereClause};";
+        var countSql = $"SELECT COUNT(*) FROM Security.RoleCompanies rc {whereClause};";
 
         var pageSql = $"""
             SELECT
@@ -87,12 +82,12 @@ public sealed class RoleCompanyRepository(
                 r.Name AS RoleName,
                 r.IsSystemDefault,
                 rc.Created
-            FROM [Security].[RoleCompanies] rc
-            INNER JOIN [Security].[Roles] r
+            FROM Security.RoleCompanies rc
+            INNER JOIN Security.Roles r
                 ON rc.RoleId = r.Id AND r.GcRecord = 0
             {whereClause}
             ORDER BY rc.Created DESC, rc.Id
-            {paginationClause};
+            LIMIT @pageSize OFFSET @offset;
             """;
 
         var parameters = new
@@ -124,11 +119,6 @@ public sealed class RoleCompanyRepository(
     {
         var offset = (page - 1) * pageSize;
 
-        // Cross-DB pagination: SQL Server uses OFFSET/FETCH NEXT, Postgres uses LIMIT/OFFSET.
-        var paginationClause = _dbContext.Database.ProviderName?.Contains("PostgreSQL", StringComparison.OrdinalIgnoreCase) == true
-            ? "LIMIT @pageSize OFFSET @offset"
-            : "OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY";
-
         // Filter source: Security.UserRoleCompanies is the user<->role<->tenant link.
         // Both sides apply GcRecord = 0 because Dapper bypasses global EF query filters,
         // and Security.UserRoleCompanies has no automatic tenant predicate.
@@ -141,8 +131,8 @@ public sealed class RoleCompanyRepository(
 
         var countSql = $"""
             SELECT COUNT(*)
-            FROM [Security].[UserRoleCompanies] urc
-            INNER JOIN [Security].[Users] u ON u.Id = urc.UserId
+            FROM Security.UserRoleCompanies urc
+            INNER JOIN Security.Users u ON u.Id = urc.UserId
             {whereClause};
             """;
 
@@ -158,11 +148,11 @@ public sealed class RoleCompanyRepository(
                 u.IsSuperAdmin,
                 u.IsSuperAdminCompany,
                 u.EmailConfirmed
-            FROM [Security].[UserRoleCompanies] urc
-            INNER JOIN [Security].[Users] u ON u.Id = urc.UserId
+            FROM Security.UserRoleCompanies urc
+            INNER JOIN Security.Users u ON u.Id = urc.UserId
             {whereClause}
             ORDER BY u.FirstName, u.LastName, u.Id
-            {paginationClause};
+            LIMIT @pageSize OFFSET @offset;
             """;
 
         var parameters = new
@@ -219,12 +209,12 @@ public sealed class RoleCompanyRepository(
             SELECT CASE
                 WHEN EXISTS (
                     SELECT 1
-                    FROM [Security].[RoleCompanies]
+                    FROM Security.RoleCompanies
                     WHERE RoleId = @RoleId
                       AND CompanyId = @CompanyId
                       AND GcRecord = 0
-                ) THEN CAST(1 AS bit)
-                ELSE CAST(0 AS bit)
+                ) THEN CAST(1 AS boolean)
+                ELSE CAST(0 AS boolean)
             END;
             """;
 

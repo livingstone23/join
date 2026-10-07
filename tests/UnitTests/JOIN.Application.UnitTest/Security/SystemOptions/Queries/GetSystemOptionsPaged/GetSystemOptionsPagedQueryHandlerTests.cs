@@ -72,21 +72,21 @@ public sealed class GetSystemOptionsPagedQueryHandlerTests
         item.IsVisibleMenu.Should().BeTrue();
         item.OrderMenu.Should().Be(0);
 
-        context.Connection.LastCommandText.Should().Contain("INNER JOIN [Admin].[SystemModules] m ON m.Id = o.ModuleId");
+        context.Connection.LastCommandText.Should().Contain("INNER JOIN Admin.SystemModules m ON m.Id = o.ModuleId");
         context.Connection.LastCommandText.Should().Contain("o.CanDownload");
         context.Connection.LastCommandText.Should().Contain("o.CanExport");
         context.Connection.LastCommandText.Should().Contain("o.CanExecute");
         context.Connection.LastCommandText.Should().Contain("o.IsVisibleMenu");
         context.Connection.LastCommandText.Should().Contain("o.OrderMenu");
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
     }
 
     /// <summary>
-    /// SQL Server branch is exercised by default (FakeDbConnection is not Npgsql). Verifies the
-    /// OFFSET/FETCH NEXT clause is selected over LIMIT/OFFSET.
+    /// main_postgresql (SPEC 39): pagination no longer depends on the connection type — a
+    /// non-Npgsql connection still gets LIMIT/OFFSET and never the SQL Server OFFSET/FETCH form.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenCalledOnSqlServer_ShouldUseOffsetFetchNextPagination()
+    public async Task Handle_WhenCalledOnNonNpgsqlConnection_ShouldStillUseLimitOffsetPagination()
     {
         var context = new TestContext();
         context.Connection.SetResults(FakeResultSet.Empty(Columns), FakeResultSet.FromRows(new Dictionary<string, object?> { ["Total"] = 0 }));
@@ -94,8 +94,8 @@ public sealed class GetSystemOptionsPagedQueryHandlerTests
         var handler = context.CreateHandler();
         await handler.Handle(new GetSystemOptionsPagedQuery(), CancellationToken.None);
 
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
-        context.Connection.LastCommandText.Should().NotContain("LIMIT @PageSize");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
+        context.Connection.LastCommandText.Should().NotContain("FETCH NEXT");
     }
 
     /// <summary>

@@ -23,7 +23,7 @@ public sealed class MfaLoginChallengeRepository(ISqlConnectionFactory connection
         ArgumentNullException.ThrowIfNull(challenge);
 
         const string sql = """
-            INSERT INTO [Security].[MfaLoginChallenges]
+            INSERT INTO Security.MfaLoginChallenges
                 (Id, UserId, TargetCompanyId, TokenHash, ExpiresAtUtc, ConsumedAtUtc, AttemptCount,
                  EmailCodeHash, EmailCodeExpiresAtUtc, EmailSentAtUtc,
                  Created, CreatedBy, LastModified, LastModifiedBy, GcRecord)
@@ -60,7 +60,7 @@ public sealed class MfaLoginChallengeRepository(ISqlConnectionFactory connection
                 EmailCodeHash,
                 EmailCodeExpiresAtUtc,
                 EmailSentAtUtc
-            FROM [Security].[MfaLoginChallenges]
+            FROM Security.MfaLoginChallenges
             WHERE TokenHash = @tokenHash
               AND ConsumedAtUtc IS NULL
               AND GcRecord = 0;
@@ -75,7 +75,7 @@ public sealed class MfaLoginChallengeRepository(ISqlConnectionFactory connection
     public async Task UpdateEmailCodeAsync(Guid challengeId, string emailCodeHash, DateTime expiresAtUtc, DateTime sentAtUtc, CancellationToken ct)
     {
         const string sql = """
-            UPDATE [Security].[MfaLoginChallenges]
+            UPDATE Security.MfaLoginChallenges
             SET EmailCodeHash = @emailCodeHash,
                 EmailCodeExpiresAtUtc = @expiresAtUtc,
                 EmailSentAtUtc = @sentAtUtc,
@@ -96,14 +96,14 @@ public sealed class MfaLoginChallengeRepository(ISqlConnectionFactory connection
     public async Task<int> IncrementAttemptAsync(Guid challengeId, DateTime utcNow, CancellationToken ct)
     {
         const string sql = """
-            UPDATE [Security].[MfaLoginChallenges]
+            UPDATE Security.MfaLoginChallenges
             SET AttemptCount = AttemptCount + 1,
                 LastModified = @utcNow
             WHERE Id = @challengeId
               AND ConsumedAtUtc IS NULL
               AND GcRecord = 0;
 
-            SELECT AttemptCount FROM [Security].[MfaLoginChallenges] WHERE Id = @challengeId;
+            SELECT AttemptCount FROM Security.MfaLoginChallenges WHERE Id = @challengeId;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -115,7 +115,7 @@ public sealed class MfaLoginChallengeRepository(ISqlConnectionFactory connection
     public async Task<bool> MarkConsumedAsync(Guid challengeId, DateTime utcNow, CancellationToken ct)
     {
         const string sql = """
-            UPDATE [Security].[MfaLoginChallenges]
+            UPDATE Security.MfaLoginChallenges
             SET ConsumedAtUtc = @utcNow,
                 LastModified = @utcNow
             WHERE Id = @challengeId
@@ -135,7 +135,7 @@ public sealed class MfaLoginChallengeRepository(ISqlConnectionFactory connection
         var gcStamp = int.Parse(utcNow.ToString("yyyyMMdd"));
 
         const string sql = """
-            UPDATE [Security].[MfaLoginChallenges]
+            UPDATE Security.MfaLoginChallenges
             SET GcRecord = @gcStamp,
                 LastModified = @utcNow
             WHERE Id = @challengeId

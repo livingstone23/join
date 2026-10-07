@@ -142,7 +142,7 @@ public sealed class GetSystemWideTicketsQueryHandler(
             LEFT JOIN Security.Users au ON t.AssignedToUserId = au.Id
             {whereClause}
             ORDER BY co.Name ASC, t.Created DESC, t.Code DESC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Messaging.Tickets t
@@ -239,9 +239,4 @@ public sealed class GetSystemWideTicketsQueryHandler(
         public DateTime? LastActivityAt { get; init; }
         public DateTime? FinishedAt { get; init; }
     }
-
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

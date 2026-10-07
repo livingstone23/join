@@ -43,7 +43,7 @@ internal static class RoleSystemOptionQuerySql
         {FromWithJoins}
         {whereClause}
         ORDER BY c.Name ASC, ar.Name ASC, so.Name ASC
-        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
+        LIMIT @PageSize OFFSET @Offset;
 
         SELECT COUNT(*)
         {FromWithJoins}

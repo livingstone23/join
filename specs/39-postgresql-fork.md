@@ -1,6 +1,6 @@
 # SPEC 39 — Fork `main_postgresql`: portar persistencia, queries Dapper y seed a PostgreSQL
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** Ninguna dependencia dura de código. SPEC 38 (consolidación de query filters) no necesita portarse — su mecanismo (`Expression`/reflexión sobre `IAuditableEntity`/`BaseTenantEntity`) es 100% agnóstico de proveedor y funciona igual una vez fusionado a `main`; solo las declaraciones puntuales de `HasFilter`/`HasColumnType` en las clases `IEntityTypeConfiguration<T>` (fuera del alcance de SPEC 38) necesitan ajuste, y son objeto de esta spec.
 > **Date:** 2026-09-28
 > **Objective:** Crear la rama `main_postgresql` como **fork permanente** (sin plan de reintegración a `main`) donde el sistema corre íntegramente contra PostgreSQL: registro del `DbContext` (`UseNpgsql` en vez de `UseSqlServer`), un historial de migraciones EF Core propio y generado desde cero para esa rama, las 9 declaraciones `HasFilter`/4 `HasColumnType` con sintaxis exclusiva de SQL Server corregidas, los ~29 archivos de SQL crudo (Dapper) con sintaxis no portable corregidos, el seed verificado end-to-end, una suite de tests de integración *smoke* (no paridad completa) contra `Testcontainers.PostgreSql`, y un job de CI que corre exclusivamente en esa rama.
@@ -77,6 +77,8 @@ Reemplazo directo, archivo por archivo (no hace falta branching por proveedor po
 | `Messaging/TicketComplexityConfiguration.cs:64` | `.HasFilter("[GcRecord] = 0")` | `.HasFilter("\"GcRecord\" = 0")` |
 | `Messaging/TimeUnitConfiguration.cs:65` | `.HasFilter("[GcRecord] = 0")` | `.HasFilter("\"GcRecord\" = 0")` |
 
+> **Ajuste por SPEC 39 (implementación, 2026-10-07):** la tabla anterior lista 8 llamadas (no 9). Re-grep sobre el código actual encontró 3 más con la misma sintaxis SQL Server, introducidas por specs implementadas después de la auditoría: `Messaging/TicketAttachmentSettingsConfiguration.cs:43` (SPEC 36), `Messaging/TicketUserCompanyConfiguration.cs:40` (SPEC 34) y `Messaging/TicketStatusTransitionConfiguration.cs:65` (SPEC 37), todas `[GcRecord] = 0` → `"GcRecord" = 0`. Total real: **11 índices filtrados**; donde esta spec dice "los 9 índices filtrados" (Scope G caso 3, F2.5, criterios de aceptación) debe leerse "los 11". Por el ajuste de nombres en minúsculas (ver Scope E), los filtros finales usan nombres en minúsculas: `"isdefault"`/`"isinitial"`/`"ispaused"`/`"isfinal" = TRUE AND "gcrecord" = 0` y `"gcrecord" = 0`, no la forma con mayúsculas de la tabla anterior.
+
 `RoleCompanyConfiguration`/`UserCommunicationChannelConfiguration`/`TicketComplexityConfiguration`/`TimeUnitConfiguration` comparten el mismo patrón simple (`[GcRecord] = 0` → `"GcRecord" = 0`); `UserCompanyConfiguration`/`TicketStatusConfiguration` combinan una columna booleana con `GcRecord`, y requieren `TRUE` en vez de `1` porque Postgres no compara implícitamente un `boolean` con un entero.
 
 `HasColumnType`:
@@ -90,6 +92,8 @@ Reemplazo directo, archivo por archivo (no hace falta branching por proveedor po
 | `Messaging/TicketConfiguration.cs:40` | `"decimal(5,1)"` | `"decimal(5,1)"` (sin cambios) | Sintaxis válida en ambos motores |
 
 ### E. Queries Dapper y repositorios
+
+> **Ajuste por SPEC 39 (implementación, 2026-10-07) — nombres físicos en minúsculas.** La premisa del punto 2 ("sin comillas, `Security.Users` es válido tal cual") era falsa con el modelo tal como estaba: EF Core/Npgsql crea los identificadores **entre comillas y con mayúsculas** (`"Messaging"."Tickets"`, `"CompanyId"`), mientras que Postgres pliega a minúsculas todo identificador sin comillas — verificado contra la base: `select count(*) from Messaging.Tickets` → `ERROR: relation "messaging.tickets" does not exist`. Afectaba a todo el SQL Dapper (~66 archivos), no solo a los 18 con corchetes. Decisión del usuario (opción A): `ApplicationDbContext.OnModelCreating` gana un paso final `ApplyLowerCaseNaming` que pasa a minúsculas esquemas, tablas, columnas, PK/FK e índices de todo el modelo (sin paquetes nuevos). Consecuencias: (1) los 11 `HasFilter` de Scope D usan nombres en minúsculas (`"isdefault" = TRUE AND "gcrecord" = 0`, `"gcrecord" = 0`) porque son SQL crudo que la convención no reescribe; (2) `InitialPostgres` se regeneró con esa convención; (3) el SQL Dapper sin comillas resuelve sin cambios adicionales, y F4 conserva su alcance original (corchetes, `ISNULL`, `TOP`, `+`, `NVARCHAR`, paginación). Dapper mapea columnas a propiedades sin distinguir mayúsculas, así que los DTOs no cambian. Descartadas: entrecomillar cada identificador en ~66 archivos (opción B) y devolver la spec a Borrador (opción C).
 
 Cinco categorías de fix, cada una mecánica y sin ambigüedad:
 
@@ -116,11 +120,17 @@ Cinco categorías de fix, cada una mecánica y sin ambigüedad:
   4. Un flujo CRUD + paginado end-to-end sobre `Tickets` (crear, listar paginado, filtrar) — reutiliza el módulo ya auditado en profundidad en esta conversación como caso representativo.
   5. Un flujo de sesión/login básico (`RoleUserSessionRepository`, ya que sus 3 archivos con `TOP (n)` quedan reescritos en esta rama) — confirma que el `LIMIT` reemplazando `TOP` funciona.
 
+> **Ajuste por SPEC 39 (implementación, 2026-10-07) — cómo quedó F6.** La "variante" de `CustomWebApplicationFactory` es una clase aparte, `tests/IntegrationTests/PostgreSqlWebApplicationFactory.cs` (`Testcontainers.PostgreSql` 4.0.0, imagen `postgres:17`); para que ambas factories no compitan por el `Log.Logger` estático de Serilog, `CustomWebApplicationFactory._hostBuildLock` pasó de `private` a `internal` y la variante Postgres serializa sobre ese mismo lock. `PostgreSqlSmokeTests` (26 ejecuciones): (1) `InitialPostgres` es la única migración aplicada y no queda nada pendiente; (2) 12 catálogos sembrados con filas; (3) `[Theory]` sobre los **11** índices filtrados — duplicar una fila activa falla con `23505` y `ConstraintName` igual al índice bajo prueba, y tras soft-delete (`gcrecord = 1`) el duplicado se acepta; todo dentro de una transacción con rollback, insertando una fila base en las 3 tablas que el seed deja vacías (`rolecompanies`, `usercommunicationchannels`, `ticketstatustransitions`); (4) Tickets por HTTP: crea 3 tickets propios y pagina/filtra sobre ellos (no depende de cuántos tickets siembre el seed); (5) sesiones: login, `GET /account/sessions`, `FindActiveByIdAsync`/`GetUserIdBySessionIdAsync`, `DELETE /account/sessions/{id}`, y además `GetLatestActiveByUserAsync` de `EmailOtpEnableCodeRepository`/`PhoneVerificationCodeRepository` (los otros 2 repos con `TOP (1)` → `LIMIT 1`, según la mitigación de Riesgos). La suite existente compila; corre contra `Testcontainers.MsSql` y por eso queda fuera del filtro `FullyQualifiedName~PostgreSql` de CI (no se marcó con `[Trait]`).
+
 ### H. CI
 
 - `.github/workflows/ci.yml`: agregar `main_postgresql` a `on.push.branches`/`on.pull_request.branches`.
 - Nuevo job (no matrix — esta rama es de un solo proveedor, no tiene sentido una matriz `[SqlServer, PostgreSql]` cuando `main_postgresql` nunca corre contra SQL Server): `integration-tests-postgres`, corre `dotnet test tests/IntegrationTests/JOIN.IntegrationTests.csproj --filter "FullyQualifiedName~PostgreSql"` contra el `PostgreSqlSmokeTests` de Scope G, usando Testcontainers (no necesita un servicio Postgres declarado aparte en el workflow — Testcontainers lo levanta por sí solo, igual que ya hace con SQL Server hoy).
 - El job de cobertura de `JOIN.Application.UnitTest` (90%) se mantiene sin cambios — no depende de ningún proveedor de base de datos real.
+
+> **Ajuste por SPEC 39 (implementación, 2026-10-07) — paso de integración existente (decisión del usuario, opción A).** El job `build-and-test` de `main` incluía el paso "🐳 Run Integration Tests (Testcontainers)", que corre toda la suite de integración sin filtro contra `Testcontainers.MsSql`. En `main_postgresql` ese paso fallaría siempre (la app solo habla PostgreSQL), así que se **quitó de esta rama**, dejando un comentario en su lugar; las pruebas de integración de la rama son exclusivamente las del job `integration-tests-postgres`. `main` no se ve afectado (cada rama usa su propio `ci.yml`).
+
+> **Ajuste por SPEC 39 (implementación, 2026-10-07) — permisos del job `build-and-test` (decisión del usuario, opción A).** La PR `spec-39-postgresql-fork → main_postgresql` fue la primera PR del repo que disparó el CI, y con ella el paso "📝 Add Coverage PR Comment" (`marocchino/sticky-pull-request-comment`, preexistente en `main`, solo corre en `pull_request`). Falló con `Resource not accessible by integration`: el `GITHUB_TOKEN` del repo es de solo lectura (`Contents: read`, `Metadata: read`, `Packages: read`). Build, tests unitarios (1845) y gate de cobertura (91,85 %) habían pasado; el job `integration-tests-postgres` pasó completo (27 smoke tests). Se agregó al job `build-and-test` un bloque `permissions:` con `contents: read` y `pull-requests: write` — mínimo necesario, sin cambiar la configuración global del repo. `main` conserva el mismo problema latente en su `ci.yml`; se resolverá allí cuando una PR hacia `main` dispare ese paso.
 
 **Out of scope (para specs futuras, si esta rama se vuelve prioritaria):**
 
@@ -138,6 +148,8 @@ Sin cambios de dominio. El "modelo" de esta spec es el conjunto de archivos de c
 ### `IDesignTimeDbContextFactory` — necesario para `dotnet ef` en esta rama
 
 Como `main_postgresql` fija el proveedor directamente en `UseNpgsql(...)` dentro de `AddPersistenceServices`, `dotnet ef migrations add`/`database update` (ejecutados desde `src/4.Services.WebApi`, según `CLAUDE.md`) ya resuelven el proveedor correcto sin necesidad de una fábrica de diseño adicional — a diferencia de un escenario dual-proveedor (que sí la necesitaría para elegir en tiempo de diseño). No se agrega `IDesignTimeDbContextFactory` en esta spec; si `dotnet ef` no logra resolver el `DbContext` vía DI estándar del `WebApi` (poco probable, es el patrón que ya usa `main` hoy), se agrega como ajuste puntual durante F3.
+
+> **Ajuste por SPEC 39 (implementación, 2026-10-07):** la premisa anterior no se cumplía — `main` ya tenía `src/3.Persistence/Contexts/DesignTimeApplicationDbContextFactory.cs` con `UseSqlServer(...)`, y `dotnet ef` prioriza esa fábrica sobre la DI del `WebApi`. Sin tocarla, `InitialPostgres` se habría generado con tipos SQL Server. Se cambió a `UseNpgsql(...)` (una línea, sin otros cambios); no se agrega ni elimina ninguna fábrica.
 
 ---
 
@@ -184,6 +196,31 @@ Lista exhaustiva de archivos a tocar, agrupada por fix (todos confirmados por gr
 
 Tras cada grupo: `dotnet build -c Release` → 0 errores (el build no detecta errores de SQL crudo, así que esto solo confirma que no se rompió C#; la validación real de que el SQL es correcto ocurre en F7).
 
+> **Ajuste por SPEC 39 (implementación, 2026-10-07) — inventario real de F4.** Re-grep sobre el código actual (104 archivos con SQL crudo en `2.Application`/`3.Persistence/Repositories`) encontró más casos y más categorías T-SQL que las listadas arriba; todos se resolvieron con el mismo criterio mecánico de Scope E:
+>
+> | Categoría | Spec | Real | Fix |
+> |---|---|---|---|
+> | Corchetes `[Schema].[Tabla]`/`[Col]` | 18 archivos | 19 archivos, 245 ocurrencias (+ `GetSystemModules*` de SPEC 43) | Quitar corchetes; `[Order]` → `"order"` y `[Exists]` → `"exists"` (palabras reservadas, minúsculas por el ajuste de Scope E) |
+> | `ISNULL(` | 5 | 5 archivos, 36 | `COALESCE(`; además `COALESCE(rso.CanX, 0)` sobre columnas boolean → `COALESCE(rso.CanX, FALSE)` (Postgres no mezcla boolean/integer) |
+> | `TOP (n)` | 3 | 4 (+ subquery `TOP(1)` en `UserAdminRepository`) | `LIMIT 1` al final de cada query/subquery |
+> | Concatenación `+` | 2 | 4 (+ `COALESCE(p.MiddleName + ' ', '')` en `CustomerQuerySql`/`GetCustomersPaged`) | `CONCAT(...)` donde lo fija la spec; `p.MiddleName \|\| ' '` en los 2 nuevos para conservar la semántica NULL → `''` |
+> | `CAST(... AS NVARCHAR(n))` | 1 | 1 | `VARCHAR(n)` |
+> | Paginación | 1 fijo + 28 con branch | 4 fijos (`RoleSystemOptionQuerySql`, `PersonRepository`, `SecurityEventRepository`, `RoleRepository`) + 35 con branch (31 `GetPaginationClause`, 2 `var pagination`, 2 repos con `ProviderName`) | `LIMIT @PageSize OFFSET @Offset` literal, se eliminan métodos/variables de branching |
+> | *No listadas:* columna boolean comparada con `1`/`0` | — | 8 archivos, 34 | `= TRUE`/`= FALSE` |
+> | *No listadas:* `CAST(... AS bit)` | — | 6 archivos, 42 | `AS boolean` |
+> | *No listadas:* `uniqueidentifier` | — | 2 archivos, 4 | `uuid`; literal `'0000…'` en `COALESCE(@guid, …)` → `CAST('0000…' AS uuid)` |
+> | *No listadas:* `SYSUTCDATETIME()` | — | 1 archivo, 2 | `NOW()` (columnas `timestamp with time zone`) |
+> | *No listadas:* `STRING_SPLIT(@csv, ',')` | — | `RoleUserSessionRepository` | `unnest(string_to_array(@csv, ','))` |
+> | *No listadas:* `TRY_CAST(a.ChangedBy AS uniqueidentifier)` | — | `AuditLogRepository` | `CAST(u.Id AS text) = LOWER(a.ChangedBy)` (Postgres no tiene `TRY_CAST`) |
+> | *No listadas:* hint `WITH (UPDLOCK, HOLDLOCK)` | — | `RoleSystemOptionsRepository` | `FOR UPDATE` al final del `SELECT` |
+> | *No listadas:* `GetSystemModules*` con `sm."Order"` entre comillas (branch Npgsql) | — | 2 archivos | `sm."order"` + `ORDER BY sm."order" ASC NULLS LAST` (forma Postgres que ya tenía el branch) |
+>
+> **Validación adicional (no prevista en la spec):** cada sentencia SQL de los 104 archivos (219 sueltas + 6 compuestas por concatenación de constantes, extraídas por reflexión) se pasó por `EXPLAIN` contra la base Postgres migrada → 0 errores. `EXPLAIN` valida sintaxis, tablas/columnas y tipos de literales; no valida tipos de parámetros (sustituidos por `NULL`), que quedan cubiertos por F5/F6.
+>
+> **Tests unitarios (decisión del usuario, opción A):** 40 tests de `JOIN.Application.UnitTest` afirmaban el texto SQL de la rama SQL Server (su `FakeDbConnection` no es Npgsql): `OFFSET ... FETCH NEXT`, `[Admin].[SystemModules]`, `AS [Order]`, `= 1`/`= 0` sobre booleanos. Se actualizaron al SQL Postgres; el test `Handle_WhenCalledOnSqlServer_ShouldUseOffsetFetchNextPagination` pasó a `Handle_WhenCalledOnNonNpgsqlConnection_ShouldStillUseLimitOffsetPagination` (afirma `LIMIT/OFFSET` y ausencia de `FETCH NEXT`), y 6 tests con `SqlServer` en el nombre se renombraron. Resultado con cultura `en-US` (como CI): 1845 pasan, 0 fallan, cobertura de líneas 91,85 % (umbral 90 %). Con cultura `es` fallan 12 tests de validadores por el idioma del mensaje de FluentValidation — preexistente, ajeno a esta spec.
+>
+> **Diferencias de comportamiento conocidas, no corregidas (fuera de alcance):** (1) `LIKE` distingue mayúsculas en Postgres y no en la colación por defecto de SQL Server — 66 usos en 34 archivos, ninguno con `UPPER`/`LOWER`; candidato natural a `ILIKE` en una spec de seguimiento. (2) `FOR UPDATE` bloquea solo filas existentes; `HOLDLOCK` además bloqueaba el rango (inserciones fantasma) — el índice único de `RoleSystemOptions` sigue protegiendo contra duplicados. (3) `CONCAT(u.FirstName, ' ', u.LastName)` devuelve `' Apellido'` donde SQL Server devolvía `NULL` si `FirstName` era nulo.
+
 ### F5 — Seed
 
 1. Sin cambios de código (Scope F).
@@ -211,6 +248,8 @@ Tras cada grupo: `dotnet build -c Release` → 0 errores (el build no detecta er
 4. Smoke manual: login, listar tickets paginado, crear un `TicketStatus` duplicado con `IsInitial = true` para la misma empresa → debe rechazarse por el índice filtrado (confirma que el filtro Postgres corregido funciona igual que el de SQL Server).
 5. `dotnet test tests/IntegrationTests/JOIN.IntegrationTests.csproj --filter "FullyQualifiedName~PostgreSql"` → 0 fallidos.
 6. CI verde en un push real a `main_postgresql`.
+
+> **Ajuste por SPEC 39 (implementación, 2026-10-07) — 409 en violaciones de unicidad (decisión del usuario, opción A).** El smoke manual de F8.4 confirmó que el índice filtrado rechaza el duplicado (`23505` sobre `ux_ticketstatuses_company_initial`, sin fila insertada), pero la API respondía **500** en vez del **409 `DUPLICATE_KEY`** que devuelve `main`: `GlobalExceptionHandler` solo reconocía `SqlException` 2601/2627. Se agregó un brazo equivalente para `Npgsql.PostgresException` con `SqlState == "23505"` → 409 `DUPLICATE_KEY`, detectado por nombre de tipo + reflexión (mismo patrón que `TryGetSqlErrorNumber`, sin referencia directa a Npgsql en la WebApi). Aplica a cualquier endpoint que choque con un índice único, no solo `TicketStatus`. Cubierto por un sexto caso en `PostgreSqlSmokeTests`, `DuplicateKey_ViaFilteredIndex_ReturnsConflict` (POST de un segundo estado inicial → 409 con `code = DUPLICATE_KEY`); la suite queda en 27 ejecuciones.
 
 ---
 

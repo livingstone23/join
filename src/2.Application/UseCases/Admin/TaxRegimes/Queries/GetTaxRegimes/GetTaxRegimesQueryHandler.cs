@@ -38,14 +38,12 @@ public sealed class GetTaxRegimesQueryHandler(
         if (request.IsActive.HasValue) { where.Append(" AND tr.IsActive = @IsActive"); parameters.Add("IsActive", request.IsActive.Value); }
 
         var whereClause = where.ToString();
-        var pagination = connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset" : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
         var sql = $"""
             SELECT tr.Id, tr.CompanyId, c.Name AS CompanyName, tr.Code, tr.Name, tr.IsActive, tr.Created AS CreatedAt
             FROM Admin.TaxRegimes tr
             INNER JOIN Common.Companies c ON c.Id = tr.CompanyId AND c.GcRecord = 0
-            {whereClause} ORDER BY tr.Code ASC, tr.Name ASC {pagination};
+            {whereClause} ORDER BY tr.Code ASC, tr.Name ASC LIMIT @PageSize OFFSET @Offset;
             SELECT COUNT(*) FROM Admin.TaxRegimes tr
             INNER JOIN Common.Companies c ON c.Id = tr.CompanyId AND c.GcRecord = 0
             {whereClause};

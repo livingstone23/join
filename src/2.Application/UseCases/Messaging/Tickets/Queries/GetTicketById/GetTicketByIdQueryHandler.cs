@@ -132,7 +132,7 @@ public sealed class GetTicketByIdQueryHandler(
               AND tl.CompanyId = @TenantId
               AND tl.GcRecord = 0
               AND (
-                    tl.IsOnlyForCreatedAndAssigned = 0
+                    tl.IsOnlyForCreatedAndAssigned = FALSE
                     OR t.CreatedByUserId = @ViewerId
                     OR t.AssignedToUserId = @ViewerId
                     OR EXISTS (
@@ -141,7 +141,7 @@ public sealed class GetTicketByIdQueryHandler(
                         WHERE tuc.UserId = @ViewerId
                           AND tuc.CompanyId = @TenantId
                           AND tuc.GcRecord = 0
-                          AND tuc.IsSuperAdminTicket = 1
+                          AND tuc.IsSuperAdminTicket = TRUE
                     )
                   )
             ORDER BY tl.Created DESC;

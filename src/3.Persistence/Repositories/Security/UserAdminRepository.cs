@@ -21,11 +21,11 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
     public async Task<int> RevokeActiveRefreshTokensAsync(Guid userId, DateTime utcNow, CancellationToken ct = default)
     {
         const string sql = """
-            UPDATE [Security].[UserRefreshTokens]
-            SET IsRevoked = 1,
+            UPDATE Security.UserRefreshTokens
+            SET IsRevoked = TRUE,
                 LastModified = @UtcNow
             WHERE UserId = @UserId
-              AND IsRevoked = 0
+              AND IsRevoked = FALSE
               AND GcRecord = 0;
             """;
 
@@ -46,11 +46,11 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
         // RoleUserSessionRepository.SoftRevokeActiveConnectionsAsync uses the same shape
         // and is the reference implementation; keep this one aligned with it.
         const string sql = """
-            UPDATE [Security].[UserConnectionLogs]
-            SET IsActiveSession = 0,
+            UPDATE Security.UserConnectionLogs
+            SET IsActiveSession = FALSE,
                 DisconnectionDate = @UtcNow
             WHERE UserId = @UserId
-              AND IsActiveSession = 1;
+              AND IsActiveSession = TRUE;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -72,12 +72,12 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
                    u.StatusChangeReason AS StatusChangeReason,
                    CASE WHEN EXISTS (
                        SELECT 1
-                       FROM [Security].[UserCompanies] uc
+                       FROM Security.UserCompanies uc
                        WHERE uc.UserId = u.Id
                          AND uc.CompanyId = @CompanyId
                          AND uc.GcRecord = 0
                    ) THEN 1 ELSE 0 END AS HasMembership
-            FROM [Security].[Users] u
+            FROM Security.Users u
             WHERE u.Id = @UserId
               AND u.GcRecord = 0;
             """;
@@ -110,7 +110,7 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
         CancellationToken ct = default)
     {
         const string sql = """
-            UPDATE [Security].[Users]
+            UPDATE Security.Users
             SET IsActive = @IsActive,
                 StatusChangeReason = @Reason,
                 LastModified = @UtcNow,
@@ -137,11 +137,11 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
         const string sql = """
             SELECT CAST(CASE WHEN EXISTS (
                 SELECT 1
-                FROM [Security].[Users]
+                FROM Security.Users
                 WHERE Id = @UserId
                   AND GcRecord = 0
-                  AND IsSuperAdmin = 1
-            ) THEN 1 ELSE 0 END AS bit);
+                  AND IsSuperAdmin = TRUE
+            ) THEN 1 ELSE 0 END AS boolean);
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -156,11 +156,11 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
         const string sql = """
             SELECT CAST(CASE WHEN EXISTS (
                 SELECT 1
-                FROM [Security].[UserCompanies]
+                FROM Security.UserCompanies
                 WHERE UserId = @UserId
                   AND CompanyId = @CompanyId
                   AND GcRecord = 0
-            ) THEN 1 ELSE 0 END AS bit);
+            ) THEN 1 ELSE 0 END AS boolean);
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -175,10 +175,10 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
         const string sql = """
             SELECT CAST(CASE WHEN EXISTS (
                 SELECT 1
-                FROM [Security].[UserCompanies]
+                FROM Security.UserCompanies
                 WHERE UserId = @UserId
                   AND GcRecord = 0
-            ) THEN 1 ELSE 0 END AS bit);
+            ) THEN 1 ELSE 0 END AS boolean);
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -198,8 +198,8 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
 
         const string sql = """
             SELECT r.Id
-            FROM [Security].[Roles] r
-            INNER JOIN [Security].[RoleCompanies] rc
+            FROM Security.Roles r
+            INNER JOIN Security.RoleCompanies rc
                 ON rc.RoleId = r.Id
                AND rc.CompanyId = @CompanyId
                AND rc.GcRecord = 0
@@ -217,8 +217,8 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
     public async Task<string?> GetCompanyNameAsync(Guid companyId, CancellationToken ct = default)
     {
         const string sql = """
-            SELECT [Name]
-            FROM [Common].[Companies]
+            SELECT Name
+            FROM Common.Companies
             WHERE Id = @CompanyId
               AND GcRecord = 0;
             """;
@@ -234,10 +234,10 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
         const string sql = """
             SELECT CAST(CASE WHEN EXISTS (
                 SELECT 1
-                FROM [Common].[Companies]
+                FROM Common.Companies
                 WHERE Id = @CompanyId
                   AND GcRecord = 0
-            ) THEN 1 ELSE 0 END AS bit);
+            ) THEN 1 ELSE 0 END AS boolean);
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -262,8 +262,8 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
         // exists in another tenant and must not bleed into this one).
         const string sql = """
             SELECT r.Id
-            FROM [Security].[Roles] r
-            INNER JOIN [Security].[RoleCompanies] rc
+            FROM Security.Roles r
+            INNER JOIN Security.RoleCompanies rc
                 ON rc.RoleId = r.Id
                AND rc.CompanyId = @CompanyId
                AND rc.GcRecord = 0
@@ -294,28 +294,29 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
             SELECT
                 CAST(CASE WHEN EXISTS (
                     SELECT 1
-                    FROM [Security].[UserCompanies]
+                    FROM Security.UserCompanies
                     WHERE UserId = @UserId
                       AND CompanyId = @CompanyId
                       AND GcRecord = 0
-                ) THEN 1 ELSE 0 END AS bit) AS [Exists],
-                CAST(ISNULL((
-                    SELECT TOP(1) CASE WHEN IsDefault = 1 THEN 1 ELSE 0 END
-                    FROM [Security].[UserCompanies]
+                ) THEN 1 ELSE 0 END AS boolean) AS "exists",
+                CAST(COALESCE((
+                    SELECT CASE WHEN IsDefault = TRUE THEN 1 ELSE 0 END
+                    FROM Security.UserCompanies
                     WHERE UserId = @UserId
                       AND CompanyId = @CompanyId
                       AND GcRecord = 0
-                ), 0) AS bit) AS [IsDefault],
-                ISNULL((
+                    LIMIT 1
+                ), 0) AS boolean) AS IsDefault,
+                COALESCE((
                     SELECT COUNT(1)
-                    FROM [Security].[UserCompanies]
+                    FROM Security.UserCompanies
                     WHERE UserId = @UserId
                       AND GcRecord = 0
-                ), 0) AS [TotalActiveCompanies]
+                ), 0) AS TotalActiveCompanies
             FROM (VALUES(1)) AS dummy(x)
             WHERE EXISTS (
                 SELECT 1
-                FROM [Security].[Users]
+                FROM Security.Users
                 WHERE Id = @UserId
                   AND GcRecord = 0
             );
@@ -344,7 +345,7 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
 
         const string sql = """
             SELECT DISTINCT UserId
-            FROM [Security].[UserCompanies]
+            FROM Security.UserCompanies
             WHERE UserId IN @UserIds
               AND CompanyId = @CompanyId
               AND GcRecord = 0;
@@ -376,56 +377,56 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
             SELECT
                 sm.Id                              AS ModuleId,
                 sm.Name                            AS ModuleName,
-                sm.[Order]                         AS ModuleOrder,
+                sm."order"                         AS ModuleOrder,
                 so.Id                              AS SystemOptionId,
                 so.Name                            AS Name,
                 so.Route                           AS Route,
                 so.OrderMenu                       AS OptionOrder,
-                CAST(ISNULL(so.CanRead,     0) AS bit) AS SupportsCanRead,
-                CAST(ISNULL(so.CanCreate,   0) AS bit) AS SupportsCanCreate,
-                CAST(ISNULL(so.CanUpdate,   0) AS bit) AS SupportsCanUpdate,
-                CAST(ISNULL(so.CanDelete,   0) AS bit) AS SupportsCanDelete,
-                CAST(ISNULL(so.CanDownload, 0) AS bit) AS SupportsCanDownload,
-                CAST(ISNULL(so.CanExport,   0) AS bit) AS SupportsCanExport,
-                CAST(ISNULL(so.CanExecute,  0) AS bit) AS SupportsCanExecute,
-                MAX(CAST(ISNULL(rso.CanRead,     0) AS int)) AS GrantedCanRead,
-                MAX(CAST(ISNULL(rso.CanCreate,   0) AS int)) AS GrantedCanCreate,
-                MAX(CAST(ISNULL(rso.CanUpdate,   0) AS int)) AS GrantedCanUpdate,
-                MAX(CAST(ISNULL(rso.CanDelete,   0) AS int)) AS GrantedCanDelete,
-                MAX(CAST(ISNULL(rso.CanDownload, 0) AS int)) AS GrantedCanDownload,
-                MAX(CAST(ISNULL(rso.CanExport,   0) AS int)) AS GrantedCanExport,
-                MAX(CAST(ISNULL(rso.CanExecute,  0) AS int)) AS GrantedCanExecute
-            FROM [Admin].[SystemModules] sm
-            LEFT JOIN [Security].[SystemOptions] so
+                CAST(COALESCE(so.CanRead,     FALSE) AS boolean) AS SupportsCanRead,
+                CAST(COALESCE(so.CanCreate,   FALSE) AS boolean) AS SupportsCanCreate,
+                CAST(COALESCE(so.CanUpdate,   FALSE) AS boolean) AS SupportsCanUpdate,
+                CAST(COALESCE(so.CanDelete,   FALSE) AS boolean) AS SupportsCanDelete,
+                CAST(COALESCE(so.CanDownload, FALSE) AS boolean) AS SupportsCanDownload,
+                CAST(COALESCE(so.CanExport,   FALSE) AS boolean) AS SupportsCanExport,
+                CAST(COALESCE(so.CanExecute,  FALSE) AS boolean) AS SupportsCanExecute,
+                MAX(CAST(COALESCE(rso.CanRead,     FALSE) AS int)) AS GrantedCanRead,
+                MAX(CAST(COALESCE(rso.CanCreate,   FALSE) AS int)) AS GrantedCanCreate,
+                MAX(CAST(COALESCE(rso.CanUpdate,   FALSE) AS int)) AS GrantedCanUpdate,
+                MAX(CAST(COALESCE(rso.CanDelete,   FALSE) AS int)) AS GrantedCanDelete,
+                MAX(CAST(COALESCE(rso.CanDownload, FALSE) AS int)) AS GrantedCanDownload,
+                MAX(CAST(COALESCE(rso.CanExport,   FALSE) AS int)) AS GrantedCanExport,
+                MAX(CAST(COALESCE(rso.CanExecute,  FALSE) AS int)) AS GrantedCanExecute
+            FROM Admin.SystemModules sm
+            LEFT JOIN Security.SystemOptions so
                 ON so.ModuleId = sm.Id
                AND so.GcRecord = 0
-            LEFT JOIN [Security].[UserRoleCompanies] urc
+            LEFT JOIN Security.UserRoleCompanies urc
                 ON urc.UserId = @UserId
                AND urc.CompanyId = @CompanyId
                AND urc.GcRecord = 0
-            LEFT JOIN [Security].[RoleSystemOptions] rso
+            LEFT JOIN Security.RoleSystemOptions rso
                 ON rso.RoleId = urc.RoleId
                AND rso.CompanyId = @CompanyId
                AND rso.GcRecord = 0
                AND rso.SystemOptionId = so.Id
             WHERE sm.GcRecord = 0
             GROUP BY
-                sm.Id, sm.Name, sm.[Order],
+                sm.Id, sm.Name, sm."order",
                 so.Id, so.Name, so.Route, so.OrderMenu,
                 so.CanRead, so.CanCreate, so.CanUpdate, so.CanDelete,
                 so.CanDownload, so.CanExport, so.CanExecute
             ORDER BY
-                ISNULL(sm.[Order], 2147483647) ASC,
+                COALESCE(sm."order", 2147483647) ASC,
                 sm.Name ASC,
-                ISNULL(so.OrderMenu, 2147483647) ASC,
+                COALESCE(so.OrderMenu, 2147483647) ASC,
                 so.Name ASC;
             """;
 
         const string rolesSql = """
             SELECT r.Id   AS RoleId,
                    r.Name AS RoleName
-            FROM [Security].[UserRoleCompanies] urc
-            INNER JOIN [Security].[Roles] r
+            FROM Security.UserRoleCompanies urc
+            INNER JOIN Security.Roles r
                 ON r.Id = urc.RoleId
                AND r.GcRecord = 0
             WHERE urc.UserId = @UserId
@@ -509,10 +510,10 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
         const string sql = """
             SELECT CAST(CASE WHEN EXISTS (
                 SELECT 1
-                FROM [Security].[Users]
+                FROM Security.Users
                 WHERE Id = @UserId
                   AND GcRecord = 0
-            ) THEN 1 ELSE 0 END AS bit);
+            ) THEN 1 ELSE 0 END AS boolean);
             """;
 
         var command = new CommandDefinition(sql, new { UserId = userId, CompanyId = companyId }, cancellationToken: ct);

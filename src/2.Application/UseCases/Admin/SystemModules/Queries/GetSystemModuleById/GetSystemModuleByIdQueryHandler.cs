@@ -26,13 +26,6 @@ public sealed class GetSystemModuleByIdQueryHandler(ISqlConnectionFactory connec
     public async Task<Response<SystemModuleDto>> Handle(GetSystemModuleByIdQuery request, CancellationToken cancellationToken)
     {
         using var connection = connectionFactory.CreateConnection();
-        var orderColumn = connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "sm.\"Order\""
-            : "sm.[Order]";
-        var orderAlias = connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "\"Order\""
-            : "[Order]";
-
         var sql = $"""
             SELECT
                 sm.Id,
@@ -40,7 +33,7 @@ public sealed class GetSystemModuleByIdQueryHandler(ISqlConnectionFactory connec
                 sm.Description,
                 sm.Icon,
                 sm.IsActive,
-                {orderColumn} AS {orderAlias},
+                sm."order" AS "Order",
                 sm.Created AS CreatedAt
             FROM Admin.SystemModules sm
             WHERE sm.Id = @Id

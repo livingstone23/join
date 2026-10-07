@@ -64,7 +64,7 @@ public sealed class GetSystemModulesQueryHandlerTests
         context.Connection.LastCommandText.Should().Contain("WHERE sm.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("sm.Name LIKE @Name");
         context.Connection.LastCommandText.Should().Contain("sm.IsActive = @IsActive");
-        context.Connection.LastCommandText.Should().Contain("ORDER BY sm.\"Order\" ASC NULLS LAST, sm.Name ASC");
+        context.Connection.LastCommandText.Should().Contain("ORDER BY sm.\"order\" ASC NULLS LAST, sm.Name ASC");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
 
         context.Connection.CapturedParameters["Name"].Should().Be("%CRM%");
@@ -107,8 +107,8 @@ public sealed class GetSystemModulesQueryHandlerTests
         response.Data.PageSize.Should().Be(5);
         response.Data.TotalCount.Should().Be(0);
         response.Data.TotalPages.Should().Be(0);
-        context.Connection.LastCommandText.Should().Contain("ORDER BY CASE WHEN sm.[Order] IS NULL THEN 1 ELSE 0 END ASC, sm.[Order] ASC, sm.Name ASC");
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+        context.Connection.LastCommandText.Should().Contain("ORDER BY sm.\"order\" ASC NULLS LAST, sm.Name ASC");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
     }
 
     /// <summary>

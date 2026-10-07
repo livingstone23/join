@@ -119,7 +119,7 @@ public sealed class GetSystemWideTicketCompanyDefaultsQueryHandler(
             LEFT JOIN Common.CommunicationChannels ch ON tcd.ChannelDefaultId = ch.Id
             {whereClause}
             ORDER BY c.Name ASC, tcd.Created DESC, tcd.StartCode ASC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Messaging.TicketCompanyDefaults tcd
@@ -153,9 +153,4 @@ public sealed class GetSystemWideTicketCompanyDefaultsQueryHandler(
             }
         };
     }
-
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

@@ -40,7 +40,7 @@ public sealed class BulkUpdateUserRolesCommandHandler(
                urc.UserId AS UserId,
                urc.RoleId AS RoleId,
                urc.GcRecord AS GcRecord
-        FROM [Security].[UserRoleCompanies] urc
+        FROM Security.UserRoleCompanies urc
         WHERE urc.CompanyId = @CompanyId
           AND urc.UserId IN @UserIds;
         """;

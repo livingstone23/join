@@ -37,7 +37,7 @@ public class TicketUserCompanyConfiguration : IEntityTypeConfiguration<TicketUse
         builder.HasIndex(x => new { x.UserId, x.CompanyId })
             .HasDatabaseName("UX_TicketUserCompanies_User_Company")
             .IsUnique()
-            .HasFilter("[GcRecord] = 0");
+            .HasFilter("\"gcrecord\" = 0");
 
         builder.HasQueryFilter(x => x.GcRecord == 0);
     }

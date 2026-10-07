@@ -98,7 +98,7 @@ public sealed class GetSystemWideTicketStatusesQueryHandler(
             INNER JOIN Common.Companies c ON c.Id = ts.CompanyId
             {whereClause}
             ORDER BY c.Name ASC, ts.Created DESC, ts.Name ASC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Messaging.TicketStatuses ts
@@ -126,9 +126,4 @@ public sealed class GetSystemWideTicketStatusesQueryHandler(
             }
         };
     }
-
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

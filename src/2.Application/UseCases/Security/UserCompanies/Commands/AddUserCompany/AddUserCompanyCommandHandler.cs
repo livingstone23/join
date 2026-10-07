@@ -34,7 +34,7 @@ public sealed class AddUserCompanyCommandHandler(
         SELECT Id        AS Id,
                IsDefault AS IsDefault,
                GcRecord  AS GcRecord
-        FROM [Security].[UserCompanies]
+        FROM Security.UserCompanies
         WHERE UserId = @UserId
           AND CompanyId = @CompanyId;
         """;
@@ -45,7 +45,7 @@ public sealed class AddUserCompanyCommandHandler(
         SELECT Id       AS Id,
                RoleId   AS RoleId,
                GcRecord AS GcRecord
-        FROM [Security].[UserRoleCompanies]
+        FROM Security.UserRoleCompanies
         WHERE UserId = @UserId
           AND CompanyId = @CompanyId;
         """;

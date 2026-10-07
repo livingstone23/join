@@ -49,14 +49,14 @@ public sealed class InviteUserCommandHandler(
                LastName    AS LastName,
                IsActive    AS IsActive,
                Email       AS Email
-        FROM [Security].[Users]
+        FROM Security.Users
         WHERE Id = @UserId
           AND GcRecord = 0;
         """;
 
     private const string PriorUserRoleCompaniesSql = """
         SELECT RoleId AS RoleId
-        FROM [Security].[UserRoleCompanies]
+        FROM Security.UserRoleCompanies
         WHERE UserId = @UserId
           AND CompanyId = @CompanyId
           AND GcRecord = 0;
