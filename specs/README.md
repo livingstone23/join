@@ -9,7 +9,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 ## Reglas
 
 ### Numeración
-- Una spec nueva toma el **siguiente número libre** (hoy: **50**).
+- Una spec nueva toma el **siguiente número libre** (hoy: **51**).
 - Los números **no se reutilizan ni se reordenan**. Si una spec se divide, la parte que sale toma un número nuevo y ambas lo dicen en su encabezado (ejemplo: SPEC 99 → SPEC 47).
 - **Excepción autorizada (2026-10-05):** por decisión del usuario se renumeró una sola vez: la 37 (canales `WEB`/`APP`) pasó a **99** y las 38–49 bajaron un número (38→37 … 49→48). Las referencias se actualizaron en ambos repositorios. Una spec citada con su número anterior en un commit o conversación previa a esa fecha debe traducirse con esta tabla.
 - El nombre del archivo es `NN-tema-en-ingles.md` y el título empieza con `# SPEC NN — `.
@@ -75,7 +75,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 36 | Adjuntos de ticket: parámetros, `TicketDocuments` y storage | Implementado | 35 |
 | 37 | Transiciones de status parametrizables y SLA | Implementado | 34, 35, 36 |
 | 38 | Consolidación de query filters globales | Implementado | 30 |
-| 39 | Fork `main_postgresql` | Borrador | — |
+| 39 | Fork `main_postgresql` | Implementado (en `main_postgresql`) | — |
 | 40 | Índices únicos filtrados por soft-delete | Borrador | — |
 | 41 | Visibilidad de registros borrados y restauración para SuperAdmin | Borrador | 38, 40 |
 | 42 | Valores iniciales del ticket desde `TicketCompanyDefaults` | Borrador | — |
@@ -86,6 +86,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 47 | Ingesta de tickets por WhatsApp y correo | **Pospuesto** | 34, 35, 36, 99, 42, 43 |
 | 48 | Bloqueo de APIs y menú por módulo activo de la empresa | Borrador | 43 |
 | 49 | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Borrador | 36 |
+| 50 | `main_postgresql`: port de 40–49 y pendientes para llevar QA a PostgreSQL (archivo en `main_postgresql`) | Borrador | 39, 40–49 |
 | 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
 
 ---
@@ -102,7 +103,9 @@ Orden sugerido de implementación (cada uno requiere `Aprobado`):
 6. **44** — calendario base.
 7. **46** — estructura de Google Calendar.
 
-En paralelo, sin dependencias con lo anterior: **38 → 40 → 41** (query filters, índices filtrados, restauración) y **39** (fork PostgreSQL, que deberá portar los índices filtrados y el SQL nuevo de 43, 44, 46 y 48).
+En paralelo, sin dependencias con lo anterior: **38 → 40 → 41** (query filters, índices filtrados, restauración) y **39** (fork PostgreSQL, `Implementado` en `main_postgresql`).
+
+**Cierre de etapa — 50:** las specs 40–49 se implementan en `main` (SQL Server). La **50** sale de `main_postgresql`, hace un único `git merge main`, convierte a PostgreSQL todo lo de 40–49 (migración incremental Npgsql, `HasFilter`, SQL) y cierra los pendientes de QA; su PR va a `main_postgresql`, nunca a `main`. Los archivos de las specs 39 y 50 vigentes viven en `main_postgresql`; mientras tanto, el SQL nuevo de 40–49 se escribe portable (ver `CLAUDE.md`) para reducir el port.
 
 **Etapa posterior** (`Pospuesto`): **45** (agente de canales del calendario) y **47** (tickets por WhatsApp y correo), después de concluir Tickets y Calendar.
 
