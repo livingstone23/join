@@ -79,7 +79,7 @@ public sealed class GetIndustriesQueryHandler(
                AND c.GcRecord = 0
             {whereClause}
             ORDER BY i.Code ASC, i.Name ASC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Admin.Industries i
@@ -109,9 +109,4 @@ public sealed class GetIndustriesQueryHandler(
             }
         };
     }
-
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

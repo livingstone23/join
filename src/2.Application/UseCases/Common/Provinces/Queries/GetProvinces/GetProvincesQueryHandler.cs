@@ -87,7 +87,7 @@ public sealed class GetProvincesQueryHandler(
                AND r.CompanyId = @TenantId
             {whereClause}
             ORDER BY p.Created DESC, p.Name ASC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Common.Provinces p
@@ -121,14 +121,4 @@ public sealed class GetProvincesQueryHandler(
             }
         };
     }
-
-    /// <summary>
-    /// Resolves a provider-compatible pagination clause.
-    /// </summary>
-    /// <param name="connection">The active database connection.</param>
-    /// <returns>The pagination SQL fragment for the current provider.</returns>
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

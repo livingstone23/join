@@ -198,7 +198,7 @@ public sealed class GetTicketByIdQueryHandlerTests
         await handler.Handle(query, CancellationToken.None);
 
         // Assert
-        context.Connection.LastCommandText.Should().Contain("tl.IsOnlyForCreatedAndAssigned = 0");
+        context.Connection.LastCommandText.Should().Contain("tl.IsOnlyForCreatedAndAssigned = FALSE");
     }
 
     /// <summary>
@@ -280,7 +280,7 @@ public sealed class GetTicketByIdQueryHandlerTests
 
         // Assert
         context.Connection.LastCommandText.Should().Contain("Messaging.TicketUserCompanies");
-        context.Connection.LastCommandText.Should().Contain("tuc.IsSuperAdminTicket = 1");
+        context.Connection.LastCommandText.Should().Contain("tuc.IsSuperAdminTicket = TRUE");
     }
 
     /// <summary>
@@ -312,7 +312,7 @@ public sealed class GetTicketByIdQueryHandlerTests
         var sql = context.Connection.LastCommandText;
         var orBranches = new[]
         {
-            "tl.IsOnlyForCreatedAndAssigned = 0",
+            "tl.IsOnlyForCreatedAndAssigned = FALSE",
             "t.CreatedByUserId = @ViewerId",
             "t.AssignedToUserId = @ViewerId",
             "EXISTS"

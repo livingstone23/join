@@ -56,7 +56,7 @@ public class GetCountriesPagedQueryHandler(
             FROM Common.Countries c
             {whereClause}
             ORDER BY c.Created DESC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Common.Countries c
@@ -83,14 +83,4 @@ public class GetCountriesPagedQueryHandler(
             }
         };
     }
-
-    /// <summary>
-    /// Resolves a provider-compatible pagination clause.
-    /// </summary>
-    /// <param name="connection">The active database connection.</param>
-    /// <returns>The pagination SQL fragment for the current provider.</returns>
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

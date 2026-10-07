@@ -30,7 +30,7 @@ public sealed class RemoveUserCompanyCommandHandler(
     // soft-delete branch can iterate the Ids without an N+1 of GetAsync calls.
     private const string RoleAssignmentsIndexSql = """
         SELECT Id AS Id
-        FROM [Security].[UserRoleCompanies]
+        FROM Security.UserRoleCompanies
         WHERE UserId = @UserId
           AND CompanyId = @CompanyId
           AND GcRecord = 0;
@@ -79,7 +79,7 @@ public sealed class RemoveUserCompanyCommandHandler(
             new CommandDefinition(
                 """
                 SELECT Id AS Id
-                FROM [Security].[UserCompanies]
+                FROM Security.UserCompanies
                 WHERE UserId = @UserId
                   AND CompanyId = @CompanyId
                   AND GcRecord = 0;

@@ -41,7 +41,7 @@ public sealed class ReplaceUserRolesCommandHandler(
                UserName    AS UserName,
                Email       AS Email,
                IsActive    AS IsActive
-        FROM [Security].[Users]
+        FROM Security.Users
         WHERE Id = @UserId
           AND GcRecord = 0;
         """;
@@ -55,7 +55,7 @@ public sealed class ReplaceUserRolesCommandHandler(
         SELECT Id       AS Id,
                RoleId   AS RoleId,
                GcRecord AS GcRecord
-        FROM [Security].[UserRoleCompanies]
+        FROM Security.UserRoleCompanies
         WHERE UserId = @UserId
           AND CompanyId = @CompanyId;
         """;
@@ -65,7 +65,7 @@ public sealed class ReplaceUserRolesCommandHandler(
     private const string RoleNamesByIdSql = """
         SELECT Id   AS Id,
                Name AS Name
-        FROM [Security].[Roles]
+        FROM Security.Roles
         WHERE Id IN @Ids
           AND GcRecord = 0;
         """;

@@ -12,6 +12,7 @@ using JOIN.Domain.Support;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 
 
@@ -149,7 +150,57 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<IdentityUserLogin<Guid>>(e => e.ToTable("UserLogins", "Security"));
         builder.Entity<IdentityRoleClaim<Guid>>(e => e.ToTable("RoleClaims", "Security"));
         builder.Entity<IdentityUserToken<Guid>>(e => e.ToTable("UserTokens", "Security"));
-        
+
+        // 8. POSTGRESQL (main_postgresql, SPEC 39): must run last, after every name above is set.
+        ApplyLowerCaseNaming(builder);
+    }
+
+    /// <summary>
+    /// Lower-cases every schema, table, column, key, foreign key and index name in the model.
+    /// PostgreSQL folds unquoted identifiers to lower case, so the hand-written Dapper SQL
+    /// (<c>FROM Security.Users u WHERE u.CompanyId = ...</c>) only resolves if the physical
+    /// names are lower case too. Raw <c>HasFilter</c> strings are not rewritten here — they
+    /// already reference the lower-case column names directly. See SPEC 39.
+    /// </summary>
+    private static void ApplyLowerCaseNaming(ModelBuilder builder)
+    {
+        foreach (var entity in builder.Model.GetEntityTypes())
+        {
+            var tableName = entity.GetTableName();
+            if (tableName is null)
+            {
+                continue;
+            }
+
+            entity.SetTableName(tableName.ToLowerInvariant());
+            entity.SetSchema(entity.GetSchema()?.ToLowerInvariant());
+
+            var table = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+
+            foreach (var property in entity.GetProperties())
+            {
+                var columnName = property.GetColumnName(table);
+                if (columnName is not null)
+                {
+                    property.SetColumnName(columnName.ToLowerInvariant());
+                }
+            }
+
+            foreach (var key in entity.GetKeys())
+            {
+                key.SetName(key.GetName()?.ToLowerInvariant());
+            }
+
+            foreach (var foreignKey in entity.GetForeignKeys())
+            {
+                foreignKey.SetConstraintName(foreignKey.GetConstraintName()?.ToLowerInvariant());
+            }
+
+            foreach (var index in entity.GetIndexes())
+            {
+                index.SetDatabaseName(index.GetDatabaseName()?.ToLowerInvariant());
+            }
+        }
     }
 
     /// <summary>

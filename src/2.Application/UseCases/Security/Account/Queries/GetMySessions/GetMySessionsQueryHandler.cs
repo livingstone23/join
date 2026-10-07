@@ -29,7 +29,7 @@ public sealed class GetMySessionsQueryHandler(ISqlConnectionFactory connectionFa
                     ucl.IpAddress
                 FROM Security.UserConnectionLogs ucl
                 WHERE ucl.UserId = @UserId
-                  AND ucl.IsActiveSession = 1
+                  AND ucl.IsActiveSession = TRUE
 
                 UNION ALL
 
@@ -38,10 +38,10 @@ public sealed class GetMySessionsQueryHandler(ISqlConnectionFactory connectionFa
                     urt.Created AS ConnectedAtUtc,
                     COALESCE(urt.LastModified, urt.Created) AS LastActivityAtUtc,
                     N'JWT Refresh Token' AS Device,
-                    CAST(NULL AS NVARCHAR(45)) AS IpAddress
+                    CAST(NULL AS VARCHAR(45)) AS IpAddress
                 FROM Security.UserRefreshTokens urt
                 WHERE urt.UserId = @UserId
-                  AND urt.IsRevoked = 0
+                  AND urt.IsRevoked = FALSE
                   AND urt.ExpiryDate > @UtcNow
                   AND urt.GcRecord = 0
             ) AS sessions

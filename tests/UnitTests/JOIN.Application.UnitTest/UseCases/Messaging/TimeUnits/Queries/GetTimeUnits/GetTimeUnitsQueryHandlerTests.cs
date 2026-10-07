@@ -119,7 +119,7 @@ public sealed class GetTimeUnitsQueryHandlerTests
         response.Data.PageSize.Should().Be(5);
         response.Data.TotalCount.Should().Be(0);
         response.Data.TotalPages.Should().Be(0);
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
     }
 
     /// <summary>

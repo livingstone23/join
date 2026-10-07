@@ -27,7 +27,7 @@ public sealed class AuditLogRepository(
         ArgumentNullException.ThrowIfNull(entry);
 
         const string sql = """
-            INSERT INTO [Security].[AuditLogs]
+            INSERT INTO Security.AuditLogs
                 (Id, EntityName, EntityId, EntityLabel, Action,
                  CompanyId, ChangedBy, ChangedAtUtc, IpAddress,
                  OldValuesJson, NewValuesJson, MetadataJson)
@@ -47,7 +47,7 @@ public sealed class AuditLogRepository(
         ArgumentNullException.ThrowIfNull(entries);
 
         const string sql = """
-            INSERT INTO [Security].[AuditLogs]
+            INSERT INTO Security.AuditLogs
                 (Id, EntityName, EntityId, EntityLabel, Action,
                  CompanyId, ChangedBy, ChangedAtUtc, IpAddress,
                  OldValuesJson, NewValuesJson, MetadataJson)
@@ -82,12 +82,6 @@ public sealed class AuditLogRepository(
     {
         var offset = (pageNumber - 1) * pageSize;
 
-        // Cross-DB pagination: SQL Server uses OFFSET/FETCH NEXT, PostgreSQL uses LIMIT/OFFSET.
-        var isPostgres = _dbContext.Database.ProviderName?.Contains("PostgreSQL", StringComparison.OrdinalIgnoreCase) == true;
-        var paginationClause = isPostgres
-            ? "LIMIT @pageSize OFFSET @offset"
-            : "OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY";
-
         // Each optional filter uses the (@Param IS NULL OR Column = @Param) idiom so the
         // same SQL handles both "filter present" and "no filter" with one execution plan.
         var whereClause = """
@@ -114,23 +108,24 @@ public sealed class AuditLogRepository(
                 a.OldValuesJson,
                 a.NewValuesJson,
                 a.MetadataJson
-            FROM [Security].[AuditLogs] a
+            FROM Security.AuditLogs a
             {whereClause}
             ORDER BY a.ChangedAtUtc DESC, a.Id DESC
-            {paginationClause};
+            LIMIT @pageSize OFFSET @offset;
 
             SELECT COUNT(*)
-            FROM [Security].[AuditLogs] a
+            FROM Security.AuditLogs a
             {whereClause};
             """;
 
         // Second query: resolve ChangedByName per affected actor in the page (not the full table).
-        // a.ChangedBy <> 'System' guards against the CAST raising on a non-Guid literal.
+        // Joined on the text form of u.Id (PostgreSQL has no TRY_CAST); LOWER matches the
+        // case-insensitive comparison SQL Server applied. a.ChangedBy <> 'System' kept as a filter.
         var namesSql = $"""
-            SELECT a.ChangedBy, u.FirstName + ' ' + u.LastName AS FullName
-            FROM [Security].[AuditLogs] a
-            LEFT JOIN [Security].[Users] u
-                ON u.Id = TRY_CAST(a.ChangedBy AS uniqueidentifier)
+            SELECT a.ChangedBy, CONCAT(u.FirstName, ' ', u.LastName) AS FullName
+            FROM Security.AuditLogs a
+            LEFT JOIN Security.Users u
+                ON CAST(u.Id AS text) = LOWER(a.ChangedBy)
             WHERE a.ChangedBy <> 'System'
               AND (@companyId IS NULL OR a.CompanyId = @companyId)
               AND (@entityName IS NULL OR a.EntityName = @entityName)

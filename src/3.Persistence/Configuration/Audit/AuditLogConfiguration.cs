@@ -49,13 +49,13 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
             .HasMaxLength(45);
 
         builder.Property(a => a.OldValuesJson)
-            .HasColumnType("nvarchar(max)");
+            .HasColumnType("text");
 
         builder.Property(a => a.NewValuesJson)
-            .HasColumnType("nvarchar(max)");
+            .HasColumnType("text");
 
         builder.Property(a => a.MetadataJson)
-            .HasColumnType("nvarchar(max)");
+            .HasColumnType("text");
 
         // Drives the per-entity history lookup.
         builder.HasIndex(a => new { a.EntityName, a.EntityId, a.ChangedAtUtc })

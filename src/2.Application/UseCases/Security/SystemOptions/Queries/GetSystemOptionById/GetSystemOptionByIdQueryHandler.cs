@@ -34,7 +34,7 @@ public sealed class GetSystemOptionByIdQueryHandler(
                                     o.CanDownload, o.CanExport, o.CanExecute,
                                     o.IsVisibleMenu, o.OrderMenu, o.Created
                              FROM Security.SystemOptions o
-                             INNER JOIN [Admin].[SystemModules] m ON m.Id = o.ModuleId
+                             INNER JOIN Admin.SystemModules m ON m.Id = o.ModuleId
                              LEFT JOIN Security.SystemOptions p ON p.Id = o.ParentId AND p.GcRecord = 0
                              WHERE o.Id = @Id AND o.GcRecord = 0;";
 

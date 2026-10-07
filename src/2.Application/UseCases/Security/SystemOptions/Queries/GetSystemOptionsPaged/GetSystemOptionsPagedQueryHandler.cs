@@ -68,14 +68,14 @@ public sealed class GetSystemOptionsPagedQueryHandler(
                 o.OrderMenu,
                 o.Created
             FROM Security.SystemOptions o
-            INNER JOIN [Admin].[SystemModules] m ON m.Id = o.ModuleId
+            INNER JOIN Admin.SystemModules m ON m.Id = o.ModuleId
             {whereClause}
             ORDER BY o.Name ASC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Security.SystemOptions o
-            INNER JOIN [Admin].[SystemModules] m ON m.Id = o.ModuleId
+            INNER JOIN Admin.SystemModules m ON m.Id = o.ModuleId
             {whereClause};
         ";
 
@@ -99,9 +99,4 @@ public sealed class GetSystemOptionsPagedQueryHandler(
             }
         };
     }
-
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

@@ -69,12 +69,12 @@ public static class ConfigureServices
             // Testcontainers connection string entirely.
             var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection");
 
-            // Configuración predeterminada para SQL Server.
+            // main_postgresql (SPEC 39): PostgreSQL is the only EF Core provider on this branch.
             // CommandTimeout(30) (seconds) is set explicitly per SPEC 05 so the value
             // is visible at the infrastructure layer rather than relying on the
-            // SQL Server driver's implicit default. Applies to every EF Core command
+            // driver's implicit default. Applies to every EF Core command
             // issued through ApplicationDbContext (Commands).
-            options.UseSqlServer(connectionString,
+            options.UseNpgsql(connectionString,
                 builder => builder
                     .MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
                     .CommandTimeout(30));

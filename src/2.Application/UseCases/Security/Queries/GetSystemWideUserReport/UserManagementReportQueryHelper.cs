@@ -282,7 +282,7 @@ internal static class UserManagementReportQueryHelper
         var totalCount = await connection.ExecuteScalarAsync<int>(
             new CommandDefinition(ReadPagedCountSqlTemplate, parameters, transaction: tx, cancellationToken: cancellationToken));
 
-        var detailSql = ReadPagedSqlTemplate.Replace("{PAGINATION}", GetPaginationClause(connection));
+        var detailSql = ReadPagedSqlTemplate.Replace("{PAGINATION}", "LIMIT @PageSize OFFSET @Offset");
         var rows = (await connection.QueryAsync<UserManagementReportSqlRow>(
             new CommandDefinition(detailSql, parameters, transaction: tx, cancellationToken: cancellationToken))).AsList();
 
@@ -291,15 +291,6 @@ internal static class UserManagementReportQueryHelper
         return (MapRows(rows), totalCount);
     }
 
-    /// <summary>
-    /// Resolves a provider-compatible pagination clause. Branching on the runtime
-    /// type name is the project's established pattern (see
-    /// <c>GetPersonsPagedQueryHandler</c>).
-    /// </summary>
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
     private static DynamicParameters BuildBaseParameters(
         Guid? scopedCompanyId,

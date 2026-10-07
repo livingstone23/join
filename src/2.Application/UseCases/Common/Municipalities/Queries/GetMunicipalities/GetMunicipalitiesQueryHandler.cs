@@ -74,7 +74,7 @@ public sealed class GetMunicipalitiesQueryHandler(
                AND p.GcRecord = 0
             {whereClause}
             ORDER BY m.Created DESC, m.Name ASC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Common.Municipalities m
@@ -104,14 +104,4 @@ public sealed class GetMunicipalitiesQueryHandler(
             }
         };
     }
-
-    /// <summary>
-    /// Resolves a provider-compatible pagination clause.
-    /// </summary>
-    /// <param name="connection">The active database connection.</param>
-    /// <returns>The pagination SQL fragment for the current provider.</returns>
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

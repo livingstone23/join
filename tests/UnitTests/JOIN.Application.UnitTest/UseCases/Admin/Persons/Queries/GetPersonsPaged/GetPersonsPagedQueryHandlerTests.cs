@@ -149,7 +149,7 @@ public sealed class GetPersonsPagedQueryHandlerTests
         response.Data.PageSize.Should().Be(10);
         response.Data.TotalCount.Should().Be(0);
         response.Data.TotalPages.Should().Be(0);
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.CapturedParameters["TenantId"].Should().Be(companyId);
         context.Connection.CapturedParameters["Offset"].Should().Be(0);
         context.Connection.CapturedParameters["PageSize"].Should().Be(10);

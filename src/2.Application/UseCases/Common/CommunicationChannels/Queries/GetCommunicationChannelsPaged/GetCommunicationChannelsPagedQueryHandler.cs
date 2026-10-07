@@ -55,7 +55,7 @@ public class GetCommunicationChannelsPagedQueryHandler(
             FROM Common.CommunicationChannels cc
             {whereClause}
             ORDER BY cc.Created DESC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Common.CommunicationChannels cc
@@ -82,12 +82,4 @@ public class GetCommunicationChannelsPagedQueryHandler(
             }
         };
     }
-
-    /// <summary>
-    /// Resolves a provider-compatible pagination clause.
-    /// </summary>
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

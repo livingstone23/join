@@ -69,7 +69,7 @@ public class UserCommunicationChannelConfiguration : IEntityTypeConfiguration<Us
         // to the same communication channel once within a company.
         builder.HasIndex(p => new { p.CompanyId, p.UserId, p.CommunicationChannelId })
             .IsUnique()
-            .HasFilter("[GcRecord] = 0");
+            .HasFilter("\"gcrecord\" = 0");
 
 
         // Apply a soft-delete filter to automatically exclude records marked as deleted.

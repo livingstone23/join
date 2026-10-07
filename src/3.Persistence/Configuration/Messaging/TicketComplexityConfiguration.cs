@@ -61,7 +61,7 @@ public class TicketComplexityConfiguration : IEntityTypeConfiguration<TicketComp
         builder.HasIndex(p => new { p.CompanyId, p.Name })
             .HasDatabaseName("UX_TicketComplexities_Company_Name")
             .IsUnique()
-            .HasFilter("[GcRecord] = 0");
+            .HasFilter("\"gcrecord\" = 0");
 
         builder.HasQueryFilter(a => a.GcRecord == 0);
     }

@@ -2,9 +2,9 @@ name: Backend CI Pipeline
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: [ "main", "develop", "main_postgresql" ]
   pull_request:
-    branches: [ "main", "develop" ]
+    branches: [ "main", "develop", "main_postgresql" ]
 
 jobs:
   build-and-test:
@@ -40,11 +40,9 @@ jobs:
         /p:Threshold=90
         /p:ThresholdType=line
 
-    - name: 🐳 Run Integration Tests (Testcontainers)
-      # Sin flags de Coverlet/Threshold: las pruebas de integración no entran
-      # en el gate de cobertura del 90% (separación deliberada por spec).
-      # El runner ubuntu-latest trae Docker preinstalado.
-      run: dotnet test tests/IntegrationTests/JOIN.IntegrationTests.csproj --no-build --configuration Release --verbosity normal
+    # main_postgresql (SPEC 39): el paso "Run Integration Tests" de main se quitó en esta
+    # rama — la suite existente corre contra Testcontainers.MsSql y la app aquí solo habla
+    # PostgreSQL. Las pruebas de integración viven en el job integration-tests-postgres.
 
     # --- LOS SIGUIENTES PASOS GENERAN EL COMENTARIO VISUAL EN EL PR ---
     - name: 📊 Generate Code Coverage Report
@@ -65,3 +63,33 @@ jobs:
       with:
         recreate: true
         path: code-coverage-results.md
+
+  integration-tests-postgres:
+    # SPEC 39: main_postgresql es Postgres-only — un solo proveedor, sin matriz.
+    # Testcontainers levanta postgres:17 por sí mismo (Docker viene en ubuntu-latest),
+    # igual que hace con SQL Server; no hace falta declarar un servicio aparte.
+    name: Integration Tests (PostgreSQL)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+
+    - name: ⚙️ Setup .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: 📦 Restore dependencies
+      run: dotnet restore
+
+    - name: 🔨 Build
+      run: dotnet build --no-restore --configuration Release
+
+    - name: 🐘 Run PostgreSQL Smoke Tests (Testcontainers)
+      # Solo PostgreSqlSmokeTests: la suite existente usa Testcontainers.MsSql y no
+      # aplica a esta rama (paridad completa = spec de seguimiento).
+      run: >
+        dotnet test tests/IntegrationTests/JOIN.IntegrationTests.csproj
+        --no-build --configuration Release --verbosity normal
+        --filter "FullyQualifiedName~PostgreSql"

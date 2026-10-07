@@ -68,17 +68,17 @@ public class TicketStatusConfiguration : IEntityTypeConfiguration<TicketStatus>
         builder.HasIndex(p => new { p.CompanyId, p.IsInitial })
             .HasDatabaseName("UX_TicketStatuses_Company_Initial")
             .IsUnique()
-            .HasFilter("[IsInitial] = 1 AND [GcRecord] = 0");
+            .HasFilter("\"isinitial\" = TRUE AND \"gcrecord\" = 0");
 
         builder.HasIndex(p => new { p.CompanyId, p.IsPaused })
             .HasDatabaseName("UX_TicketStatuses_Company_Paused")
             .IsUnique()
-            .HasFilter("[IsPaused] = 1 AND [GcRecord] = 0");
+            .HasFilter("\"ispaused\" = TRUE AND \"gcrecord\" = 0");
 
         builder.HasIndex(p => new { p.CompanyId, p.IsFinal })
             .HasDatabaseName("UX_TicketStatuses_Company_Final")
             .IsUnique()
-            .HasFilter("[IsFinal] = 1 AND [GcRecord] = 0");
+            .HasFilter("\"isfinal\" = TRUE AND \"gcrecord\" = 0");
 
         // Apply a soft-delete filter to automatically exclude records marked as deleted.
         builder.HasQueryFilter(a => a.GcRecord == 0);

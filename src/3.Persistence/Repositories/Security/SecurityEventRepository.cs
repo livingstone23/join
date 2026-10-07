@@ -22,7 +22,7 @@ public sealed class SecurityEventRepository(ISqlConnectionFactory connectionFact
         ArgumentNullException.ThrowIfNull(entry);
 
         const string sql = """
-            INSERT INTO [Security].[SecurityEventLogs]
+            INSERT INTO Security.SecurityEventLogs
                 (Id, UserId, EventType, OccurredAtUtc, IpAddress, UserAgent, Result, MetadataJson)
             VALUES
                 (@Id, @UserId, @EventType, @OccurredAtUtc, @IpAddress, @UserAgent, @Result, @MetadataJson);
@@ -52,7 +52,6 @@ public sealed class SecurityEventRepository(ISqlConnectionFactory connectionFact
     {
         var offset = (pageNumber - 1) * pageSize;
 
-        // Cross-DB pagination: SQL Server OFFSET/FETCH NEXT (SQLite/Postgres share the LIMIT/OFFSET shape).
         const string sql = """
             SELECT
                 Id,
@@ -63,10 +62,10 @@ public sealed class SecurityEventRepository(ISqlConnectionFactory connectionFact
                 UserAgent,
                 Result,
                 MetadataJson
-            FROM [Security].[SecurityEventLogs]
+            FROM Security.SecurityEventLogs
             WHERE UserId = @UserId
             ORDER BY OccurredAtUtc DESC, Id DESC
-            OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
+            LIMIT @pageSize OFFSET @offset;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -80,7 +79,7 @@ public sealed class SecurityEventRepository(ISqlConnectionFactory connectionFact
     {
         const string sql = """
             SELECT COUNT(*)
-            FROM [Security].[SecurityEventLogs]
+            FROM Security.SecurityEventLogs
             WHERE UserId = @userId;
             """;
 

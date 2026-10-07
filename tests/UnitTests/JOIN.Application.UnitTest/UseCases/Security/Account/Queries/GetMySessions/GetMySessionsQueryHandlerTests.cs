@@ -44,8 +44,8 @@ public sealed class GetMySessionsQueryHandlerTests
         response.Data!.Should().BeEmpty();
 
         context.Connection.LastCommandText.Should().Contain("UNION ALL");
-        context.Connection.LastCommandText.Should().Contain("IsActiveSession = 1");
-        context.Connection.LastCommandText.Should().Contain("IsRevoked = 0");
+        context.Connection.LastCommandText.Should().Contain("IsActiveSession = TRUE");
+        context.Connection.LastCommandText.Should().Contain("IsRevoked = FALSE");
         context.Connection.LastCommandText.Should().Contain("ExpiryDate > @UtcNow");
         context.Connection.CapturedParameters["UserId"].Should().Be(userId);
     }

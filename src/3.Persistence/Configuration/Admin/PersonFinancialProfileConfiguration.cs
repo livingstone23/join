@@ -40,7 +40,7 @@ public class PersonFinancialProfileConfiguration : IEntityTypeConfiguration<Pers
 
         builder.Property(pfp => pfp.DeclaredDate)
             .IsRequired()
-            .HasColumnType("datetime2");
+            .HasColumnType("timestamp");
 
         // State flags
         builder.Property(pfp => pfp.IsCurrent)

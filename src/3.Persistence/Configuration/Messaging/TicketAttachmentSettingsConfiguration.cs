@@ -40,7 +40,7 @@ public sealed class TicketAttachmentSettingsConfiguration : IEntityTypeConfigura
         // Filtered unique index — see class summary.
         builder.HasIndex(x => x.CompanyId)
             .IsUnique()
-            .HasFilter("[GcRecord] = 0")
+            .HasFilter("\"gcrecord\" = 0")
             .HasDatabaseName("UX_TicketAttachmentSettings_Company_Active");
     }
 }

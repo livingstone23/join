@@ -90,8 +90,8 @@ public class PersonsRepository : GenericRepository<Person>, IPersonsRepository
                     WHERE CompanyId = @CompanyId
                       AND IdentificationNumber = @IdentificationNumber
                       AND GcRecord = 0
-                ) THEN CAST(1 AS bit)
-                ELSE CAST(0 AS bit)
+                ) THEN CAST(1 AS boolean)
+                ELSE CAST(0 AS boolean)
             END
             """;
 
@@ -122,8 +122,8 @@ public class PersonsRepository : GenericRepository<Person>, IPersonsRepository
                       AND IdentificationNumber = @IdentificationNumber
                       AND Id <> @PersonId
                       AND GcRecord = 0
-                ) THEN CAST(1 AS bit)
-                ELSE CAST(0 AS bit)
+                ) THEN CAST(1 AS boolean)
+                ELSE CAST(0 AS boolean)
             END
             """;
 
@@ -169,8 +169,7 @@ public class PersonsRepository : GenericRepository<Person>, IPersonsRepository
             SELECT * FROM Admin.Persons 
             WHERE GcRecord = 0 
             ORDER BY Created DESC
-            OFFSET @Offset ROWS 
-            FETCH NEXT @PageSize ROWS ONLY";
+            LIMIT @PageSize OFFSET @Offset";
 
         var parameters = new 
         { 

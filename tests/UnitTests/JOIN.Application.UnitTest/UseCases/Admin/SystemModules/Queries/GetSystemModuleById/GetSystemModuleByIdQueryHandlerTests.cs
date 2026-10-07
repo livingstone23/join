@@ -53,7 +53,7 @@ public sealed class GetSystemModuleByIdQueryHandlerTests
 
         context.Connection.LastCommandText.Should().Contain("WHERE sm.Id = @Id");
         context.Connection.LastCommandText.Should().Contain("AND sm.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("AS [Order]");
+        context.Connection.LastCommandText.Should().Contain("sm.\"order\" AS \"Order\"");
         context.Connection.CapturedParameters["Id"].Should().Be(moduleId);
     }
 

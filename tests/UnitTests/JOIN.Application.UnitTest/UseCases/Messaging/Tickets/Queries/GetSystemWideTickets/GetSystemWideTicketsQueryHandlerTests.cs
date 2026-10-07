@@ -70,7 +70,7 @@ public sealed class GetSystemWideTicketsQueryHandlerTests
         context.Connection.LastCommandText.Should().Contain("t.ProjectId = @ProjectId");
         context.Connection.LastCommandText.Should().Contain("t.Created >= @FromDate");
         context.Connection.LastCommandText.Should().Contain("t.Created <= @ToDate");
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.LastCommandText.Should().NotContain("t.CompanyId = @TenantId");
         context.Connection.LastCommandText.Should().NotContain("@TenantId");
 

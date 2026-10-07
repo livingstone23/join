@@ -85,7 +85,7 @@ public sealed class GetRoleSystemOptionsPagedQueryHandlerTests
         context.Connection.LastCommandText.Should().Contain("INNER JOIN Security.Roles ar");
         context.Connection.LastCommandText.Should().Contain("LEFT JOIN Common.Companies c");
         context.Connection.LastCommandText.Should().Contain("AND rso.CompanyId = @CompanyId");
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.CapturedParameters["CompanyId"].Should().Be(companyId);
     }
 

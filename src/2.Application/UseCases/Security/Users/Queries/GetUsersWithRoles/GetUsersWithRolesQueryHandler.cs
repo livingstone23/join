@@ -26,16 +26,16 @@ public sealed class GetUsersWithRolesQueryHandler(
             u.Email,
             u.IsActive,
             r.Name AS RoleName
-        FROM [Security].[Users] u
-        INNER JOIN [Security].[UserCompanies] uc
+        FROM Security.Users u
+        INNER JOIN Security.UserCompanies uc
             ON uc.UserId = u.Id
            AND uc.CompanyId = @CompanyId
            AND uc.GcRecord = 0
-        LEFT JOIN [Security].[UserRoleCompanies] urc
+        LEFT JOIN Security.UserRoleCompanies urc
             ON urc.UserId = u.Id
            AND urc.CompanyId = @CompanyId
            AND urc.GcRecord = 0
-        LEFT JOIN [Security].[Roles] r
+        LEFT JOIN Security.Roles r
             ON r.Id = urc.RoleId
            AND r.GcRecord = 0
         WHERE u.GcRecord = 0

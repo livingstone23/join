@@ -42,7 +42,7 @@ public sealed class GetSidebarMenuQueryHandler(
            AND urc.CompanyId = @CompanyId
            AND urc.GcRecord = 0
         WHERE so.GcRecord = 0
-          AND so.IsVisibleMenu = 1
+          AND so.IsVisibleMenu = TRUE
         GROUP BY
             so.Id,
             so.ModuleId,

@@ -23,7 +23,7 @@ public sealed class EmailOtpEnableCodeRepository(ISqlConnectionFactory connectio
         var gcStamp = int.Parse(utcNow.ToString("yyyyMMdd"));
 
         const string sql = """
-            UPDATE [Security].[EmailOtpEnableCodes]
+            UPDATE Security.EmailOtpEnableCodes
             SET GcRecord = @gcStamp,
                 LastModified = @utcNow
             WHERE UserId = @userId
@@ -43,7 +43,7 @@ public sealed class EmailOtpEnableCodeRepository(ISqlConnectionFactory connectio
         ArgumentNullException.ThrowIfNull(code);
 
         const string sql = """
-            INSERT INTO [Security].[EmailOtpEnableCodes]
+            INSERT INTO Security.EmailOtpEnableCodes
                 (Id, UserId, Email, CodeHash, ExpiresAtUtc, UsedAtUtc, AttemptCount, Created, CreatedBy, LastModified, LastModifiedBy, GcRecord)
             VALUES
                 (@Id, @UserId, @Email, @CodeHash, @ExpiresAtUtc, @UsedAtUtc, @AttemptCount, @Created, @CreatedBy, @LastModified, @LastModifiedBy, @GcRecord);
@@ -57,7 +57,7 @@ public sealed class EmailOtpEnableCodeRepository(ISqlConnectionFactory connectio
     public async Task<EmailOtpEnableCode?> GetLatestActiveByUserAsync(Guid userId, DateTime utcNow, CancellationToken ct)
     {
         const string sql = """
-            SELECT TOP (1)
+            SELECT
                 Id,
                 UserId,
                 Email,
@@ -65,11 +65,12 @@ public sealed class EmailOtpEnableCodeRepository(ISqlConnectionFactory connectio
                 ExpiresAtUtc,
                 UsedAtUtc,
                 AttemptCount
-            FROM [Security].[EmailOtpEnableCodes]
+            FROM Security.EmailOtpEnableCodes
             WHERE UserId = @userId
               AND UsedAtUtc IS NULL
               AND GcRecord = 0
-            ORDER BY ExpiresAtUtc DESC, Id DESC;
+            ORDER BY ExpiresAtUtc DESC, Id DESC
+            LIMIT 1;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -81,7 +82,7 @@ public sealed class EmailOtpEnableCodeRepository(ISqlConnectionFactory connectio
     public async Task<bool> MarkUsedAsync(Guid codeId, DateTime utcNow, CancellationToken ct)
     {
         const string sql = """
-            UPDATE [Security].[EmailOtpEnableCodes]
+            UPDATE Security.EmailOtpEnableCodes
             SET UsedAtUtc = @utcNow,
                 LastModified = @utcNow
             WHERE Id = @codeId
@@ -99,14 +100,14 @@ public sealed class EmailOtpEnableCodeRepository(ISqlConnectionFactory connectio
     public async Task<int> IncrementAttemptAsync(Guid codeId, DateTime utcNow, CancellationToken ct)
     {
         const string sql = """
-            UPDATE [Security].[EmailOtpEnableCodes]
+            UPDATE Security.EmailOtpEnableCodes
             SET AttemptCount = AttemptCount + 1,
                 LastModified = @utcNow
             WHERE Id = @codeId
               AND UsedAtUtc IS NULL
               AND GcRecord = 0;
 
-            SELECT AttemptCount FROM [Security].[EmailOtpEnableCodes] WHERE Id = @codeId;
+            SELECT AttemptCount FROM Security.EmailOtpEnableCodes WHERE Id = @codeId;
             """;
 
         using var connection = _connectionFactory.CreateConnection();

@@ -71,7 +71,7 @@ public sealed class GetSystemWideTimeUnitsQueryHandler(
             LEFT JOIN Common.Companies c ON c.Id = tu.CompanyId
             {whereClause}
             ORDER BY c.Name ASC, tu.Created DESC, tu.Name ASC
-            {GetPaginationClause(connection)};
+            LIMIT @PageSize OFFSET @Offset;
 
             SELECT COUNT(*)
             FROM Messaging.TimeUnits tu
@@ -99,9 +99,4 @@ public sealed class GetSystemWideTimeUnitsQueryHandler(
             }
         };
     }
-
-    private static string GetPaginationClause(IDbConnection connection)
-        => connection.GetType().Name.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
-            ? "LIMIT @PageSize OFFSET @Offset"
-            : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 }

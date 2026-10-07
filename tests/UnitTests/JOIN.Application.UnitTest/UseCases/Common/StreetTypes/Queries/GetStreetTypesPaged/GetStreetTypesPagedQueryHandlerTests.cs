@@ -70,10 +70,10 @@ public sealed class GetStreetTypesPagedQueryHandlerTests
     }
 
     /// <summary>
-    /// Verifies that empty results are handled correctly with SQL Server OFFSET/FETCH syntax.
+    /// Verifies that empty results are handled correctly with LIMIT/OFFSET pagination.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenNoStreetTypesMatchWithSqlServer_ShouldReturnEmptyPagedResult()
+    public async Task Handle_WhenNoStreetTypesMatch_ShouldReturnEmptyPagedResult()
     {
         // Arrange
         var context = new GetStreetTypesPagedQueryTestContext(useNpgsqlConnection: false);
@@ -101,7 +101,7 @@ public sealed class GetStreetTypesPagedQueryHandlerTests
         response.Data.TotalCount.Should().Be(0);
         response.Data.TotalPages.Should().Be(0);
 
-        context.Connection.LastCommandText.Should().Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+        context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
     }
 
     /// <summary>

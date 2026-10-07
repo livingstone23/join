@@ -81,6 +81,13 @@ public sealed class GlobalExceptionHandler(
                     "Conflict",
                     $"Duplicate key violation detected (SQL {sqlErrorNumber}).",
                     "DUPLICATE_KEY"),
+            DbUpdateException dbUpdateException
+                when IsPostgresUniqueViolation(dbUpdateException.InnerException) => CreateProblemDetails(
+                    httpContext,
+                    StatusCodes.Status409Conflict,
+                    "Conflict",
+                    $"Duplicate key violation detected (PostgreSQL {PostgresUniqueViolationSqlState}).",
+                    "DUPLICATE_KEY"),
             _ => CreateProblemDetails(
                 httpContext,
                 StatusCodes.Status500InternalServerError,
@@ -181,5 +188,28 @@ public sealed class GlobalExceptionHandler(
 
         errorNumber = sqlNumber;
         return true;
+    }
+
+    /// <summary>
+    /// PostgreSQL SQLSTATE for <c>unique_violation</c> — the counterpart of SQL Server's
+    /// 2601/2627 on the main_postgresql fork (SPEC 39).
+    /// </summary>
+    private const string PostgresUniqueViolationSqlState = "23505";
+
+    /// <summary>
+    /// Detects a PostgreSQL unique-key violation without a hard dependency on the Npgsql
+    /// assembly, mirroring <see cref="TryGetSqlErrorNumber"/>.
+    /// </summary>
+    /// <param name="exception">Potential Npgsql exception instance.</param>
+    /// <returns><c>true</c> when the exception is a <c>PostgresException</c> with SQLSTATE 23505.</returns>
+    private static bool IsPostgresUniqueViolation(Exception? exception)
+    {
+        if (exception?.GetType().FullName is not "Npgsql.PostgresException")
+        {
+            return false;
+        }
+
+        var sqlState = exception.GetType().GetProperty("SqlState")?.GetValue(exception) as string;
+        return sqlState == PostgresUniqueViolationSqlState;
     }
 }

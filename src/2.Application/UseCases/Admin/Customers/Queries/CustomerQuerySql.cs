@@ -23,9 +23,9 @@ internal static class CustomerQuerySql
             CASE
                 WHEN p.PersonType = 1 THEN LTRIM(RTRIM(CONCAT(
                     p.FirstName, ' ',
-                    ISNULL(p.MiddleName + ' ', ''),
-                    ISNULL(p.LastName, ''), ' ',
-                    ISNULL(p.SecondLastName, ''))))
+                    COALESCE(p.MiddleName || ' ', ''),
+                    COALESCE(p.LastName, ''), ' ',
+                    COALESCE(p.SecondLastName, ''))))
                 ELSE COALESCE(NULLIF(p.CommercialName, ''), p.FirstName, '')
             END AS PersonName,
             u.Email AS UserEmail,

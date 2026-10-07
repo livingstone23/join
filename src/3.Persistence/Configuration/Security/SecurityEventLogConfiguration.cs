@@ -39,7 +39,7 @@ public class SecurityEventLogConfiguration : IEntityTypeConfiguration<SecurityEv
             .HasMaxLength(500);
 
         builder.Property(log => log.MetadataJson)
-            .HasColumnType("nvarchar(max)");
+            .HasColumnType("text");
 
         builder.HasOne(log => log.User)
             .WithMany()

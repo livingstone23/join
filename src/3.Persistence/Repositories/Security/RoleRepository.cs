@@ -35,11 +35,11 @@ public sealed class RoleRepository(
                 CreatedBy,
                 Created,
                 (SELECT COUNT(*)
-                 FROM [Security].[RoleSystemOptions] rso
+                 FROM Security.RoleSystemOptions rso
                  WHERE rso.RoleId = r.Id
                    AND rso.CompanyId = @CompanyId
                    AND rso.GcRecord = 0) AS PermissionsCount
-            FROM [Security].[Roles] r
+            FROM Security.Roles r
             WHERE r.Id = @Id AND r.GcRecord = 0
             """;
 
@@ -57,18 +57,16 @@ public sealed class RoleRepository(
         Guid companyId,
         CancellationToken cancellationToken = default)
     {
-        // Default to SQL Server pagination. The project runs on SQL Server today; when Postgres is wired,
-        // branch on _dbContext.Database.ProviderName and switch to "LIMIT @pageSize OFFSET @offset".
         var offset = (page - 1) * pageSize;
 
         var whereClause = """
-            WHERE (@nameFilter IS NULL OR Name LIKE '%' + @nameFilter + '%')
+            WHERE (@nameFilter IS NULL OR Name LIKE CONCAT('%', @nameFilter, '%'))
               AND (@isActive IS NULL
-                   OR ((@isActive = 1 AND GcRecord = 0)
-                       OR (@isActive = 0 AND GcRecord <> 0)))
+                   OR ((@isActive = TRUE AND GcRecord = 0)
+                       OR (@isActive = FALSE AND GcRecord <> 0)))
             """;
 
-        var countSql = $"SELECT COUNT(*) FROM [Security].[Roles] {whereClause};";
+        var countSql = $"SELECT COUNT(*) FROM Security.Roles {whereClause};";
         var pageSql = $"""
             SELECT
                 Id,
@@ -79,14 +77,14 @@ public sealed class RoleRepository(
                 CreatedBy,
                 Created,
                 (SELECT COUNT(*)
-                 FROM [Security].[RoleSystemOptions] rso
+                 FROM Security.RoleSystemOptions rso
                  WHERE rso.RoleId = r.Id
                    AND rso.CompanyId = @CompanyId
                    AND rso.GcRecord = 0) AS PermissionsCount
-            FROM [Security].[Roles] r
+            FROM Security.Roles r
             {whereClause}
             ORDER BY Name ASC
-            OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
+            LIMIT @pageSize OFFSET @offset;
             """;
 
         var parameters = new
@@ -134,10 +132,10 @@ public sealed class RoleRepository(
             SELECT CASE
                 WHEN EXISTS (
                     SELECT 1
-                    FROM [Security].[Roles]
+                    FROM Security.Roles
                     WHERE NormalizedName = @NormalizedName AND GcRecord = 0
-                ) THEN CAST(1 AS bit)
-                ELSE CAST(0 AS bit)
+                ) THEN CAST(1 AS boolean)
+                ELSE CAST(0 AS boolean)
             END;
             """;
 
@@ -153,12 +151,12 @@ public sealed class RoleRepository(
             SELECT CASE
                 WHEN EXISTS (
                     SELECT 1
-                    FROM [Security].[Roles]
+                    FROM Security.Roles
                     WHERE NormalizedName = @NormalizedName
                       AND Id <> @ExcludedId
                       AND GcRecord = 0
-                ) THEN CAST(1 AS bit)
-                ELSE CAST(0 AS bit)
+                ) THEN CAST(1 AS boolean)
+                ELSE CAST(0 AS boolean)
             END;
             """;
 
@@ -182,10 +180,10 @@ public sealed class RoleRepository(
             SELECT CASE
                 WHEN EXISTS (
                     SELECT 1
-                    FROM [Security].[Roles]
+                    FROM Security.Roles
                     WHERE Id = @RoleId AND GcRecord = 0
-                ) THEN CAST(1 AS bit)
-                ELSE CAST(0 AS bit)
+                ) THEN CAST(1 AS boolean)
+                ELSE CAST(0 AS boolean)
             END;
             """;
 
@@ -205,8 +203,8 @@ public sealed class RoleRepository(
         // but keeps the count strictly aligned with "the role itself is still active" semantics.
         const string sql = """
             SELECT COUNT(*) AS UsersCount
-            FROM [Security].[UserRoleCompanies] urc
-            INNER JOIN [Security].[Roles] r ON r.Id = urc.RoleId
+            FROM Security.UserRoleCompanies urc
+            INNER JOIN Security.Roles r ON r.Id = urc.RoleId
             WHERE urc.RoleId = @RoleId
               AND urc.CompanyId = @CompanyId
               AND urc.GcRecord = 0
@@ -229,8 +227,8 @@ public sealed class RoleRepository(
         // (the unique index already prevents duplicates, but be defensive).
         const string sql = """
             SELECT DISTINCT urc.UserId
-            FROM [Security].[UserRoleCompanies] urc
-            INNER JOIN [Security].[Roles] r ON r.Id = urc.RoleId
+            FROM Security.UserRoleCompanies urc
+            INNER JOIN Security.Roles r ON r.Id = urc.RoleId
             WHERE urc.RoleId = @RoleId
               AND urc.CompanyId = @CompanyId
               AND urc.GcRecord = 0
