@@ -53,14 +53,18 @@ public class RegionConfiguration : IEntityTypeConfiguration<Region>
         // CRITICAL: Integrity Constraint.
         // A specific Tenant cannot have two active Regions with the exact same Name within the same Country.
         // E.g., You can't have two "Madrid"s in "Spain" for the same company.
-        builder.HasIndex(r => new { r.CompanyId, r.CountryId, r.Name, r.GcRecord })
+        builder.HasIndex(r => new { r.CompanyId, r.CountryId, r.Name })
             .IsUnique()
-            .HasDatabaseName("IX_Regions_Company_Country_Name_GcRecord");
+            .HasFilter("[GcRecord] = 0")
+            .HasDatabaseName("UX_Regions_Company_Country_Name");
 
-        // Similar constraint for the Code (if they use one, it shouldn't be duplicated in the same country)
-        builder.HasIndex(r => new { r.CompanyId, r.CountryId, r.Code, r.GcRecord })
+        // Similar constraint for the Code (if they use one, it shouldn't be duplicated in the same country).
+        // Code is nullable: the filter keeps "[Code] IS NOT NULL" so several active regions without a code
+        // can coexist, as they did with the previous EF-generated filter (SPEC 40).
+        builder.HasIndex(r => new { r.CompanyId, r.CountryId, r.Code })
             .IsUnique()
-            .HasDatabaseName("IX_Regions_Company_Country_Code_GcRecord");
+            .HasFilter("[Code] IS NOT NULL AND [GcRecord] = 0")
+            .HasDatabaseName("UX_Regions_Company_Country_Code");
 
         // --- Relationships ---
 

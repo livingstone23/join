@@ -58,10 +58,11 @@ public class PersonConfiguration : IEntityTypeConfiguration<Person>
         // --- Indexes & Unique Constraints ---
 
         // CRITICAL: Unique index ensuring a customer's identification is unique within a company.
-        // GcRecord is included so logically deleted persons don't block new registrations with the same ID.
-        builder.HasIndex(c => new { c.CompanyId, c.IdentificationTypeId, c.IdentificationNumber, c.GcRecord })
+        // Filtered to GcRecord = 0 so logically deleted persons don't block new registrations with the same ID (SPEC 40).
+        builder.HasIndex(c => new { c.CompanyId, c.IdentificationTypeId, c.IdentificationNumber })
             .IsUnique()
-            .HasDatabaseName("IX_Persons_Company_IdType_IdNumber_GcRecord");
+            .HasFilter("[GcRecord] = 0")
+            .HasDatabaseName("UX_Persons_Company_IdType_IdNumber");
 
         // --- Relationships (Many-to-One) ---
 

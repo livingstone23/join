@@ -1,9 +1,10 @@
 # SPEC 40 — Índices únicos filtrados por soft-delete (sacar `GcRecord` de las claves únicas)
 
-> **Status:** Borrador
+> **Status:** Implementado
 > **Depends on:** Ninguna. Es prerequisito de SPEC 41 (restauración de registros borrados), que necesita que la unicidad aplique solo a registros activos.
 > **Related:** SPEC 38 (query filters), SPEC 39 (fork PostgreSQL — la sintaxis de `HasFilter` es específica del proveedor).
 > **Date:** 2026-09-28
+> **Ajuste por SPEC 40 (implementación, 2026-10-07):** (1) Nombres definitivos siguiendo el ejemplo `UX_<Tabla>_Company_<…>` (se normaliza `CompanyId` → `Company`): `UX_PersonContacts_Person_Type_Value`, `UX_Persons_Company_IdType_IdNumber`, `UX_Customers_Company_CustomerCode`, `UX_Customers_Company_Person_User`, `UX_Genders_Company_Code|Name`, `UX_Industries_Company_Code|Name`, `UX_TaxRegimes_Company_Code|Name`, `UX_IncomeRanges_Company_DisplayName|DisplayOrder`, `UX_Regions_Company_Country_Name|Code`. (2) `Region.Code` es nullable y el índice viejo tenía el filtro automático de EF `[Code] IS NOT NULL`; para no cambiar el comportamiento con códigos nulos, `UX_Regions_Company_Country_Code` usa `HasFilter("[Code] IS NOT NULL AND [GcRecord] = 0")` (los otros 13 usan `[GcRecord] = 0`).
 > **Objective:** Reemplazar los 14 índices únicos que incluyen `GcRecord` como columna de la clave por índices únicos **filtrados** (`WHERE GcRecord = 0`), el patrón que el sistema ya usa en otros 7 índices, para que la unicidad aplique solo a registros activos y los registros borrados nunca choquen entre sí.
 
 ---

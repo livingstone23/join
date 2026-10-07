@@ -70,10 +70,12 @@ public class PersonContactConfiguration : IEntityTypeConfiguration<PersonContact
 
         // 2. Integrity Constraint: 
         // Prevents the exact same contact value (e.g., the same email) from being registered 
-        // multiple times for the same person, ignoring logically deleted ones.
-        builder.HasIndex(cc => new { cc.PersonId, cc.ContactType, cc.ContactValue, cc.GcRecord })
+        // multiple times for the same person. Filtered to GcRecord = 0 so it only applies to active
+        // rows and soft-deleted duplicates never collide with each other (SPEC 40).
+        builder.HasIndex(cc => new { cc.PersonId, cc.ContactType, cc.ContactValue })
             .IsUnique()
-            .HasDatabaseName("IX_PersonContacts_Unique_ValuePerPerson");
+            .HasFilter("[GcRecord] = 0")
+            .HasDatabaseName("UX_PersonContacts_Person_Type_Value");
 
         // --- Relationships ---
 
