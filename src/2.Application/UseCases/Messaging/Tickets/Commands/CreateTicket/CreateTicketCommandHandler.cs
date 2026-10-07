@@ -105,12 +105,8 @@ public sealed class CreateTicketCommandHandler(
                 return Response<TicketDto>.Error("INVALID_ASSIGNED_USER", ["The assigned user does not exist or is inactive."]);
             }
 
-            var userCompanyRepository = _unitOfWork.GetRepository<UserCompany>();
-            var userCompanies = await userCompanyRepository.GetAllAsync();
-            var assignedUserHasTenant = userCompanies.Any(link =>
-                link.GcRecord == 0
-                && link.CompanyId == currentUserService.CompanyId
-                && link.UserId == request.AssignedToUserId.Value);
+            var assignedUserHasTenant = await _unitOfWork.UserCompanies
+                .IsActiveMemberAsync(request.AssignedToUserId.Value, currentUserService.CompanyId, cancellationToken);
 
             if (!assignedUserHasTenant)
             {

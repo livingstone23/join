@@ -19,6 +19,8 @@ public interface IUnitOfWork : IDisposable
     IPersonBusinessProfileRepository PersonBusinessProfiles { get; }
     IPersonFinancialProfileRepository PersonFinancialProfiles { get; }
     IRoleSystemOptionsRepository RoleSystemOptions { get; }
+    ICompanyModuleRepository CompanyModules { get; }
+    IUserCompanyRepository UserCompanies { get; }
 
     // --- 2. Scalable Access ---
     // This allows access to any entity without modifying this interface ever again

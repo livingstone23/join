@@ -2,6 +2,7 @@ using AutoFixture;
 using FluentAssertions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.UseCases.Messaging.Tickets;
 using JOIN.Application.UseCases.Messaging.Tickets.Commands.ReassignTicket;
 using JOIN.Domain.Admin;
@@ -187,9 +188,15 @@ public sealed class ReassignTicketCommandHandlerTests
             .ReturnsAsync(new ApplicationUser { Id = targetUserId, FirstName = "T", LastName = "U" });
         context.UserCompanyRepositoryMock.Setup(x => x.GetAllAsync())
             .ReturnsAsync(Array.Empty<UserCompany>()); // target has no tenant link
+        // SPEC 38: build the handler LAST so the negative IsActiveMemberAsync setup below wins
+        // over the default true from CreateHandler (Moq last-write semantics).
+        var handler = context.CreateHandler();
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.IsActiveMemberAsync(targetUserId, companyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
 
         // Act
-        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+        var response = await handler.Handle(request, CancellationToken.None);
 
         // Assert
         response.IsSuccess.Should().BeFalse();
@@ -479,9 +486,18 @@ public sealed class ReassignTicketCommandHandlerTests
         public Mock<IGenericRepository<CommunicationChannel>> ChannelRepositoryMock { get; } = new();
         public Mock<IGenericRepository<TicketLog>> TicketLogRepositoryMock { get; } = new();
         public Mock<IGenericRepository<TicketCompanyDefault>> TicketCompanyDefaultRepositoryMock { get; } = new();
+        public Mock<IUserCompanyRepository> UserCompanyNamedRepositoryMock { get; } = new();
 
         public ReassignTicketCommandHandler CreateHandler()
         {
+            // SPEC 38: tenant membership check is via the named repo (IgnoreQueryFilters +
+            // explicit predicate). Default to "linked" so existing tests keep passing; tests
+            // that need "not linked" override IsActiveMemberAsync explicitly.
+            UserCompanyNamedRepositoryMock
+                .Setup(x => x.IsActiveMemberAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            UnitOfWorkMock.Setup(x => x.UserCompanies).Returns(UserCompanyNamedRepositoryMock.Object);
+
             return new ReassignTicketCommandHandler(
                 UnitOfWorkMock.Object,
                 CurrentUserServiceMock.Object,

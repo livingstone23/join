@@ -203,11 +203,12 @@ public sealed class RoleCompanyRepository(
     /// <inheritdoc />
     public async Task<RoleCompany?> GetByIdForUpdateAsync(Guid id, Guid tenantId, CancellationToken cancellationToken = default)
     {
-        // Tracked read with tenant + soft-delete filter. Skips the global query filter for tenant
-        // (only soft-delete is global here) and enforces CompanyId == tenantId explicitly.
-        // Defense-in-depth against cross-tenant manipulation: even if a caller passes an Id from
-        // another tenant, this filter returns null.
+        // SPEC 38: The global query filter on RoleCompany now includes CompanyId == currentUser.CompanyId,
+        // which would break SuperAdmin cross-tenant edits (TenantResolver may return a tenant other than the
+        // token's). Skip the global filter and enforce CompanyId == tenantId + GcRecord == 0 explicitly.
+        // Defense-in-depth: even if a caller passes an Id from another tenant, this filter returns null.
         return await _dbContext.RoleCompanies
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(rc => rc.Id == id && rc.CompanyId == tenantId && rc.GcRecord == 0, cancellationToken);
     }
 

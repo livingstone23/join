@@ -11,12 +11,17 @@ namespace JOIN.Application.UseCases.Common.Regions.Queries;
 
 /// <summary>
 /// Handles paginated region queries using Dapper for high-performance reads.
+/// SPEC 38: tenant-scoped — Manager of A no longer sees regions of B. EF Core global filter
+/// (ConfigureGlobalQueryFilters) covers EF reads; this handler is Dapper and must filter by
+/// <c>r.CompanyId = @TenantId</c> explicitly.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
 /// <param name="paginationOptions">Configurable pagination defaults for the region listing endpoint.</param>
+/// <param name="currentUserService">Resolves the active tenant for the region filter.</param>
 public sealed class GetRegionsQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetRegionsQuery, Response<PagedResult<RegionDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -29,6 +34,13 @@ public sealed class GetRegionsQueryHandler(
     /// <returns>A standardized paged response containing the matching regions.</returns>
     public async Task<Response<PagedResult<RegionDto>>> Handle(GetRegionsQuery request, CancellationToken cancellationToken)
     {
+        if (currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<PagedResult<RegionDto>>.Error(
+                "COMPANY_REQUIRED",
+                ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
         var (sanitizedPageNumber, sanitizedPageSize) = _paginationSettings.Sanitize(request.PageNumber, request.PageSize);
         var offset = (sanitizedPageNumber - 1) * sanitizedPageSize;
 
@@ -37,8 +49,9 @@ public sealed class GetRegionsQueryHandler(
         var parameters = new DynamicParameters();
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
+        parameters.Add("TenantId", currentUserService.CompanyId);
 
-        var whereBuilder = new StringBuilder("WHERE r.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE r.GcRecord = 0 AND r.CompanyId = @TenantId");
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {

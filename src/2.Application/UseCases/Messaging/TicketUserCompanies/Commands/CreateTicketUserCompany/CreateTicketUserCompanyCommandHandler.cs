@@ -37,12 +37,8 @@ public sealed class CreateTicketUserCompanyCommandHandler(
             return Response<TicketUserCompanyDto>.Error("USER_NOT_FOUND", ["The provided user does not exist."]);
         }
 
-        var userCompanyRepository = _unitOfWork.GetRepository<UserCompany>();
-        var userCompanies = await userCompanyRepository.GetAllAsync();
-        var userHasTenant = userCompanies.Any(link =>
-            link.GcRecord == 0
-            && link.CompanyId == tenantId
-            && link.UserId == request.UserId);
+        var userHasTenant = await _unitOfWork.UserCompanies
+            .IsActiveMemberAsync(request.UserId, tenantId, cancellationToken);
 
         if (!userHasTenant)
         {

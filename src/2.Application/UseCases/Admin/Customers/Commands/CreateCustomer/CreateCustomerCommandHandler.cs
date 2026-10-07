@@ -37,7 +37,7 @@ public sealed class CreateCustomerCommandHandler(
         var companyRepository = unitOfWork.GetRepository<Company>();
         var personRepository = unitOfWork.GetRepository<Person>();
         var userRepository = unitOfWork.GetRepository<ApplicationUser>();
-        var userCompanyRepository = unitOfWork.GetRepository<UserCompany>();
+        var userCompanyRepository = unitOfWork.UserCompanies;
         var customerRepository = unitOfWork.GetRepository<Customer>();
 
         var company = await companyRepository.GetAsync(tenantId);
@@ -64,11 +64,8 @@ public sealed class CreateCustomerCommandHandler(
                 ["User not found."]);
         }
 
-        var userCompanies = await userCompanyRepository.GetAllAsync();
-        var userLinkedToTenant = userCompanies.Any(uc =>
-            uc.UserId == request.UserId
-            && uc.CompanyId == tenantId
-            && uc.GcRecord == 0);
+        var userLinkedToTenant = await userCompanyRepository
+            .IsActiveMemberAsync(request.UserId, tenantId, cancellationToken);
 
         if (!userLinkedToTenant)
         {

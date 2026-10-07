@@ -2,6 +2,7 @@ using AutoFixture;
 using FluentAssertions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.UseCases.Security.Auth.Login;
 using JOIN.Domain.Common;
 using JOIN.Domain.Security;
@@ -37,8 +38,8 @@ public sealed class AuthenticatedSessionIssuerTests
 
         ArrangeAuthenticatedUser(context, user);
 
-        context.UserCompanyRepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[]
             {
                 new UserCompany
@@ -48,7 +49,7 @@ public sealed class AuthenticatedSessionIssuerTests
                     IsDefault = true,
                     Created = DateTime.UtcNow.AddDays(-1)
                 }
-            }.AsEnumerable());
+            });
 
         context.UserRoleCompanyRepositoryMock
             .Setup(x => x.GetAllAsync())
@@ -56,7 +57,7 @@ public sealed class AuthenticatedSessionIssuerTests
             {
                 new UserRoleCompany { UserId = user.Id, CompanyId = requestedCompanyId, RoleId = roleIdManager },
                 new UserRoleCompany { UserId = user.Id, CompanyId = requestedCompanyId, RoleId = roleIdAdmin }
-            }.AsEnumerable());
+            });
 
         context.RoleRepositoryMock
             .Setup(x => x.GetAllAsync())
@@ -64,7 +65,7 @@ public sealed class AuthenticatedSessionIssuerTests
             {
                 new ApplicationRole { Id = roleIdManager, Name = "Manager" },
                 new ApplicationRole { Id = roleIdAdmin, Name = "Admin" }
-            }.AsEnumerable());
+            });
 
         context.TokenGeneratorMock
             .Setup(x => x.GenerateRefreshTokenString())
@@ -126,8 +127,8 @@ public sealed class AuthenticatedSessionIssuerTests
 
         ArrangeAuthenticatedUser(context, user);
 
-        context.UserCompanyRepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserCompany>());
 
         context.UserRoleCompanyRepositoryMock
@@ -140,14 +141,14 @@ public sealed class AuthenticatedSessionIssuerTests
                     CompanyId = assignedCompanyId,
                     RoleId = roleId
                 }
-            }.AsEnumerable());
+            });
 
         context.RoleRepositoryMock
             .Setup(x => x.GetAllAsync())
             .ReturnsAsync(new[]
             {
                 new ApplicationRole { Id = roleId, Name = "Agent" }
-            }.AsEnumerable());
+            });
 
         context.TokenGeneratorMock
             .Setup(x => x.GenerateToken(
@@ -192,8 +193,8 @@ public sealed class AuthenticatedSessionIssuerTests
 
         ArrangeAuthenticatedUser(context, user);
 
-        context.UserCompanyRepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[]
             {
                 new UserCompany
@@ -203,7 +204,7 @@ public sealed class AuthenticatedSessionIssuerTests
                     IsDefault = true,
                     Created = DateTime.UtcNow
                 }
-            }.AsEnumerable());
+            });
 
         context.UserRoleCompanyRepositoryMock
             .Setup(x => x.GetAllAsync())
@@ -215,14 +216,14 @@ public sealed class AuthenticatedSessionIssuerTests
                     CompanyId = assignedCompanyId,
                     RoleId = roleId
                 }
-            }.AsEnumerable());
+            });
 
         context.RoleRepositoryMock
             .Setup(x => x.GetAllAsync())
             .ReturnsAsync(new[]
             {
                 new ApplicationRole { Id = roleId, Name = "Reader" }
-            }.AsEnumerable());
+            });
 
         context.TokenGeneratorMock
             .Setup(x => x.GenerateToken(
@@ -268,8 +269,8 @@ public sealed class AuthenticatedSessionIssuerTests
 
         ArrangeAuthenticatedUser(context, user);
 
-        context.UserCompanyRepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserCompany>());
 
         context.UserRoleCompanyRepositoryMock
@@ -321,8 +322,8 @@ public sealed class AuthenticatedSessionIssuerTests
 
         ArrangeAuthenticatedUser(context, user);
 
-        context.UserCompanyRepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserCompany>());
 
         context.UserRoleCompanyRepositoryMock
@@ -373,8 +374,8 @@ public sealed class AuthenticatedSessionIssuerTests
 
         ArrangeAuthenticatedUser(context, user);
 
-        context.UserCompanyRepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserCompany>());
 
         context.UserRoleCompanyRepositoryMock
@@ -386,7 +387,7 @@ public sealed class AuthenticatedSessionIssuerTests
             .ReturnsAsync(new[]
             {
                 CreateCompany(fallbackCompanyId)
-            }.AsEnumerable());
+            });
 
         context.TokenGeneratorMock
             .Setup(x => x.GenerateToken(
@@ -427,8 +428,8 @@ public sealed class AuthenticatedSessionIssuerTests
 
         ArrangeAuthenticatedUser(context, user);
 
-        context.UserCompanyRepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserCompany>());
 
         context.UserRoleCompanyRepositoryMock
@@ -475,8 +476,8 @@ public sealed class AuthenticatedSessionIssuerTests
 
         ArrangeAuthenticatedUser(context, user);
 
-        context.UserCompanyRepositoryMock
-            .Setup(x => x.GetAllAsync())
+        context.UserCompanyNamedRepositoryMock
+            .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserCompany>());
 
         context.UserRoleCompanyRepositoryMock
@@ -606,6 +607,7 @@ public sealed class AuthenticatedSessionIssuerTests
         public Mock<IJwtTokenGenerator> TokenGeneratorMock { get; } = new();
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
         public Mock<IGenericRepository<UserCompany>> UserCompanyRepositoryMock { get; } = new();
+        public Mock<IUserCompanyRepository> UserCompanyNamedRepositoryMock { get; } = new();
         public Mock<IGenericRepository<UserRoleCompany>> UserRoleCompanyRepositoryMock { get; } = new();
         public Mock<IGenericRepository<UserRefreshToken>> RefreshTokenRepositoryMock { get; } = new();
         public Mock<IGenericRepository<ApplicationRole>> RoleRepositoryMock { get; } = new();
@@ -615,6 +617,13 @@ public sealed class AuthenticatedSessionIssuerTests
 
         public AuthenticatedSessionIssuer CreateIssuer()
         {
+            // SPEC 38: tenant memberships come from the named repo (scoped by UserId) instead
+            // of a full-table GetAllAsync(). Default to empty so tests that override win.
+            UserCompanyNamedRepositoryMock
+                .Setup(x => x.GetActiveByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Array.Empty<UserCompany>());
+            UnitOfWorkMock.Setup(x => x.UserCompanies).Returns(UserCompanyNamedRepositoryMock.Object);
+
             return new AuthenticatedSessionIssuer(
                 UserManagerMock.Object,
                 TokenGeneratorMock.Object,

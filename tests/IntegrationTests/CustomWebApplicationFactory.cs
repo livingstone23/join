@@ -107,6 +107,16 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // HealthCheckEmailPublisher don't hit DI scope validation.
             services.AddSingleton<CapturingEmailService>();
             services.AddTransient<IEmailService>(sp => sp.GetRequiredService<CapturingEmailService>());
+
+            // SPEC 38: replace the production CurrentUserService (HttpContext-only) with a
+            // test double that keeps production semantics when an HttpContext is present but
+            // falls back to a per-scope override (CompanyIdOverride) for EF-only scopes
+            // created by GlobalQueryFiltersIntegrationTests.CreateScopeAsCompany. Without
+            // this, the global tenant filters evaluate CompanyId == Guid.Empty and hide
+            // every row from those scopes.
+            services.RemoveAll<ICurrentUserService>();
+            services.AddScoped<TestCurrentUserService>();
+            services.AddScoped<ICurrentUserService>(sp => sp.GetRequiredService<TestCurrentUserService>());
         });
     }
 

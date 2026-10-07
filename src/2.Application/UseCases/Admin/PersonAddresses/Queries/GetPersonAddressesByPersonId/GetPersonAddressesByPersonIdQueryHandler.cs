@@ -36,7 +36,7 @@ public sealed class GetPersonAddressesByPersonIdQueryHandler(
         var sql = $"""
             {PersonAddressQuerySql.SelectWithCatalogNames}
             WHERE a.PersonId = @PersonId
-              AND a.CompanyId = @CompanyId
+              AND a.CompanyId = @TenantId
               AND a.GcRecord = 0
             ORDER BY a.IsDefault DESC, a.Created DESC;
             """;
@@ -47,7 +47,7 @@ public sealed class GetPersonAddressesByPersonIdQueryHandler(
                 new
                 {
                     request.PersonId,
-                    CompanyId = currentUserService.CompanyId
+                    TenantId = currentUserService.CompanyId
                 },
                 cancellationToken: cancellationToken));
 

@@ -129,11 +129,39 @@ public sealed class GetRegionsQueryHandlerTests
 
         public Mock<ISqlConnectionFactory> ConnectionFactoryMock { get; } = new();
         public FakeDbConnection Connection { get; }
+        public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public IOptions<PaginationSettings> PaginationOptions { get; }
 
         public GetRegionsQueryHandler CreateHandler()
         {
-            return new GetRegionsQueryHandler(ConnectionFactoryMock.Object, PaginationOptions);
+            // SPEC 38: tests supply a stable tenant id so r.CompanyId = @TenantId matches.
+            CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.NewGuid());
+            return new GetRegionsQueryHandler(ConnectionFactoryMock.Object, PaginationOptions, CurrentUserServiceMock.Object);
         }
+    }
+
+    /// <summary>
+    /// SPEC 38: when the token carries no CompanyId, the handler must short-circuit with
+    /// COMPANY_REQUIRED before touching the database.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTokenHasNoCompanyId_ShouldReturnCompanyRequiredError()
+    {
+        var context = new GetRegionsQueryTestContext(useNpgsqlConnection: true);
+        var handler = context.CreateHandler();
+        // SPEC 38: setup AFTER CreateHandler because Moq's last-wins semantics would otherwise
+        // overwrite this Guid.Empty setup with the handler-context default.
+        context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.Empty);
+
+        var response = await handler.Handle(
+            new GetRegionsQuery(PageNumber: 1, PageSize: 10, Name: null, Code: null, CountryId: null),
+            CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("COMPANY_REQUIRED");
+        response.Errors.Should().Contain("The authenticated token must contain a valid CompanyId claim.");
+
+        context.Connection.LastCommandText.Should().BeNullOrWhiteSpace(
+            "no SQL should reach the connection when the token has no CompanyId claim");
     }
 }

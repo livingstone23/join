@@ -8,9 +8,14 @@ namespace JOIN.Application.UseCases.Common.Provinces.Queries;
 
 /// <summary>
 /// Handles province detail queries using Dapper for high-performance reads.
+/// SPEC 38: the LEFT JOIN to Admin.Regions is now scoped by tenant + soft-delete so a
+/// province whose RegionId points to another company's region does not leak the RegionName.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
-public sealed class GetProvinceByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+/// <param name="currentUserService">Resolves the active tenant for the Region LEFT JOIN.</param>
+public sealed class GetProvinceByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetProvinceByIdQuery, Response<ProvinceDto>>
 {
     /// <summary>
@@ -40,12 +45,16 @@ public sealed class GetProvinceByIdQueryHandler(ISqlConnectionFactory connection
             LEFT JOIN Admin.Regions r
                 ON r.Id = p.RegionId
                AND r.GcRecord = 0
+               AND r.CompanyId = @TenantId
             WHERE p.Id = @Id
               AND p.GcRecord = 0;
             """;
 
         var province = await connection.QuerySingleOrDefaultAsync<ProvinceDto>(
-            new CommandDefinition(sql, new { request.Id }, cancellationToken: cancellationToken));
+            new CommandDefinition(
+                sql,
+                new { request.Id, TenantId = currentUserService.CompanyId },
+                cancellationToken: cancellationToken));
 
         if (province is null)
         {

@@ -1,5 +1,6 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
@@ -9,12 +10,15 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 
 /// <summary>
 /// Handles company module assignment update commands using the transactional write stack.
+/// SPEC 38: only SuperAdmin can update; the target CompanyId is resolved via TenantResolver.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
-public sealed class UpdateCompanyModulesCommandHandler(IUnitOfWork unitOfWork)
+/// <param name="currentUserService">Resolves the JWT-driven tenant and role context.</param>
+public sealed class UpdateCompanyModulesCommandHandler(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
     : IRequestHandler<UpdateCompanyModulesCommand, Response<CompanyModuleDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     /// <summary>
     /// Updates an existing system module assignment for the specified tenant company.
@@ -29,21 +33,22 @@ public sealed class UpdateCompanyModulesCommandHandler(IUnitOfWork unitOfWork)
             return Response<CompanyModuleDto>.Error("INVALID_COMPANY_ID", ["CompanyId is required."]);
         }
 
+        // SPEC 38: tenant scope = explicit request.CompanyId only for SuperAdmin, otherwise the token's tenant.
+        var tenantId = TenantResolver.Resolve(_currentUserService, request.CompanyId);
+
         var companyRepository = _unitOfWork.GetRepository<Company>();
-        var companyModuleRepository = _unitOfWork.GetRepository<CompanyModule>();
         var moduleRepository = _unitOfWork.GetRepository<SystemModule>();
 
-        var company = await companyRepository.GetAsync(request.CompanyId);
+        var company = await companyRepository.GetAsync(tenantId);
         if (company is null)
         {
             return Response<CompanyModuleDto>.Error("INVALID_COMPANY_ID", ["The specified CompanyId does not exist."]);
         }
 
-        var existingAssignments = await companyModuleRepository.GetAllAsync();
-        var entity = existingAssignments.FirstOrDefault(x =>
-            x.Id == request.Id
-            && x.CompanyId == request.CompanyId
-            && x.GcRecord == 0);
+        // SPEC 38: Use the named repo (IgnoreQueryFilters + explicit tenant filter) so SuperAdmin
+        // can update a CompanyModule for any tenant via TenantResolver.
+        var entity = await _unitOfWork.CompanyModules
+            .GetByIdForUpdateAsync(request.Id, tenantId, cancellationToken);
 
         if (entity is null)
         {
@@ -52,7 +57,7 @@ public sealed class UpdateCompanyModulesCommandHandler(IUnitOfWork unitOfWork)
 
         entity.IsActive = request.IsActive;
 
-        await companyModuleRepository.UpdateAsync(entity);
+        await _unitOfWork.GetRepository<CompanyModule>().UpdateAsync(entity);
         var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
         if (result <= 0)
         {

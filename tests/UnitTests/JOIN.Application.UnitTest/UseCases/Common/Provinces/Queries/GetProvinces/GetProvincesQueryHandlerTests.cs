@@ -134,11 +134,14 @@ public sealed class GetProvincesQueryHandlerTests
 
         public Mock<ISqlConnectionFactory> ConnectionFactoryMock { get; } = new();
         public FakeDbConnection Connection { get; }
+        public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public IOptions<PaginationSettings> PaginationOptions { get; }
 
         public GetProvincesQueryHandler CreateHandler()
         {
-            return new GetProvincesQueryHandler(ConnectionFactoryMock.Object, PaginationOptions);
+            // SPEC 38: tests supply a stable tenant id so the Region LEFT JOIN's tenant filter matches.
+            CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.NewGuid());
+            return new GetProvincesQueryHandler(ConnectionFactoryMock.Object, PaginationOptions, CurrentUserServiceMock.Object);
         }
     }
 }

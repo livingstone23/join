@@ -158,7 +158,7 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
     /// <param name="cancellationToken">Token used to cancel the request while the create command is being processed.</param>
     /// <returns>A <c>201 Created</c> response containing the newly created assignment resource.</returns>
     [HttpPost]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(Response<CompanyModuleDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -198,7 +198,7 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
     /// <param name="cancellationToken">Token used to cancel the request while the update command is being processed.</param>
     /// <returns>A standardized response containing the updated assignment resource.</returns>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(Response<CompanyModuleDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -239,7 +239,7 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
     /// <param name="cancellationToken">Token used to cancel the request while the delete command is being processed.</param>
     /// <returns>A standardized response containing the deleted assignment identifier.</returns>
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -256,7 +256,7 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
                 ["Authenticated token must contain a valid CompanyId claim."]));
         }
 
-        var response = await _sender.Send(new DeleteCompanyModulesCommand(id), cancellationToken);
+        var response = await _sender.Send(new DeleteCompanyModulesCommand(id, companyId), cancellationToken);
         if (!response.IsSuccess)
         {
             if (response.Message == "COMPANY_MODULE_NOT_FOUND")

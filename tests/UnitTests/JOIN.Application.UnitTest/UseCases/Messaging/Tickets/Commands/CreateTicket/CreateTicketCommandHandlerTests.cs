@@ -2,6 +2,7 @@ using AutoFixture;
 using FluentAssertions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.Mappings;
 using JOIN.Application.UseCases.Messaging.Tickets;
 using JOIN.Application.UseCases.Messaging.Tickets.Commands;
@@ -678,6 +679,12 @@ public sealed class CreateTicketCommandHandlerTests
         var userCompanyRepo = CreateRepositoryMock<UserCompany>();
         userCompanyRepo.Setup(x => x.GetAllAsync()).ReturnsAsync(new[] { new UserCompany { UserId = assignedUserId, CompanyId = companyId, GcRecord = 0 } });
         SetupRepository(unitOfWorkMock, userCompanyRepo);
+        // SPEC 38: assigned user IS linked to the current tenant — IsActiveMemberAsync returns true.
+        var userCompanyNamedRepo = new Mock<JOIN.Application.Interface.Persistence.Security.IUserCompanyRepository>();
+        userCompanyNamedRepo
+            .Setup(x => x.IsActiveMemberAsync(assignedUserId, companyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        unitOfWorkMock.Setup(x => x.UserCompanies).Returns(userCompanyNamedRepo.Object);
         var ticketUserCompanyRepo = CreateRepositoryMock<TicketUserCompany>();
         // Empty roster ⇒ assigned user has no flags, so CanResolveTicket = false.
         ticketUserCompanyRepo.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketUserCompany>());
@@ -724,6 +731,12 @@ public sealed class CreateTicketCommandHandlerTests
         var userCompanyRepo = CreateRepositoryMock<UserCompany>();
         userCompanyRepo.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<UserCompany>());
         SetupRepository(unitOfWorkMock, userCompanyRepo);
+        // SPEC 38: assigned user is NOT linked to the current tenant — IsActiveMemberAsync returns false.
+        var userCompanyNamedRepo = new Mock<JOIN.Application.Interface.Persistence.Security.IUserCompanyRepository>();
+        userCompanyNamedRepo
+            .Setup(x => x.IsActiveMemberAsync(assignedUserId, companyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        unitOfWorkMock.Setup(x => x.UserCompanies).Returns(userCompanyNamedRepo.Object);
         SetupRepository(unitOfWorkMock, CreateRepositoryMock<Ticket>());
 
         var handler = new CreateTicketCommandHandler(unitOfWorkMock.Object, mapperMock.Object, currentUserServiceMock.Object, new TicketDtoAssembler(unitOfWorkMock.Object), new TicketUserCompanyCapabilityResolver(unitOfWorkMock.Object), new TicketCodeGenerator(unitOfWorkMock.Object));

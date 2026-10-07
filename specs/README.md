@@ -74,7 +74,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 35 | Acciones de ciclo de vida del ticket | Implementado | 34 |
 | 36 | Adjuntos de ticket: parámetros, `TicketDocuments` y storage | Implementado | 35 |
 | 37 | Transiciones de status parametrizables y SLA | Implementado | 34, 35, 36 |
-| 38 | Consolidación de query filters globales | Borrador | 30 |
+| 38 | Consolidación de query filters globales | Implementado | 30 |
 | 39 | Fork `main_postgresql` | Borrador | — |
 | 40 | Índices únicos filtrados por soft-delete | Borrador | — |
 | 41 | Visibilidad de registros borrados y restauración para SuperAdmin | Borrador | 38, 40 |
@@ -122,4 +122,6 @@ Decisiones o verificaciones que no tienen spec propia todavía:
 | 46 | Acciones de sincronización con Google (OAuth, envío, webhook, worker). |
 | 44 | Mejoras diferidas del calendario: invitados, calendarios privados, turnos nocturnos, permisos de medio día. |
 | 41 | Al implementarla, incluir las entidades del calendario (44, 45, 46). |
+| 38 (F0) | Ejecutar `docs/migrations/spec-38-data-audit.sql` contra la base de desarrollo y pegar los conteos en el PR; si hay filas afectadas, decidir si se reasignan. |
+| 38 (D) | Smoke manual: un `SuperAdminCompany` solo ve su empresa y sus módulos, y no puede borrar empresas ni modificar módulos; validar con `join_frontb`. |
 | Proceso | Script de verificación de consistencia de specs (referencias inexistentes, nombres retirados, dependencias de specs pospuestas, specs fuera del índice). |

@@ -8,9 +8,13 @@ namespace JOIN.Application.UseCases.Common.Regions.Queries;
 
 /// <summary>
 /// Handles region detail queries using Dapper for high-performance reads.
+/// SPEC 38: tenant-scoped — a Manager of company A cannot read a region of company B by id.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
-public sealed class GetRegionByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+/// <param name="currentUserService">Resolves the active tenant for the region filter.</param>
+public sealed class GetRegionByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetRegionByIdQuery, Response<RegionDto>>
 {
     /// <summary>
@@ -21,6 +25,13 @@ public sealed class GetRegionByIdQueryHandler(ISqlConnectionFactory connectionFa
     /// <returns>A standardized response containing the requested region.</returns>
     public async Task<Response<RegionDto>> Handle(GetRegionByIdQuery request, CancellationToken cancellationToken)
     {
+        if (currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<RegionDto>.Error(
+                "COMPANY_REQUIRED",
+                ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
         using var connection = connectionFactory.CreateConnection();
 
         const string sql = """
@@ -36,11 +47,15 @@ public sealed class GetRegionByIdQueryHandler(ISqlConnectionFactory connectionFa
                 ON c.Id = r.CountryId
                AND c.GcRecord = 0
             WHERE r.Id = @Id
-              AND r.GcRecord = 0;
+              AND r.GcRecord = 0
+              AND r.CompanyId = @TenantId;
             """;
 
         var region = await connection.QuerySingleOrDefaultAsync<RegionDto>(
-            new CommandDefinition(sql, new { request.Id }, cancellationToken: cancellationToken));
+            new CommandDefinition(
+                sql,
+                new { request.Id, TenantId = currentUserService.CompanyId },
+                cancellationToken: cancellationToken));
 
         if (region is null)
         {
