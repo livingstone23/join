@@ -86,7 +86,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 47 | Ingesta de tickets por WhatsApp y correo | **Pospuesto** | 34, 35, 36, 99, 42, 43 |
 | 48 | Bloqueo de APIs y menú por módulo activo de la empresa | Borrador | 43 |
 | 49 | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Borrador | 36 |
-| 50 | `main_postgresql`: pendientes para llevar QA a PostgreSQL | Borrador | 39 |
+| 50 | `main_postgresql`: port de 40–49 y pendientes para llevar QA a PostgreSQL | Borrador | 39, 40–49 |
 | 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
 
 ---
@@ -103,7 +103,9 @@ Orden sugerido de implementación (cada uno requiere `Aprobado`):
 6. **44** — calendario base.
 7. **46** — estructura de Google Calendar.
 
-En paralelo, sin dependencias con lo anterior: **38 → 40 → 41** (query filters, índices filtrados, restauración) y **39** (fork PostgreSQL, que deberá portar los índices filtrados y el SQL nuevo de 43, 44, 46 y 48).
+En paralelo, sin dependencias con lo anterior: **38 → 40 → 41** (query filters, índices filtrados, restauración) y **39** (fork PostgreSQL, `Implementado` en `main_postgresql`).
+
+**Cierre de etapa — 50:** las specs 40–49 se implementan en `main` (SQL Server). La **50** sale de `main_postgresql`, hace un único `git merge main`, convierte a PostgreSQL todo lo de 40–49 (migración incremental Npgsql, `HasFilter`, SQL) y cierra los pendientes de QA; su PR va a `main_postgresql`, nunca a `main`. Después, QA pasa a PostgreSQL.
 
 **Etapa posterior** (`Pospuesto`): **45** (agente de canales del calendario) y **47** (tickets por WhatsApp y correo), después de concluir Tickets y Calendar.
 
