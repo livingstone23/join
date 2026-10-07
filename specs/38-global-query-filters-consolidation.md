@@ -4,6 +4,7 @@
 > **Depends on:** SPEC 30 (`UserConnectionLog` ganó `GcRecord` ahí; esta spec cierra el lado EF que quedó pendiente). Establece la convención que deben seguir las specs 34 en adelante del módulo de tickets (`TicketUserCompany`, `TicketAttachmentSettings`, `TicketDocument`, `TicketInboundChannel`, `TicketStatusTransition` — ninguna existe todavía en el dominio).
 > **Date:** 2026-09-28
 > **Objective:** Mantener `ApplicationDbContext.ConfigureGlobalQueryFilters` como lista explícita (una línea `HasQueryFilter` por entidad, agrupada por sección), completarla con las entidades tenant-scoped que hoy no tienen filtro (incluida `Region`), alinear `UserConnectionLog` con SPEC 30, y agregar un test de guarda que falle cuando una entidad nueva quede sin filtro.
+> **Pendientes (2026-10-07):** 10 de 12 criterios de aceptación aplicados. Quedan dos verificaciones, sin cambios de código: (1) ejecutar la auditoría F0 (`docs/migrations/spec-38-data-audit.sql`, ya corregido) contra la base de desarrollo y pegar los conteos en el PR; (2) smoke manual de la sección D (`SuperAdminCompany` limitado a su empresa) y validación con `join_frontb`.
 
 ---
 
@@ -262,6 +263,18 @@ Diferencial -0.12pp / -0.09pp / -0.14pp — pasa el threshold de 90% línea.
 `JOIN.Application.UnitTest` vía `[assembly: NeutralResourcesLanguage("en-US")]` o
 `Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture` en un
 `AssemblyInitialize`. Es deuda separada del spec 38 — abrir issue aparte.
+
+**Pendiente (2026-10-07):** fijar `LANG=en_US.UTF-8` y `LC_ALL=en_US.UTF-8` en el job `build-and-test` de `.github/workflows/ci.yml`. No se incluyó en el push porque el token de git no tiene el permiso `workflow`; se aplica editando el archivo desde la web de GitHub.
+
+### Script de auditoría F0 corregido (2026-10-07)
+
+`docs/migrations/spec-38-data-audit.sql` tenía tres errores, corregidos antes de ejecutarlo:
+
+- La sección C usaba `Common.Provinces.CompanyId`, que no existe (`Province` es global): la consulta fallaba. Ahora cuenta las provincias activas cuyo `RegionId` apunta a una región activa, agrupadas por la empresa dueña de la región.
+- La sección A no revisaba `CompanyId` vacío en `Security.RoleCompanies` ni `Admin.CompanyModules`, que también pasaron a filtro de tenant.
+- La sección D consultaba `Security.CompanyModules`; la tabla está en el esquema `Admin`.
+
+La auditoría sigue **sin ejecutarse**: el criterio de F0 queda pendiente hasta correrla y pegar los conteos en el PR.
 
 ### Helpers añadidos al fixture de integration tests
 
