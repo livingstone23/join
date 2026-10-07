@@ -1,6 +1,6 @@
 # SPEC 39 — Fork `main_postgresql`: portar persistencia, queries Dapper y seed a PostgreSQL
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** Ninguna dependencia dura de código. SPEC 38 (consolidación de query filters) no necesita portarse — su mecanismo (`Expression`/reflexión sobre `IAuditableEntity`/`BaseTenantEntity`) es 100% agnóstico de proveedor y funciona igual una vez fusionado a `main`; solo las declaraciones puntuales de `HasFilter`/`HasColumnType` en las clases `IEntityTypeConfiguration<T>` (fuera del alcance de SPEC 38) necesitan ajuste, y son objeto de esta spec.
 > **Date:** 2026-09-28
 > **Objective:** Crear la rama `main_postgresql` como **fork permanente** (sin plan de reintegración a `main`) donde el sistema corre íntegramente contra PostgreSQL: registro del `DbContext` (`UseNpgsql` en vez de `UseSqlServer`), un historial de migraciones EF Core propio y generado desde cero para esa rama, las 9 declaraciones `HasFilter`/4 `HasColumnType` con sintaxis exclusiva de SQL Server corregidas, los ~29 archivos de SQL crudo (Dapper) con sintaxis no portable corregidos, el seed verificado end-to-end, una suite de tests de integración *smoke* (no paridad completa) contra `Testcontainers.PostgreSql`, y un job de CI que corre exclusivamente en esa rama.
