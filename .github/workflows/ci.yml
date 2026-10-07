@@ -10,6 +10,11 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
+    # El token por defecto del repo es de solo lectura; "Add Coverage PR Comment"
+    # necesita escribir en la PR (SPEC 39, primera PR que ejecutó este paso).
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
     - name: 📥 Checkout Code
