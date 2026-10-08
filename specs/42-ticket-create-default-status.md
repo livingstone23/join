@@ -1,6 +1,6 @@
 # SPEC 42 — Valores iniciales del ticket desde `TicketCompanyDefaults`, con estado inicial editable
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** Ninguna para implementarse. Relacionada con SPEC 35 (lifecycle), SPEC 47 (ingesta por canal, etapa posterior — su `RegisterInboundTicketCommandHandler` debe usar el mismo resolvedor; antes estaba en SPEC 99), SPEC 37 (estados finales solo vía `FinishTicket`) y con las specs de front `join_frontb/specs/17-tickets-nuevo.md` y `19-tickets-configuracion.md`.
 > **Date:** 2026-09-28
 > **Objective:** Que al crear un ticket el estado sea opcional en el request: si el cliente lo envía, el backend valida que sea un estado activo, no final y de la misma empresa; si no lo envía, aplica `Messaging.TicketCompanyDefaults.TicketStatusDefaultId`.
