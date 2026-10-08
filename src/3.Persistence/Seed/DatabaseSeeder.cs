@@ -1422,22 +1422,34 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         var now = DateTime.UtcNow;
         var seeds = new List<CommunicationChannel>
         {
-            new() { Name = "SendGrid", Provider = "SendGrid", Code = "SENDGRID", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
-            new() { Name = "Telegram", Provider = "Telegram", Code = "TELEGRAM", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
-            new() { Name = "Twilio", Provider = "Twilio", Code = "TWILIO", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
-            new() { Name = "WhatsApp", Provider = "Meta", Code = "WHATSAPP", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 }
+            new() { Name = "SendGrid", Provider = "SendGrid", Code = CommunicationChannelCodes.SendGrid, IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
+            new() { Name = "Telegram", Provider = "Telegram", Code = CommunicationChannelCodes.Telegram, IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
+            new() { Name = "Twilio", Provider = "Twilio", Code = CommunicationChannelCodes.Twilio, IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
+            new() { Name = "WhatsApp", Provider = "Meta", Code = CommunicationChannelCodes.WhatsApp, IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
+            // SPEC 99: internal channels for requests born inside JOIN (web console) or a first-party app.
+            new() { Name = "Web", Provider = "Internal", Code = CommunicationChannelCodes.Web, IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
+            new() { Name = "App", Provider = "Internal", Code = CommunicationChannelCodes.App, IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 }
         };
 
         var inserted = 0;
 
         foreach (var seed in seeds)
         {
-            var exists = await _context.CommunicationChannels
+            var existing = await _context.CommunicationChannels
                 .IgnoreQueryFilters()
-                .AnyAsync(c => c.Name == seed.Name);
+                .FirstOrDefaultAsync(c => c.Name == seed.Name);
 
-            if (exists)
+            if (existing is not null)
             {
+                // SPEC 99: a channel created by hand with the same name but another code is not fixed here
+                // (the code drives the Application logic); the CRUD of channels corrects it.
+                if (!string.Equals(existing.Code, seed.Code, StringComparison.Ordinal))
+                {
+                    _logger.LogWarning(
+                        "Communication channel '{Name}' exists with code '{Code}' instead of '{ExpectedCode}'. Fix it from the channels catalog.",
+                        existing.Name, existing.Code, seed.Code);
+                }
+
                 continue;
             }
 
@@ -1451,6 +1463,35 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         }
 
         _logger.LogInformation("Communication channels catalog seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
+    }
+
+    /// <summary>
+    /// Default channel for seeded ticket data (SPEC 99): <c>WEB</c>, then <c>WHATSAPP</c>, then the oldest active
+    /// channel. A deleted <c>WEB</c> is never revived here — only a SuperAdmin restores it (SPEC 41) — so the
+    /// seed logs a warning and falls back.
+    /// </summary>
+    private async Task<CommunicationChannel?> ResolveDefaultTicketChannelAsync()
+    {
+        var channels = _context.CommunicationChannels.IgnoreQueryFilters();
+
+        var web = await channels.FirstOrDefaultAsync(x => x.Code == CommunicationChannelCodes.Web);
+        if (web is { GcRecord: 0 })
+        {
+            return web;
+        }
+
+        if (web is not null)
+        {
+            _logger.LogWarning(
+                "Communication channel {Code} is deleted; ticket seed data falls back to another channel. Restore it with POST /CommunicationChannels/{Id}/restore.",
+                CommunicationChannelCodes.Web, web.Id);
+        }
+
+        return await channels.FirstOrDefaultAsync(x => x.GcRecord == 0 && x.Code == CommunicationChannelCodes.WhatsApp)
+            ?? await channels
+                .Where(x => x.GcRecord == 0)
+                .OrderBy(x => x.Created)
+                .FirstOrDefaultAsync();
     }
 
     private async Task<Guid> SeedMessagingCatalogsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
@@ -1654,17 +1695,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync();
 
-        var defaultChannelId = await _context.CommunicationChannels
-            .IgnoreQueryFilters()
-            .Where(x => x.GcRecord == 0 && x.Code == "WHATSAPP")
-            .Select(x => (Guid?)x.Id)
-            .FirstOrDefaultAsync()
-            ?? await _context.CommunicationChannels
-                .IgnoreQueryFilters()
-                .Where(x => x.GcRecord == 0)
-                .OrderBy(x => x.Created)
-                .Select(x => (Guid?)x.Id)
-                .FirstOrDefaultAsync();
+        var defaultChannelId = (await ResolveDefaultTicketChannelAsync())?.Id;
 
         if (!openStatusId.HasValue
             || !mediumComplexityId.HasValue
@@ -1868,12 +1899,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             .OrderBy(x => x.Code)
             .FirstOrDefaultAsync();
 
-        var channel = await _context.CommunicationChannels
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.GcRecord == 0 && x.Code == "WHATSAPP")
-            ?? await _context.CommunicationChannels
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(x => x.GcRecord == 0);
+        var channel = await ResolveDefaultTicketChannelAsync();
 
         var customers = await _context.Persons
             .IgnoreQueryFilters()
@@ -2009,7 +2035,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 continue;
             }
 
-            var seedCreationSummary = string.IsNullOrWhiteSpace(channel.Name)
+            // Tickets seeded before SPEC 99 keep their original channel, so only name the current default when it is theirs.
+            var seedCreationSummary = ticket.ChannelId != channel.Id || string.IsNullOrWhiteSpace(channel.Name)
                 ? "Ticket creado"
                 : $"Ticket creado desde {channel.Name}";
 

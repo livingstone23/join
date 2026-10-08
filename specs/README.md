@@ -88,7 +88,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 49 | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Borrador | 36 |
 | 50 | `main_postgresql`: port de 40–49 y pendientes para llevar QA a PostgreSQL (archivo en `main_postgresql`) | Borrador | 39, 40–49 |
 | 51 | Invalidación de la caché de permisos con la clave `permissions:v2` | Borrador | 17, 25 |
-| 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
+| 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Aprobado | — |
 
 ---
 
@@ -97,9 +97,9 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 Orden sugerido de implementación (cada uno requiere `Aprobado`):
 
 1. **99** — canales `WEB`/`APP` (lo necesita 44; 42 no depende de ella).
-2. **43** — módulos base, opciones conectadas a su módulo, rutas en inglés.
-3. **48** — bloqueo por módulo e interruptor `Modules:EnforceCompanyModules`.
-4. **42** — estado inicial del ticket.
+2. **42** — estado inicial del ticket (sin dependencias; cierra Tickets antes de pasar a módulos y calendario, decisión 2026-10-08).
+3. **43** — módulos base, opciones conectadas a su módulo, rutas en inglés.
+4. **48** — bloqueo por módulo e interruptor `Modules:EnforceCompanyModules`.
 5. **44** — calendario base.
 6. **46** — estructura de Google Calendar.
 

@@ -103,6 +103,14 @@ new() { Name = "App", Provider = "Internal", Code = "APP", IsActive = true, Crea
 
 ---
 
+## Decisiones de implementación (Ajuste por SPEC 99, 2026-10-08)
+
+- `ResolveDefaultTicketChannelAsync` (seeder) concentra la elección del canal de la siembra de tickets: `WEB` activo → `WHATSAPP` → el canal activo más antiguo. La usan la siembra de `TicketCompanyDefault` y `SeedJoinTicketsAsync`.
+- `SeedCommunicationChannelsAsync` registra un warning cuando un canal sembrado existe con el mismo `Name` y otro `Code` (riesgo de la tabla de abajo); no lo corrige.
+- `SeedJoinTicketsAsync`: el log de creación que se agrega a un ticket demo ya existente sin log nombra el canal solo si es el del ticket (los tickets anteriores conservan su canal).
+- Migración `Spec99InternalCommunicationChannels`: sin cambios de modelo; `INSERT` condicionado por `Name` o `Code`, `CreatedBy = 'Spec99_Migration'`. El test de integración comprueba que en una base limpia las filas `WEB`/`APP` las inserta la migración (antes de la siembra).
+- Tests: `tests/IntegrationTests/Persistence/CommunicationChannelSeedTests.cs` (base limpia + segunda siembra; `WEB` borrado → no se reactiva y el canal por defecto cae a `WHATSAPP`).
+
 ## Decisions taken and discarded
 
 - **Reducir la 99 y mover la ingesta a SPEC 47** (decisión del usuario, 2026-10-01) vs posponer la 99 completa. Los canales internos se necesitan ya (SPEC 44 y la etiqueta correcta de los tickets creados desde la aplicación); la ingesta externa no.
