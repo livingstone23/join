@@ -31,9 +31,12 @@ public sealed class GetTicketStatusTransitionsQueryHandler(
         }
 
         var parameters = new DynamicParameters();
-        parameters.Add("TenantId", _currentUserService.CompanyId);
+        parameters.Add("TenantId", TenantResolver.Resolve(_currentUserService, request.CompanyId));
 
-        var whereBuilder = new StringBuilder("WHERE tst.CompanyId = @TenantId AND tst.GcRecord = 0");
+        // SPEC 41: deleted rules only for a SuperAdmin asking includeDeleted=true.
+        var whereBuilder = new StringBuilder(SoftDeleteVisibility.IncludeDeleted(_currentUserService, request.IncludeDeleted)
+            ? "WHERE tst.CompanyId = @TenantId"
+            : "WHERE tst.CompanyId = @TenantId AND tst.GcRecord = 0");
 
         if (request.FromStatusId.HasValue && request.FromStatusId.Value != Guid.Empty)
         {
@@ -46,6 +49,7 @@ public sealed class GetTicketStatusTransitionsQueryHandler(
         var sql = $"""
             SELECT
                 tst.Id,
+                tst.GcRecord,
                 tst.FromStatusId,
                 fs.Name AS FromStatusName,
                 tst.ToStatusId,

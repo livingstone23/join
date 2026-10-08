@@ -46,6 +46,8 @@ public class TicketsController(ISender sender) : ControllerBase
         [FromQuery] bool? isVisibleToExternals = null,
         [FromQuery] DateTime? fromDate = null,
         [FromQuery] DateTime? toDate = null,
+        [FromQuery] bool? includeDeleted = null,
+        [FromQuery] Guid? companyId = null,
         CancellationToken cancellationToken = default)
     {
         var query = new GetTicketsQuery(
@@ -59,7 +61,9 @@ public class TicketsController(ISender sender) : ControllerBase
             projectId,
             isVisibleToExternals,
             fromDate,
-            toDate);
+            toDate,
+            includeDeleted,
+            companyId);
 
         var response = await _sender.Send(query, cancellationToken);
 
@@ -128,9 +132,13 @@ public class TicketsController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetById(
+        Guid id,
+        [FromQuery] bool? includeDeleted = null,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
     {
-        var response = await _sender.Send(new GetTicketByIdQuery(id), cancellationToken);
+        var response = await _sender.Send(new GetTicketByIdQuery(id, includeDeleted, companyId), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -231,6 +239,7 @@ public class TicketsController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var response = await _sender.Send(new DeleteTicketCommand(id), cancellationToken);
@@ -361,6 +370,29 @@ public class TicketsController(ISender sender) : ControllerBase
     /// <c>400</c> that a <c>BadRequest</c> fallback would produce — closing
     /// the cross-endpoint incoherence that existed before this spec.
     /// </summary>
+    /// <summary>
+    /// Restores a logically deleted ticket with the attachments of its cascade and logs the restoration (SPEC 41).
+    /// Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The ticket identifier.</param>
+    /// <param name="companyId">Optional explicit company, honored only for SuperAdmin.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new RestoreTicketCommand(id, companyId), cancellationToken);
+        return this.ToRestoreResult(response);
+    }
+
     private IActionResult MapResponseError<T>(Response<T> response)
     {
         return response.Message switch
@@ -371,7 +403,7 @@ public class TicketsController(ISender sender) : ControllerBase
                 => NotFound(response),
             "TICKET_REASSIGN_FORBIDDEN" or "TICKET_FINISH_FORBIDDEN"
                 => StatusCode(StatusCodes.Status403Forbidden, response),
-            "TICKET_ALREADY_FINISHED"
+            "TICKET_ALREADY_FINISHED" or "TICKET_IN_USE"
                 => Conflict(response),
             _ => BadRequest(response)
         };

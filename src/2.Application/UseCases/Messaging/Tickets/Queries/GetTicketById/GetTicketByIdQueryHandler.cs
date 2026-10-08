@@ -41,9 +41,15 @@ public sealed class GetTicketByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        // SPEC 41: a deleted ticket only for a SuperAdmin asking includeDeleted=true; its logs stay active-only.
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND t.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 t.Id,
+                t.GcRecord,
                 t.CompanyId,
                 co.Name AS CompanyName,
                 t.Code,
@@ -104,7 +110,7 @@ public sealed class GetTicketByIdQueryHandler(
             LEFT JOIN Messaging.Tickets pt ON t.PrecedentTicketId = pt.Id
             WHERE t.Id = @Id
               AND t.CompanyId = @TenantId
-              AND t.GcRecord = 0;
+              {activeOnly};
 
             SELECT
                 tl.Id,
@@ -115,6 +121,7 @@ public sealed class GetTicketByIdQueryHandler(
                     WHEN 3 THEN 'ExternalNote'
                     WHEN 4 THEN 'Reassignment'
                     WHEN 5 THEN 'Finalization'
+                    WHEN 6 THEN 'Restoration'
                     ELSE CONCAT('Unknown(', tl.LogType, ')')
                 END AS LogType,
                 tl.Summary,
@@ -150,7 +157,7 @@ public sealed class GetTicketByIdQueryHandler(
         using var multi = await connection.QueryMultipleAsync(
             new CommandDefinition(
                 sql,
-                new { request.Id, TenantId = currentUserService.CompanyId, ViewerId = viewerId },
+                new { request.Id, TenantId = TenantResolver.Resolve(currentUserService, request.CompanyId), ViewerId = viewerId },
                 cancellationToken: cancellationToken));
 
         var row = await multi.ReadFirstOrDefaultAsync<TicketSlaRow>();
@@ -173,6 +180,7 @@ public sealed class GetTicketByIdQueryHandler(
         var ticket = new TicketDto
         {
             Id = row.Id,
+            GcRecord = row.GcRecord,
             CompanyId = row.CompanyId,
             CompanyName = row.CompanyName,
             Code = row.Code,
@@ -226,6 +234,7 @@ public sealed class GetTicketByIdQueryHandler(
     private sealed class TicketSlaRow
     {
         public Guid Id { get; init; }
+        public int GcRecord { get; init; }
         public Guid CompanyId { get; init; }
         public string? CompanyName { get; init; }
         public string Code { get; init; } = string.Empty;

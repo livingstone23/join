@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Messaging.TicketAttachmentSettings.Queries;
 /// Query para recuperar una configuración de adjuntos por identificador.
 /// </summary>
 /// <param name="Id">Identificador de la configuración.</param>
-public record GetTicketAttachmentSettingByIdQuery(Guid Id) : IRequest<Response<TicketAttachmentSettingsDto>>;
+public record GetTicketAttachmentSettingByIdQuery(Guid Id, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<TicketAttachmentSettingsDto>>;

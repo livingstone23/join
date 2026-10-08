@@ -1672,7 +1672,9 @@ namespace JOIN.Persistence.Migrations
                     b.HasIndex("ChannelDefaultId");
 
                     b.HasIndex("CompanyId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("UX_TicketCompanyDefaults_Company_Active")
+                        .HasFilter("[GcRecord] = 0");
 
                     b.HasIndex("ProjectDefaultId");
 

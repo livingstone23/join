@@ -102,6 +102,7 @@ public static class ConfigureServices
         services.AddScoped<RolePermissionCacheInvalidator>();
         services.AddScoped<PersonCascadeCoordinator>();
         services.AddScoped<SystemOptionCascadeCoordinator>();
+        services.AddScoped<TicketCascadeCoordinator>();
 
         return services;
     

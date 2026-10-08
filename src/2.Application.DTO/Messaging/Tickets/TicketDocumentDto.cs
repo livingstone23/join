@@ -1,3 +1,5 @@
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Messaging;
 
 /// <summary>
@@ -6,7 +8,7 @@ namespace JOIN.Application.DTO.Messaging;
 /// interno de almacenamiento; el cliente descarga por <c>Id</c> a través
 /// del endpoint dedicado, nunca construye la ruta.
 /// </summary>
-public sealed record TicketDocumentDto
+public sealed record TicketDocumentDto : SoftDeletableDto
 {
     /// <summary>
     /// Identificador del documento.

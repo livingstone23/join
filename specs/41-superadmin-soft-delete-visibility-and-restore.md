@@ -3,6 +3,7 @@
 > **Status:** Aprobado
 > **Depends on:** SPEC 38 (query filters completos — define qué es "de empresa" y qué es "global"), SPEC 40 (índices únicos filtrados — la unicidad debe aplicar solo a activos para poder restaurar sin colisiones).
 > **Date:** 2026-09-28
+> **Historia (2026-10-08, Etapa 4):** vuelve a Borrador por cambio de lógica al planificar la Etapa 4: `Ticket` pasa a ser padre de composición de `TicketDocument` (cascada), los tickets de seguimiento activos bloquean el borrado de un ticket, se agrega `LogType.Restoration` y se filtra el índice único de `TicketCompanyDefault`. Las etapas 1 a 3 ya están implementadas y no cambian.
 > **Historia (2026-10-08):** vuelve a Borrador por cambio de lógica del borrado (sección E, "Borrado en cascada de composición"). Las etapas 1 y 2 ya implementadas se ajustan cuando la spec se vuelva a aprobar.
 > **Historia (2026-10-07):** al planificar la Etapa 1, el usuario decidió que un hijo no se restaura mientras su padre siga borrado, incluidas las referencias a catálogos (reemplaza la decisión del 2026-09-28 que lo permitía), y que los endpoints `system-wide` de SuperAdmin quedan sin cambios. Se agregaron el plan y el inventario de la Etapa 1.
 > **Objective:** Permitir que el rol Identity `SuperAdmin` vea registros activos **y** borrados (`GcRecord > 0`) de todas las entidades, y que pueda restaurar un registro borrado (`GcRecord → 0`), sin abrir ninguna fuga de datos entre empresas para el resto de los roles. Se implementa por etapas.
@@ -94,7 +95,8 @@ Este patrón ya existe en la mayoría de los catálogos: `DeleteGender`, `Delete
 - **Composición** (el hijo no existe sin el padre): borrar el padre marca como borrados (`GcRecord`) al padre y a sus hijos activos, en la misma operación y con el mismo sello de fecha. Aplica a:
   - `Person` → `PersonAddress`, `PersonContact`, `PersonEmployment`, `PersonBusinessProfile`, `PersonFinancialProfile`.
   - `SystemModule` → `SystemOption` → `SystemOption` hijas (`ParentId`), en todos los niveles.
-- **Referencia** (el hijo apunta a un catálogo o a otra entidad con vida propia): sigue la regla anterior, el padre con referencias activas no se borra → `<ENTIDAD>_IN_USE`. Aplica a los catálogos (`Gender`, `Country`, `TimeUnit`…) y, para `Person`, a `Customer`, `Ticket` y `UserPerson`; para `SystemOption`, a `RoleSystemOption`; para `SystemModule`, a `CompanyModule`.
+  - `Ticket` → `TicketDocument` (decisión 2026-10-08, Etapa 4).
+- **Referencia** (el hijo apunta a un catálogo o a otra entidad con vida propia): sigue la regla anterior, el padre con referencias activas no se borra → `<ENTIDAD>_IN_USE`. Aplica a los catálogos (`Gender`, `Country`, `TimeUnit`…) y, para `Person`, a `Customer`, `Ticket` y `UserPerson`; para `SystemOption`, a `RoleSystemOption`; para `SystemModule`, a `CompanyModule`; para `Ticket`, a sus tickets de seguimiento (`PrecedentTicketId`).
 - **Orden de los chequeos al borrar un padre de composición:** primero las referencias (si hay alguna activa en el padre o en cualquier hijo que se borraría → `_IN_USE` y no se borra nada); después la cascada.
 - **Permiso:** basta `CanDelete` sobre el recurso del padre (los hijos de `Person` comparten el recurso `Persons`).
 - **Restaurar un padre de composición** restaura con él a los hijos que se borraron en la misma cascada (mismo sello `GcRecord` que el padre), aplicando el chequeo de duplicado activo y las marcas default/principal/actual de cada hijo. Los hijos borrados antes, uno por uno, quedan borrados. **Limitación:** `GcRecord` guarda solo la fecha (`yyyyMMdd`), así que un hijo borrado individualmente el mismo día que el padre también se restaura con él.
@@ -281,6 +283,47 @@ Rama `spec-41-etapa-3-seguridad` (desde `main` con las etapas 1 y 2). Dos partes
 
 - `TicketLog` no se restaura (sección E).
 - Restaurar un `Ticket` genera una entrada en `TicketLog` (auditoría del ticket).
+
+#### Etapa 4 — Plan e inventario (2026-10-08)
+
+Rama `spec-41-etapa-4-tickets` (desde `main` con las etapas 1 a 3).
+
+**Alcance verificado (F0).** Solo se restauran entidades con caso de uso de borrado. `TicketNotification` no tiene borrado (queda fuera, igual que `ApplicationUser` en la Etapa 3); `TicketLog` nunca se restaura (sección F). BE-99 no está implementada.
+
+| Entidad | Borrado hoy | Queries (`includeDeleted`) | Padres (`PARENT_DELETED`) | Duplicado activo | Restore |
+|---|---|---|---|---|---|
+| `Ticket` | `DELETE /Tickets/{id}` (solo marca el ticket) | `GetTickets`, `GetTicketById` (Dapper) | `TicketStatus`, `TicketComplexity`, `TimeUnit`, `CommunicationChannel`; `Person`, `Project`, `Area`, ticket precedente si los tiene | — (índice `(CompanyId, Code)` sin filtro: el código borrado sigue ocupado) | `POST /Tickets/{id}/restore` + cascada de adjuntos + `TicketLog` |
+| `TicketDocument` | `DELETE /Tickets/{ticketId}/documents/{id}` | `GetTicketDocuments` (Dapper). `DownloadTicketDocument` sigue solo activos | `Ticket` | — ; tope `MaxFilesPerTicket` | `POST /Tickets/{ticketId}/documents/{id}/restore` |
+| `TicketCompanyDefault` | `DELETE /TicketCompanyDefaults/{id}` | `GetTicketCompanyDefaults`, `GetTicketCompanyDefaultById` (Dapper) | `TicketStatus`, `TicketComplexity`, `TimeUnit`, `Area`, `Project`, `CommunicationChannel` (los que tenga) | `CompanyId` (índice pasa a filtrado, ver decisiones) | `POST /TicketCompanyDefaults/{id}/restore` |
+| `TicketAttachmentSettings` | `DELETE /TicketAttachmentSettings/{id}` | `GetTicketAttachmentSettings`, `GetTicketAttachmentSettingById` (Dapper) | — | `UX_TicketAttachmentSettings_Company_Active` | `POST /TicketAttachmentSettings/{id}/restore` |
+| `TicketStatusTransition` | `DELETE /TicketStatusTransitions/{id}` | `GetTicketStatusTransitions` (Dapper, sin "por id") | `TicketStatus` origen y destino | `(CompanyId, FromStatusId, ToStatusId)` filtrado | `POST /TicketStatusTransitions/{id}/restore` |
+| `TicketUserCompany` | `DELETE /TicketUserCompanies/{id}` | `GetTicketUserCompanies`, `GetTicketUserCompanyById` (Dapper) | `ApplicationUser`; membresía `UserCompany` activa en la empresa | `(UserId, CompanyId)` filtrado | `POST /TicketUserCompanies/{id}/restore` |
+
+Los endpoints `system-wide` (`GetSystemWideTickets`, `GetSystemWideTicketCompanyDefaults`, `GetSystemWideTicketAttachmentSettings`, `GetSystemWideTicketUserCompanies`) quedan sin cambios (decisión 2026-10-07). Las queries de empresa pasan a `TenantResolver` (`?companyId=` para SuperAdmin), como en las etapas anteriores.
+
+**Decisiones (2026-10-08):**
+- **`DeleteTicket`:** composición → los `TicketDocument` activos del ticket se borran en cascada con el mismo sello; referencia → tickets de seguimiento activos (`PrecedentTicketId` = el ticket) bloquean: `TICKET_IN_USE` (409) con `"Active follow-up tickets: N"`. `TicketNotification` y `TicketLog` no se tocan. `RestoreTicket` restaura los adjuntos de su misma cascada.
+- **Bitácora:** nuevo `LogType.Restoration = 6` (la columna es entera, sin migración). `RestoreTicket` agrega una entrada pública con el usuario que restaura.
+- **Índice de `TicketCompanyDefault`:** el índice único por `CompanyId` no estaba filtrado (SPEC 40 no lo incluyó): borrar la configuración y crear otra fallaba con un 500. Se filtra por `GcRecord = 0` (migración, patrón SPEC 40) y el restore chequea `ACTIVE_DUPLICATE_EXISTS`.
+- **`TicketDocument`:** restaurar respeta `MaxFilesPerTicket` (`MAX_FILES_PER_TICKET_REACHED`, 409); la cuota diaria no aplica. El archivo físico no se borra con el soft delete, así que restaurar no toca el storage.
+- **`TicketUserCompany`:** restaurar exige que el usuario siga siendo miembro activo de la empresa (`UserCompany`) → si no, `PARENT_DELETED`. Mismo criterio que el alta (`USER_NOT_IN_TENANT`).
+
+**Pasos:**
+- **F1** Lógica de borrado: `DeleteTicket` (cascada de adjuntos + bloqueo por seguimiento) + `LogType.Restoration` + migración del índice filtrado de `TicketCompanyDefault` + unit tests.
+- **F2** Restore de las 6 entidades (commands, validators, handlers, cascada, `TicketLog`) + unit tests.
+- **F3** `includeDeleted` + `TenantResolver` en las 10 queries, `IsDeleted`/`DeletedOn` en los DTO + tests de visibilidad.
+- **F4** Endpoints `POST …/restore` y parámetros `includeDeleted`/`companyId` en los GET; `DELETE /Tickets` mapea `TICKET_IN_USE` a 409.
+- **F5** Integración: listados de la Etapa 4 en el test de guarda; restore Manager → 403 / SuperAdmin → 200; `DeleteTicket` en cascada y bloqueado.
+- **F6** Build Release, gate 90 %, suite de integración completa. Actualizar FE-15, FE-16 y FE-19 (`join_frontb`).
+
+#### Etapa 4 — Decisiones de implementación (Ajuste por SPEC 41, 2026-10-08)
+
+- **`DeleteTicket`:** `TicketCascadeCoordinator` cuenta los tickets de seguimiento activos (`TICKET_IN_USE`, 409, `"Active follow-up tickets: N"`) y, si no hay, marca los adjuntos activos con el sello del ticket. `RestoreTicket` restaura los adjuntos de ese sello y agrega la entrada `Restoration` con `UpdateAsync` del ticket (el repositorio marca como `Added` el `TicketLog` nuevo; sin eso EF lo trataba como fila existente y respondía 500). `GetTicketById` traduce `LogType = 6` a `"Restoration"`.
+- **`RestoreTicketDocument`** (`POST /tickets/{ticketId}/documents/{id}/restore`): el adjunto debe ser del ticket de la ruta (si no, `NOT_FOUND`); `MAX_FILES_PER_TICKET_REACHED` (409) solo si la empresa tiene `TicketAttachmentSettings` activa; sin configuración no hay tope que aplicar.
+- **`RestoreTicketUserCompany`:** el usuario debe existir y tener una membresía `UserCompany` activa en la empresa; si no, `PARENT_DELETED`.
+- **Índice:** migración `Spec41FilterTicketCompanyDefaultsIndex` reemplaza `IX_TicketCompanyDefaults_CompanyId` por `UX_TicketCompanyDefaults_Company_Active` (`[GcRecord] = 0`).
+- **DTO (cambio de contrato):** los 7 DTO de tickets heredan `SoftDeletableDto`. `TicketCompanyDefaultDto` y `TicketAttachmentSettingsDto` ya exponían `gcRecord` e `isDeleted` (los usan los listados `system-wide`): `gcRecord` deja de serializarse y se suma `deletedOn`. `GetSystemWideTickets` ahora selecciona `GcRecord`, así `isDeleted` es correcto en ese listado (su filtro no cambia).
+- **Sin cambios:** `DownloadTicketDocument` sigue descargando solo adjuntos activos; `TicketNotification` no tiene borrado ni restore.
 
 ---
 

@@ -26,9 +26,15 @@ public sealed class GetTicketUserCompanyByIdQueryHandler(
                 ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        const string sql = """
+        // SPEC 41: deleted rows only for a SuperAdmin asking includeDeleted=true.
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND tuc.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 tuc.Id,
+                tuc.GcRecord,
                 tuc.CompanyId,
                 co.Name AS CompanyName,
                 tuc.UserId,
@@ -43,7 +49,7 @@ public sealed class GetTicketUserCompanyByIdQueryHandler(
             LEFT JOIN Common.Companies co ON tuc.CompanyId = co.Id
             WHERE tuc.Id = @Id
               AND tuc.CompanyId = @TenantId
-              AND tuc.GcRecord = 0;
+              {activeOnly};
             """;
 
         using var connection = connectionFactory.CreateConnection();
@@ -51,7 +57,7 @@ public sealed class GetTicketUserCompanyByIdQueryHandler(
         var row = await connection.QueryFirstOrDefaultAsync<TicketUserCompanyDto>(
             new CommandDefinition(
                 sql,
-                new { request.Id, TenantId = currentUserService.CompanyId },
+                new { request.Id, TenantId = TenantResolver.Resolve(currentUserService, request.CompanyId) },
                 cancellationToken: cancellationToken));
 
         if (row is null)
