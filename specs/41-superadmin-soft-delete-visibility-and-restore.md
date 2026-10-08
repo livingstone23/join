@@ -281,7 +281,7 @@ Rama `spec-41-etapa-3-seguridad` (desde `main` con las etapas 1 y 2). Dos partes
 
 `Ticket`, `TicketNotification`, `TicketCompanyDefault`, y las entidades de SPEC 34-37 y 99 que ya estén implementadas.
 
-- `TicketLog` no se restaura (sección E).
+- `TicketLog` no se restaura (sección F).
 - Restaurar un `Ticket` genera una entrada en `TicketLog` (auditoría del ticket).
 
 #### Etapa 4 — Plan e inventario (2026-10-08)
@@ -351,16 +351,18 @@ Este test también cubre el hueco que SPEC 38 dejó abierto: una query Dapper nu
 
 ## Acceptance criteria
 
-- [ ] Ningún rol distinto de `SuperAdmin` puede ver registros borrados ni datos de otra empresa, aunque envíe `includeDeleted=true` o `companyId`.
-- [ ] `SuperAdmin` ve activos y borrados con `includeDeleted=true`, dentro de la empresa resuelta por `TenantResolver`.
-- [ ] `SuperAdmin` puede restaurar cualquier entidad de las etapas implementadas; las de la sección E no son restaurables.
-- [ ] Restaurar nunca produce un 500 por índice único: el duplicado activo se detecta antes y devuelve `ACTIVE_DUPLICATE_EXISTS`.
-- [ ] No se puede restaurar un hijo cuyo padre está borrado.
-- [ ] Un padre con referencias activas no se puede borrar (`<ENTIDAD>_IN_USE` lista las referencias). Un padre de composición (`Person`, `SystemModule`, `SystemOption`) borra en cascada (soft delete) a sus hijos de composición, y restaurarlo restaura los de esa misma cascada.
-- [ ] No existe ningún borrado físico en el código (`DeleteAsync` eliminado de `IGenericRepository`).
-- [ ] Los invariantes de default/principal/actual se mantienen al restaurar.
-- [ ] El test de guarda de visibilidad cubre todos los endpoints de listado de las etapas implementadas.
-- [ ] Gate de cobertura ≥ 90% y suite de integración en verde en cada etapa.
+> **Ajuste por SPEC 41 (2026-10-08, cierre):** criterios verificados al cerrar la Etapa 4 (test de guarda de visibilidad, tests de restore y de cascada en verde; `DeleteAsync` eliminado y sin borrados físicos en el código). El criterio de cascada se completa con los padres de composición agregados en las etapas 3 y 4.
+
+- [x] Ningún rol distinto de `SuperAdmin` puede ver registros borrados ni datos de otra empresa, aunque envíe `includeDeleted=true` o `companyId`.
+- [x] `SuperAdmin` ve activos y borrados con `includeDeleted=true`, dentro de la empresa resuelta por `TenantResolver`.
+- [x] `SuperAdmin` puede restaurar cualquier entidad de las etapas implementadas; las de la sección F no son restaurables.
+- [x] Restaurar nunca produce un 500 por índice único: el duplicado activo se detecta antes y devuelve `ACTIVE_DUPLICATE_EXISTS`.
+- [x] No se puede restaurar un hijo cuyo padre está borrado.
+- [x] Un padre con referencias activas no se puede borrar (`<ENTIDAD>_IN_USE` lista las referencias). Un padre de composición (`Person`, `SystemModule`, `SystemOption`, `ApplicationRole`, `UserCompany`, `Ticket`) borra en cascada (soft delete) a sus hijos de composición, y restaurarlo restaura los de esa misma cascada.
+- [x] No existe ningún borrado físico en el código (`DeleteAsync` eliminado de `IGenericRepository`).
+- [x] Los invariantes de default/principal/actual se mantienen al restaurar.
+- [x] El test de guarda de visibilidad cubre todos los endpoints de listado de las etapas implementadas.
+- [x] Gate de cobertura ≥ 90% y suite de integración en verde en cada etapa.
 
 ---
 

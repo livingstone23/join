@@ -9,7 +9,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 ## Reglas
 
 ### Numeración
-- Una spec nueva toma el **siguiente número libre** (hoy: **51**).
+- Una spec nueva toma el **siguiente número libre** (hoy: **52**).
 - Los números **no se reutilizan ni se reordenan**. Si una spec se divide, la parte que sale toma un número nuevo y ambas lo dicen en su encabezado (ejemplo: SPEC 99 → SPEC 47).
 - **Excepción autorizada (2026-10-05):** por decisión del usuario se renumeró una sola vez: la 37 (canales `WEB`/`APP`) pasó a **99** y las 38–49 bajaron un número (38→37 … 49→48). Las referencias se actualizaron en ambos repositorios. Una spec citada con su número anterior en un commit o conversación previa a esa fecha debe traducirse con esta tabla.
 - El nombre del archivo es `NN-tema-en-ingles.md` y el título empieza con `# SPEC NN — `.
@@ -77,7 +77,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 38 | Consolidación de query filters globales | Implementado | 30 |
 | 39 | Fork `main_postgresql` | Implementado (en `main_postgresql`) | — |
 | 40 | Índices únicos filtrados por soft-delete | Implementado | — |
-| 41 | Visibilidad de registros borrados y restauración para SuperAdmin | Aprobado (etapas 1–4 implementadas; falta pasar a Implementado) | 38, 40 |
+| 41 | Visibilidad de registros borrados y restauración para SuperAdmin | Implementado | 38, 40 |
 | 42 | Valores iniciales del ticket desde `TicketCompanyDefaults` | Borrador | — |
 | 43 | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Borrador | — |
 | 44 | Módulo Calendario: parametrización, calendarios y actividades | Borrador | 99, 43, 48 |
@@ -87,6 +87,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 48 | Bloqueo de APIs y menú por módulo activo de la empresa | Borrador | 43 |
 | 49 | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Borrador | 36 |
 | 50 | `main_postgresql`: port de 40–49 y pendientes para llevar QA a PostgreSQL (archivo en `main_postgresql`) | Borrador | 39, 40–49 |
+| 51 | Invalidación de la caché de permisos con la clave `permissions:v2` | Borrador | 17, 25 |
 | 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
 
 ---
@@ -95,15 +96,14 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 
 Orden sugerido de implementación (cada uno requiere `Aprobado`):
 
-1. **99** — canales `WEB`/`APP` (lo necesitan 42 y 44).
+1. **99** — canales `WEB`/`APP` (lo necesita 44; 42 no depende de ella).
 2. **43** — módulos base, opciones conectadas a su módulo, rutas en inglés.
 3. **48** — bloqueo por módulo e interruptor `Modules:EnforceCompanyModules`.
 4. **42** — estado inicial del ticket.
-5. **37** — flujo de estados y SLA, ya aprobada.
-6. **44** — calendario base.
-7. **46** — estructura de Google Calendar.
+5. **44** — calendario base.
+6. **46** — estructura de Google Calendar.
 
-En paralelo, sin dependencias con lo anterior: **38 → 40 → 41** (query filters, índices filtrados, restauración) y **39** (fork PostgreSQL, `Implementado` en `main_postgresql`).
+En paralelo, sin dependencias con lo anterior: **38 → 40 → 41** (query filters, índices filtrados, restauración; las tres `Implementado`), **39** (fork PostgreSQL, `Implementado` en `main_postgresql`) y **51** (clave de la caché de permisos; sus preguntas abiertas se responden al retomarla).
 
 **Cierre de etapa — 50:** las specs 40–49 se implementan en `main` (SQL Server). La **50** sale de `main_postgresql`, hace un único `git merge main`, convierte a PostgreSQL todo lo de 40–49 (migración incremental Npgsql, `HasFilter`, SQL) y cierra los pendientes de QA; su PR va a `main_postgresql`, nunca a `main`. Los archivos de las specs 39 y 50 vigentes viven en `main_postgresql`; mientras tanto, el SQL nuevo de 40–49 se escribe portable (ver `CLAUDE.md`) para reducir el port.
 
@@ -124,7 +124,7 @@ Decisiones o verificaciones que no tienen spec propia todavía:
 | 44 | Recordatorios y tareas automáticas (Hangfire): avisos, cierre de actividades vencidas, barridos de estados. |
 | 46 | Acciones de sincronización con Google (OAuth, envío, webhook, worker). |
 | 44 | Mejoras diferidas del calendario: invitados, calendarios privados, turnos nocturnos, permisos de medio día. |
-| 41 | Las entidades del calendario (44, 45, 46) no existen todavía: entran en la Etapa 4 de la 41 (o en su propia spec) cuando se implementen. |
+| 41 | Las entidades del calendario (44, 45, 46) no existen todavía: su visibilidad de borrados y su restauración se diseñan en su propia spec cuando se implementen (la 41 cerró sus 4 etapas). |
 | 41 | Commands de `Area` y `Project` (crear/editar/borrar) usan `X-Company-Id` sin validarlo contra el token: alinearlos con `TenantResolver` (las queries ya se alinearon en la Etapa 1). |
 | 41 | Índices únicos de los catálogos globales (`Country.IsoCode`, `StreetType.Name`, `SystemModule.Name`…) no están filtrados por `GcRecord`: un borrado impide crear otro con la misma clave. Decidir si se filtran (patrón SPEC 40). |
 | 41 | `GET /Users/{userId}/companies` (`GetUserCompanies`) no filtra por empresa: lista las membresías de cualquier usuario (endpoint solo SuperAdmin, sin fuga hoy). `GetCompanyModules` recibe la empresa del controller sin `TenantResolver`. Revisar en una spec de hardening. |

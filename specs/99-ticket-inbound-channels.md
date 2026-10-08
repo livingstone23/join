@@ -1,10 +1,12 @@
 # SPEC 99 — Canales internos `WEB` y `APP` en el catálogo de canales
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** Ninguna.
 > **Related:** SPEC 44 (el calendario registra como origen `WEB` las actividades creadas desde la aplicación), SPEC 47 (ingesta de tickets por WhatsApp y correo, etapa posterior — contenido que antes estaba en esta spec).
 > **Date:** 2026-10-01 (reescrita; la versión original del 2026-09-25 se movió a SPEC 47)
 > **Objective:** Agregar al catálogo `Common.CommunicationChannels` los canales internos `Web` (`WEB`) y `App` (`APP`), para que un ticket o una actividad creados desde la propia aplicación queden registrados con su origen real, y usar `WEB` como canal por defecto de los tickets en la seed de desarrollo.
+
+> **Historia (2026-10-08):** al revisarla contra el código, el usuario decidió: (1) `WEB` y `APP` se agregan también con una **migración de datos** idempotente, porque la siembra completa solo corre cuando hay migraciones pendientes y una base existente (QA) nunca los recibiría; (2) los tickets demo que siembre `SeedJoinTicketsAsync` de aquí en adelante usan `WEB`; (3) si `WEB` existe pero está borrado (SPEC 41), la siembra registra un warning y el SuperAdmin lo restaura con `POST /CommunicationChannels/{id}/restore`. Lo relacionado con WhatsApp sigue en SPEC 47 (etapa posterior). Sigue en **Borrador** hasta que el usuario la apruebe.
 
 > **Numeración (2026-10-05):** esta spec fue la **SPEC 37** hasta el 2026-10-05; se renumeró a 99 por decisión del usuario (ver `specs/README.md`).
 
@@ -45,7 +47,16 @@ new() { Name = "App", Provider = "Internal", Code = "APP", IsActive = true, Crea
 
 - `Web` = la aplicación web de JOIN (la consola de gestión). `App` = una aplicación propia futura (móvil o portal con login); se siembra ya para que el catálogo esté completo, aunque hoy nada la use.
 - Seed de `TicketCompanyDefault` de desarrollo: `ChannelDefaultId` pasa a buscar primero `Code == "WEB"` y, solo si no existe, el comportamiento actual (`WHATSAPP` y luego el primero disponible). Como esa seed ya actualiza la fila existente (`existing.ChannelDefaultId = ...`), las bases de desarrollo quedan con `WEB`.
+- Seed de tickets demo (`SeedJoinTicketsAsync`): los tickets que siembre a partir de esta spec usan `WEB` (con el mismo fallback). Los tickets ya sembrados no cambian (decisión 2026-10-08).
+- Si existe un canal con `Code = "WEB"` (o `Name = "Web"`) borrado (`GcRecord > 0`), la siembra no lo inserta ni lo reactiva: registra un warning indicando que se restaure con `POST /CommunicationChannels/{id}/restore` (SPEC 41, solo SuperAdmin) y usa el fallback.
 - Las búsquedas son siempre por `Code`, nunca por `Name` (el comentario de `CommunicationChannel.Code` lo establece: *"Internal code to facilitate logic in the Application layer"*).
+
+### A2. Migración de datos (decisión 2026-10-08)
+
+- Hoy `Program.cs` corre la siembra completa (`SeedAsync`, que incluye `SeedCommunicationChannelsAsync`) **solo cuando hay migraciones pendientes**; en Development sin migraciones pendientes solo corre `SeedMenuAndPermissionsAsync` (roles, usuarios, opciones y permisos). Esta spec no agrega columnas, así que sin una migración propia `WEB` y `APP` no llegarían a una base que ya existe.
+- Migración `Spec99InternalCommunicationChannels`: inserta `Web` (`WEB`, `Internal`) y `App` (`APP`, `Internal`) con `migrationBuilder.Sql(...)`, cada uno solo si no existe una fila con ese `Name` **o** ese `Code` (incluidas las borradas: el índice único de `Name` no está filtrado por `GcRecord`). `Down()` borra solo las filas que insertó (`CreatedBy = 'Spec99_Migration'`) y que ningún ticket o configuración referencia.
+- Como la migración queda pendiente, el primer arranque también corre la siembra completa: la de `TicketCompanyDefault` de `JOIN-001` pasa a `WEB` (la seed ya sobreescribe esa fila, comportamiento previo).
+- SQL de SQL Server; el port a PostgreSQL entra en SPEC 50 (lista de la sección F de esa spec).
 
 ### B. Constantes
 
@@ -53,7 +64,8 @@ new() { Name = "App", Provider = "Internal", Code = "APP", IsActive = true, Crea
 
 ### C. Tests
 
-- Prueba de integración del seeder: sobre base limpia y sobre una base ya sembrada, quedan seis canales activos (`SendGrid`, `Telegram`, `Twilio`, `WhatsApp`, `Web`, `App`) sin duplicados, y el `TicketCompanyDefault` de `JOIN-001` apunta a `WEB`.
+- Prueba de integración del seeder: sobre base limpia (la que crea `CustomWebApplicationFactory`) y volviendo a ejecutar `SeedAsync` sobre la base ya sembrada, quedan seis canales activos (`SendGrid`, `Telegram`, `Twilio`, `WhatsApp`, `Web`, `App`) sin duplicados, y el `TicketCompanyDefault` de `JOIN-001` apunta a `WEB`. Hoy no existe ningún test del seeder; este es el primero.
+- Prueba de integración: con `WEB` borrado, una nueva ejecución de la siembra no lo reactiva ni falla, y el canal por defecto cae al fallback.
 
 **Out of scope:**
 
@@ -67,15 +79,16 @@ new() { Name = "App", Provider = "Internal", Code = "APP", IsActive = true, Crea
 
 ## Implementation plan
 
-### F1 — Constantes y seed
-1. Crear `CommunicationChannelCodes`.
+### F1 — Constantes, seed y migración
+1. Crear `CommunicationChannelCodes` y reemplazar los literales de código de canal del seeder (`"WHATSAPP"`) por las constantes.
 2. Agregar `Web` y `App` a `SeedCommunicationChannelsAsync`.
-3. Cambiar la búsqueda del canal por defecto de la seed de `TicketCompanyDefault` a `WEB` primero.
+3. Cambiar la búsqueda del canal por defecto de la seed de `TicketCompanyDefault` y de `SeedJoinTicketsAsync` a `WEB` primero; warning si `WEB` está borrado.
+4. Migración de datos `Spec99InternalCommunicationChannels` (sección A2). La base de QA es compartida: avisar antes de levantar la API contra ella.
 
 ### F2 — Tests y verificación
 1. Prueba de integración del seeder (sección C).
 2. `dotnet build` sin warnings nuevos; `dotnet test` en verde.
-3. Arrancar en Development contra una base existente y comprobar en `GET /CommunicationChannels` los seis canales, y en `GET /TicketCompanyDefaults` que el canal por defecto es `Web`. Detener la API al terminar.
+3. Arrancar en Development contra una base existente (la migración de datos queda pendiente y se aplica) y comprobar en `GET /CommunicationChannels` los seis canales, y en `GET /TicketCompanyDefaults` que el canal por defecto es `Web`. Detener la API al terminar.
 
 ---
 
@@ -84,7 +97,9 @@ new() { Name = "App", Provider = "Internal", Code = "APP", IsActive = true, Crea
 - [ ] `Common.CommunicationChannels` tiene `Web` (`WEB`, `Internal`) y `App` (`APP`, `Internal`) activos, sin duplicar los existentes, en base limpia y en base ya sembrada.
 - [ ] El `TicketCompanyDefault` de desarrollo usa `WEB` como canal por defecto.
 - [ ] Ningún código nuevo compara canales por `Name`; se usan las constantes de `CommunicationChannelCodes`.
-- [ ] Ningún ticket existente cambia de canal.
+- [ ] Ningún ticket existente cambia de canal; los tickets demo nuevos de la siembra usan `WEB`.
+- [ ] Una base existente sin otras migraciones pendientes recibe `WEB` y `APP` al aplicar `Spec99InternalCommunicationChannels`.
+- [ ] Un `WEB` borrado no se reactiva desde la siembra: queda un warning en el log.
 
 ---
 
@@ -100,4 +115,6 @@ new() { Name = "App", Provider = "Internal", Code = "APP", IsActive = true, Crea
 
 | Riesgo | Mitigación |
 |---|---|
-| Una base donde alguien creó a mano un canal llamado "Web" con otro `Code`: la seed no inserta la fila (es idempotente por `Name`) y la búsqueda por `Code = "WEB"` no la encuentra. | La seed registra un warning si existe un canal con `Name = "Web"` y `Code` distinto de `WEB`. La corrección es manual desde el CRUD de canales. |
+| Una base donde alguien creó a mano un canal llamado "Web" con otro `Code`: la seed no inserta la fila (es idempotente por `Name`) y la búsqueda por `Code = "WEB"` no la encuentra. | La seed registra un warning si existe un canal con `Name = "Web"` y `Code` distinto de `WEB`. La corrección es manual desde el CRUD de canales. La migración tampoco inserta (chequea `Name` o `Code`). |
+| `WEB` borrado por un usuario (SPEC 41): la seed no lo reactiva y el canal por defecto cae a `WHATSAPP` o al primero disponible. | Warning en el log; el SuperAdmin lo restaura con `POST /CommunicationChannels/{id}/restore` (decisión 2026-10-08). |
+| La migración de datos usa SQL de SQL Server. | Se convierte al portar a `main_postgresql` (SPEC 50). |
