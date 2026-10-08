@@ -1,6 +1,6 @@
 # SPEC 41 — Visibilidad de registros borrados y restauración para SuperAdmin
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 38 (query filters completos — define qué es "de empresa" y qué es "global"), SPEC 40 (índices únicos filtrados — la unicidad debe aplicar solo a activos para poder restaurar sin colisiones).
 > **Date:** 2026-09-28
 > **Historia (2026-10-08, Etapa 4):** vuelve a Borrador por cambio de lógica al planificar la Etapa 4: `Ticket` pasa a ser padre de composición de `TicketDocument` (cascada), los tickets de seguimiento activos bloquean el borrado de un ticket, se agrega `LogType.Restoration` y se filtra el índice único de `TicketCompanyDefault`. Las etapas 1 a 3 ya están implementadas y no cambian.
