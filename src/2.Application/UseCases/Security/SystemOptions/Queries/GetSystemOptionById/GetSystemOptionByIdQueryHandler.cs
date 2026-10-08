@@ -19,7 +19,8 @@ namespace JOIN.Application.UseCases.Security.SystemOptions.Queries;
 /// Handler for getting a SystemOption by Id using Dapper.
 /// </summary>
 public sealed class GetSystemOptionByIdQueryHandler(
-    ISqlConnectionFactory connectionFactory)
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetSystemOptionByIdQuery, Response<SystemOptionDto>>
 {
     public async Task<Response<SystemOptionDto>> Handle(GetSystemOptionByIdQuery request, CancellationToken cancellationToken)
@@ -28,7 +29,11 @@ public sealed class GetSystemOptionByIdQueryHandler(
         
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = @"SELECT o.Id, o.ModuleId, m.Name AS ModuleName, o.Name, o.Route, o.Icon,
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND o.GcRecord = 0";
+
+        var sql = $@"SELECT o.Id, o.GcRecord, o.ModuleId, m.Name AS ModuleName, o.Name, o.Route, o.Icon,
                                     o.ParentId, p.Name AS ParentName, o.ControllerName,
                                     o.CanRead, o.CanCreate, o.CanUpdate, o.CanDelete,
                                     o.CanDownload, o.CanExport, o.CanExecute,
@@ -36,7 +41,7 @@ public sealed class GetSystemOptionByIdQueryHandler(
                              FROM Security.SystemOptions o
                              INNER JOIN [Admin].[SystemModules] m ON m.Id = o.ModuleId
                              LEFT JOIN Security.SystemOptions p ON p.Id = o.ParentId AND p.GcRecord = 0
-                             WHERE o.Id = @Id AND o.GcRecord = 0;";
+                             WHERE o.Id = @Id {activeOnly};";
 
         var entity = await connection.QuerySingleOrDefaultAsync<SystemOptionDto>(sql, new { request.Id });
         

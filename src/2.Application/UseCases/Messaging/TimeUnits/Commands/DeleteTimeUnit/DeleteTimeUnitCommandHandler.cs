@@ -20,8 +20,6 @@ public sealed class DeleteTimeUnitCommandHandler(IUnitOfWork unitOfWork)
     public async Task<Response<Guid>> Handle(DeleteTimeUnitCommand request, CancellationToken cancellationToken)
     {
         var timeUnitRepository = _unitOfWork.GetRepository<TimeUnit>();
-        var ticketRepository = _unitOfWork.GetRepository<Ticket>();
-        var ticketComplexityRepository = _unitOfWork.GetRepository<TicketComplexity>();
 
         var entity = await timeUnitRepository.GetAsync(request.Id);
         if (entity is null)
@@ -29,14 +27,14 @@ public sealed class DeleteTimeUnitCommandHandler(IUnitOfWork unitOfWork)
             return Response<Guid>.Error("TIME_UNIT_NOT_FOUND", ["Time unit not found."]);
         }
 
-        var tickets = await ticketRepository.GetAllAsync();
-        var ticketComplexities = await ticketComplexityRepository.GetAllAsync();
-        var isInUse = tickets.Any(t => t.GcRecord == 0 && t.TimeUnitId == request.Id)
-                   || ticketComplexities.Any(tc => tc.GcRecord == 0 && tc.TimeUnitId == request.Id);
+        var dependents = new ActiveDependentsCheck(_unitOfWork);
+        await dependents.CountAsync<Ticket>(t => t.GcRecord == 0 && t.TimeUnitId == request.Id, "tickets");
+        await dependents.CountAsync<TicketComplexity>(tc => tc.GcRecord == 0 && tc.TimeUnitId == request.Id, "ticket complexities");
+        await dependents.CountAsync<TicketCompanyDefault>(d => d.GcRecord == 0 && d.TimeUnitDefaultId == request.Id, "ticket company defaults");
 
-        if (isInUse)
+        if (dependents.HasDependents)
         {
-            return Response<Guid>.Error("TIME_UNIT_IN_USE", ["The time unit is currently linked to tickets or ticket complexities and cannot be deleted."]);
+            return Response<Guid>.Error("TIME_UNIT_IN_USE", dependents.Details);
         }
 
         entity.MarkAsDeleted();

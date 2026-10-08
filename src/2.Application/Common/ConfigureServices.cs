@@ -96,6 +96,7 @@ public static class ConfigureServices
         services.AddScoped<TicketStatusTransitionGuard>();
         services.AddScoped<TicketDtoAssembler>();
         services.AddScoped<TicketCodeGenerator>();
+        services.AddScoped<SoftDeleteRestorer>();
 
         return services;
     

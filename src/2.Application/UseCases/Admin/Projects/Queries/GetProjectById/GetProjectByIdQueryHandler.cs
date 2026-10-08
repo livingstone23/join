@@ -10,7 +10,9 @@ namespace JOIN.Application.UseCases.Admin.Projects.Queries;
 /// Handles tenant-scoped project detail queries using Dapper.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
-public sealed class GetProjectByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+public sealed class GetProjectByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetProjectByIdQuery, Response<ProjectDto>>
 {
     /// <summary>
@@ -21,7 +23,10 @@ public sealed class GetProjectByIdQueryHandler(ISqlConnectionFactory connectionF
     /// <returns>A standardized response containing the requested project when it exists.</returns>
     public async Task<Response<ProjectDto>> Handle(GetProjectByIdQuery request, CancellationToken cancellationToken)
     {
-        if (request.CompanyId == Guid.Empty)
+        // SPEC 41: the X-Company-Id header is only an explicit override, honored for SuperAdmin;
+        // every other caller always reads the company of their token (TenantResolver).
+        var companyId = TenantResolver.Resolve(currentUserService, request.CompanyId == Guid.Empty ? null : request.CompanyId);
+        if (companyId == Guid.Empty)
         {
             return Response<ProjectDto>.Error(
                 "INVALID_COMPANY_ID",
@@ -30,9 +35,14 @@ public sealed class GetProjectByIdQueryHandler(ISqlConnectionFactory connectionF
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND p.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 p.Id,
+                p.GcRecord,
                 p.CompanyId,
                 c.Name AS CompanyName,
                 p.Name,
@@ -48,11 +58,11 @@ public sealed class GetProjectByIdQueryHandler(ISqlConnectionFactory connectionF
                AND c.GcRecord = 0
             WHERE p.Id = @Id
               AND p.CompanyId = @CompanyId
-              AND p.GcRecord = 0;
+              {activeOnly};
             """;
 
         var project = await connection.QuerySingleOrDefaultAsync<ProjectDto>(
-            new CommandDefinition(sql, new { request.Id, request.CompanyId }, cancellationToken: cancellationToken));
+            new CommandDefinition(sql, new { request.Id, CompanyId = companyId }, cancellationToken: cancellationToken));
 
         if (project is null)
         {

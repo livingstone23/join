@@ -16,7 +16,8 @@ namespace JOIN.Application.UseCases.Admin.IdentificationTypes.Queries;
 /// <param name="paginationOptions">Configurable pagination defaults for the identification type listing endpoint.</param>
 public sealed class GetIdentificationTypesQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetIdentificationTypesQuery, Response<PagedResult<IdentificationTypeListItemDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -45,7 +46,11 @@ public sealed class GetIdentificationTypesQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE it.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND it.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
@@ -77,6 +82,7 @@ public sealed class GetIdentificationTypesQueryHandler(
         var sql = $"""
             SELECT
                 it.Id,
+                it.GcRecord,
                 it.Name,
                 it.IsActive,
                 it.Created AS CreatedAt

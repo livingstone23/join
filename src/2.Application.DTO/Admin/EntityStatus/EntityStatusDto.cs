@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Data Transfer Object (DTO) representing an administrative entity status.
 /// </summary>
-public sealed record EntityStatusDto
+public sealed record EntityStatusDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the entity status.

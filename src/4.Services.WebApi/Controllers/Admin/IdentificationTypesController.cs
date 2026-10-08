@@ -6,6 +6,8 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
+using JOIN.Services.WebApi.Controllers;
 
 namespace JOIN.Services.WebApi.Controllers.Admin;
 
@@ -46,10 +48,11 @@ public class IdentificationTypesController(ISender sender) : ControllerBase
         [FromQuery] DateTime? created = null,
         [FromQuery] DateTime? createdFrom = null,
         [FromQuery] DateTime? createdTo = null,
+        [FromQuery] bool? includeDeleted = null,
         CancellationToken cancellationToken = default)
     {
         var response = await _sender.Send(
-            new GetIdentificationTypesQuery(pageNumber, pageSize, name, created, createdFrom, createdTo),
+            new GetIdentificationTypesQuery(pageNumber, pageSize, name, created, createdFrom, createdTo, includeDeleted),
             cancellationToken);
 
         if (!response.IsSuccess)
@@ -71,9 +74,9 @@ public class IdentificationTypesController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
-        var response = await _sender.Send(new GetIdentificationTypeByIdQuery(id), cancellationToken);
+        var response = await _sender.Send(new GetIdentificationTypeByIdQuery(id, includeDeleted), cancellationToken);
         if (!response.IsSuccess)
         {
             if (response.Message == "IDENTIFICATION_TYPE_NOT_FOUND")
@@ -179,5 +182,25 @@ public class IdentificationTypesController(ISender sender) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted identification type (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The identification type identifier.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new RestoreIdentificationTypeCommand(id, null), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

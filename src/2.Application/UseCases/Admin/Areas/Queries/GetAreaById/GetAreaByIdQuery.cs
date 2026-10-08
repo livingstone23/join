@@ -9,5 +9,5 @@ namespace JOIN.Application.UseCases.Admin.Areas.Queries;
 /// </summary>
 /// <param name="AreaId">The unique identifier of the requested area.</param>
 /// <param name="CompanyId">The tenant identifier used to scope the result.</param>
-public sealed record GetAreaByIdQuery(Guid AreaId, Guid CompanyId)
+public sealed record GetAreaByIdQuery(Guid AreaId, Guid CompanyId, bool? IncludeDeleted = null)
     : IRequest<Response<AreaDto>>;

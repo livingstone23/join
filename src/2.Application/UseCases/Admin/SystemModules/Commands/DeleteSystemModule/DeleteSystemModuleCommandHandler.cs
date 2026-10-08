@@ -28,7 +28,6 @@ public sealed class DeleteSystemModuleCommandHandler(IUnitOfWork unitOfWork)
     public async Task<Response<Guid>> Handle(DeleteSystemModuleCommand request, CancellationToken cancellationToken)
     {
         var systemModuleRepository = _unitOfWork.GetRepository<SystemModule>();
-        var systemOptionRepository = _unitOfWork.GetRepository<SystemOption>();
         var entity = await systemModuleRepository.GetAsync(request.Id);
 
         if (entity is null || entity.GcRecord != 0)
@@ -38,14 +37,13 @@ public sealed class DeleteSystemModuleCommandHandler(IUnitOfWork unitOfWork)
                 ["System module not found."]);
         }
 
-        var systemOptions = await systemOptionRepository.GetAllAsync();
-        var isInUse = systemOptions.Any(option => option.GcRecord == 0 && option.ModuleId == request.Id);
+        var dependents = new ActiveDependentsCheck(_unitOfWork);
+        await dependents.CountAsync<SystemOption>(o => o.GcRecord == 0 && o.ModuleId == request.Id, "system options");
+        await dependents.CountAsync<CompanyModule>(m => m.GcRecord == 0 && m.ModuleId == request.Id, "company modules");
 
-        if (isInUse)
+        if (dependents.HasDependents)
         {
-            return Response<Guid>.Error(
-                "SYSTEM_MODULE_IN_USE",
-                ["The system module is currently linked to one or more system options and cannot be deleted."]);
+            return Response<Guid>.Error("SYSTEM_MODULE_IN_USE", dependents.Details);
         }
 
         entity.MarkAsDeleted();

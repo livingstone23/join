@@ -84,6 +84,7 @@ public sealed class GetSystemWideTicketStatusesQueryHandler(
         var sql = $"""
             SELECT
                 ts.Id,
+                ts.GcRecord,
                 ts.CompanyId,
                 c.Name AS CompanyName,
                 ts.Name,

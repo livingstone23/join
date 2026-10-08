@@ -109,6 +109,6 @@ public sealed class GetSystemOptionByIdQueryHandlerTests
             ConnectionFactoryMock.Setup(x => x.CreateConnection()).Returns(Connection);
         }
 
-        public GetSystemOptionByIdQueryHandler CreateHandler() => new(ConnectionFactoryMock.Object);
+        public GetSystemOptionByIdQueryHandler CreateHandler() => new(ConnectionFactoryMock.Object, new Mock<ICurrentUserService>().Object);
     }
 }

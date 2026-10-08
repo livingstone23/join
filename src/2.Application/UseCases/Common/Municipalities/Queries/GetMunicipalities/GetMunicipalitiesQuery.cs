@@ -17,5 +17,6 @@ public record GetMunicipalitiesQuery(
     int? PageSize = null,
     string? Name = null,
     string? Code = null,
-    Guid? ProvinceId = null)
+    Guid? ProvinceId = null,
+    bool? IncludeDeleted = null)
     : IRequest<Response<PagedResult<MunicipalityDto>>>;

@@ -30,7 +30,7 @@ public sealed class GetGendersQueryHandler(
                 ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        var companyId = currentUserService.CompanyId;
+        var companyId = TenantResolver.Resolve(currentUserService, request.CompanyId);
         var (sanitizedPageNumber, sanitizedPageSize) = _paginationSettings.Sanitize(request.PageNumber, request.PageSize);
         var offset = (sanitizedPageNumber - 1) * sanitizedPageSize;
 
@@ -41,7 +41,11 @@ public sealed class GetGendersQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE g.CompanyId = @CompanyId AND g.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE g.CompanyId = @CompanyId");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND g.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Code))
         {
@@ -66,6 +70,7 @@ public sealed class GetGendersQueryHandler(
         var sql = $"""
             SELECT
                 g.Id,
+                g.GcRecord,
                 g.CompanyId,
                 c.Name AS CompanyName,
                 g.Code,

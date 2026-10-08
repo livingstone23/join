@@ -1,5 +1,6 @@
 using JOIN.Application.Common;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
 using MediatR;
 
@@ -28,6 +29,16 @@ public class DeleteCountryCommandHandler(IUnitOfWork unitOfWork)
         if (countryEntity is null)
         {
             return Response<Guid>.Error("COUNTRY_NOT_FOUND", ["Country not found."]);
+        }
+
+        var dependents = new ActiveDependentsCheck(_unitOfWork);
+        await dependents.CountAsync<Province>(p => p.GcRecord == 0 && p.CountryId == request.Id, "provinces");
+        await dependents.CountAsync<Region>(r => r.GcRecord == 0 && r.CountryId == request.Id, "regions");
+        await dependents.CountAsync<PersonAddress>(a => a.GcRecord == 0 && a.CountryId == request.Id, "person addresses");
+
+        if (dependents.HasDependents)
+        {
+            return Response<Guid>.Error("COUNTRY_IN_USE", dependents.Details);
         }
 
         countryEntity.MarkAsDeleted();

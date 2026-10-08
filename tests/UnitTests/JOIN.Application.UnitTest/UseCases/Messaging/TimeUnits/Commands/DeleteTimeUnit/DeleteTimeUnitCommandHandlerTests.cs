@@ -4,6 +4,7 @@ using JOIN.Application.Interface.Persistence;
 using JOIN.Application.UseCases.Messaging.TimeUnits.Commands;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Messaging;
+using JOIN.Application.UnitTest.Common.TestDoubles;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Messaging.TimeUnits.Commands.DeleteTimeUnit;
@@ -48,11 +49,11 @@ public sealed class DeleteTimeUnitCommandHandlerTests
         var entity = CreateExistingEntity(entityId);
 
         context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(entityId)).ReturnsAsync(entity);
-        context.TicketRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(
+        context.TicketRepositoryMock.SetupRows(
         [
             new Ticket { TimeUnitId = entityId, GcRecord = BaseAuditableEntity.ActiveGcRecord }
         ]);
-        context.TicketComplexityRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketComplexity>());
+        context.TicketComplexityRepositoryMock.SetupRows(Array.Empty<TicketComplexity>());
 
         var handler = context.CreateHandler();
 
@@ -76,8 +77,8 @@ public sealed class DeleteTimeUnitCommandHandlerTests
         var entity = CreateExistingEntity(entityId);
 
         context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(entityId)).ReturnsAsync(entity);
-        context.TicketRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<Ticket>());
-        context.TicketComplexityRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(
+        context.TicketRepositoryMock.SetupRows(Array.Empty<Ticket>());
+        context.TicketComplexityRepositoryMock.SetupRows(
         [
             new TicketComplexity { TimeUnitId = entityId, GcRecord = BaseAuditableEntity.ActiveGcRecord }
         ]);
@@ -90,7 +91,7 @@ public sealed class DeleteTimeUnitCommandHandlerTests
         // Assert
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("TIME_UNIT_IN_USE");
-        response.Errors.Should().Contain("The time unit is currently linked to tickets or ticket complexities and cannot be deleted.");
+        response.Errors.Should().Contain("Active ticket complexities: 1");
     }
 
     /// <summary>
@@ -105,8 +106,8 @@ public sealed class DeleteTimeUnitCommandHandlerTests
         var entity = CreateExistingEntity(entityId);
 
         context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(entityId)).ReturnsAsync(entity);
-        context.TicketRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<Ticket>());
-        context.TicketComplexityRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketComplexity>());
+        context.TicketRepositoryMock.SetupRows(Array.Empty<Ticket>());
+        context.TicketComplexityRepositoryMock.SetupRows(Array.Empty<TicketComplexity>());
         context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
 
         var handler = context.CreateHandler();
@@ -132,11 +133,88 @@ public sealed class DeleteTimeUnitCommandHandlerTests
         var entity = CreateExistingEntity(entityId);
 
         context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(entityId)).ReturnsAsync(entity);
-        context.TicketRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<Ticket>());
-        context.TicketComplexityRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketComplexity>());
+        context.TicketRepositoryMock.SetupRows(Array.Empty<Ticket>());
+        context.TicketComplexityRepositoryMock.SetupRows(Array.Empty<TicketComplexity>());
         context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var handler = context.CreateHandler();
+
+        // Act
+        var response = await handler.Handle(new DeleteTimeUnitCommand(entityId), CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeTrue();
+        response.Message.Should().Be("Time unit deleted successfully.");
+        response.Data.Should().Be(entityId);
+        entity.GcRecord.Should().BeGreaterThan(BaseAuditableEntity.ActiveGcRecord);
+        context.TimeUnitRepositoryMock.Verify(x => x.UpdateAsync(entity), Times.Once);
+    }
+
+    /// <summary>
+    /// SPEC 41: every active child type blocks the delete and is listed in the errors.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenActiveDependentsExist_ShouldReturnInUseWithDetails()
+    {
+        // Arrange
+        var entityId = _fixture.Create<Guid>();
+        var context = new DeleteTimeUnitCommandTestContext();
+        var entity = CreateExistingEntity(entityId);
+
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(entityId)).ReturnsAsync(entity);
+        context.TicketRepositoryMock.SetupRows(Array.Empty<Ticket>());
+        context.TicketComplexityRepositoryMock.SetupRows(Array.Empty<TicketComplexity>());
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var handler = context.CreateHandler();
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new Ticket { CompanyId = Guid.NewGuid(), TimeUnitId = entityId };
+        context.UnitOfWorkMock.SetupRepositoryRows<Ticket>([child1]);
+        var child2 = new TicketComplexity { CompanyId = Guid.NewGuid(), Name = "High", TimeUnitId = entityId };
+        context.UnitOfWorkMock.SetupRepositoryRows<TicketComplexity>([child2]);
+        var child3 = new TicketCompanyDefault { CompanyId = Guid.NewGuid(), TimeUnitDefaultId = entityId };
+        context.UnitOfWorkMock.SetupRepositoryRows<TicketCompanyDefault>([child3]);
+
+
+        // Act
+        var response = await handler.Handle(new DeleteTimeUnitCommand(entityId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("TIME_UNIT_IN_USE");
+        response.Errors.Should().Equal("Active tickets: 1", "Active ticket complexities: 1", "Active ticket company defaults: 1");
+        entity.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
+    }
+
+    /// <summary>
+    /// SPEC 41: logically deleted children do not block the delete.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenDependentsAreDeleted_ShouldSoftDelete()
+    {
+        // Arrange
+        var entityId = _fixture.Create<Guid>();
+        var context = new DeleteTimeUnitCommandTestContext();
+        var entity = CreateExistingEntity(entityId);
+
+        context.TimeUnitRepositoryMock.Setup(x => x.GetAsync(entityId)).ReturnsAsync(entity);
+        context.TicketRepositoryMock.SetupRows(Array.Empty<Ticket>());
+        context.TicketComplexityRepositoryMock.SetupRows(Array.Empty<TicketComplexity>());
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var handler = context.CreateHandler();
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new Ticket { CompanyId = Guid.NewGuid(), TimeUnitId = entityId };
+        child1.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<Ticket>([child1]);
+        var child2 = new TicketComplexity { CompanyId = Guid.NewGuid(), Name = "High", TimeUnitId = entityId };
+        child2.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<TicketComplexity>([child2]);
+        var child3 = new TicketCompanyDefault { CompanyId = Guid.NewGuid(), TimeUnitDefaultId = entityId };
+        child3.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<TicketCompanyDefault>([child3]);
+
 
         // Act
         var response = await handler.Handle(new DeleteTimeUnitCommand(entityId), CancellationToken.None);
@@ -183,7 +261,7 @@ public sealed class DeleteTimeUnitCommandHandlerTests
             UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         }
 
-        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
+        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new() { DefaultValue = DefaultValue.Mock };
         public Mock<IGenericRepository<TimeUnit>> TimeUnitRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Ticket>> TicketRepositoryMock { get; } = new();
         public Mock<IGenericRepository<TicketComplexity>> TicketComplexityRepositoryMock { get; } = new();

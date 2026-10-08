@@ -16,7 +16,8 @@ namespace JOIN.Application.UseCases.Admin.EntityStatuses.Queries;
 /// <param name="paginationOptions">Configurable pagination defaults for the entity status listing endpoint.</param>
 public sealed class GetEntityStatusQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetEntityStatusQuery, Response<PagedResult<EntityStatusListItemDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -70,7 +71,11 @@ public sealed class GetEntityStatusQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE es.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND es.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
@@ -101,6 +106,7 @@ public sealed class GetEntityStatusQueryHandler(
         var sql = $"""
             SELECT
                 es.Id,
+                es.GcRecord,
                 es.Name,
                 es.Description,
                 es.Code,

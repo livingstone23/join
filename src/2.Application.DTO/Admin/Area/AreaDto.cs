@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Data Transfer Object (DTO) representing a tenant-scoped functional area.
 /// </summary>
-public record AreaDto
+public record AreaDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the area.

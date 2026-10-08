@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Data Transfer Object (DTO) representing a tenant-scoped project.
 /// </summary>
-public sealed record ProjectDto
+public sealed record ProjectDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the project.

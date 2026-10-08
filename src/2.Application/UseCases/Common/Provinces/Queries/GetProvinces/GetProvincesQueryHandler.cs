@@ -45,7 +45,11 @@ public sealed class GetProvincesQueryHandler(
         var tenantId = currentUserService.CompanyId;
         parameters.Add("TenantId", tenantId);
 
-        var whereBuilder = new StringBuilder("WHERE p.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND p.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
@@ -70,6 +74,7 @@ public sealed class GetProvincesQueryHandler(
         var sql = $"""
             SELECT
                 p.Id,
+                p.GcRecord,
                 p.Name,
                 p.Code,
                 p.CountryId,

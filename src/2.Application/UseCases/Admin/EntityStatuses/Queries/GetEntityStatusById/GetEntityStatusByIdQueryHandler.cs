@@ -10,7 +10,9 @@ namespace JOIN.Application.UseCases.Admin.EntityStatuses.Queries;
 /// Handles single entity status detail queries using Dapper.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
-public sealed class GetEntityStatusByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+public sealed class GetEntityStatusByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetEntityStatusByIdQuery, Response<EntityStatusDto>>
 {
     /// <summary>
@@ -47,9 +49,14 @@ public sealed class GetEntityStatusByIdQueryHandler(ISqlConnectionFactory connec
                 ["The specified CompanyId does not exist."]);
         }
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND es.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 es.Id,
+                es.GcRecord,
                 es.Name,
                 es.Description,
                 es.Code,
@@ -57,7 +64,7 @@ public sealed class GetEntityStatusByIdQueryHandler(ISqlConnectionFactory connec
                 es.Created AS CreatedAt
             FROM Admin.EntityStatuses es
             WHERE es.Id = @Id
-              AND es.GcRecord = 0;
+              {activeOnly};
             """;
 
         var entity = await connection.QuerySingleOrDefaultAsync<EntityStatusDto>(

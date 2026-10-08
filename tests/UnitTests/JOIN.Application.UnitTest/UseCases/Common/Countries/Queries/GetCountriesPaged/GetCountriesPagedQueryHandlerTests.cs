@@ -58,7 +58,7 @@ public sealed class GetCountriesPagedQueryHandlerTests
         response.Data.TotalCount.Should().Be(3);
         response.Data.TotalPages.Should().Be(1);
 
-        context.Connection.LastCommandText.Should().Contain("WHERE c.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain("AND c.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("c.Name LIKE @SearchTerm");
         context.Connection.LastCommandText.Should().NotContain("c.IsoCode LIKE @SearchTerm");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
@@ -158,7 +158,7 @@ public sealed class GetCountriesPagedQueryHandlerTests
 
         public GetCountriesPagedQueryHandler CreateHandler()
         {
-            return new GetCountriesPagedQueryHandler(ConnectionFactoryMock.Object, PaginationOptions);
+            return new GetCountriesPagedQueryHandler(ConnectionFactoryMock.Object, PaginationOptions, new Mock<ICurrentUserService>().Object);
         }
     }
 }

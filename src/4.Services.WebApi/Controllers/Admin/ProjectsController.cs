@@ -6,6 +6,8 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
+using JOIN.Services.WebApi.Controllers;
+using Microsoft.AspNetCore.Authorization;
 
 
 
@@ -46,6 +48,7 @@ public class ProjectsController(ISender sender) : ControllerBase
         [FromQuery] int? pageSize = null,
         [FromQuery] string? name = null,
         [FromQuery] Guid? entityStatusId = null,
+        [FromQuery] bool? includeDeleted = null,
         CancellationToken cancellationToken = default)
     {
         if (companyId == Guid.Empty)
@@ -56,7 +59,7 @@ public class ProjectsController(ISender sender) : ControllerBase
         }
 
         var response = await _sender.Send(
-            new GetProjectsQuery(companyId, pageNumber, pageSize, name, entityStatusId),
+            new GetProjectsQuery(companyId, pageNumber, pageSize, name, entityStatusId, includeDeleted),
             cancellationToken);
 
         if (!response.IsSuccess)
@@ -82,6 +85,7 @@ public class ProjectsController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetById(
         Guid id,
         [FromHeader(Name = "X-Company-Id")] Guid companyId,
+        [FromQuery] bool? includeDeleted = null,
         CancellationToken cancellationToken = default)
     {
         if (companyId == Guid.Empty)
@@ -91,7 +95,7 @@ public class ProjectsController(ISender sender) : ControllerBase
                 ["The X-Company-Id header is required."]));
         }
 
-        var response = await _sender.Send(new GetProjectByIdQuery(id, companyId), cancellationToken);
+        var response = await _sender.Send(new GetProjectByIdQuery(id, companyId, includeDeleted), cancellationToken);
         if (!response.IsSuccess)
         {
             if (response.Message == "PROJECT_NOT_FOUND")
@@ -240,5 +244,27 @@ public class ProjectsController(ISender sender) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted project (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The project identifier.</param>
+    /// <param name="companyId">The X-Company-Id header: explicit company, honored only for SuperAdmin.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        [FromHeader(Name = "X-Company-Id")] Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new RestoreProjectCommand(id, companyId == Guid.Empty ? null : companyId), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

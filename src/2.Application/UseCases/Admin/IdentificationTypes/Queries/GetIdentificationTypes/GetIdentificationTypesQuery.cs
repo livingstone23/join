@@ -19,5 +19,6 @@ public sealed record GetIdentificationTypesQuery(
     string? Name = null,
     DateTime? Created = null,
     DateTime? CreatedFrom = null,
-    DateTime? CreatedTo = null)
+    DateTime? CreatedTo = null,
+    bool? IncludeDeleted = null)
     : IRequest<Response<PagedResult<IdentificationTypeListItemDto>>>;

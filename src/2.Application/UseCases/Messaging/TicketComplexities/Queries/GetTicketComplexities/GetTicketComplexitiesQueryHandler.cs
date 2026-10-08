@@ -39,11 +39,15 @@ public sealed class GetTicketComplexitiesQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("TenantId", _currentUserService.CompanyId);
+        parameters.Add("TenantId", TenantResolver.Resolve(_currentUserService, request.CompanyId));
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE tc.CompanyId = @TenantId AND tc.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE tc.CompanyId = @TenantId");
+        if (!SoftDeleteVisibility.IncludeDeleted(_currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND tc.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
@@ -62,6 +66,7 @@ public sealed class GetTicketComplexitiesQueryHandler(
         var sql = $"""
             SELECT
                 tc.Id,
+                tc.GcRecord,
                 tc.CompanyId,
                 c.Name AS CompanyName,
                 tc.Name,

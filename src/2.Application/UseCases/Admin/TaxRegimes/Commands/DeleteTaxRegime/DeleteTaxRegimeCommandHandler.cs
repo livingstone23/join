@@ -22,9 +22,10 @@ public sealed class DeleteTaxRegimeCommandHandler(
         if (entity is null || entity.CompanyId != companyId || entity.GcRecord != 0)
             return Response<Guid>.Error("TAX_REGIME_NOT_FOUND", ["Tax regime not found."]);
 
-        var profiles = await unitOfWork.GetRepository<PersonBusinessProfile>().GetAllAsync();
-        if (profiles.Any(p => p.CompanyId == companyId && p.GcRecord == 0 && p.TaxRegimeId == request.Id))
-            return Response<Guid>.Error("TAX_REGIME_IN_USE", ["The tax regime is currently assigned to one or more business profiles and cannot be deleted."]);
+        var dependents = await new ActiveDependentsCheck(unitOfWork)
+            .CountAsync<PersonBusinessProfile>(p => p.GcRecord == 0 && p.TaxRegimeId == request.Id, "business profiles");
+        if (dependents.HasDependents)
+            return Response<Guid>.Error("TAX_REGIME_IN_USE", dependents.Details);
 
         entity.MarkAsDeleted();
         await repo.UpdateAsync(entity);

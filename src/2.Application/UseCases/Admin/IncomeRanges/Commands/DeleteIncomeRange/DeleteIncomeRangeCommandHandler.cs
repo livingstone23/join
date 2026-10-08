@@ -22,9 +22,10 @@ public sealed class DeleteIncomeRangeCommandHandler(
         if (entity is null || entity.CompanyId != companyId || entity.GcRecord != 0)
             return Response<Guid>.Error("INCOME_RANGE_NOT_FOUND", ["Income range not found."]);
 
-        var profiles = await unitOfWork.GetRepository<PersonFinancialProfile>().GetAllAsync();
-        if (profiles.Any(p => p.CompanyId == companyId && p.GcRecord == 0 && p.IncomeRangeId == request.Id))
-            return Response<Guid>.Error("INCOME_RANGE_IN_USE", ["The income range is currently assigned to one or more financial profiles and cannot be deleted."]);
+        var dependents = await new ActiveDependentsCheck(unitOfWork)
+            .CountAsync<PersonFinancialProfile>(p => p.GcRecord == 0 && p.IncomeRangeId == request.Id, "financial profiles");
+        if (dependents.HasDependents)
+            return Response<Guid>.Error("INCOME_RANGE_IN_USE", dependents.Details);
 
         entity.MarkAsDeleted();
         await repo.UpdateAsync(entity);

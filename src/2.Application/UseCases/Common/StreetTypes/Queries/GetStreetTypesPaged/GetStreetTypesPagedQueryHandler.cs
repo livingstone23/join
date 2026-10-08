@@ -16,7 +16,8 @@ namespace JOIN.Application.UseCases.Common.StreetTypes.Queries;
 /// <param name="paginationOptions">Configurable pagination defaults shared across paged endpoints.</param>
 public class GetStreetTypesPagedQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetStreetTypesPagedQuery, Response<PagedResult<StreetTypeListItemDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -35,7 +36,11 @@ public class GetStreetTypesPagedQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE st.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND st.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
@@ -48,6 +53,7 @@ public class GetStreetTypesPagedQueryHandler(
         var sql = $"""
             SELECT
                 st.Id,
+                st.GcRecord,
                 st.Name,
                 st.Abbreviation,
                 st.IsActive

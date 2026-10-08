@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Admin.SystemModules.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
+using JOIN.Application.UnitTest.Common.TestDoubles;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Admin.SystemModules.Commands.DeleteSystemModule;
@@ -85,9 +86,7 @@ public sealed class DeleteSystemModuleCommandHandlerTests
             .Setup(x => x.GetAsync(entity.Id))
             .ReturnsAsync(entity);
 
-        context.SystemOptionRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(
+        context.SystemOptionRepositoryMock.SetupRows(
             [
                 new SystemOption
                 {
@@ -104,7 +103,7 @@ public sealed class DeleteSystemModuleCommandHandlerTests
         // Assert
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("SYSTEM_MODULE_IN_USE");
-        response.Errors.Should().Contain("The system module is currently linked to one or more system options and cannot be deleted.");
+        response.Errors.Should().Contain("Active system options: 1");
     }
 
     /// <summary>
@@ -123,9 +122,7 @@ public sealed class DeleteSystemModuleCommandHandlerTests
             .Setup(x => x.GetAsync(entity.Id))
             .ReturnsAsync(entity);
 
-        context.SystemOptionRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(Array.Empty<SystemOption>());
+        context.SystemOptionRepositoryMock.SetupRows(Array.Empty<SystemOption>());
 
         context.RepositoryMock
             .Setup(x => x.UpdateAsync(entity))
@@ -161,9 +158,7 @@ public sealed class DeleteSystemModuleCommandHandlerTests
             .Setup(x => x.GetAsync(entity.Id))
             .ReturnsAsync(entity);
 
-        context.SystemOptionRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(Array.Empty<SystemOption>());
+        context.SystemOptionRepositoryMock.SetupRows(Array.Empty<SystemOption>());
 
         context.RepositoryMock
             .Setup(x => x.UpdateAsync(entity))
@@ -172,6 +167,95 @@ public sealed class DeleteSystemModuleCommandHandlerTests
         context.UnitOfWorkMock
             .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
+
+        // Act
+        var response = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeTrue();
+        response.Message.Should().Be("System module deleted successfully.");
+        response.Data.Should().Be(entity.Id);
+        entity.GcRecord.Should().BeGreaterThan(BaseAuditableEntity.ActiveGcRecord);
+
+        context.RepositoryMock.Verify(x => x.UpdateAsync(entity), Times.Once);
+    }
+
+    /// <summary>
+    /// SPEC 41: every active child type blocks the delete and is listed in the errors.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenActiveDependentsExist_ShouldReturnInUseWithDetails()
+    {
+        // Arrange
+        var entity = CreateExistingModule(_fixture.Create<Guid>());
+        var context = new DeleteSystemModuleCommandTestContext();
+        var command = new DeleteSystemModuleCommand(entity.Id);
+        var handler = context.CreateHandler();
+
+        context.RepositoryMock
+            .Setup(x => x.GetAsync(entity.Id))
+            .ReturnsAsync(entity);
+
+        context.SystemOptionRepositoryMock.SetupRows(Array.Empty<SystemOption>());
+
+        context.RepositoryMock
+            .Setup(x => x.UpdateAsync(entity))
+            .ReturnsAsync(true);
+
+        context.UnitOfWorkMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new SystemOption { ModuleId = entity.Id, Name = "Manage Persons", Route = "/persons" };
+        context.UnitOfWorkMock.SetupRepositoryRows<SystemOption>([child1]);
+        var child2 = new CompanyModule { CompanyId = Guid.NewGuid(), ModuleId = entity.Id };
+        context.UnitOfWorkMock.SetupRepositoryRows<CompanyModule>([child2]);
+
+
+        // Act
+        var response = await handler.Handle(command, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("SYSTEM_MODULE_IN_USE");
+        response.Errors.Should().Equal("Active system options: 1", "Active company modules: 1");
+        entity.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
+    }
+
+    /// <summary>
+    /// SPEC 41: logically deleted children do not block the delete.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenDependentsAreDeleted_ShouldSoftDelete()
+    {
+        // Arrange
+        var entity = CreateExistingModule(_fixture.Create<Guid>());
+        var context = new DeleteSystemModuleCommandTestContext();
+        var command = new DeleteSystemModuleCommand(entity.Id);
+        var handler = context.CreateHandler();
+
+        context.RepositoryMock
+            .Setup(x => x.GetAsync(entity.Id))
+            .ReturnsAsync(entity);
+
+        context.SystemOptionRepositoryMock.SetupRows(Array.Empty<SystemOption>());
+
+        context.RepositoryMock
+            .Setup(x => x.UpdateAsync(entity))
+            .ReturnsAsync(true);
+
+        context.UnitOfWorkMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new SystemOption { ModuleId = entity.Id, Name = "Manage Persons", Route = "/persons" };
+        child1.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<SystemOption>([child1]);
+        var child2 = new CompanyModule { CompanyId = Guid.NewGuid(), ModuleId = entity.Id };
+        child2.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<CompanyModule>([child2]);
+
 
         // Act
         var response = await handler.Handle(command, CancellationToken.None);
@@ -226,7 +310,7 @@ public sealed class DeleteSystemModuleCommandHandlerTests
             SetupRepository(UnitOfWorkMock, SystemOptionRepositoryMock);
         }
 
-        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
+        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new() { DefaultValue = DefaultValue.Mock };
         public Mock<IGenericRepository<SystemModule>> RepositoryMock { get; } = new();
         public Mock<IGenericRepository<SystemOption>> SystemOptionRepositoryMock { get; } = new();
 

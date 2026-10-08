@@ -26,9 +26,14 @@ public sealed class GetTicketComplexityByIdQueryHandler(ISqlConnectionFactory co
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(_currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND tc.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 tc.Id,
+                tc.GcRecord,
                 tc.CompanyId,
                 c.Name AS CompanyName,
                 tc.Name,
@@ -42,11 +47,11 @@ public sealed class GetTicketComplexityByIdQueryHandler(ISqlConnectionFactory co
             LEFT JOIN Common.Companies c ON c.Id = tc.CompanyId
             WHERE tc.Id = @Id
               AND tc.CompanyId = @TenantId
-              AND tc.GcRecord = 0;
+              {activeOnly};
             """;
 
         var ticketComplexity = await connection.QuerySingleOrDefaultAsync<TicketComplexityDto>(
-            new CommandDefinition(sql, new { request.Id, TenantId = _currentUserService.CompanyId }, cancellationToken: cancellationToken));
+            new CommandDefinition(sql, new { request.Id, TenantId = TenantResolver.Resolve(_currentUserService, request.CompanyId) }, cancellationToken: cancellationToken));
 
         if (ticketComplexity is null)
         {

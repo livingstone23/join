@@ -4,4 +4,4 @@ using MediatR;
 
 namespace JOIN.Application.UseCases.Admin.IncomeRanges.Queries;
 
-public sealed record GetIncomeRangeByIdQuery(Guid Id) : IRequest<Response<IncomeRangeDto>>;
+public sealed record GetIncomeRangeByIdQuery(Guid Id, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<IncomeRangeDto>>;

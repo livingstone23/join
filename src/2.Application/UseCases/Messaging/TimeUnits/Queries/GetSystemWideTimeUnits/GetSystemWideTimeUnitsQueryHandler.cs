@@ -61,6 +61,7 @@ public sealed class GetSystemWideTimeUnitsQueryHandler(
         var sql = $"""
             SELECT
                 tu.Id,
+                tu.GcRecord,
                 tu.CompanyId,
                 c.Name AS CompanyName,
                 tu.Name,

@@ -88,14 +88,6 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         return Task.FromResult(true);
     }
 
-    public async Task<bool> DeleteAsync(Guid id)
-    {
-        var entity = await _context.Set<T>().FindAsync(id);
-        if (entity == null) return false;
-        _context.Set<T>().Remove(entity);
-        return true;
-    }
-
     // --- Queries ---
     public virtual async Task<T?> GetAsync(Guid id) => await _context.Set<T>().FindAsync(id);
 

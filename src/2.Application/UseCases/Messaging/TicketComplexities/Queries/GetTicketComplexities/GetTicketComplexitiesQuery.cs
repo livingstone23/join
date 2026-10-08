@@ -15,5 +15,7 @@ public record GetTicketComplexitiesQuery(
     int? PageNumber = null,
     int? PageSize = null,
     string? Name = null,
-    bool? IsActive = null)
+    bool? IsActive = null,
+    bool? IncludeDeleted = null,
+    Guid? CompanyId = null)
     : IRequest<Response<PagedResult<TicketComplexityDto>>>;

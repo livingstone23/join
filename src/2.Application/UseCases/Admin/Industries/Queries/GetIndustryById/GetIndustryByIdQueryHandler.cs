@@ -26,9 +26,15 @@ public sealed class GetIndustryByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var companyId = TenantResolver.Resolve(currentUserService, request.CompanyId);
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND i.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 i.Id,
+                i.GcRecord,
                 i.CompanyId,
                 c.Name AS CompanyName,
                 i.Code,
@@ -42,13 +48,13 @@ public sealed class GetIndustryByIdQueryHandler(
                AND c.GcRecord = 0
             WHERE i.Id = @Id
               AND i.CompanyId = @CompanyId
-              AND i.GcRecord = 0;
+              {activeOnly};
             """;
 
         var industry = await connection.QuerySingleOrDefaultAsync<IndustryDto>(
             new CommandDefinition(
                 sql,
-                new { request.Id, CompanyId = currentUserService.CompanyId },
+                new { request.Id, CompanyId = companyId },
                 cancellationToken: cancellationToken));
 
         if (industry is null)

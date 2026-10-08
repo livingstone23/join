@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Common.Countries.Queries;
 /// Query to retrieve a country catalog item by id.
 /// </summary>
 /// <param name="CountryId">The country identifier.</param>
-public record GetCountryByIdQuery(Guid CountryId) : IRequest<Response<CountryDto>>;
+public record GetCountryByIdQuery(Guid CountryId, bool? IncludeDeleted = null) : IRequest<Response<CountryDto>>;

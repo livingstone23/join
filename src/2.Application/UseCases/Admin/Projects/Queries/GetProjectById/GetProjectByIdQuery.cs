@@ -9,5 +9,5 @@ namespace JOIN.Application.UseCases.Admin.Projects.Queries;
 /// </summary>
 /// <param name="Id">The unique identifier of the requested project.</param>
 /// <param name="CompanyId">The tenant identifier used to validate and scope the lookup.</param>
-public sealed record GetProjectByIdQuery(Guid Id, Guid CompanyId)
+public sealed record GetProjectByIdQuery(Guid Id, Guid CompanyId, bool? IncludeDeleted = null)
     : IRequest<Response<ProjectDto>>;

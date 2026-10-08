@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Admin.Projects.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Messaging;
+using JOIN.Application.UnitTest.Common.TestDoubles;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Admin.Projects.Commands.DeleteProject;
@@ -88,9 +89,7 @@ public sealed class DeleteProjectCommandHandlerTests
             .Setup(x => x.GetAsync(project.Id))
             .ReturnsAsync(project);
 
-        context.TicketRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(
+        context.TicketRepositoryMock.SetupRows(
             [
                 new Ticket
                 {
@@ -108,7 +107,7 @@ public sealed class DeleteProjectCommandHandlerTests
         // Assert
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("PROJECT_IN_USE");
-        response.Errors.Should().Contain("The project is currently assigned to one or more tickets and cannot be deleted.");
+        response.Errors.Should().Contain("Active tickets: 1");
         context.ProjectRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<Project>()), Times.Never);
     }
 
@@ -133,9 +132,7 @@ public sealed class DeleteProjectCommandHandlerTests
             .Setup(x => x.GetAsync(project.Id))
             .ReturnsAsync(project);
 
-        context.TicketRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(Array.Empty<Ticket>());
+        context.TicketRepositoryMock.SetupRows(Array.Empty<Ticket>());
 
         context.ProjectRepositoryMock
             .Setup(x => x.UpdateAsync(project))
@@ -177,9 +174,7 @@ public sealed class DeleteProjectCommandHandlerTests
             .Setup(x => x.GetAsync(project.Id))
             .ReturnsAsync(project);
 
-        context.TicketRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(Array.Empty<Ticket>());
+        context.TicketRepositoryMock.SetupRows(Array.Empty<Ticket>());
 
         context.ProjectRepositoryMock
             .Setup(x => x.UpdateAsync(project))
@@ -190,6 +185,110 @@ public sealed class DeleteProjectCommandHandlerTests
             .ReturnsAsync(1);
 
         var handler = context.CreateHandler();
+
+        // Act
+        var response = await handler.Handle(new DeleteProjectCommand(project.Id, companyId), CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeTrue();
+        response.Message.Should().Be("Project deleted successfully.");
+        response.Data.Should().Be(project.Id);
+        project.GcRecord.Should().BeGreaterThan(BaseAuditableEntity.ActiveGcRecord);
+
+        context.ProjectRepositoryMock.Verify(x => x.UpdateAsync(project), Times.Once);
+        context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// SPEC 41: every active child type blocks the delete and is listed in the errors.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenActiveDependentsExist_ShouldReturnInUseWithDetails()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var project = new Project
+        {
+            CompanyId = companyId,
+            Name = "Portal Migration",
+            EntityStatusId = _fixture.Create<Guid>(),
+            GcRecord = 0
+        };
+
+        var context = new DeleteProjectCommandTestContext();
+        context.ProjectRepositoryMock
+            .Setup(x => x.GetAsync(project.Id))
+            .ReturnsAsync(project);
+
+        context.TicketRepositoryMock.SetupRows(Array.Empty<Ticket>());
+
+        context.ProjectRepositoryMock
+            .Setup(x => x.UpdateAsync(project))
+            .ReturnsAsync(true);
+
+        context.UnitOfWorkMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var handler = context.CreateHandler();
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new Ticket { CompanyId = Guid.NewGuid(), ProjectId = project.Id };
+        context.UnitOfWorkMock.SetupRepositoryRows<Ticket>([child1]);
+        var child2 = new TicketCompanyDefault { CompanyId = Guid.NewGuid(), ProjectDefaultId = project.Id };
+        context.UnitOfWorkMock.SetupRepositoryRows<TicketCompanyDefault>([child2]);
+
+
+        // Act
+        var response = await handler.Handle(new DeleteProjectCommand(project.Id, companyId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("PROJECT_IN_USE");
+        response.Errors.Should().Equal("Active tickets: 1", "Active ticket company defaults: 1");
+        project.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
+    }
+
+    /// <summary>
+    /// SPEC 41: logically deleted children do not block the delete.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenDependentsAreDeleted_ShouldSoftDelete()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var project = new Project
+        {
+            CompanyId = companyId,
+            Name = "Portal Migration",
+            EntityStatusId = _fixture.Create<Guid>(),
+            GcRecord = 0
+        };
+
+        var context = new DeleteProjectCommandTestContext();
+        context.ProjectRepositoryMock
+            .Setup(x => x.GetAsync(project.Id))
+            .ReturnsAsync(project);
+
+        context.TicketRepositoryMock.SetupRows(Array.Empty<Ticket>());
+
+        context.ProjectRepositoryMock
+            .Setup(x => x.UpdateAsync(project))
+            .ReturnsAsync(true);
+
+        context.UnitOfWorkMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var handler = context.CreateHandler();
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new Ticket { CompanyId = Guid.NewGuid(), ProjectId = project.Id };
+        child1.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<Ticket>([child1]);
+        var child2 = new TicketCompanyDefault { CompanyId = Guid.NewGuid(), ProjectDefaultId = project.Id };
+        child2.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<TicketCompanyDefault>([child2]);
+
 
         // Act
         var response = await handler.Handle(new DeleteProjectCommand(project.Id, companyId), CancellationToken.None);
@@ -226,7 +325,7 @@ public sealed class DeleteProjectCommandHandlerTests
             SetupRepository(UnitOfWorkMock, TicketRepositoryMock);
         }
 
-        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
+        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new() { DefaultValue = DefaultValue.Mock };
         public Mock<IGenericRepository<Project>> ProjectRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Ticket>> TicketRepositoryMock { get; } = new();
 

@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Data Transfer Object (DTO) representing an identification document type.
 /// </summary>
-public sealed record IdentificationTypeDto
+public sealed record IdentificationTypeDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the identification type.

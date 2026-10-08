@@ -104,7 +104,7 @@ public sealed class GetIdentificationTypeByIdQueryHandlerTests
 
         public GetIdentificationTypeByIdQueryHandler CreateHandler()
         {
-            return new GetIdentificationTypeByIdQueryHandler(ConnectionFactoryMock.Object);
+            return new GetIdentificationTypeByIdQueryHandler(ConnectionFactoryMock.Object, new Mock<ICurrentUserService>().Object);
         }
     }
 }

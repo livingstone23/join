@@ -6,6 +6,8 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
+using JOIN.Services.WebApi.Controllers;
+using Microsoft.AspNetCore.Authorization;
 
 namespace JOIN.Services.WebApi.Controllers.Admin;
 
@@ -45,6 +47,7 @@ public class AreaController(ISender sender) : ControllerBase
         [FromQuery] string? name = null,
         [FromQuery] DateTime? createdFrom = null,
         [FromQuery] DateTime? createdTo = null,
+        [FromQuery] bool? includeDeleted = null,
         CancellationToken cancellationToken = default)
     {
         if (companyId == Guid.Empty)
@@ -55,7 +58,7 @@ public class AreaController(ISender sender) : ControllerBase
         }
 
         var response = await _sender.Send(
-            new GetAreasQuery(companyId, pageNumber, pageSize, name, createdFrom, createdTo),
+            new GetAreasQuery(companyId, pageNumber, pageSize, name, createdFrom, createdTo, includeDeleted),
             cancellationToken);
 
         if (!response.IsSuccess)
@@ -81,6 +84,7 @@ public class AreaController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetById(
         Guid id,
         [FromHeader(Name = "X-Company-Id")] Guid companyId,
+        [FromQuery] bool? includeDeleted = null,
         CancellationToken cancellationToken = default)
     {
         if (companyId == Guid.Empty)
@@ -90,7 +94,7 @@ public class AreaController(ISender sender) : ControllerBase
                 ["The X-Company-Id header is required."]));
         }
 
-        var response = await _sender.Send(new GetAreaByIdQuery(id, companyId), cancellationToken);
+        var response = await _sender.Send(new GetAreaByIdQuery(id, companyId, includeDeleted), cancellationToken);
         if (!response.IsSuccess)
         {
             if (response.Message == "AREA_NOT_FOUND")
@@ -226,5 +230,27 @@ public class AreaController(ISender sender) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted area (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The area identifier.</param>
+    /// <param name="companyId">The X-Company-Id header: explicit company, honored only for SuperAdmin.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        [FromHeader(Name = "X-Company-Id")] Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new RestoreAreaCommand(id, companyId == Guid.Empty ? null : companyId), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

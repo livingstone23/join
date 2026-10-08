@@ -61,7 +61,7 @@ public sealed class GetSystemModulesQueryHandlerTests
         item.Order.Should().Be(1);
         item.CreatedAt.Should().Be(createdAt);
 
-        context.Connection.LastCommandText.Should().Contain("WHERE sm.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain("AND sm.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("sm.Name LIKE @Name");
         context.Connection.LastCommandText.Should().Contain("sm.IsActive = @IsActive");
         context.Connection.LastCommandText.Should().Contain("ORDER BY sm.\"Order\" ASC NULLS LAST, sm.Name ASC");
@@ -154,7 +154,7 @@ public sealed class GetSystemModulesQueryHandlerTests
         {
             return new GetSystemModulesQueryHandler(
                 ConnectionFactoryMock.Object,
-                PaginationOptions);
+                PaginationOptions, new Mock<ICurrentUserService>().Object);
         }
     }
 }

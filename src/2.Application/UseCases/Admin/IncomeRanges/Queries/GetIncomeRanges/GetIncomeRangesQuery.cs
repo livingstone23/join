@@ -9,5 +9,7 @@ public sealed record GetIncomeRangesQuery(
     int? PageSize = null,
     string? DisplayName = null,
     string? CurrencyCode = null,
-    bool? IsActive = null)
+    bool? IsActive = null,
+    bool? IncludeDeleted = null,
+    Guid? CompanyId = null)
     : IRequest<Response<PagedResult<IncomeRangeDto>>>;

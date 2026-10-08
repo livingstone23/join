@@ -5,7 +5,7 @@ namespace JOIN.Application.DTO.Common;
 /// <summary>
 /// Data Transfer Object (DTO) representing a communication channel catalog item.
 /// </summary>
-public record CommunicationChannelDto
+public record CommunicationChannelDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the communication channel identifier.

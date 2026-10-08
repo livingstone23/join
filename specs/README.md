@@ -77,7 +77,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 38 | Consolidación de query filters globales | Implementado | 30 |
 | 39 | Fork `main_postgresql` | Implementado (en `main_postgresql`) | — |
 | 40 | Índices únicos filtrados por soft-delete | Implementado | — |
-| 41 | Visibilidad de registros borrados y restauración para SuperAdmin | Borrador | 38, 40 |
+| 41 | Visibilidad de registros borrados y restauración para SuperAdmin | Aprobado | 38, 40 |
 | 42 | Valores iniciales del ticket desde `TicketCompanyDefaults` | Borrador | — |
 | 43 | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Borrador | — |
 | 44 | Módulo Calendario: parametrización, calendarios y actividades | Borrador | 99, 43, 48 |
@@ -124,7 +124,9 @@ Decisiones o verificaciones que no tienen spec propia todavía:
 | 44 | Recordatorios y tareas automáticas (Hangfire): avisos, cierre de actividades vencidas, barridos de estados. |
 | 46 | Acciones de sincronización con Google (OAuth, envío, webhook, worker). |
 | 44 | Mejoras diferidas del calendario: invitados, calendarios privados, turnos nocturnos, permisos de medio día. |
-| 41 | Al implementarla, incluir las entidades del calendario (44, 45, 46). |
+| 41 | Las entidades del calendario (44, 45, 46) no existen todavía: entran en la Etapa 4 de la 41 (o en su propia spec) cuando se implementen. |
+| 41 | Commands de `Area` y `Project` (crear/editar/borrar) usan `X-Company-Id` sin validarlo contra el token: alinearlos con `TenantResolver` (las queries ya se alinearon en la Etapa 1). |
+| 41 | Índices únicos de los catálogos globales (`Country.IsoCode`, `StreetType.Name`, `SystemModule.Name`…) no están filtrados por `GcRecord`: un borrado impide crear otro con la misma clave. Decidir si se filtran (patrón SPEC 40). |
 | 38 (F0) | Ejecutar `docs/migrations/spec-38-data-audit.sql` contra la base de desarrollo y pegar los conteos en el PR; si hay filas afectadas, decidir si se reasignan. |
 | 38 (D) | Smoke manual: un `SuperAdminCompany` solo ve su empresa y sus módulos, y no puede borrar empresas ni modificar módulos; validar con `join_frontb`. |
 | Proceso | Script de verificación de consistencia de specs (referencias inexistentes, nombres retirados, dependencias de specs pospuestas, specs fuera del índice). |

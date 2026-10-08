@@ -22,7 +22,7 @@ public sealed class GetTaxRegimesQueryHandler(
         if (currentUserService.CompanyId == Guid.Empty)
             return Response<PagedResult<TaxRegimeDto>>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
 
-        var companyId = currentUserService.CompanyId;
+        var companyId = TenantResolver.Resolve(currentUserService, request.CompanyId);
         var (pageNumber, pageSize) = _pagination.Sanitize(request.PageNumber, request.PageSize);
         var offset = (pageNumber - 1) * pageSize;
 
@@ -32,7 +32,11 @@ public sealed class GetTaxRegimesQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", pageSize);
 
-        var where = new StringBuilder("WHERE tr.CompanyId = @CompanyId AND tr.GcRecord = 0");
+        var where = new StringBuilder("WHERE tr.CompanyId = @CompanyId");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            where.Append(" AND tr.GcRecord = 0");
+        }
         if (!string.IsNullOrWhiteSpace(request.Code)) { where.Append(" AND tr.Code LIKE @Code"); parameters.Add("Code", $"%{request.Code.Trim()}%"); }
         if (!string.IsNullOrWhiteSpace(request.Name)) { where.Append(" AND tr.Name LIKE @Name"); parameters.Add("Name", $"%{request.Name.Trim()}%"); }
         if (request.IsActive.HasValue) { where.Append(" AND tr.IsActive = @IsActive"); parameters.Add("IsActive", request.IsActive.Value); }
@@ -42,7 +46,7 @@ public sealed class GetTaxRegimesQueryHandler(
             ? "LIMIT @PageSize OFFSET @Offset" : "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
         var sql = $"""
-            SELECT tr.Id, tr.CompanyId, c.Name AS CompanyName, tr.Code, tr.Name, tr.IsActive, tr.Created AS CreatedAt
+            SELECT tr.Id, tr.GcRecord, tr.CompanyId, c.Name AS CompanyName, tr.Code, tr.Name, tr.IsActive, tr.Created AS CreatedAt
             FROM Admin.TaxRegimes tr
             INNER JOIN Common.Companies c ON c.Id = tr.CompanyId AND c.GcRecord = 0
             {whereClause} ORDER BY tr.Code ASC, tr.Name ASC {pagination};

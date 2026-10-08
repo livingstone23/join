@@ -10,7 +10,9 @@ namespace JOIN.Application.UseCases.Common.Municipalities.Queries;
 /// Handles municipality detail queries using Dapper for high-performance reads.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
-public sealed class GetMunicipalityByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+public sealed class GetMunicipalityByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetMunicipalityByIdQuery, Response<MunicipalityDto>>
 {
     /// <summary>
@@ -23,9 +25,14 @@ public sealed class GetMunicipalityByIdQueryHandler(ISqlConnectionFactory connec
     {
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND m.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 m.Id,
+                m.GcRecord,
                 m.Name,
                 m.Code,
                 m.ProvinceId,
@@ -36,7 +43,7 @@ public sealed class GetMunicipalityByIdQueryHandler(ISqlConnectionFactory connec
                 ON p.Id = m.ProvinceId
                AND p.GcRecord = 0
             WHERE m.Id = @Id
-              AND m.GcRecord = 0;
+              {activeOnly};
             """;
 
         var municipality = await connection.QuerySingleOrDefaultAsync<MunicipalityDto>(

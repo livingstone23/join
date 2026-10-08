@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Common.CommunicationChannels.Queries;
 /// Query to retrieve a communication channel by id.
 /// </summary>
 /// <param name="CommunicationChannelId">The communication channel identifier.</param>
-public record GetCommunicationChannelByIdQuery(Guid CommunicationChannelId) : IRequest<Response<CommunicationChannelDto>>;
+public record GetCommunicationChannelByIdQuery(Guid CommunicationChannelId, bool? IncludeDeleted = null) : IRequest<Response<CommunicationChannelDto>>;

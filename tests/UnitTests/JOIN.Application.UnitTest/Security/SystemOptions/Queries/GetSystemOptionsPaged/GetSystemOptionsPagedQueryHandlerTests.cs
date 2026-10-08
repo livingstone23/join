@@ -150,7 +150,7 @@ public sealed class GetSystemOptionsPagedQueryHandlerTests
                 DefaultPageSize = 20,
                 MaxPageSize = 100
             });
-            return new GetSystemOptionsPagedQueryHandler(ConnectionFactoryMock.Object, options);
+            return new GetSystemOptionsPagedQueryHandler(ConnectionFactoryMock.Object, options, new Mock<ICurrentUserService>().Object);
         }
     }
 }

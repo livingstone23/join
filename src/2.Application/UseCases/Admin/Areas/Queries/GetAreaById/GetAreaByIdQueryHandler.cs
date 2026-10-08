@@ -10,7 +10,9 @@ namespace JOIN.Application.UseCases.Admin.Areas.Queries;
 /// Handles tenant-scoped area detail queries using Dapper.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
-public sealed class GetAreaByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+public sealed class GetAreaByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetAreaByIdQuery, Response<AreaDto>>
 {
     /// <summary>
@@ -21,7 +23,10 @@ public sealed class GetAreaByIdQueryHandler(ISqlConnectionFactory connectionFact
     /// <returns>A standardized response containing the requested area when it exists.</returns>
     public async Task<Response<AreaDto>> Handle(GetAreaByIdQuery request, CancellationToken cancellationToken)
     {
-        if (request.CompanyId == Guid.Empty)
+        // SPEC 41: the X-Company-Id header is only an explicit override, honored for SuperAdmin;
+        // every other caller always reads the company of their token (TenantResolver).
+        var companyId = TenantResolver.Resolve(currentUserService, request.CompanyId == Guid.Empty ? null : request.CompanyId);
+        if (companyId == Guid.Empty)
         {
             return Response<AreaDto>.Error(
                 "INVALID_COMPANY_ID",
@@ -30,9 +35,14 @@ public sealed class GetAreaByIdQueryHandler(ISqlConnectionFactory connectionFact
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND a.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 a.Id,
+                a.GcRecord,
                 a.CompanyId,
                 c.Name AS CompanyName,
                 a.Name,
@@ -48,13 +58,13 @@ public sealed class GetAreaByIdQueryHandler(ISqlConnectionFactory connectionFact
                AND c.GcRecord = 0
             WHERE a.Id = @AreaId
               AND a.CompanyId = @CompanyId
-              AND a.GcRecord = 0;
+              {activeOnly};
             """;
 
         var area = await connection.QuerySingleOrDefaultAsync<AreaDto>(
             new CommandDefinition(
                 sql,
-                new { request.AreaId, request.CompanyId },
+                new { request.AreaId, CompanyId = companyId },
                 cancellationToken: cancellationToken));
 
         if (area is null)

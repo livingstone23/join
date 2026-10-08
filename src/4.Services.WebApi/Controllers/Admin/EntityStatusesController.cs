@@ -6,6 +6,8 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
+using JOIN.Services.WebApi.Controllers;
 
 namespace JOIN.Services.WebApi.Controllers.Admin;
 
@@ -47,6 +49,7 @@ public class EntityStatusesController(ISender sender) : ControllerBase
         [FromQuery] string? moduleName = null,
         [FromQuery] DateTime? createdFrom = null,
         [FromQuery] DateTime? createdTo = null,
+        [FromQuery] bool? includeDeleted = null,
         CancellationToken cancellationToken = default)
     {
         if (companyId == Guid.Empty)
@@ -57,7 +60,7 @@ public class EntityStatusesController(ISender sender) : ControllerBase
         }
 
         var response = await _sender.Send(
-            new GetEntityStatusQuery(companyId, pageNumber, pageSize, entityStatuses, moduleName, createdFrom, createdTo),
+            new GetEntityStatusQuery(companyId, pageNumber, pageSize, entityStatuses, moduleName, createdFrom, createdTo, includeDeleted),
             cancellationToken);
 
         if (!response.IsSuccess)
@@ -83,6 +86,7 @@ public class EntityStatusesController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetById(
         Guid id,
         [FromHeader(Name = "X-Company-Id")] Guid companyId,
+        [FromQuery] bool? includeDeleted = null,
         CancellationToken cancellationToken = default)
     {
         if (companyId == Guid.Empty)
@@ -92,7 +96,7 @@ public class EntityStatusesController(ISender sender) : ControllerBase
                 ["The X-Company-Id header is required."]));
         }
 
-        var response = await _sender.Send(new GetEntityStatusByIdQuery(id, companyId), cancellationToken);
+        var response = await _sender.Send(new GetEntityStatusByIdQuery(id, companyId, includeDeleted), cancellationToken);
         if (!response.IsSuccess)
         {
             if (response.Message == "ENTITY_STATUS_NOT_FOUND")
@@ -236,5 +240,25 @@ public class EntityStatusesController(ISender sender) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted entity status (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The entity status identifier.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new RestoreEntityStatusCommand(id, null), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

@@ -5,7 +5,7 @@ namespace JOIN.Application.DTO.Common;
 /// <summary>
 /// Data Transfer Object (DTO) representing a province catalog item.
 /// </summary>
-public record ProvinceDto
+public record ProvinceDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the province.

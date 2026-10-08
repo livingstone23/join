@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Security;
 
 /// <summary>
 /// Data transfer object for detailed information about a system option.
 /// </summary>
-public sealed record SystemOptionDto
+public sealed record SystemOptionDto : SoftDeletableDto
 {
     public Guid Id { get; init; }
     public Guid ModuleId { get; init; }

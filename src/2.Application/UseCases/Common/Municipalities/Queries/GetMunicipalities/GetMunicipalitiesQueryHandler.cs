@@ -16,7 +16,8 @@ namespace JOIN.Application.UseCases.Common.Municipalities.Queries;
 /// <param name="paginationOptions">Configurable pagination defaults for the municipality listing endpoint.</param>
 public sealed class GetMunicipalitiesQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetMunicipalitiesQuery, Response<PagedResult<MunicipalityDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -38,7 +39,11 @@ public sealed class GetMunicipalitiesQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE m.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND m.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
@@ -63,6 +68,7 @@ public sealed class GetMunicipalitiesQueryHandler(
         var sql = $"""
             SELECT
                 m.Id,
+                m.GcRecord,
                 m.Name,
                 m.Code,
                 m.ProvinceId,

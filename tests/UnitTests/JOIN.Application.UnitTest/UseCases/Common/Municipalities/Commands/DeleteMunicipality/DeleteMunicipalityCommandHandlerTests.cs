@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Common.Municipalities.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
+using JOIN.Application.UnitTest.Common.TestDoubles;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Common.Municipalities.Commands.DeleteMunicipality;
@@ -63,7 +64,7 @@ public sealed class DeleteMunicipalityCommandHandlerTests
             GcRecord = 0
         };
         address.SetAsDefault();
-        context.PersonAddressRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(new[] { address });
+        context.PersonAddressRepositoryMock.SetupRows(new[] { address });
 
         var handler = context.CreateHandler();
 
@@ -73,7 +74,7 @@ public sealed class DeleteMunicipalityCommandHandlerTests
         // Assert
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("MUNICIPALITY_IN_USE");
-        response.Errors.Should().Contain("The municipality is currently linked to customer addresses and cannot be deleted.");
+        response.Errors.Should().Contain("Active person addresses: 1");
     }
 
     /// <summary>
@@ -88,7 +89,7 @@ public sealed class DeleteMunicipalityCommandHandlerTests
         var entity = CreateMunicipality(municipalityId);
 
         context.MunicipalityRepositoryMock.Setup(x => x.GetAsync(municipalityId)).ReturnsAsync(entity);
-        context.PersonAddressRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<PersonAddress>());
+        context.PersonAddressRepositoryMock.SetupRows(Array.Empty<PersonAddress>());
         context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
 
         var handler = context.CreateHandler();
@@ -115,9 +116,72 @@ public sealed class DeleteMunicipalityCommandHandlerTests
         var entity = CreateMunicipality(municipalityId);
 
         context.MunicipalityRepositoryMock.Setup(x => x.GetAsync(municipalityId)).ReturnsAsync(entity);
-        context.PersonAddressRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<PersonAddress>());
+        context.PersonAddressRepositoryMock.SetupRows(Array.Empty<PersonAddress>());
 
         var handler = context.CreateHandler();
+
+        // Act
+        var response = await handler.Handle(new DeleteMunicipalityCommand(municipalityId), CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeTrue();
+        response.Message.Should().Be("Municipality deleted successfully.");
+        response.Data.Should().Be(municipalityId);
+        entity.GcRecord.Should().BeGreaterThan(BaseAuditableEntity.ActiveGcRecord);
+        context.MunicipalityRepositoryMock.Verify(x => x.UpdateAsync(entity), Times.Once);
+    }
+
+    /// <summary>
+    /// SPEC 41: every active child type blocks the delete and is listed in the errors.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenActiveDependentsExist_ShouldReturnInUseWithDetails()
+    {
+        // Arrange
+        var municipalityId = _fixture.Create<Guid>();
+        var context = new DeleteMunicipalityCommandTestContext();
+        var entity = CreateMunicipality(municipalityId);
+
+        context.MunicipalityRepositoryMock.Setup(x => x.GetAsync(municipalityId)).ReturnsAsync(entity);
+        context.PersonAddressRepositoryMock.SetupRows(Array.Empty<PersonAddress>());
+
+        var handler = context.CreateHandler();
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new PersonAddress { CompanyId = Guid.NewGuid(), PersonId = Guid.NewGuid(), MunicipalityId = municipalityId };
+        context.UnitOfWorkMock.SetupRepositoryRows<PersonAddress>([child1]);
+
+
+        // Act
+        var response = await handler.Handle(new DeleteMunicipalityCommand(municipalityId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("MUNICIPALITY_IN_USE");
+        response.Errors.Should().Equal("Active person addresses: 1");
+        entity.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
+    }
+
+    /// <summary>
+    /// SPEC 41: logically deleted children do not block the delete.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenDependentsAreDeleted_ShouldSoftDelete()
+    {
+        // Arrange
+        var municipalityId = _fixture.Create<Guid>();
+        var context = new DeleteMunicipalityCommandTestContext();
+        var entity = CreateMunicipality(municipalityId);
+
+        context.MunicipalityRepositoryMock.Setup(x => x.GetAsync(municipalityId)).ReturnsAsync(entity);
+        context.PersonAddressRepositoryMock.SetupRows(Array.Empty<PersonAddress>());
+
+        var handler = context.CreateHandler();
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new PersonAddress { CompanyId = Guid.NewGuid(), PersonId = Guid.NewGuid(), MunicipalityId = municipalityId };
+        child1.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<PersonAddress>([child1]);
+
 
         // Act
         var response = await handler.Handle(new DeleteMunicipalityCommand(municipalityId), CancellationToken.None);
@@ -159,7 +223,7 @@ public sealed class DeleteMunicipalityCommandHandlerTests
             UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         }
 
-        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
+        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new() { DefaultValue = DefaultValue.Mock };
         public Mock<IGenericRepository<Municipality>> MunicipalityRepositoryMock { get; } = new();
         public Mock<IGenericRepository<PersonAddress>> PersonAddressRepositoryMock { get; } = new();
 

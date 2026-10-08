@@ -24,7 +24,6 @@ public sealed class DeleteMunicipalityCommandHandler(IUnitOfWork unitOfWork)
     public async Task<Response<Guid>> Handle(DeleteMunicipalityCommand request, CancellationToken cancellationToken)
     {
         var municipalityRepository = _unitOfWork.GetRepository<Municipality>();
-        var customerAddressRepository = _unitOfWork.GetRepository<PersonAddress>();
 
         var municipalityEntity = await municipalityRepository.GetAsync(request.Id);
         if (municipalityEntity is null)
@@ -32,14 +31,12 @@ public sealed class DeleteMunicipalityCommandHandler(IUnitOfWork unitOfWork)
             return Response<Guid>.Error("MUNICIPALITY_NOT_FOUND", ["Municipality not found."]);
         }
 
-        var customerAddresses = await customerAddressRepository.GetAllAsync();
-        var isInUse = customerAddresses.Any(address =>
-            address.GcRecord == 0
-            && address.MunicipalityId == request.Id);
+        var dependents = await new ActiveDependentsCheck(_unitOfWork)
+            .CountAsync<PersonAddress>(a => a.GcRecord == 0 && a.MunicipalityId == request.Id, "person addresses");
 
-        if (isInUse)
+        if (dependents.HasDependents)
         {
-            return Response<Guid>.Error("MUNICIPALITY_IN_USE", ["The municipality is currently linked to customer addresses and cannot be deleted."]);
+            return Response<Guid>.Error("MUNICIPALITY_IN_USE", dependents.Details);
         }
 
         municipalityEntity.MarkAsDeleted();

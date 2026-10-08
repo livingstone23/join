@@ -30,8 +30,8 @@ public class SystemOptionsController(IMediator mediator) : ControllerBase
     /// <param name="pageSize">The number of items per page.</param>
     /// <returns>A standardized paged response containing system option list items.</returns>
     [HttpGet]
-    public async Task<ActionResult<Response<PagedResult<SystemOptionListItemDto>>>> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
-        => Ok(await mediator.Send(new GetSystemOptionsPagedQuery(pageNumber, pageSize)));
+    public async Task<ActionResult<Response<PagedResult<SystemOptionListItemDto>>>> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20, [FromQuery] bool? includeDeleted = null)
+        => Ok(await mediator.Send(new GetSystemOptionsPagedQuery(pageNumber, pageSize, IncludeDeleted: includeDeleted)));
 
     /// <summary>
     /// Retrieves the details of a specific system option by its unique identifier.
@@ -39,8 +39,8 @@ public class SystemOptionsController(IMediator mediator) : ControllerBase
     /// <param name="id">The unique identifier (GUID) of the system option to retrieve.</param>
     /// <returns>A standardized response containing the system option details, or 404 if not found.</returns>
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<Response<SystemOptionDto>>> GetById(Guid id)
-        => Ok(await mediator.Send(new GetSystemOptionByIdQuery(id)));
+    public async Task<ActionResult<Response<SystemOptionDto>>> GetById(Guid id, [FromQuery] bool? includeDeleted = null)
+        => Ok(await mediator.Send(new GetSystemOptionByIdQuery(id, includeDeleted)));
 
     /// <summary>
     /// Creates a new system option with the provided attributes.
@@ -72,4 +72,21 @@ public class SystemOptionsController(IMediator mediator) : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult<Response<Guid>>> Delete(Guid id)
         => Ok(await mediator.Send(new DeleteSystemOptionCommand(id)));
+
+    /// <summary>
+    /// Restores a logically deleted system option (SPEC 41). The controller is already restricted to SuperAdmin.
+    /// </summary>
+    /// <param name="id">The system option identifier.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(Guid id, CancellationToken cancellationToken = default)
+    {
+        var response = await mediator.Send(new RestoreSystemOptionCommand(id), cancellationToken);
+        return this.ToRestoreResult(response);
+    }
 }

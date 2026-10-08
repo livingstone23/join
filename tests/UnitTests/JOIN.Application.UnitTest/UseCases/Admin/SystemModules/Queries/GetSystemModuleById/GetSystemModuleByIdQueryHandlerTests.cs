@@ -103,7 +103,7 @@ public sealed class GetSystemModuleByIdQueryHandlerTests
 
         public GetSystemModuleByIdQueryHandler CreateHandler()
         {
-            return new GetSystemModuleByIdQueryHandler(ConnectionFactoryMock.Object);
+            return new GetSystemModuleByIdQueryHandler(ConnectionFactoryMock.Object, new Mock<ICurrentUserService>().Object);
         }
     }
 }
