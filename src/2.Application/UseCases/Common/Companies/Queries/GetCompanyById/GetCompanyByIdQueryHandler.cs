@@ -37,9 +37,14 @@ public class GetCompanyByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND c.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 c.Id,
+                c.GcRecord,
                 c.Name,
                 c.Description,
                 c.TaxId,
@@ -48,7 +53,7 @@ public class GetCompanyByIdQueryHandler(
                 c.WebSite,
                 c.IsActive
             FROM Common.Companies c
-            WHERE c.Id = @Id AND c.GcRecord = 0;
+            WHERE c.Id = @Id {activeOnly};
             """;
 
         var parameters = new DynamicParameters();

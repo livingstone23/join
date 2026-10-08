@@ -16,7 +16,8 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Queries;
 /// <param name="paginationOptions">Configurable pagination defaults for the company module listing endpoint.</param>
 public sealed class GetCompanyModulesQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetCompanyModulesQuery, Response<PagedResult<CompanyModuleListItemDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -45,7 +46,11 @@ public sealed class GetCompanyModulesQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE cm.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND cm.GcRecord = 0");
+        }
 
         if (request.CompanyId.HasValue)
         {
@@ -82,6 +87,7 @@ public sealed class GetCompanyModulesQueryHandler(
         var sql = $"""
             SELECT
                 cm.Id,
+                cm.GcRecord,
                 cm.CompanyId,
                 c.Name AS CompanyName,
                 cm.ModuleId,

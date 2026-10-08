@@ -21,5 +21,6 @@ public sealed record GetCompanyModulesQuery(
     string? CompanyName = null,
     string? ModuleName = null,
     DateTime? CreatedFrom = null,
-    DateTime? CreatedTo = null)
+    DateTime? CreatedTo = null,
+    bool? IncludeDeleted = null)
     : IRequest<Response<PagedResult<CompanyModuleListItemDto>>>;

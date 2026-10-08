@@ -15,7 +15,7 @@ public interface IRoleRepository
     /// <paramref name="companyId"/> is required because <see cref="RoleDto.PermissionsCount"/> is tenant-scoped
     /// (counts active RoleSystemOption rows for that CompanyId only).
     /// </summary>
-    Task<RoleDto?> GetByIdAsync(Guid id, Guid companyId, CancellationToken cancellationToken = default);
+    Task<RoleDto?> GetByIdAsync(Guid id, Guid companyId, bool includeDeleted = false, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns a page of active roles filtered by optional name substring and active flag, plus the total count.
@@ -27,6 +27,7 @@ public interface IRoleRepository
         int page,
         int pageSize,
         Guid companyId,
+        bool includeDeleted = false,
         CancellationToken cancellationToken = default);
 
     /// <summary>

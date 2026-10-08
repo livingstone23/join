@@ -142,7 +142,7 @@ public sealed class GetSuperAdminAllRoleSystemOptionsPagedQueryHandlerTests
                 DefaultPageSize = 20,
                 MaxPageSize = 100
             });
-            return new GetSuperAdminAllRoleSystemOptionsPagedQueryHandler(ConnectionFactoryMock.Object, options);
+            return new GetSuperAdminAllRoleSystemOptionsPagedQueryHandler(ConnectionFactoryMock.Object, options, new Mock<ICurrentUserService>().Object);
         }
     }
 }

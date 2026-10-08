@@ -9,7 +9,7 @@ namespace JOIN.Application.UseCases.Common.Companies.Commands;
 /// Handles soft delete operations for companies.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
-public class DeleteCompanyCommandHandler(IUnitOfWork unitOfWork)
+public class DeleteCompanyCommandHandler(IUnitOfWork unitOfWork, ITenantDataInspector tenantDataInspector)
     : IRequestHandler<DeleteCompanyCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
@@ -25,6 +25,14 @@ public class DeleteCompanyCommandHandler(IUnitOfWork unitOfWork)
         if (entity is null)
         {
             return Response<Guid>.Error("COMPANY_NOT_FOUND", ["Company not found."]);
+        }
+
+        // SPEC 41 (decision 2026-10-08): a company with any active data (memberships, persons, tickets,
+        // catalogs, ...) cannot be deleted; there is no cascade. The inspector walks every tenant table.
+        var activeData = await tenantDataInspector.GetActiveDataAsync(entity.Id, cancellationToken);
+        if (activeData.Count > 0)
+        {
+            return Response<Guid>.Error("COMPANY_IN_USE", activeData);
         }
 
         entity.MarkAsDeleted();

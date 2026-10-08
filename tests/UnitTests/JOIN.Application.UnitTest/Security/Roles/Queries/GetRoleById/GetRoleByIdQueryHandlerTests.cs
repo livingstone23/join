@@ -42,7 +42,7 @@ public sealed class GetRoleByIdQueryHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(role.Id, companyId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(role.Id, companyId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(role);
 
         var handler = context.CreateHandler();
@@ -62,7 +62,7 @@ public sealed class GetRoleByIdQueryHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.NewGuid());
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((RoleDto?)null);
 
         var handler = context.CreateHandler();

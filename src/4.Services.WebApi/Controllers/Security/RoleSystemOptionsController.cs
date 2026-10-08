@@ -9,6 +9,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
+using JOIN.Services.WebApi.Controllers;
 
 namespace JOIN.Services.WebApi.Controllers.Security;
 
@@ -36,9 +37,9 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
     /// Returns <c>404 Not Found</c> when the rule does not exist for the current scope.
     /// </returns>
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<Response<RoleSystemOptionDto>>> GetById(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<Response<RoleSystemOptionDto>>> GetById(Guid id, [FromQuery] bool? includeDeleted = null, [FromQuery] Guid? companyId = null, CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(new GetRoleSystemOptionByIdQuery(id), cancellationToken);
+        var response = await mediator.Send(new GetRoleSystemOptionByIdQuery(id, includeDeleted, companyId), cancellationToken);
         if (!response.IsSuccess && response.Message == "ROLE_SYSTEM_OPTION_NOT_FOUND")
         {
             return NotFound(response);
@@ -87,7 +88,7 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
         [FromQuery] bool? canExecute = null,
         [FromQuery] bool? isVisibleMenu = null,
         [FromQuery] int? orderMenu = null,
-        CancellationToken cancellationToken = default)
+        [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
         var query = new GetRoleSystemOptionsPagedQuery(
             pageNumber,
@@ -105,7 +106,8 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
             canExport,
             canExecute,
             isVisibleMenu,
-            orderMenu);
+            orderMenu,
+            includeDeleted);
 
         var response = await mediator.Send(query, cancellationToken);
         return response.IsSuccess ? Ok(response) : BadRequest(response);
@@ -232,7 +234,7 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
         [FromQuery] bool? isVisibleMenu = null,
         [FromQuery] int? orderMenu = null,
         [FromQuery] Guid? companyId = null,
-        CancellationToken cancellationToken = default)
+        [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
         var query = new GetSuperAdminAllRoleSystemOptionsPagedQuery(
             pageNumber,
@@ -251,7 +253,8 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
             canExecute,
             isVisibleMenu,
             orderMenu,
-            companyId);
+            companyId,
+            includeDeleted);
 
         var response = await mediator.Send(query, cancellationToken);
         return response.IsSuccess ? Ok(response) : BadRequest(response);
@@ -322,5 +325,24 @@ public class RoleSystemOptionsController(IMediator mediator) : ControllerBase
         }
 
         return response.IsSuccess ? Ok(response) : BadRequest(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted role permission (SPEC 41, Etapa 3). Restricted to the SuperAdmin role.
+    /// </summary>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RestoreRolePermission(
+        Guid id,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await mediator.Send(new RestoreRoleSystemOptionCommand(id, companyId), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

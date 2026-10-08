@@ -232,6 +232,49 @@ Rama `spec-41-etapa-2-personas` (PR propio, sobre la Etapa 1).
 - Restaurar un usuario queda registrado en el log de eventos de seguridad (`SecurityEventLog`).
 - Invalidar la caché de permisos (`permissions:v2:{companyId}:{userId}`) al restaurar `UserRoleCompany`, `RoleCompany` o `RoleSystemOption`.
 
+#### Etapa 3 — Plan e inventario (Ajuste por SPEC 41, 2026-10-08)
+
+Rama `spec-41-etapa-3-seguridad` (desde `main` con las etapas 1 y 2). Dos partes: **(1)** que el SuperAdmin vea y restaure; **(2)** cambios de lógica del borrado de roles y empresas.
+
+**Alcance verificado (F0).** Solo se restauran entidades con caso de uso de borrado:
+
+| Entidad | Borrado hoy | Queries (`includeDeleted`) | Padres (`PARENT_DELETED`) | Duplicado activo | Restore |
+|---|---|---|---|---|---|
+| `ApplicationRole` | `DELETE /Roles/{id}` | `GetRolesDetailed`, `GetRoleById` (EF) | — | — (índice `NormalizedName` sin filtro) | `POST /Roles/{id}/restore` + cascada |
+| `Company` | `DELETE /Companies/{id}` (SuperAdmin) | `GetCompaniesPaged`, `GetCompanyById` (Dapper) | — | — (índice `TaxId` sin filtro) | `POST /Companies/{id}/restore` |
+| `CompanyModule` | `DELETE /CompanyModules/{id}` (SuperAdmin) | `GetCompanyModules`, `GetCompanyModulesById` (Dapper) | `Company`, `SystemModule` | — | `POST /CompanyModules/{id}/restore` |
+| `RoleCompany` | `DELETE /RoleCompanies/{id}` | `GetRoleCompaniesPaged`, `GetRoleCompanyById` (EF) | `ApplicationRole`, `Company` | `(RoleId, CompanyId)` filtrado | `POST /RoleCompanies/{id}/restore` |
+| `RoleSystemOption` | `DELETE /RoleSystemOptions/{id}` | `GetRoleSystemOptionsPaged`, `GetRoleSystemOptionById`, `GetSuperAdminAllRoleSystemOptionsPaged` (Dapper) | `ApplicationRole`, `SystemOption` | — (índice sin filtro) | `POST /RoleSystemOptions/{id}/restore` |
+| `UserCompany` | `DELETE /Users/{userId}/companies/{companyId}` (borra también sus `UserRoleCompany`) | `GetUserCompanies` (Dapper) | `Company` | — (índice sin filtro); marca `IsDefault` | `POST /Users/{userId}/companies/{companyId}/restore` + cascada |
+
+**Fuera de la Etapa 3:** `ApplicationUser`, `UserCommunicationChannel` y `UserPerson` no tienen caso de uso de borrado (los usuarios solo se activan/desactivan con `ChangeUserStatus`), por lo que no se restauran ni aplica el registro en `SecurityEventLog`. `UserRoleCompany` no tiene endpoint propio: se borra desde `ReplaceUserRoles`, `BulkUpdateUserRoles` y `RemoveUserCompany`, se reactiva reasignando el rol (camino existente) y se restaura en cascada con su `UserCompany`. `GetRoleSystemOptionMatrix` y `GetUsersByRoleId` no listan la entidad borrable y no cambian.
+
+**Cambios de lógica (decisión 2026-10-08):**
+- **`DeleteRole`:** composición → borra en cascada los `RoleSystemOption` y `RoleCompany` activos del rol (todas las empresas), con el mismo sello. Referencia → `UserRoleCompany` activos en **cualquier** empresa bloquean (`ROLE_HAS_USERS`); hoy solo cuenta la empresa del token. `RestoreRole` trae de vuelta los permisos y vínculos de su misma cascada.
+- **`DeleteCompany`:** se bloquea (`COMPANY_IN_USE`) si la empresa tiene **cualquier** dato activo: un servicio de Persistence recorre el modelo de EF y cuenta las filas activas de toda entidad `BaseTenantEntity` de esa `CompanyId` (cubre entidades futuras sin mantener una lista). Sin cascada.
+- **`RestoreUserCompany`:** restaura la membresía y sus `UserRoleCompany` de la misma cascada; si el usuario ya tiene otra empresa default activa, vuelve sin `IsDefault`.
+- **Caché de permisos:** restaurar `UserCompany`, `RoleCompany` o `RoleSystemOption` invalida `permissions:v2:{companyId}:{userId}` de los usuarios afectados (`IPermissionService.InvalidateUserCacheAsync`).
+
+**Implementación:** `ApplicationRole` no hereda de `BaseAuditableEntity`, así que su restore no usa `SoftDeleteRestorer.RestoreAsync` y va por el repositorio de roles (mismos códigos de error). Las queries EF de roles y `RoleCompany` agregan `IgnoreQueryFilters()` solo cuando `SoftDeleteVisibility` lo permite.
+
+**Pasos:**
+- **F1** Lógica de borrado: `DeleteRole` (cascada + bloqueo entre empresas), `DeleteCompany` (bloqueo por datos activos) + unit tests.
+- **F2** Restore de las 6 entidades (commands, handlers, validators, cascadas, invalidación de caché) + unit tests.
+- **F3** `includeDeleted` en las 13 queries + DTO + tests de visibilidad.
+- **F4** Endpoints `POST …/restore` y parámetros `includeDeleted`/`companyId` en los GET.
+- **F5** Integración: listados de la Etapa 3 en el test de guarda; restore Manager → 403 / SuperAdmin → 200; `DeleteCompany` con datos → 409; `DeleteRole` en cascada.
+- **F6** Build Release, gate 90 %, suite de integración completa.
+
+#### Etapa 3 — Decisiones de implementación (Ajuste por SPEC 41, 2026-10-08)
+
+- **`DeleteRole`:** `UserRoleCompany` activos de cualquier empresa → `ROLE_HAS_USERS` (409); si no hay, el rol, sus `RoleSystemOption` y sus `RoleCompany` se marcan con el mismo sello. `RestoreRole` (handler propio, el rol es de Identity) trae de vuelta los de ese sello cuyo `SystemOption`/`Company` siga activo y sin vínculo activo duplicado; el resto queda borrado.
+- **`DeleteCompany`:** `ITenantDataInspector` (Persistence) recorre el modelo de EF y cuenta filas activas de toda entidad con `CompanyId` + `GcRecord`; si hay alguna → `COMPANY_IN_USE` (409) con `"Active <Entidad>: N"`.
+- **`RestoreUserCompany`** (`POST /Users/{userId}/companies/{companyId}/restore`): restaura la membresía y sus `UserRoleCompany` del mismo sello (rol activo), quita `IsDefault` si ya hay otra default activa e invalida la caché del usuario. `RestoreRoleCompany` y `RestoreRoleSystemOption` invalidan la caché de los usuarios con ese rol en esa empresa (`RolePermissionCacheInvalidator`).
+- **Acceso a listados (cambio de contrato):** `GET /Roles/detailed`, `GET /Roles/{id}`, `GET /Companies` y `GET /Companies/{id}` eran solo `SuperAdminCompany`; se agrega `SuperAdmin` para que pueda ver los borrados. `GET /Users/{id}/companies` ya era solo `SuperAdmin`.
+- **Hueco cerrado en roles:** `GET /Roles/detailed?isActive=false` (o sin `isActive`) devolvía roles borrados a cualquier usuario con lectura. Ahora sin `includeDeleted` (SuperAdmin) el listado es solo de activos y `isActive=false` no devuelve filas; con `includeDeleted` `isActive` conserva su sentido. Mismo criterio en `RoleCompanies`.
+- **`RoleDto`** es un record posicional (Dapper lo construye por constructor), así que agrega `GcRecord` como último parámetro con `IsDeleted`/`DeletedOn` calculados en vez de heredar `SoftDeletableDto`.
+- **Sin auditoría de restauración:** `AuditAction` solo tiene Created/Updated/Deleted; restaurar un rol no escribe en la bitácora (la spec solo pedía `SecurityEventLog` para usuarios, que no se borran).
+
 ### Etapa 4 — Tickets
 
 `Ticket`, `TicketNotification`, `TicketCompanyDefault`, y las entidades de SPEC 34-37 y 99 que ya estén implementadas.

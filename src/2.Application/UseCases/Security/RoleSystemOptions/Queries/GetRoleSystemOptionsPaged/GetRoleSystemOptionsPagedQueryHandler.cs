@@ -51,7 +51,8 @@ public sealed class GetRoleSystemOptionsPagedQueryHandler(
             CanExport: request.CanExport,
             CanExecute: request.CanExecute,
             IsVisibleMenu: request.IsVisibleMenu,
-            OrderMenu: request.OrderMenu));
+            OrderMenu: request.OrderMenu,
+            IncludeDeleted: SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)));
 
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);

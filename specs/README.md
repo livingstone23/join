@@ -127,6 +127,8 @@ Decisiones o verificaciones que no tienen spec propia todavía:
 | 41 | Las entidades del calendario (44, 45, 46) no existen todavía: entran en la Etapa 4 de la 41 (o en su propia spec) cuando se implementen. |
 | 41 | Commands de `Area` y `Project` (crear/editar/borrar) usan `X-Company-Id` sin validarlo contra el token: alinearlos con `TenantResolver` (las queries ya se alinearon en la Etapa 1). |
 | 41 | Índices únicos de los catálogos globales (`Country.IsoCode`, `StreetType.Name`, `SystemModule.Name`…) no están filtrados por `GcRecord`: un borrado impide crear otro con la misma clave. Decidir si se filtran (patrón SPEC 40). |
+| 41 | `GET /Users/{userId}/companies` (`GetUserCompanies`) no filtra por empresa: lista las membresías de cualquier usuario (endpoint solo SuperAdmin, sin fuga hoy). `GetCompanyModules` recibe la empresa del controller sin `TenantResolver`. Revisar en una spec de hardening. |
+| 41 | Restaurar un rol no queda en la bitácora (`AuditAction` sin `Restored`). Decidir si se agrega. |
 | 38 (F0) | Ejecutar `docs/migrations/spec-38-data-audit.sql` contra la base de desarrollo y pegar los conteos en el PR; si hay filas afectadas, decidir si se reasignan. |
 | 38 (D) | Smoke manual: un `SuperAdminCompany` solo ve su empresa y sus módulos, y no puede borrar empresas ni modificar módulos; validar con `join_frontb`. |
 | Proceso | Script de verificación de consistencia de specs (referencias inexistentes, nombres retirados, dependencias de specs pospuestas, specs fuera del índice). |

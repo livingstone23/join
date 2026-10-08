@@ -208,7 +208,7 @@ public sealed class GetCompanyModulesQueryHandlerTests
         {
             return new GetCompanyModulesQueryHandler(
                 ConnectionFactoryMock.Object,
-                PaginationOptions);
+                PaginationOptions, new Mock<ICurrentUserService>().Object);
         }
     }
 }

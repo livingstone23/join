@@ -40,7 +40,11 @@ public class GetCompaniesPagedQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE c.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND c.GcRecord = 0");
+        }
 
         // SPEC 38: non-SuperAdmin is locked to its own tenant. The endpoint stays open to the
         // SuperAdminCompany role in the controller, but the query result is restricted here so
@@ -71,6 +75,7 @@ public class GetCompaniesPagedQueryHandler(
         var sql = $"""
             SELECT
                 c.Id,
+                c.GcRecord,
                 c.Name,
                 c.TaxId,
                 c.IsActive

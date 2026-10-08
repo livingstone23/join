@@ -28,6 +28,8 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using JOIN.Services.WebApi.Controllers;
+using JOIN.Application.UseCases.Security.UserCompanies.Commands.RestoreUserCompany;
 
 
 
@@ -281,9 +283,9 @@ public class UsersController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetUserCompanies(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetUserCompanies(Guid userId, [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetUserCompaniesQuery(userId), cancellationToken);
+        var response = await _mediator.Send(new GetUserCompaniesQuery(userId, includeDeleted), cancellationToken);
 
         if (!response.IsSuccess && string.Equals(response.Message, "User not found.", StringComparison.Ordinal))
         {
@@ -666,4 +668,22 @@ public class UsersController(IMediator mediator) : ControllerBase
         };
     }
 
+    /// <summary>
+    /// Restores a logically deleted user company (SPEC 41, Etapa 3). Restricted to the SuperAdmin role.
+    /// </summary>
+    [HttpPost("{userId:guid}/companies/{companyId:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RestoreUserCompany(
+        Guid userId,
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new RestoreUserCompanyCommand(userId, companyId), cancellationToken);
+        return this.ToRestoreResult(response);
+    }
 }

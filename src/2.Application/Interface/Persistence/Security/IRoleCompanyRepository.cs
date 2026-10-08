@@ -21,7 +21,7 @@ public interface IRoleCompanyRepository
     /// Loads the detailed projection (with RoleName/IsSystemDefault from Security.Roles) for a single link,
     /// scoped to <paramref name="tenantId"/>. Returns null when not found or cross-tenant.
     /// </summary>
-    Task<RoleCompanyDto?> GetByIdAsync(Guid id, Guid tenantId, CancellationToken cancellationToken = default);
+    Task<RoleCompanyDto?> GetByIdAsync(Guid id, Guid tenantId, bool includeDeleted = false, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Loads a paged list of lightweight projections for the supplied tenant.
@@ -33,6 +33,7 @@ public interface IRoleCompanyRepository
         bool? isActive,
         int page,
         int pageSize,
+        bool includeDeleted = false,
         CancellationToken cancellationToken = default);
 
     /// <summary>

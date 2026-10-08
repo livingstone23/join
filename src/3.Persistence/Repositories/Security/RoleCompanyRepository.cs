@@ -30,11 +30,14 @@ public sealed class RoleCompanyRepository(
     private readonly ISqlConnectionFactory _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
 
     /// <inheritdoc />
-    public async Task<RoleCompanyDto?> GetByIdAsync(Guid id, Guid tenantId, CancellationToken cancellationToken = default)
+    public async Task<RoleCompanyDto?> GetByIdAsync(Guid id, Guid tenantId, bool includeDeleted = false, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        // SPEC 41: deleted links only when the handler resolved includeDeleted through SoftDeleteVisibility.
+        var activeOnly = includeDeleted ? string.Empty : "AND rc.GcRecord = 0";
+        var sql = $"""
             SELECT
                 rc.Id,
+                rc.GcRecord,
                 rc.RoleId,
                 r.Name AS RoleName,
                 r.IsSystemDefault,
@@ -45,7 +48,7 @@ public sealed class RoleCompanyRepository(
                 ON rc.RoleId = r.Id AND r.GcRecord = 0
             WHERE rc.Id = @Id
               AND rc.CompanyId = @TenantId
-              AND rc.GcRecord = 0;
+              {activeOnly};
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -60,6 +63,7 @@ public sealed class RoleCompanyRepository(
         bool? isActive,
         int page,
         int pageSize,
+        bool includeDeleted = false,
         CancellationToken cancellationToken = default)
     {
         var offset = (page - 1) * pageSize;
@@ -69,9 +73,12 @@ public sealed class RoleCompanyRepository(
             ? "LIMIT @pageSize OFFSET @offset"
             : "OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY";
 
-        var whereClause = """
+        // SPEC 41: without includeDeleted (SuperAdmin only) the listing is always active-only, so
+        // isActive = false yields nothing; with it, isActive keeps its active/deleted meaning.
+        var activeOnly = includeDeleted ? string.Empty : "AND rc.GcRecord = 0";
+        var whereClause = $"""
             WHERE rc.CompanyId = @TenantId
-              AND rc.GcRecord = 0
+              {activeOnly}
               AND (@roleIdFilter IS NULL OR rc.RoleId = @roleIdFilter)
               AND (@isActive IS NULL
                    OR ((@isActive = 1 AND rc.GcRecord = 0)
@@ -83,6 +90,7 @@ public sealed class RoleCompanyRepository(
         var pageSql = $"""
             SELECT
                 rc.Id,
+                rc.GcRecord,
                 rc.RoleId,
                 r.Name AS RoleName,
                 r.IsSystemDefault,

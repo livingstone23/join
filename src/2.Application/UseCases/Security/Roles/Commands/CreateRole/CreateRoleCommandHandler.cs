@@ -56,7 +56,7 @@ public sealed class CreateRoleCommandHandler(
             // rows for the caller's tenant. An empty list is a legitimate "role has no
             // permissions in this tenant" case AND the "cross-tenant clone" case. To
             // distinguish them we re-read the origin's RoleDto (now carrying PermissionsCount).
-            var originRole = await roleRepository.GetByIdAsync(originId, tenantId, cancellationToken);
+            var originRole = await roleRepository.GetByIdAsync(originId, tenantId, cancellationToken: cancellationToken);
             if (originRole is null)
             {
                 return Response<RoleDto>.Error("ROLE_NOT_FOUND", [$"No existe el rol origen con id '{originId}'."]);

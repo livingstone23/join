@@ -145,7 +145,7 @@ public sealed class GetSuperAdminAllRoleSystemOptionsPagedQueryHandlerTests
         {
             return new GetSuperAdminAllRoleSystemOptionsPagedQueryHandler(
                 ConnectionFactoryMock.Object,
-                PaginationOptions);
+                PaginationOptions, new Mock<ICurrentUserService>().Object);
         }
     }
 }

@@ -7,4 +7,4 @@ namespace JOIN.Application.UseCases.Security.Roles.Queries.GetRoleById;
 /// <summary>
 /// Query for fetching a single ApplicationRole by id.
 /// </summary>
-public sealed record GetRoleByIdQuery(Guid Id) : IRequest<Response<RoleDto>>;
+public sealed record GetRoleByIdQuery(Guid Id, bool? IncludeDeleted = null) : IRequest<Response<RoleDto>>;

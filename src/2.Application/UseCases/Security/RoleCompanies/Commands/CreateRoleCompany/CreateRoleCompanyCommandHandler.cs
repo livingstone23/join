@@ -45,7 +45,7 @@ public sealed class CreateRoleCompanyCommandHandler(
         // without a separate query, but both are invalid for a new link — treat soft-deleted as 400 ROLE_INACTIVE.
         // GetByIdAsync on the role repo returns null when missing or soft-deleted (it filters GcRecord = 0).
         // We do an extra ExistsAndActiveAsync for clarity of error code.
-        var existingRole = await _roleRepository.GetByIdAsync(request.RoleId, tenantId, cancellationToken);
+        var existingRole = await _roleRepository.GetByIdAsync(request.RoleId, tenantId, cancellationToken: cancellationToken);
         if (existingRole is null)
         {
             return Response<RoleCompanyDto>.Error(
@@ -99,7 +99,7 @@ public sealed class CreateRoleCompanyCommandHandler(
             ct: cancellationToken);
 
         // Reload via Dapper so the response carries RoleName + IsSystemDefault from Security.Roles.
-        var dto = await _roleCompanyRepository.GetByIdAsync(entity.Id, tenantId, cancellationToken);
+        var dto = await _roleCompanyRepository.GetByIdAsync(entity.Id, tenantId, cancellationToken: cancellationToken);
         if (dto is null)
         {
             return Response<RoleCompanyDto>.Error(

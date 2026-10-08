@@ -15,6 +15,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
+using JOIN.Services.WebApi.Controllers;
+using JOIN.Application.UseCases.Security.Roles.Commands.RestoreRole;
 
 
 
@@ -77,7 +79,8 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
     /// <param name="cancellationToken">Token used to cancel the request.</param>
     /// <returns>A standardized paged response containing matching role DTOs.</returns>
     [HttpGet("detailed")]
-    [Authorize(Roles = "SuperAdminCompany")]
+    // SPEC 41 (Etapa 3): SuperAdmin added so it can list deleted roles (includeDeleted=true).
+    [Authorize(Roles = "SuperAdmin,SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<PagedResult<RoleDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -89,9 +92,9 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
         [FromQuery] bool? isActive,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
-        CancellationToken cancellationToken = default)
+        [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetRolesDetailedQuery(name, isActive, page, pageSize), cancellationToken);
+        var response = await _mediator.Send(new GetRolesDetailedQuery(name, isActive, page, pageSize, includeDeleted), cancellationToken);
         return response.IsSuccess ? Ok(response) : BadRequest(response);
     }
 
@@ -105,16 +108,17 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
     /// Returns <c>404 Not Found</c> when the role does not exist or has been soft-deleted.
     /// </returns>
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = "SuperAdminCompany")]
+    // SPEC 41 (Etapa 3): SuperAdmin added so it can list deleted roles (includeDeleted=true).
+    [Authorize(Roles = "SuperAdmin,SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<RoleDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<Response<RoleDto>>> GetById(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<Response<RoleDto>>> GetById(Guid id, [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetRoleByIdQuery(id), cancellationToken);
+        var response = await _mediator.Send(new GetRoleByIdQuery(id, includeDeleted), cancellationToken);
         if (!response.IsSuccess && response.Message == "Rol no encontrado o inactivo.")
         {
             return NotFound(response);
@@ -280,5 +284,23 @@ public class RolesController(RoleManager<ApplicationRole> roleManager, IMediator
         }
 
         return BadRequest(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted role (SPEC 41, Etapa 3). Restricted to the SuperAdmin role.
+    /// </summary>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RestoreRole(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new RestoreRoleCommand(id), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

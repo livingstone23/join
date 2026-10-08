@@ -128,7 +128,7 @@ public sealed class CreateRoleCommandHandlerTests
         var response = await handler.Handle(new CreateRoleCommand("Admin", null, false, CloneFromRoleId: null), CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
-        context.RoleRepositoryMock.Verify(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        context.RoleRepositoryMock.Verify(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
         context.UnitOfWorkMock.Verify(x => x.RoleSystemOptions.GetActiveByRoleAndCompanyAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -150,7 +150,7 @@ public sealed class CreateRoleCommandHandlerTests
         // Origin role exists, has 2 permissions in the caller's tenant.
         var originRoleDto = new RoleDto(originId, "Origin", "ORIGIN", null, false, "seed", DateTime.UtcNow, PermissionsCount: 2);
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(originId, tenantId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(originId, tenantId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(originRoleDto);
 
         var originPermissions = new List<RoleSystemOption>
@@ -226,7 +226,7 @@ public sealed class CreateRoleCommandHandlerTests
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleRepositoryMock.Setup(x => x.ExistsByNameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(originId, tenantId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(originId, tenantId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((RoleDto?)null);
 
         var handler = context.CreateHandler();
@@ -256,7 +256,7 @@ public sealed class CreateRoleCommandHandlerTests
         // (the DTO is projected with the caller's CompanyId filter).
         var originRoleDto = new RoleDto(originId, "Origin", "ORIGIN", null, false, "seed", DateTime.UtcNow, PermissionsCount: 5);
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(originId, tenantId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(originId, tenantId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(originRoleDto);
         context.RoleSystemOptionsRepositoryMock
             .Setup(x => x.GetActiveByRoleAndCompanyAsync(originId, tenantId, It.IsAny<CancellationToken>()))
@@ -286,7 +286,7 @@ public sealed class CreateRoleCommandHandlerTests
 
         var originRoleDto = new RoleDto(originId, "Empty", "EMPTY", null, false, "seed", DateTime.UtcNow, PermissionsCount: 0);
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(originId, tenantId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(originId, tenantId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(originRoleDto);
         context.RoleSystemOptionsRepositoryMock
             .Setup(x => x.GetActiveByRoleAndCompanyAsync(originId, tenantId, It.IsAny<CancellationToken>()))
@@ -320,7 +320,7 @@ public sealed class CreateRoleCommandHandlerTests
 
         var originRoleDto = new RoleDto(originId, "Origin", "ORIGIN", null, false, "seed", DateTime.UtcNow, PermissionsCount: 1);
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(originId, tenantId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(originId, tenantId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(originRoleDto);
 
         var originPermissions = new List<RoleSystemOption>

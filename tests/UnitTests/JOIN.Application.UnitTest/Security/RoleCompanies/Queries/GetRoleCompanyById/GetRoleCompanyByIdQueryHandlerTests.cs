@@ -28,7 +28,7 @@ public sealed class GetRoleCompanyByIdQueryHandlerTests
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("INVALID_COMPANY_ID");
         context.RoleCompanyRepositoryMock.Verify(
-            x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -53,7 +53,7 @@ public sealed class GetRoleCompanyByIdQueryHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleCompanyRepositoryMock
-            .Setup(x => x.GetByIdAsync(id, tenantId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(id, tenantId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(dto);
 
         var handler = context.CreateHandler();
@@ -73,7 +73,7 @@ public sealed class GetRoleCompanyByIdQueryHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleCompanyRepositoryMock
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), tenantId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), tenantId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((RoleCompanyDto?)null);
 
         var handler = context.CreateHandler();
