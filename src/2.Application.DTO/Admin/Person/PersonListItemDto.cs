@@ -1,4 +1,5 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 
 
@@ -9,7 +10,7 @@ namespace JOIN.Application.DTO.Admin;
 /// <summary>
 /// Data Transfer Object (DTO) representing a customer in paginated list responses.
 /// </summary>
-public record PersonListItemDto
+public record PersonListItemDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the customer.

@@ -51,11 +51,15 @@ public class GetPersonsPagedQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("TenantId", currentUserService.CompanyId);
+        parameters.Add("TenantId", TenantResolver.Resolve(currentUserService, request.CompanyId));
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE c.CompanyId = @TenantId AND c.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE c.CompanyId = @TenantId");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND c.GcRecord = 0");
+        }
 
         AddLikeFilter(request.PersonType, "PersonType");
         AddLikeFilter(request.FirstName, "FirstName");
@@ -76,6 +80,7 @@ public class GetPersonsPagedQueryHandler(
         var sql = $"""
             SELECT
                 c.Id,
+                c.GcRecord,
                 c.CompanyId,
                 co.Name AS CompanyName,
                 c.PersonType,

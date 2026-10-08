@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Admin.PersonBusinessProfiles.Queries;
 /// Query that retrieves all business profiles for a specific person in the current tenant.
 /// </summary>
 /// <param name="PersonId">The unique identifier of the person.</param>
-public sealed record GetPersonBusinessProfilesByPersonIdQuery(Guid PersonId) : IRequest<Response<List<PersonBusinessProfileResponseDto>>>;
+public sealed record GetPersonBusinessProfilesByPersonIdQuery(Guid PersonId, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<List<PersonBusinessProfileResponseDto>>>;

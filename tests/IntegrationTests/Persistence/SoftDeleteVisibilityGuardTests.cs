@@ -13,6 +13,7 @@ using JOIN.Application.UseCases.Security.Auth.Register;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
+using JOIN.Domain.Enums;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
 using JOIN.Persistence.Contexts;
@@ -73,6 +74,12 @@ public sealed class SoftDeleteVisibilityGuardTests : IClassFixture<CustomWebAppl
             response.StatusCode.Should().Be(HttpStatusCode.OK, $"{caseName} as {role}: {await response.Content.ReadAsStringAsync()}");
             var ids = await ListIdsAsync(client, testCase, rows, includeDeleted: true, companyId: companyB);
             ids.Should().BeEquivalentTo(new[] { rows.ActiveA }, $"{caseName} as {role} must only see the active row of its own company");
+
+            if (rows.TagB is not null)
+            {
+                var otherPerson = await ListIdsAsync(client, testCase, rows, includeDeleted: true, companyId: companyB, useCompanyBKey: true);
+                otherPerson.Should().BeEmpty($"{caseName} as {role} must not read the children of another company's person");
+            }
         }
     }
 
@@ -93,7 +100,7 @@ public sealed class SoftDeleteVisibilityGuardTests : IClassFixture<CustomWebAppl
 
         if (testCase.TenantScoped)
         {
-            var otherCompany = await ListIdsAsync(client, testCase, rows, includeDeleted: true, companyId: companyB);
+            var otherCompany = await ListIdsAsync(client, testCase, rows, includeDeleted: true, companyId: companyB, useCompanyBKey: true);
             otherCompany.Should().BeEquivalentTo(new[] { rows.ActiveB!.Value }, $"{caseName}: SuperAdmin can request another company explicitly");
         }
     }
@@ -148,9 +155,95 @@ public sealed class SoftDeleteVisibilityGuardTests : IClassFixture<CustomWebAppl
         (await response.Content.ReadAsStringAsync()).Should().Contain("ACTIVE_DUPLICATE_EXISTS");
     }
 
+    [Fact]
+    public async Task DeletePerson_ShouldCascadeToItsAddress_AndRestorePersonShouldBringItBack()
+    {
+        var (companyA, _) = await SeedCompaniesAsync();
+        var (personId, addressId) = await SeedPersonWithAddressAsync(companyA);
+        using var superAdmin = await CreateClientAsync(companyA, "SuperAdmin");
+
+        var deleted = await superAdmin.DeleteAsync($"/api/v1/Persons/{personId}");
+        deleted.StatusCode.Should().Be(HttpStatusCode.OK, await deleted.Content.ReadAsStringAsync());
+
+        var (personStamp, addressStamp) = await ReadStampsAsync(personId, addressId);
+        personStamp.Should().BeGreaterThan(BaseAuditableEntity.ActiveGcRecord);
+        addressStamp.Should().Be(personStamp, "SPEC 41 (2026-10-08): composition children share the cascade stamp");
+
+        var restored = await superAdmin.PostAsync($"/api/v1/Persons/{personId}/restore", content: null);
+        restored.StatusCode.Should().Be(HttpStatusCode.OK, await restored.Content.ReadAsStringAsync());
+
+        (await ReadStampsAsync(personId, addressId)).Should().Be((BaseAuditableEntity.ActiveGcRecord, BaseAuditableEntity.ActiveGcRecord),
+            "restoring the person brings back the children of its cascade");
+    }
+
+    [Fact]
+    public async Task DeletePerson_WithAnActiveCustomer_ShouldAnswerConflictAndDeleteNothing()
+    {
+        var (companyA, _) = await SeedCompaniesAsync();
+        var (personId, addressId) = await SeedPersonWithAddressAsync(companyA);
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = $"c{Guid.NewGuid():N}"[..12], Email = $"c{Guid.NewGuid():N}"[..12] + "@t.local" };
+            user.NormalizedUserName = user.UserName!.ToUpperInvariant();
+            user.NormalizedEmail = user.Email!.ToUpperInvariant();
+            user.SecurityStamp = Guid.NewGuid().ToString();
+            db.Add(user);
+            var customer = Customer.Create(companyA, personId, user.Id, $"C{Guid.NewGuid():N}"[..10], PersonLifecycleStage.Lead);
+            customer.CreatedBy = Creator;
+            db.Add(customer);
+            await db.SaveChangesAsync();
+        }
+
+        using var superAdmin = await CreateClientAsync(companyA, "SuperAdmin");
+        var response = await superAdmin.DeleteAsync($"/api/v1/Persons/{personId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("PERSON_IN_USE").And.Contain("Active customers: 1");
+        (await ReadStampsAsync(personId, addressId)).Should().Be((BaseAuditableEntity.ActiveGcRecord, BaseAuditableEntity.ActiveGcRecord),
+            "a blocking reference stops the whole cascade");
+    }
+
+    private async Task<(Guid PersonId, Guid AddressId)> SeedPersonWithAddressAsync(Guid companyId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var identificationType = await SeedIdentificationTypeAsync(db);
+        var personId = await SeedPersonAsync(db, companyId, identificationType);
+        var catalogs = await SeedAddressCatalogsAsync(db);
+        var address = new PersonAddress
+        {
+            CompanyId = companyId,
+            PersonId = personId,
+            AddressLine1 = "Main street",
+            ZipCode = "11001",
+            StreetTypeId = catalogs.StreetType,
+            CountryId = catalogs.Country,
+            ProvinceId = catalogs.Province,
+            MunicipalityId = catalogs.Municipality,
+            CreatedBy = Creator
+        };
+        db.Add(address);
+        await db.SaveChangesAsync();
+        return (personId, address.Id);
+    }
+
+    private async Task<(int Person, int Address)> ReadStampsAsync(Guid personId, Guid addressId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var person = await db.Persons.IgnoreQueryFilters().AsNoTracking().SingleAsync(p => p.Id == personId);
+        var address = await db.Set<PersonAddress>().IgnoreQueryFilters().AsNoTracking().SingleAsync(a => a.Id == addressId);
+        return (person.GcRecord, address.GcRecord);
+    }
+
     // ── catalog of listing endpoints ─────────────────────────────────────────────────────────────
 
-    private sealed record SeededRows(string Tag, Guid ActiveA, Guid DeletedA, Guid? ActiveB);
+    /// <summary>
+    /// Seeded ids. <c>Tag</c> is the list key: a name fragment for filtered listings, or the person id of
+    /// company A for per-person child listings (<c>TagB</c> is then the person of company B).
+    /// </summary>
+    private sealed record SeededRows(string Tag, Guid ActiveA, Guid DeletedA, Guid? ActiveB, string? TagB = null);
 
     /// <summary>
     /// One listing endpoint. <paramref name="Seed"/> inserts the rows through EF (tenant rows for A and B,
@@ -164,11 +257,18 @@ public sealed class SoftDeleteVisibilityGuardTests : IClassFixture<CustomWebAppl
         bool TenantScoped,
         Func<ApplicationDbContext, string, Guid, Guid, Task<SeededRows>> Seed,
         bool SuperAdminOnly = false,
-        bool CompanyByHeader = false)
+        bool CompanyByHeader = false,
+        string? RestoreRoute = null)
     {
-        public string ListUrl(string tag, bool includeDeleted, Guid? companyId, int page = 1)
+        /// <summary>
+        /// Builds the listing URL. A route with a <c>{key}</c> placeholder (per-person child listings) takes
+        /// the key in the path and no name filter.
+        /// </summary>
+        public string ListUrl(string key, bool includeDeleted, Guid? companyId, int page = 1)
         {
-            var url = $"/api/v1/{Route}?pageNumber={page}&pageSize=100&{FilterParameter}={tag}";
+            var url = Route.Contains("{key}")
+                ? $"/api/v1/{Route.Replace("{key}", key)}?pageNumber={page}"
+                : $"/api/v1/{Route}?pageNumber={page}&pageSize=100&{FilterParameter}={key}";
             if (includeDeleted)
             {
                 url += "&includeDeleted=true";
@@ -182,7 +282,7 @@ public sealed class SoftDeleteVisibilityGuardTests : IClassFixture<CustomWebAppl
             return url;
         }
 
-        public string RestoreUrl(Guid id) => $"/api/v1/{Route}/{id}/restore";
+        public string RestoreUrl(Guid id) => $"/api/v1/{RestoreRoute ?? Route}/{id}/restore";
     }
 
     private static readonly IReadOnlyDictionary<string, VisibilityCase> Cases = new Dictionary<string, VisibilityCase>
@@ -265,9 +365,166 @@ public sealed class SoftDeleteVisibilityGuardTests : IClassFixture<CustomWebAppl
             await db.SaveChangesAsync();
             return await SeedGlobalAsync(db, tag, name => new SystemOption { ModuleId = module.Id, Name = name, Route = $"/{name}" });
         }, SuperAdminOnly: true),
+        // ── Etapa 2: personas ──
+        ["Person"] = new("Persons", "Persons", "firstName", true, async (db, tag, a, b) =>
+        {
+            var identificationType = await SeedIdentificationTypeAsync(db);
+            return await SeedTenantAsync(db, tag, (company, name) => new Person
+            {
+                CompanyId = company,
+                FirstName = name,
+                LastName = "Doe",
+                IdentificationTypeId = identificationType,
+                IdentificationNumber = name
+            }, a, b);
+        }),
+        ["Customer"] = new("Customers", "Customers", "customerCode", true, async (db, tag, a, b) =>
+        {
+            var identificationType = await SeedIdentificationTypeAsync(db);
+            async Task<Customer> NewCustomerAsync(Guid company, string code, int stamp)
+            {
+                var person = await SeedPersonAsync(db, company, identificationType);
+                var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = $"c{Guid.NewGuid():N}"[..12], Email = $"c{Guid.NewGuid():N}"[..12] + "@t.local" };
+                user.NormalizedUserName = user.UserName!.ToUpperInvariant();
+                user.NormalizedEmail = user.Email!.ToUpperInvariant();
+                user.SecurityStamp = Guid.NewGuid().ToString();
+                db.Add(user);
+                var customer = Customer.Create(company, person, user.Id, code, PersonLifecycleStage.Lead);
+                customer.GcRecord = stamp;
+                customer.CreatedBy = Creator;
+                db.Add(customer);
+                return customer;
+            }
+
+            // CustomerCode allows 10 characters: a 9-char tag + the a/d/b suffix.
+            var code = tag[..9];
+            var activeA = await NewCustomerAsync(a, $"{code}a", 0);
+            var deletedA = await NewCustomerAsync(a, $"{code}d", DeletedStamp);
+            var activeB = await NewCustomerAsync(b, $"{code}b", 0);
+            await db.SaveChangesAsync();
+            return new SeededRows(code, activeA.Id, deletedA.Id, activeB.Id);
+        }),
+        ["PersonAddress"] = PersonChildCase("PersonAddress", async (db, company, person) =>
+        {
+            var catalogs = await SeedAddressCatalogsAsync(db);
+            return company => new PersonAddress
+            {
+                CompanyId = company,
+                PersonId = person[company],
+                AddressLine1 = "Main street",
+                ZipCode = "11001",
+                StreetTypeId = catalogs.StreetType,
+                CountryId = catalogs.Country,
+                ProvinceId = catalogs.Province,
+                MunicipalityId = catalogs.Municipality
+            };
+        }),
+        ["PersonContact"] = PersonChildCase("PersonContact", (_, _, person) => Task.FromResult<Func<Guid, BaseTenantEntity>>(
+            company => PersonContact.Create(company, person[company], ContactType.PrimaryEmail, $"{Guid.NewGuid():N}"[..10] + "@t.local"))),
+        ["PersonEmployment"] = PersonChildCase("PersonEmployment", (_, _, person) => Task.FromResult<Func<Guid, BaseTenantEntity>>(
+            company => PersonEmployment.Create(company, person[company], "JOIN", "Engineer", new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)))),
+        ["PersonBusinessProfile"] = PersonChildCase("PersonBusinessProfile", async (db, companies, person) =>
+        {
+            var catalogs = new Dictionary<Guid, (Guid Industry, Guid TaxRegime)>();
+            foreach (var company in companies)
+            {
+                var industry = Industry.Create(company, $"I{Guid.NewGuid():N}"[..8], $"I{Guid.NewGuid():N}"[..12], null);
+                var taxRegime = TaxRegime.Create(company, $"T{Guid.NewGuid():N}"[..8], $"T{Guid.NewGuid():N}"[..12]);
+                industry.CreatedBy = Creator;
+                taxRegime.CreatedBy = Creator;
+                db.AddRange(industry, taxRegime);
+                catalogs[company] = (industry.Id, taxRegime.Id);
+            }
+
+            await db.SaveChangesAsync();
+            return company => PersonBusinessProfile.Create(company, person[company], catalogs[company].Industry, catalogs[company].TaxRegime);
+        }),
+        ["PersonFinancialProfile"] = PersonChildCase("PersonFinancialProfile", async (db, companies, person) =>
+        {
+            var ranges = new Dictionary<Guid, Guid>();
+            foreach (var company in companies)
+            {
+                var range = IncomeRange.Create(company, $"R{Guid.NewGuid():N}"[..12], 0m, 1000m, "USD", Random.Shared.Next(1, 1_000_000));
+                range.CreatedBy = Creator;
+                db.Add(range);
+                ranges[company] = range.Id;
+            }
+
+            await db.SaveChangesAsync();
+            return company => PersonFinancialProfile.Create(company, person[company], ranges[company], "Salary", new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        }),
     };
 
     private const string Creator = nameof(SoftDeleteVisibilityGuardTests);
+
+    /// <summary>
+    /// A per-person child listing (<c>GET /{route}/person/{personId}</c>): one active person per company;
+    /// the children are an active and a deleted row of the person of A and an active row of the person of B.
+    /// <paramref name="childFactory"/> receives the companies (A, B) and the person of each company.
+    /// </summary>
+    private static VisibilityCase PersonChildCase(
+        string route,
+        Func<ApplicationDbContext, Guid[], IReadOnlyDictionary<Guid, Guid>, Task<Func<Guid, BaseTenantEntity>>> childFactory)
+        => new("Persons", route + "/person/{key}", string.Empty, true, async (db, _, a, b) =>
+        {
+            var identificationType = await SeedIdentificationTypeAsync(db);
+            var person = new Dictionary<Guid, Guid>
+            {
+                [a] = await SeedPersonAsync(db, a, identificationType),
+                [b] = await SeedPersonAsync(db, b, identificationType)
+            };
+            await db.SaveChangesAsync();
+
+            var create = await childFactory(db, new[] { a, b }, person);
+            var activeA = create(a);
+            var deletedA = create(a);
+            deletedA.GcRecord = DeletedStamp;
+            var activeB = create(b);
+            foreach (var row in new[] { activeA, deletedA, activeB })
+            {
+                row.CreatedBy = Creator;
+                db.Add(row);
+            }
+
+            await db.SaveChangesAsync();
+            return new SeededRows(person[a].ToString(), activeA.Id, deletedA.Id, activeB.Id, person[b].ToString());
+        }, RestoreRoute: route);
+
+    private static async Task<Guid> SeedIdentificationTypeAsync(ApplicationDbContext db)
+    {
+        var identificationType = new IdentificationType { Name = $"IT{Guid.NewGuid():N}"[..20], CreatedBy = Creator };
+        db.Add(identificationType);
+        await db.SaveChangesAsync();
+        return identificationType.Id;
+    }
+
+    private static Task<Guid> SeedPersonAsync(ApplicationDbContext db, Guid company, Guid identificationType)
+    {
+        var person = new Person
+        {
+            CompanyId = company,
+            FirstName = "Jane",
+            LastName = "Doe",
+            IdentificationTypeId = identificationType,
+            IdentificationNumber = $"P{Guid.NewGuid():N}"[..15],
+            CreatedBy = Creator
+        };
+        db.Add(person);
+        return Task.FromResult(person.Id);
+    }
+
+    private static async Task<(Guid StreetType, Guid Country, Guid Province, Guid Municipality)> SeedAddressCatalogsAsync(ApplicationDbContext db)
+    {
+        var streetType = new StreetType { Name = $"S{Guid.NewGuid():N}"[..20], Abbreviation = $"S{Guid.NewGuid():N}"[..10], CreatedBy = Creator };
+        var country = new Country { Name = $"C{Guid.NewGuid():N}"[..20], IsoCode = $"C{Guid.NewGuid():N}"[..10], CreatedBy = Creator };
+        db.AddRange(streetType, country);
+        var province = new Province { Name = $"P{Guid.NewGuid():N}"[..20], Code = $"P{Guid.NewGuid():N}"[..12], CountryId = country.Id, CreatedBy = Creator };
+        db.Add(province);
+        var municipality = new Municipality { Name = $"M{Guid.NewGuid():N}"[..20], ProvinceId = province.Id, CreatedBy = Creator };
+        db.Add(municipality);
+        await db.SaveChangesAsync();
+        return (streetType.Id, country.Id, province.Id, municipality.Id);
+    }
 
     private static async Task<SeededRows> SeedTenantAsync<T>(ApplicationDbContext db, string tag, Func<Guid, string, T> create, Guid companyA, Guid companyB)
         where T : BaseTenantEntity
@@ -429,15 +686,15 @@ public sealed class SoftDeleteVisibilityGuardTests : IClassFixture<CustomWebAppl
     /// X-Company-Id header — the vector a non-SuperAdmin used to read another company before SPEC 41.
     /// </summary>
     private static async Task<HttpResponseMessage> GetListAsync(
-        HttpClient client, VisibilityCase testCase, string tag, bool includeDeleted, Guid? companyId, int page = 1)
+        HttpClient client, VisibilityCase testCase, string key, bool includeDeleted, Guid? companyId, int page = 1)
     {
         if (!testCase.CompanyByHeader)
         {
-            return await client.GetAsync(testCase.ListUrl(tag, includeDeleted, companyId, page));
+            return await client.GetAsync(testCase.ListUrl(key, includeDeleted, companyId, page));
         }
 
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, testCase.ListUrl(tag, includeDeleted, companyId: null, page));
+        using var request = new HttpRequestMessage(HttpMethod.Get, testCase.ListUrl(key, includeDeleted, companyId: null, page));
         if (companyId is { } explicitCompany)
         {
             var original = client.DefaultRequestHeaders.GetValues("X-Company-Id").Single();
@@ -463,17 +720,25 @@ public sealed class SoftDeleteVisibilityGuardTests : IClassFixture<CustomWebAppl
     /// seeded by the test are ignored, while a leaked row of company B (seeded) is still caught.
     /// </summary>
     private static async Task<IReadOnlyList<Guid>> ListIdsAsync(
-        HttpClient client, VisibilityCase testCase, SeededRows rows, bool includeDeleted, Guid? companyId)
+        HttpClient client, VisibilityCase testCase, SeededRows rows, bool includeDeleted, Guid? companyId, bool useCompanyBKey = false)
     {
+        var key = useCompanyBKey && rows.TagB is not null ? rows.TagB : rows.Tag;
         var ids = new List<Guid>();
         for (var page = 1; ; page++)
         {
-            using var response = await GetListAsync(client, testCase, rows.Tag, includeDeleted, companyId, page);
+            using var response = await GetListAsync(client, testCase, key, includeDeleted, companyId, page);
             var body = await response.Content.ReadAsStringAsync();
             response.StatusCode.Should().Be(HttpStatusCode.OK, body);
 
             using var document = JsonDocument.Parse(body);
             var data = document.RootElement.GetProperty("data");
+            if (data.ValueKind == JsonValueKind.Array)
+            {
+                // Per-person child listings return a plain list (not paged).
+                ids.AddRange(data.EnumerateArray().Select(item => item.GetProperty("id").GetGuid()));
+                break;
+            }
+
             ids.AddRange(data.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid()));
             if (page >= data.GetProperty("totalPages").GetInt32())
             {

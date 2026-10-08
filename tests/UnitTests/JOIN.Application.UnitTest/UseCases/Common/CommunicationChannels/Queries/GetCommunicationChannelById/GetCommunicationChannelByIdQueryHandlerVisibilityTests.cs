@@ -25,7 +25,7 @@ public sealed class GetCommunicationChannelByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetCommunicationChannelByIdQuery(Guid.NewGuid(), IncludeDeleted: null));
 
-        context.Connection.LastCommandText.Should().Contain("cc.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" cc.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetCommunicationChannelByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetCommunicationChannelByIdQuery(Guid.NewGuid(), IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().Contain("cc.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" cc.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetCommunicationChannelByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetCommunicationChannelByIdQuery(Guid.NewGuid(), IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().NotContain("cc.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" cc.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("cc.GcRecord,");
     }
 

@@ -6,6 +6,8 @@ using FluentValidation;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Admin;
 using JOIN.Application.UseCases.Admin.PersonAddresses;
+using JOIN.Application.UseCases.Admin.Persons;
+using JOIN.Application.UseCases.Security.SystemOptions;
 using JOIN.Application.UseCases.Security.Auth.Login;
 using JOIN.Application.UseCases.Admin.PersonContacts;
 using JOIN.Application.UseCases.Admin.PersonEmployments;
@@ -97,6 +99,8 @@ public static class ConfigureServices
         services.AddScoped<TicketDtoAssembler>();
         services.AddScoped<TicketCodeGenerator>();
         services.AddScoped<SoftDeleteRestorer>();
+        services.AddScoped<PersonCascadeCoordinator>();
+        services.AddScoped<SystemOptionCascadeCoordinator>();
 
         return services;
     

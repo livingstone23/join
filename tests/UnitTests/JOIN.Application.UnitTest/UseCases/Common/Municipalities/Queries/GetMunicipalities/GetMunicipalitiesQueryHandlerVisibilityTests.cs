@@ -25,7 +25,7 @@ public sealed class GetMunicipalitiesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetMunicipalitiesQuery(IncludeDeleted: null));
 
-        context.Connection.LastCommandText.Should().Contain("m.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" m.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetMunicipalitiesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetMunicipalitiesQuery(IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().Contain("m.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" m.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetMunicipalitiesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetMunicipalitiesQuery(IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().NotContain("m.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" m.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("m.GcRecord,");
     }
 

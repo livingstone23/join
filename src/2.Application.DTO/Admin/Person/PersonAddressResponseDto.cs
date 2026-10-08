@@ -1,3 +1,5 @@
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Admin;
 
 
@@ -5,7 +7,7 @@ namespace JOIN.Application.DTO.Admin;
 /// <summary>
 /// Data transfer object representing a person address payload exposed by Application queries and commands.
 /// </summary>
-public sealed record PersonAddressResponseDto
+public sealed record PersonAddressResponseDto : SoftDeletableDto
 {
 
     /// <summary>

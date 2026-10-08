@@ -3,6 +3,7 @@
 > **Status:** Aprobado
 > **Depends on:** SPEC 38 (query filters completos — define qué es "de empresa" y qué es "global"), SPEC 40 (índices únicos filtrados — la unicidad debe aplicar solo a activos para poder restaurar sin colisiones).
 > **Date:** 2026-09-28
+> **Historia (2026-10-08):** vuelve a Borrador por cambio de lógica del borrado (sección E, "Borrado en cascada de composición"). Las etapas 1 y 2 ya implementadas se ajustan cuando la spec se vuelva a aprobar.
 > **Historia (2026-10-07):** al planificar la Etapa 1, el usuario decidió que un hijo no se restaura mientras su padre siga borrado, incluidas las referencias a catálogos (reemplaza la decisión del 2026-09-28 que lo permitía), y que los endpoints `system-wide` de SuperAdmin quedan sin cambios. Se agregaron el plan y el inventario de la Etapa 1.
 > **Objective:** Permitir que el rol Identity `SuperAdmin` vea registros activos **y** borrados (`GcRecord > 0`) de todas las entidades, y que pueda restaurar un registro borrado (`GcRecord → 0`), sin abrir ninguna fuga de datos entre empresas para el resto de los roles. Se implementa por etapas.
 
@@ -80,18 +81,29 @@ Verificado en el código (2026-09-28):
 - **Borrar un hijo nunca afecta al padre.** `DeletePersonAddressCommandHandler` marca solo la dirección; si era la default, `PersonAddressDefaultCoordinator.PromoteNextDefaultAsync` promueve otra, y si no queda ninguna simplemente no hay default: se puede borrar la última dirección y la persona sigue activa. Igual para contactos (`PersonContactPrimaryCoordinator`).
 - **Borrar una persona sí borra (lógicamente) algunos hijos.** `DeletePersonCommandHandler` marca la persona y sus direcciones y contactos activos. **No** marca `Customer`, `PersonEmployment`, `PersonBusinessProfile` ni `PersonFinancialProfile`, y sus queries no cruzan con `Admin.Persons`: quedan activos y visibles apuntando a una persona borrada. Con la regla de abajo, este comportamiento cambia.
 
-**Decisión (2026-09-28): un padre con hijos activos no se puede borrar.** El único borrado válido en el sistema es el lógico (`GcRecord`). Si el padre tiene hijos activos, el borrado falla con un error de negocio que lista qué registros activos tiene; el usuario debe borrar primero los hijos y recién entonces puede borrar el padre. No hay borrado en cascada ni confirmación que lo fuerce.
+**Decisión (2026-09-28), vigente solo para referencias (ver decisión 2026-10-08 más abajo): un padre con hijos activos no se puede borrar.** El único borrado válido en el sistema es el lógico (`GcRecord`). Si el padre tiene hijos activos, el borrado falla con un error de negocio que lista qué registros activos tiene; el usuario debe borrar primero los hijos y recién entonces puede borrar el padre. No hay borrado en cascada ni confirmación que lo fuerce.
 
 - Código de error: el patrón existente `<ENTIDAD>_IN_USE` (por ejemplo `PERSON_IN_USE`), con el detalle de los hijos activos en `errors` (por ejemplo `"3 direcciones activas"`, `"2 contactos activos"`, `"1 empleo activo"`).
-- **`DeletePerson` deja de borrar direcciones y contactos junto con la persona.** Direcciones, contactos, cliente, empleos, perfil de negocio y perfil financiero activos bloquean el borrado de la persona. Es un cambio de comportamiento respecto de hoy: los tests existentes de `DeletePersonCommandHandler` que esperan el borrado conjunto se actualizan como parte de la Etapa 2.
+- ~~**`DeletePerson` deja de borrar direcciones y contactos junto con la persona.** Direcciones, contactos, cliente, empleos, perfil de negocio y perfil financiero activos bloquean el borrado de la persona. Es un cambio de comportamiento respecto de hoy: los tests existentes de `DeletePersonCommandHandler` que esperan el borrado conjunto se actualizan como parte de la Etapa 2.~~ Reemplazada el 2026-10-08: `DeletePerson` borra en cascada sus 5 hijos de composición; `Customer`, `Ticket` y `UserPerson` activos bloquean.
 - Borrar un hijo sigue sin afectar al padre (sin cambios).
 
 Este patrón ya existe en la mayoría de los catálogos: `DeleteGender`, `DeleteIndustry`, `DeleteRegion`, `DeleteTaxRegime`, `DeleteIncomeRange`, `DeleteProject`, `DeleteTicketStatus` y `DeleteProvince` devuelven `<ENTIDAD>_IN_USE` si el registro está referenciado. **No** lo tienen hoy: `DeleteArea`, `DeleteCountry`, `DeleteCompany` y `DeletePerson`. Esta spec lo extiende a todo padre con hijos: cada etapa, antes de implementar, inventaría las relaciones padre → hijo de sus entidades y alinea sus handlers `Delete<Entidad>`. `DeleteCompany` (solo SuperAdmin, SPEC 38) queda bloqueado mientras la empresa tenga membresías o registros activos.
 
+**Decisión (2026-10-08), reemplaza a la del 2026-09-28 para la composición: borrado en cascada (soft delete) de los hijos propios.** Se distinguen dos tipos de relación padre → hijo:
+
+- **Composición** (el hijo no existe sin el padre): borrar el padre marca como borrados (`GcRecord`) al padre y a sus hijos activos, en la misma operación y con el mismo sello de fecha. Aplica a:
+  - `Person` → `PersonAddress`, `PersonContact`, `PersonEmployment`, `PersonBusinessProfile`, `PersonFinancialProfile`.
+  - `SystemModule` → `SystemOption` → `SystemOption` hijas (`ParentId`), en todos los niveles.
+- **Referencia** (el hijo apunta a un catálogo o a otra entidad con vida propia): sigue la regla anterior, el padre con referencias activas no se borra → `<ENTIDAD>_IN_USE`. Aplica a los catálogos (`Gender`, `Country`, `TimeUnit`…) y, para `Person`, a `Customer`, `Ticket` y `UserPerson`; para `SystemOption`, a `RoleSystemOption`; para `SystemModule`, a `CompanyModule`.
+- **Orden de los chequeos al borrar un padre de composición:** primero las referencias (si hay alguna activa en el padre o en cualquier hijo que se borraría → `_IN_USE` y no se borra nada); después la cascada.
+- **Permiso:** basta `CanDelete` sobre el recurso del padre (los hijos de `Person` comparten el recurso `Persons`).
+- **Restaurar un padre de composición** restaura con él a los hijos que se borraron en la misma cascada (mismo sello `GcRecord` que el padre), aplicando el chequeo de duplicado activo y las marcas default/principal/actual de cada hijo. Los hijos borrados antes, uno por uno, quedan borrados. **Limitación:** `GcRecord` guarda solo la fecha (`yyyyMMdd`), así que un hijo borrado individualmente el mismo día que el padre también se restaura con él.
+- Restaurar un hijo sigue siendo individual y exige el padre activo (`PARENT_DELETED`).
+
 Reglas para esta spec:
 
 - Se elimina `DeleteAsync` de `IGenericRepository`/`GenericRepository` (borrado físico sin uso), para que ningún caso de uso futuro pueda introducirlo.
-- **Restaurar es siempre individual.** Restaurar una `Person` restaura solo la persona; sus direcciones y contactos se restauran uno por uno. Una persona restaurada sin direcciones ni contactos activos es un estado válido (igual que borrar todas sus direcciones).
+- ~~**Restaurar es siempre individual.**~~ Reemplazada el 2026-10-08 para los padres de composición: restaurar el padre restaura los hijos de su misma cascada (ver arriba). Restaurar un hijo sigue siendo individual.
 - **Restaurar un hijo exige el padre activo (decisión 2026-10-07, reemplaza a la del 2026-09-28).** Padre e hijo se definen igual que para el borrado: si un registro activo bloquea el borrado de otro, es su hijo. Un hijo no se restaura mientras su padre siga borrado → `PARENT_DELETED`; primero se restaura el padre. Esto incluye las referencias a catálogos (por ejemplo, una `Person` no se restaura si su `Gender` está borrado).
 
 ### F. Entidades que nunca se restauran
@@ -179,6 +191,39 @@ Todas las queries son Dapper. Las de empresa filtran hoy por `currentUserService
 - Restaurar una `Person` restaura solo la persona (sección E); direcciones y contactos se restauran individualmente.
 - Invariantes existentes: al restaurar una dirección/contacto/empleo/perfil marcado como default, principal o actual, el coordinador correspondiente (`PersonAddressDefaultCoordinator`, `PersonEmploymentCurrentCoordinator`, `PersonBusinessProfileActiveCoordinator`, `PersonFinancialProfileCurrentCoordinator`) se aplica igual que en Create/Update: si ya hay otro default activo, el restaurado vuelve **sin** la marca.
 
+#### Etapa 2 — Plan e inventario (Ajuste por SPEC 41, 2026-10-08)
+
+Rama `spec-41-etapa-2-personas` (PR propio, sobre la Etapa 1).
+
+- **F1** `DeletePerson`: referencias (`Customer`, `Ticket`, `UserPerson`) → `PERSON_IN_USE`; cascada de los 5 hijos de composición (decisión 2026-10-08). Tests existentes actualizados.
+- **F2** `SoftDeleteRestorer`: hook previo a restaurar (quitar marca default/principal/actual si ya hay otra activa) y chequeo de padre para `ApplicationUser`.
+- **F3** `Restore<Entity>` (command, validator, handler, `POST /{id}/restore`, unit tests) para las 7 entidades.
+- **F4** `includeDeleted` en las 14 queries (listado + por id), `IsDeleted`/`DeletedOn` en DTO, tests de visibilidad.
+- **F5** Integración: listados de personas en el test de guarda; restore Manager → 403, SuperAdmin → 200.
+- **F6** Build Release, gate 90 %, suite de integración.
+
+| Entidad | Padres (`PARENT_DELETED`) | Hijos activos que bloquean su borrado | Duplicado activo | Marca al restaurar |
+|---|---|---|---|---|
+| `Person` | `IdentificationType`; `Gender` si tiene | `PersonAddress`, `PersonContact`, `PersonEmployment`, `PersonBusinessProfile`, `PersonFinancialProfile`, `Customer`, `Ticket`, `UserPerson` | `UX_Persons_Company_IdType_IdNumber` | — |
+| `PersonAddress` | `Person`, `Country`, `Province`, `Municipality`, `StreetType`; `Region` si tiene | — | — | `IsDefault` |
+| `PersonContact` | `Person` | — | `UX_PersonContacts_Person_Type_Value` | `IsPrimary` |
+| `PersonEmployment` | `Person` | — | — | `IsCurrent` |
+| `PersonBusinessProfile` | `Person`, `Industry`, `TaxRegime` | — | — | `IsActive` (perfil activo) |
+| `PersonFinancialProfile` | `Person`, `IncomeRange` | — | — | `IsCurrent` |
+| `Customer` | `Person`, `ApplicationUser` | — | `UX_Customers_Company_CustomerCode`, `UX_Customers_Company_Person_User` | — |
+
+**Decisión (2026-10-08):** `Ticket` y `UserPerson` también bloquean el borrado de una persona (cualquier referencia activa bloquea). `PersonContactPrimaryCoordinator` se aplica igual que los otros cuatro coordinadores. `GetPersonById` devuelve los hijos anidados solo activos (los JOINs mantienen `GcRecord = 0`).
+
+#### Etapa 2 — Decisiones de implementación (Ajuste por SPEC 41, 2026-10-08)
+
+- **`DeletePerson`** (actualizado 2026-10-08, cascada de composición): `Customer`, `Ticket` y `UserPerson` activos → `PERSON_IN_USE` (HTTP 409) y no se borra nada; si no hay referencias, la persona y sus 5 hijos de composición se marcan con el mismo sello (`PersonCascadeCoordinator`). `RestorePerson` restaura los hijos de ese sello: valida catálogos (`PARENT_DELETED`) y contactos duplicados (`ACTIVE_DUPLICATE_EXISTS`) antes de tocar nada y conserva un solo titular por marca.
+- **Marcas al restaurar:** `SoftDeleteRestorer` tiene un hook `beforeRestore`. Si otra fila activa de la misma persona ya tiene la marca (`IsDefault` en direcciones, `IsPrimary` por tipo de contacto, `IsCurrent` en empleos y perfiles financieros, `IsActive` en perfiles de negocio), el restaurado vuelve sin ella.
+- **Padres Identity:** `IsParentDeletedAsync` acepta cualquier `IAuditableEntity`, así `Customer` valida su `ApplicationUser`.
+- **Listados por persona** (`GET /{recurso}/person/{personId}`): aceptan `includeDeleted` y `companyId` como los demás. `GetPersonById` aplica `includeDeleted` a la persona; sus hijos anidados siguen siendo solo activos.
+- **`Customer`:** su SQL compartido hace `INNER JOIN` con personas activas; un cliente borrado de una persona borrada aparece al restaurar la persona (el orden que exige la regla de padres). No se pasó a `LEFT JOIN` para no exponer clientes antiguos de personas ya borradas.
+
+- **Menú (`SystemModule` / `SystemOption`):** `SystemOptionCascadeCoordinator` borra el subárbol activo en todos los niveles con el sello del padre; `CompanyModule` y `RoleSystemOption` activos en el subárbol → `_IN_USE` (`DELETE /SystemModules` ahora responde 409). Restaurar un módulo u opción trae de vuelta las opciones de su misma cascada cuyo padre quede activo. `DELETE /SystemOptions` sigue respondiendo 200 con `isSuccess=false` ante errores (comportamiento previo del controller, no se tocó).
+
 ### Etapa 3 — Seguridad y empresas
 
 `ApplicationUser`, `ApplicationRole`, `Company`, `CompanyModule`, `UserCompany`, `RoleCompany`, `UserRoleCompany`, `RoleSystemOption`, `UserCommunicationChannel`, `UserPerson`.
@@ -225,7 +270,7 @@ Este test también cubre el hueco que SPEC 38 dejó abierto: una query Dapper nu
 - [ ] `SuperAdmin` puede restaurar cualquier entidad de las etapas implementadas; las de la sección E no son restaurables.
 - [ ] Restaurar nunca produce un 500 por índice único: el duplicado activo se detecta antes y devuelve `ACTIVE_DUPLICATE_EXISTS`.
 - [ ] No se puede restaurar un hijo cuyo padre está borrado.
-- [ ] No se puede borrar un padre con hijos activos: el error `<ENTIDAD>_IN_USE` lista los hijos activos. `DeletePerson` ya no borra direcciones ni contactos.
+- [ ] Un padre con referencias activas no se puede borrar (`<ENTIDAD>_IN_USE` lista las referencias). Un padre de composición (`Person`, `SystemModule`, `SystemOption`) borra en cascada (soft delete) a sus hijos de composición, y restaurarlo restaura los de esa misma cascada.
 - [ ] No existe ningún borrado físico en el código (`DeleteAsync` eliminado de `IGenericRepository`).
 - [ ] Los invariantes de default/principal/actual se mantienen al restaurar.
 - [ ] El test de guarda de visibilidad cubre todos los endpoints de listado de las etapas implementadas.

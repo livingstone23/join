@@ -25,7 +25,7 @@ public sealed class GetIdentificationTypeByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetIdentificationTypeByIdQuery(Guid.NewGuid(), IncludeDeleted: null));
 
-        context.Connection.LastCommandText.Should().Contain("it.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" it.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetIdentificationTypeByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetIdentificationTypeByIdQuery(Guid.NewGuid(), IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().Contain("it.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" it.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetIdentificationTypeByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetIdentificationTypeByIdQuery(Guid.NewGuid(), IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().NotContain("it.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" it.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("it.GcRecord,");
     }
 

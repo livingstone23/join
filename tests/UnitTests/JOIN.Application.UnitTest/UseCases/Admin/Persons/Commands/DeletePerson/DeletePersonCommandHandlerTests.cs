@@ -1,5 +1,7 @@
 using AutoFixture;
 using FluentAssertions;
+using JOIN.Application.Common;
+using JOIN.Application.UseCases.Admin.Persons;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Admin;
@@ -8,6 +10,9 @@ using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
 using JOIN.Domain.Enums;
+using JOIN.Application.UnitTest.Common.TestDoubles;
+using JOIN.Domain.Messaging;
+using JOIN.Domain.Security;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Admin.Persons.Commands.DeletePerson;
@@ -22,12 +27,11 @@ public sealed class DeletePersonCommandHandlerTests
     private readonly Fixture _fixture = new();
 
     /// <summary>
-    /// Verifies the happy path for a logical delete operation.
-    /// This test ensures the customer, addresses, and contacts are soft-deleted
-    /// and the mutation is persisted successfully.
+    /// Verifies the happy path for a logical delete operation. SPEC 41 (decision 2026-10-08): the
+    /// person and its composition children (here addresses and contacts) are soft-deleted together.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenPersonExists_ShouldMarkAggregateAsDeletedAndReturnSuccess()
+    public async Task Handle_WhenPersonHasNoReferences_ShouldSoftDeleteThePersonAndItsChildren()
     {
         // Arrange
         var companyId = _fixture.Create<Guid>();
@@ -62,11 +66,90 @@ public sealed class DeletePersonCommandHandlerTests
         response.Data.Should().Be(customerId);
 
         customer.GcRecord.Should().BeGreaterThan(BaseAuditableEntity.ActiveGcRecord);
-        customer.Addresses.Should().OnlyContain(x => x.GcRecord > BaseAuditableEntity.ActiveGcRecord);
-        customer.Contacts.Should().OnlyContain(x => x.GcRecord > BaseAuditableEntity.ActiveGcRecord);
+        customer.Addresses.Should().OnlyContain(x => x.GcRecord == customer.GcRecord, "same cascade stamp as the person");
+        customer.Contacts.Should().OnlyContain(x => x.GcRecord == customer.GcRecord, "same cascade stamp as the person");
 
         context.PersonsRepositoryMock.Verify(x => x.UpdateAsync(customer), Times.Once);
         context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// SPEC 41: references with a life of their own (customers, tickets, user links) block the delete;
+    /// composition children do not.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenPersonHasActiveReferences_ShouldReturnInUseWithDetails()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var customerId = _fixture.Create<Guid>();
+        var context = CreateContext(companyId);
+        var customer = CreatePersonAggregate(customerId, companyId);
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.PersonsRepositoryMock.Setup(x => x.GetForUpdateAsync(customerId, companyId)).ReturnsAsync(customer);
+        context.SetupChildren(customerId, deleted: false);
+
+        var response = await context.CreateHandler().Handle(new DeletePersonCommand(customerId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("PERSON_IN_USE");
+        response.Errors.Should().Equal(
+            "Active customers: 1",
+            "Active tickets: 1",
+            "Active user persons: 1");
+        customer.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
+        customer.Addresses.Should().OnlyContain(x => x.GcRecord == BaseAuditableEntity.ActiveGcRecord, "nothing is deleted when a reference blocks");
+        context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// SPEC 41: logically deleted references do not block the delete.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenReferencesAreDeleted_ShouldSoftDeleteThePerson()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var customerId = _fixture.Create<Guid>();
+        var context = CreateContext(companyId);
+        var customer = CreatePersonAggregate(customerId, companyId);
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.PersonsRepositoryMock.Setup(x => x.GetForUpdateAsync(customerId, companyId)).ReturnsAsync(customer);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        context.SetupChildren(customerId, deleted: true);
+
+        var response = await context.CreateHandler().Handle(new DeletePersonCommand(customerId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        customer.GcRecord.Should().BeGreaterThan(BaseAuditableEntity.ActiveGcRecord);
+    }
+
+    /// <summary>
+    /// SPEC 41 (decision 2026-10-08): the children not loaded with the aggregate (employments, business and
+    /// financial profiles) are cascaded too, with the person's stamp, and saved through their repositories.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenPersonHasCompositionChildren_ShouldCascadeTheSameStamp()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var customerId = _fixture.Create<Guid>();
+        var context = CreateContext(companyId);
+        var customer = CreatePersonAggregate(customerId, companyId);
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.PersonsRepositoryMock.Setup(x => x.GetForUpdateAsync(customerId, companyId)).ReturnsAsync(customer);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        var employment = PersonEmployment.Create(companyId, customerId, "JOIN", "Engineer", DateTime.UtcNow.AddYears(-1));
+        var business = PersonBusinessProfile.Create(companyId, customerId, Guid.NewGuid(), Guid.NewGuid());
+        var financial = PersonFinancialProfile.Create(companyId, customerId, Guid.NewGuid(), "Salary", DateTime.UtcNow);
+        var employmentRepository = context.UnitOfWorkMock.SetupRepositoryRows<PersonEmployment>([employment]);
+        var businessRepository = context.UnitOfWorkMock.SetupRepositoryRows<PersonBusinessProfile>([business]);
+        var financialRepository = context.UnitOfWorkMock.SetupRepositoryRows<PersonFinancialProfile>([financial]);
+
+        var response = await context.CreateHandler().Handle(new DeletePersonCommand(customerId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        new[] { employment.GcRecord, business.GcRecord, financial.GcRecord }.Should().OnlyContain(g => g == customer.GcRecord);
+        employmentRepository.Verify(x => x.UpdateAsync(employment), Times.Once);
+        businessRepository.Verify(x => x.UpdateAsync(business), Times.Once);
+        financialRepository.Verify(x => x.UpdateAsync(financial), Times.Once);
     }
 
     /// <summary>
@@ -263,16 +346,44 @@ public sealed class DeletePersonCommandHandlerTests
             SetupRepository(UnitOfWorkMock, CompanyRepositoryMock);
         }
 
-        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
+        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new() { DefaultValue = DefaultValue.Mock };
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IPersonsRepository> PersonsRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Company>> CompanyRepositoryMock { get; } = new();
 
+        /// <summary>
+        /// Serves one child row of every type that blocks the delete (SPEC 41).
+        /// </summary>
+        public void SetupChildren(Guid personId, bool deleted)
+        {
+            var companyId = Guid.NewGuid();
+            T Stamp<T>(T row) where T : BaseAuditableEntity
+            {
+                if (deleted)
+                {
+                    row.MarkAsDeleted();
+                }
+
+                return row;
+            }
+
+            UnitOfWorkMock.SetupRepositoryRows<PersonAddress>([Stamp(CreateCustomerAddress(companyId, personId))]);
+            UnitOfWorkMock.SetupRepositoryRows<PersonContact>([Stamp(CreateCustomerContact(companyId, personId))]);
+            UnitOfWorkMock.SetupRepositoryRows<PersonEmployment>([Stamp(PersonEmployment.Create(companyId, personId, "JOIN", "Engineer", DateTime.UtcNow.AddYears(-1)))]);
+            UnitOfWorkMock.SetupRepositoryRows<PersonBusinessProfile>([Stamp(PersonBusinessProfile.Create(companyId, personId, Guid.NewGuid(), Guid.NewGuid()))]);
+            UnitOfWorkMock.SetupRepositoryRows<PersonFinancialProfile>([Stamp(PersonFinancialProfile.Create(companyId, personId, Guid.NewGuid(), "Salary", DateTime.UtcNow))]);
+            UnitOfWorkMock.SetupRepositoryRows<Customer>([Stamp(new Customer { CompanyId = companyId, PersonId = personId, UserId = Guid.NewGuid() })]);
+            UnitOfWorkMock.SetupRepositoryRows<Ticket>([Stamp(new Ticket { CompanyId = companyId, PersonId = personId })]);
+            UnitOfWorkMock.SetupRepositoryRows<UserPerson>([Stamp(new UserPerson { UserId = Guid.NewGuid(), PersonId = personId })]);
+        }
+
         public DeletePersonCommandHandler CreateHandler()
         {
+            var restorer = new SoftDeleteRestorer(UnitOfWorkMock.Object, CurrentUserServiceMock.Object);
             return new DeletePersonCommandHandler(
                 UnitOfWorkMock.Object,
-                CurrentUserServiceMock.Object);
+                CurrentUserServiceMock.Object,
+                new PersonCascadeCoordinator(UnitOfWorkMock.Object, restorer));
         }
     }
 }

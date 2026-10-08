@@ -33,9 +33,14 @@ public sealed class GetPersonFinancialProfilesByPersonIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND pfp.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 pfp.Id,
+                pfp.GcRecord,
                 pfp.PersonId,
                 pfp.IncomeRangeId,
                 ir.DisplayName AS IncomeRangeName,
@@ -51,7 +56,7 @@ public sealed class GetPersonFinancialProfilesByPersonIdQueryHandler(
                AND ir.GcRecord = 0
             WHERE pfp.PersonId = @PersonId
               AND pfp.CompanyId = @CompanyId
-              AND pfp.GcRecord = 0
+              {activeOnly}
             ORDER BY pfp.IsCurrent DESC, pfp.DeclaredDate DESC;
             """;
 
@@ -61,7 +66,7 @@ public sealed class GetPersonFinancialProfilesByPersonIdQueryHandler(
                 new
                 {
                     request.PersonId,
-                    CompanyId = currentUserService.CompanyId
+                    CompanyId = TenantResolver.Resolve(currentUserService, request.CompanyId)
                 },
                 cancellationToken: cancellationToken));
 

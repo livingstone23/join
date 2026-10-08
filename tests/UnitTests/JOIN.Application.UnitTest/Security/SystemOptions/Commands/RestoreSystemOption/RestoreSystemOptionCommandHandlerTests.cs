@@ -6,6 +6,7 @@ using JOIN.Application.UnitTest.Common.TestDoubles;
 using JOIN.Application.UseCases.Security.SystemOptions.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Security;
+using JOIN.Application.UseCases.Security.SystemOptions;
 using Moq;
 
 namespace JOIN.Application.UnitTest.Security.SystemOptions.Commands.RestoreSystemOption;
@@ -134,6 +135,9 @@ public sealed class RestoreSystemOptionCommandHandlerTests
             => UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(affectedRows);
 
         public RestoreSystemOptionCommandHandler CreateHandler()
-            => new(CurrentUserServiceMock.Object, new SoftDeleteRestorer(UnitOfWorkMock.Object, CurrentUserServiceMock.Object));
+        {
+            var restorer = new SoftDeleteRestorer(UnitOfWorkMock.Object, CurrentUserServiceMock.Object);
+            return new(CurrentUserServiceMock.Object, restorer, new SystemOptionCascadeCoordinator(UnitOfWorkMock.Object));
+        }
     }
 }

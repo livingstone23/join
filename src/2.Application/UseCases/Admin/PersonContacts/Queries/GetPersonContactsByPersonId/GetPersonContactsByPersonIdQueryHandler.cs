@@ -37,9 +37,14 @@ public sealed class GetPersonContactsByPersonIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND c.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 c.Id,
+                c.GcRecord,
                 c.PersonId,
                 c.ContactType,
                 c.ContactValue,
@@ -49,7 +54,7 @@ public sealed class GetPersonContactsByPersonIdQueryHandler(
             FROM Admin.PersonContacts c
             WHERE c.PersonId = @PersonId
               AND c.CompanyId = @CompanyId
-              AND c.GcRecord = 0
+              {activeOnly}
             ORDER BY c.IsPrimary DESC, c.Created DESC;
             """;
 
@@ -59,7 +64,7 @@ public sealed class GetPersonContactsByPersonIdQueryHandler(
                 new
                 {
                     request.PersonId,
-                    CompanyId = currentUserService.CompanyId
+                    CompanyId = TenantResolver.Resolve(currentUserService, request.CompanyId)
                 },
                 cancellationToken: cancellationToken));
 

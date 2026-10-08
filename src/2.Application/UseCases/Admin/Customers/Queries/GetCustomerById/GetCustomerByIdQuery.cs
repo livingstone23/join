@@ -7,4 +7,4 @@ namespace JOIN.Application.UseCases.Admin.Customers.Queries;
 /// <summary>
 /// Query to retrieve a single customer by identifier.
 /// </summary>
-public sealed record GetCustomerByIdQuery(Guid Id) : IRequest<Response<CustomerResponseDto>>;
+public sealed record GetCustomerByIdQuery(Guid Id, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<CustomerResponseDto>>;

@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 using DeletePersonBusinessProfileCommand = JOIN.Application.UseCases.Admin.PersonBusinessProfiles.Commands.DeletePersonBusinessProfileCommand;
 using UpdatePersonBusinessProfileCommand = JOIN.Application.UseCases.Admin.PersonBusinessProfiles.Commands.UpdatePersonBusinessProfileCommand;
+using Microsoft.AspNetCore.Authorization;
+using JOIN.Services.WebApi.Controllers;
 
 
 
@@ -38,9 +40,9 @@ public class PersonBusinessProfileController(IMediator mediator) : ControllerBas
     [ProducesResponseType(typeof(Response<PersonBusinessProfileResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted = null, [FromQuery] Guid? companyId = null, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetPersonBusinessProfileByIdQuery(id), cancellationToken);
+        var response = await _mediator.Send(new GetPersonBusinessProfileByIdQuery(id, includeDeleted, companyId), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -125,9 +127,9 @@ public class PersonBusinessProfileController(IMediator mediator) : ControllerBas
     [ProducesResponseType(typeof(Response<List<PersonBusinessProfileResponseDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetByPersonId(Guid personId, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetByPersonId(Guid personId, [FromQuery] bool? includeDeleted = null, [FromQuery] Guid? companyId = null, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetPersonBusinessProfilesByPersonIdQuery(personId), cancellationToken);
+        var response = await _mediator.Send(new GetPersonBusinessProfilesByPersonIdQuery(personId, includeDeleted, companyId), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -162,5 +164,27 @@ public class PersonBusinessProfileController(IMediator mediator) : ControllerBas
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted business profile (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The business profile identifier.</param>
+    /// <param name="companyId">Optional explicit company, honored only for SuperAdmin.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new RestorePersonBusinessProfileCommand(id, companyId), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

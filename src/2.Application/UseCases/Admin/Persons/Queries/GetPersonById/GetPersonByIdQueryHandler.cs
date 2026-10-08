@@ -32,11 +32,16 @@ public class GetPersonByIdQueryHandler(
         }
 
         using var connection = connectionFactory.CreateConnection();
-        var tenantId = currentUserService.CompanyId;
+        var tenantId = TenantResolver.Resolve(currentUserService, request.CompanyId);
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND c.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 c.Id,
+                c.GcRecord,
                 c.CompanyId,
                 co.Name AS CompanyName,
                 c.PersonType,
@@ -65,7 +70,7 @@ public class GetPersonByIdQueryHandler(
                 ON g.Id = c.GenderId
                AND g.CompanyId = @TenantId
                AND g.GcRecord = 0
-            WHERE c.Id = @Id AND c.CompanyId = @TenantId AND c.GcRecord = 0;
+            WHERE c.Id = @Id AND c.CompanyId = @TenantId {activeOnly};
 
             SELECT
                 a.Id,

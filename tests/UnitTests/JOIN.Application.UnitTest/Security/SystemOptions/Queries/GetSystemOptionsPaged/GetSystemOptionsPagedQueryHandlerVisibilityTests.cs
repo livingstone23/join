@@ -25,7 +25,7 @@ public sealed class GetSystemOptionsPagedQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetSystemOptionsPagedQuery(IncludeDeleted: null));
 
-        context.Connection.LastCommandText.Should().Contain("o.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" o.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetSystemOptionsPagedQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetSystemOptionsPagedQuery(IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().Contain("o.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" o.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetSystemOptionsPagedQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetSystemOptionsPagedQuery(IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().NotContain("o.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" o.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("o.GcRecord,");
     }
 

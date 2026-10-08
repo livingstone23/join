@@ -182,6 +182,12 @@ public class SystemModulesController(ISender sender) : ControllerBase
                 return NotFound(response);
             }
 
+            // SPEC 41: company modules or role grants in the module's options block the cascade.
+            if (response.Message == "SYSTEM_MODULE_IN_USE")
+            {
+                return Conflict(response);
+            }
+
             return BadRequest(response);
         }
 

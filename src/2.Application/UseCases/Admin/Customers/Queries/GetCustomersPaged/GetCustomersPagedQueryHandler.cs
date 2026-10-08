@@ -37,11 +37,15 @@ public sealed class GetCustomersPagedQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("TenantId", currentUserService.CompanyId);
+        parameters.Add("TenantId", TenantResolver.Resolve(currentUserService, request.CompanyId));
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE cust.CompanyId = @TenantId AND cust.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE cust.CompanyId = @TenantId");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND cust.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.CustomerCode))
         {

@@ -15,4 +15,6 @@ public sealed record GetCustomersPagedQuery(
     PersonLifecycleStage? PersonLifecycleStage = null,
     bool? IsActive = null,
     string? PersonName = null,
-    string? UserEmail = null) : IRequest<Response<PagedResult<CustomerResponseDto>>>;
+    string? UserEmail = null,
+    bool? IncludeDeleted = null,
+    Guid? CompanyId = null) : IRequest<Response<PagedResult<CustomerResponseDto>>>;

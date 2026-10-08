@@ -13,7 +13,9 @@ namespace JOIN.Application.UseCases.Security.SystemOptions.Commands;
 /// Handles soft delete operations for SystemOption.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
-public sealed class DeleteSystemOptionCommandHandler(IUnitOfWork unitOfWork)
+public sealed class DeleteSystemOptionCommandHandler(
+    IUnitOfWork unitOfWork,
+    SystemOptionCascadeCoordinator cascadeCoordinator)
     : IRequestHandler<DeleteSystemOptionCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
@@ -31,17 +33,19 @@ public sealed class DeleteSystemOptionCommandHandler(IUnitOfWork unitOfWork)
             return Response<Guid>.Error("SYSTEM_OPTION_NOT_FOUND", ["System option not found."]);
         }
 
-        // Active child options and active role assignments both block the delete (SPEC 41).
-        var dependents = new ActiveDependentsCheck(_unitOfWork);
-        await dependents.CountAsync<JOIN.Domain.Security.SystemOption>(c => c.GcRecord == 0 && c.ParentId == request.Id, "child system options");
-        await dependents.CountAsync<JOIN.Domain.Security.RoleSystemOption>(ro => ro.GcRecord == 0 && ro.SystemOptionId == request.Id, "role system options");
+        // SPEC 41 (decision 2026-10-08): child options are composition (deleted with the option, every level);
+        // role grants on the option or any descendant are references and block the delete.
+        var descendants = await cascadeCoordinator.GetActiveSubtreeAsync(entity.ModuleId, entity.Id);
+        var blocking = await cascadeCoordinator.GetBlockingReferencesAsync(descendants.Select(o => o.Id).Append(entity.Id).ToList());
 
-        if (dependents.HasDependents)
+        if (blocking.Count > 0)
         {
-            return Response<Guid>.Error("SYSTEM_OPTION_IN_USE", dependents.Details);
+            return Response<Guid>.Error("SYSTEM_OPTION_IN_USE", blocking);
         }
 
-        entity.MarkAsDeleted();
+        var deletedAtUtc = DateTime.UtcNow;
+        entity.MarkAsDeleted(deletedAtUtc);
+        await cascadeCoordinator.MarkAsDeletedAsync(descendants, deletedAtUtc);
         await optionRepository.UpdateAsync(entity);
         var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
 

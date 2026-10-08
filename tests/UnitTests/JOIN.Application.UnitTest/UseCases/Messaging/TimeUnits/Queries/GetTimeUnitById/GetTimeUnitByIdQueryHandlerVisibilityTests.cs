@@ -25,7 +25,7 @@ public sealed class GetTimeUnitByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetTimeUnitByIdQuery(Guid.NewGuid(), IncludeDeleted: null, CompanyId: null));
 
-        context.Connection.LastCommandText.Should().Contain("tu.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" tu.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetTimeUnitByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetTimeUnitByIdQuery(Guid.NewGuid(), IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().Contain("tu.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" tu.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetTimeUnitByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetTimeUnitByIdQuery(Guid.NewGuid(), IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().NotContain("tu.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" tu.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("tu.GcRecord,");
     }
 
