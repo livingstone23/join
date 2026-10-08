@@ -1,6 +1,6 @@
 # SPEC 99 — Canales internos `WEB` y `APP` en el catálogo de canales
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** Ninguna.
 > **Related:** SPEC 44 (el calendario registra como origen `WEB` las actividades creadas desde la aplicación), SPEC 47 (ingesta de tickets por WhatsApp y correo, etapa posterior — contenido que antes estaba en esta spec).
 > **Date:** 2026-10-01 (reescrita; la versión original del 2026-09-25 se movió a SPEC 47)
