@@ -155,7 +155,6 @@ public sealed class CreateTicketCommandValidatorTests
     /// Verifies that each required FK Guid field returns its own required message when empty.
     /// </summary>
     [Theory]
-    [InlineData(nameof(CreateTicketCommand.TicketStatusId), "Ticket status is required.")]
     [InlineData(nameof(CreateTicketCommand.TicketComplexityId), "Ticket complexity is required.")]
     [InlineData(nameof(CreateTicketCommand.TimeUnitId), "Time unit is required.")]
     [InlineData(nameof(CreateTicketCommand.ChannelId), "Channel is required.")]
@@ -178,6 +177,7 @@ public sealed class CreateTicketCommandValidatorTests
     /// Verifies that each optional FK Guid field returns its own invalid message when set to Guid.Empty.
     /// </summary>
     [Theory]
+    [InlineData(nameof(CreateTicketCommand.TicketStatusId), "Ticket status id is invalid.")]
     [InlineData(nameof(CreateTicketCommand.AssignedToUserId), "Assigned user id is invalid.")]
     [InlineData(nameof(CreateTicketCommand.PersonId), "Person id is invalid.")]
     [InlineData(nameof(CreateTicketCommand.ProjectId), "Project id is invalid.")]
@@ -192,6 +192,17 @@ public sealed class CreateTicketCommandValidatorTests
         result.Errors.Should().ContainSingle(x =>
             x.PropertyName == propertyName &&
             x.ErrorMessage == expectedMessage);
+    }
+
+    /// <summary>
+    /// SPEC 42 — the status is optional: omitting it lets the handler apply the company default.
+    /// </summary>
+    [Fact]
+    public void Validate_WhenTicketStatusIdIsNull_ShouldPass()
+    {
+        var result = _validator.Validate(CreateValidCommand() with { TicketStatusId = null });
+
+        result.IsValid.Should().BeTrue();
     }
 
     // ──────────────────────────────────────────────
@@ -242,7 +253,6 @@ public sealed class CreateTicketCommandValidatorTests
     private static CreateTicketCommand SetRequiredGuidProperty(CreateTicketCommand command, string propertyName, Guid value) =>
         propertyName switch
         {
-            nameof(CreateTicketCommand.TicketStatusId) => command with { TicketStatusId = value },
             nameof(CreateTicketCommand.TicketComplexityId) => command with { TicketComplexityId = value },
             nameof(CreateTicketCommand.TimeUnitId) => command with { TimeUnitId = value },
             nameof(CreateTicketCommand.ChannelId) => command with { ChannelId = value },
@@ -255,6 +265,7 @@ public sealed class CreateTicketCommandValidatorTests
     private static CreateTicketCommand SetOptionalGuidProperty(CreateTicketCommand command, string propertyName, Guid value) =>
         propertyName switch
         {
+            nameof(CreateTicketCommand.TicketStatusId) => command with { TicketStatusId = value },
             nameof(CreateTicketCommand.AssignedToUserId) => command with { AssignedToUserId = value },
             nameof(CreateTicketCommand.PersonId) => command with { PersonId = value },
             nameof(CreateTicketCommand.ProjectId) => command with { ProjectId = value },

@@ -21,7 +21,8 @@ public sealed class CreateTicketCommandHandler(
     ICurrentUserService currentUserService,
     TicketDtoAssembler ticketDtoAssembler,
     TicketUserCompanyCapabilityResolver capabilityResolver,
-    TicketCodeGenerator ticketCodeGenerator)
+    TicketCodeGenerator ticketCodeGenerator,
+    TicketInitialStatusResolver initialStatusResolver)
     : IRequestHandler<CreateTicketCommand, Response<TicketDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
@@ -29,6 +30,7 @@ public sealed class CreateTicketCommandHandler(
     private readonly TicketDtoAssembler _ticketDtoAssembler = ticketDtoAssembler;
     private readonly TicketUserCompanyCapabilityResolver _capabilityResolver = capabilityResolver;
     private readonly TicketCodeGenerator _ticketCodeGenerator = ticketCodeGenerator;
+    private readonly TicketInitialStatusResolver _initialStatusResolver = initialStatusResolver;
 
     /// <summary>
     /// Creates a ticket for the current tenant and returns a flattened ticket projection.
@@ -52,8 +54,18 @@ public sealed class CreateTicketCommandHandler(
             return Response<TicketDto>.Error("INVALID_COMPANY", ["The provided company does not exist or is inactive."]);
         }
 
+        // SPEC 42 — requested status (active, not final, same company) or the company's initial status.
+        var initialStatus = await _initialStatusResolver.ResolveAsync(
+            currentUserService.CompanyId,
+            request.TicketStatusId,
+            cancellationToken);
+
+        if (!initialStatus.IsSuccess)
+        {
+            return Response<TicketDto>.Error(initialStatus.Message, initialStatus.Errors);
+        }
+
         var ticketRepository = _unitOfWork.GetRepository<Ticket>();
-        var statusRepository = _unitOfWork.GetRepository<TicketStatus>();
         var complexityRepository = _unitOfWork.GetRepository<TicketComplexity>();
         var timeUnitRepository = _unitOfWork.GetRepository<TimeUnit>();
         var channelRepository = _unitOfWork.GetRepository<CommunicationChannel>();
@@ -61,11 +73,6 @@ public sealed class CreateTicketCommandHandler(
         var projectRepository = _unitOfWork.GetRepository<Project>();
         var areaRepository = _unitOfWork.GetRepository<Area>();
         var userRepository = _unitOfWork.GetRepository<ApplicationUser>();
-
-        if (await statusRepository.GetAsync(request.TicketStatusId) is null)
-        {
-            return Response<TicketDto>.Error("INVALID_TICKET_STATUS", ["The provided ticket status does not exist or is inactive."]);
-        }
 
         if (await complexityRepository.GetAsync(request.TicketComplexityId) is null)
         {
@@ -136,6 +143,7 @@ public sealed class CreateTicketCommandHandler(
 
         var entity = _ticketMapper.ToEntity(request);
         entity.CompanyId = currentUserService.CompanyId;
+        entity.TicketStatusId = initialStatus.Data;
         entity.CreatedByUserId = currentUserId;
         entity.EffortPoints = request.EffortPoints;
 

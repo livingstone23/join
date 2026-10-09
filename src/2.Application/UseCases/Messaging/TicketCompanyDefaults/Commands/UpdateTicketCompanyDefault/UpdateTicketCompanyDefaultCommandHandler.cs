@@ -3,6 +3,7 @@ using JOIN.Application.DTO.Messaging;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Mappings;
+using JOIN.Application.UseCases.Messaging.Tickets;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
@@ -78,9 +79,11 @@ public sealed class UpdateTicketCompanyDefaultCommandHandler(
         if (request.TicketStatusDefaultId.HasValue)
         {
             status = await statusRepository.GetAsync(request.TicketStatusDefaultId.Value);
-            if (status is null)
+
+            // SPEC 42 — the initial status must be one the ticket creation resolver accepts.
+            if (!TicketInitialStatusResolver.IsUsableInitialStatus(status, currentUserService.CompanyId))
             {
-                return (Response<TicketCompanyDefaultDto>.Error("INVALID_TICKET_STATUS", ["The provided default ticket status does not exist."]), null, null, null, null, null, null);
+                return (Response<TicketCompanyDefaultDto>.Error("TICKET_STATUS_DEFAULT_INVALID", ["The default ticket status must exist, be active, not final and belong to the current company."]), null, null, null, null, null, null);
             }
         }
 

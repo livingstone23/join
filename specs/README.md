@@ -78,7 +78,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 39 | Fork `main_postgresql` | Implementado (en `main_postgresql`) | — |
 | 40 | Índices únicos filtrados por soft-delete | Implementado | — |
 | 41 | Visibilidad de registros borrados y restauración para SuperAdmin | Implementado | 38, 40 |
-| 42 | Valores iniciales del ticket desde `TicketCompanyDefaults` | Borrador | — |
+| 42 | Valores iniciales del ticket desde `TicketCompanyDefaults` | Aprobado (implementado en rama `spec-42-ticket-create-default-status`) | — |
 | 43 | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Borrador | — |
 | 44 | Módulo Calendario: parametrización, calendarios y actividades | Borrador | 99, 43, 48 |
 | 45 | Calendario: ingreso por canales (agente) y personas pendientes | **Pospuesto** | 43, 44, 48 |
@@ -88,7 +88,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 49 | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Borrador | 36 |
 | 50 | `main_postgresql`: port de 40–49 y pendientes para llevar QA a PostgreSQL (archivo en `main_postgresql`) | Borrador | 39, 40–49 |
 | 51 | Invalidación de la caché de permisos con la clave `permissions:v2` | Borrador | 17, 25 |
-| 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Aprobado | — |
+| 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Implementado | — |
 
 ---
 

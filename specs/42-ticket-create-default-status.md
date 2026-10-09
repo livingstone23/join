@@ -173,16 +173,16 @@ Con SPEC 38 aplicada, los filtros globales ya limitan estas lecturas a la empres
 
 ## Acceptance criteria
 
-- [ ] `TicketStatusId` es opcional en `CreateTicketDto` y `CreateTicketCommand`.
-- [ ] Un ticket creado sin estado queda en el `TicketStatusDefaultId` de su empresa.
-- [ ] Un ticket creado con un estado activo, no final y de la misma empresa queda en ese estado, aunque no sea el inicial configurado.
-- [ ] Un estado final, inactivo, borrado o de otra empresa enviado por el cliente responde 400 `INVALID_TICKET_STATUS`.
-- [ ] Sin estado enviado ni estado inicial configurado, el alta responde 400 `TICKET_DEFAULT_STATUS_NOT_CONFIGURED`; con un estado configurado no usable, 400 `TICKET_DEFAULT_STATUS_INVALID`.
-- [ ] Las reglas de transición de SPEC 37 no intervienen en el alta.
-- [ ] No se puede guardar un `TicketStatusDefaultId` que no cumpla las reglas (`TICKET_STATUS_DEFAULT_INVALID`).
-- [ ] No se puede borrar el estado configurado como inicial.
-- [ ] El seed de desarrollo deja la empresa JOIN con estado inicial configurado.
-- [ ] Gate de cobertura ≥ 90% y suite de integración en verde.
+- [x] `TicketStatusId` es opcional en `CreateTicketDto` y `CreateTicketCommand`.
+- [x] Un ticket creado sin estado queda en el `TicketStatusDefaultId` de su empresa.
+- [x] Un ticket creado con un estado activo, no final y de la misma empresa queda en ese estado, aunque no sea el inicial configurado.
+- [x] Un estado final, inactivo, borrado o de otra empresa enviado por el cliente responde 400 `INVALID_TICKET_STATUS`.
+- [x] Sin estado enviado ni estado inicial configurado, el alta responde 400 `TICKET_DEFAULT_STATUS_NOT_CONFIGURED`; con un estado configurado no usable, 400 `TICKET_DEFAULT_STATUS_INVALID`.
+- [x] Las reglas de transición de SPEC 37 no intervienen en el alta.
+- [x] No se puede guardar un `TicketStatusDefaultId` que no cumpla las reglas (`TICKET_STATUS_DEFAULT_INVALID`).
+- [x] No se puede borrar el estado configurado como inicial.
+- [x] El seed de desarrollo deja la empresa JOIN con estado inicial configurado.
+- [x] Gate de cobertura ≥ 90% y suite de integración en verde.
 
 ---
 
@@ -195,6 +195,18 @@ Con SPEC 38 aplicada, los filtros globales ya limitan estas lecturas a la empres
 - **Reutilizar `INVALID_TICKET_STATUS` para el estado enviado** (elegido) en vez de un código nuevo. El front ya lo mapea y el significado es el mismo; solo se endurece la regla.
 - **Resolvedor compartido en vez de lógica en el handler** (elegido). SPEC 47 crea tickets por otra vía y debe aplicar exactamente las mismas reglas.
 - **Descartado:** quitar `TicketStatusId` del DTO y forzar siempre el default (versión anterior de esta spec). No permite que el usuario elija el estado al crear.
+
+---
+
+## Implementation notes (2026-10-08)
+
+- **F0 omitida** por decisión del usuario: no se consultó la base QA. Las empresas sin estado inicial válido solo fallan en altas que no envían `ticketStatusId`.
+- **D — bloqueo de borrado:** ya lo cubría SPEC 41 (`DeleteTicketStatusCommandHandler` + `ActiveDependentsCheck`): responde `TICKET_STATUS_IN_USE` con el detalle `"Active ticket company defaults: 1"`. Se mantiene ese formato (spec más reciente) en vez del texto en español propuesto aquí; no se cambió código.
+- **D — validación de defaults:** create/update de `TicketCompanyDefault` reutilizan `TicketInitialStatusResolver.IsUsableInitialStatus`; cualquier fallo del estado (inexistente incluido) responde `TICKET_STATUS_DEFAULT_INVALID` (antes `INVALID_TICKET_STATUS` solo si no existía).
+- **Mapper:** `TicketMapper.ToEntity(CreateTicketCommand)` ignora `TicketStatusId`; el handler asigna el estado resuelto.
+- **F — seed:** `SeedTicketCompanyDefaultsAsync` ya usaba el estado `IsInitial`; se endureció el filtro a `IsActive && !IsFinal`.
+- **G:** `POSTMAN_CURL.txt` no existe en el repo; solo se actualizó `CURL_REQUESTS.md`. FE-17 alineada (nota "Historia"); FE-19 ya era consistente.
+- **Tests:** `TicketInitialStatusResolverTests`, casos nuevos en `CreateTicketCommandHandlerTests`, `CreateTicketCommandValidatorTests` y handlers de `TicketCompanyDefaults`; integración en `tests/IntegrationTests/Messaging/CreateTicketInitialStatusTests.cs` (los 5 escenarios de F5 + `TICKET_STATUS_DEFAULT_INVALID`).
 
 ---
 
