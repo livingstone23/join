@@ -25,7 +25,7 @@ namespace JOIN.IntegrationTests.Persistence;
 
 /// <summary>
 /// SPEC 41-post — visibility guard (PostgreSQL, <see cref="PostgreSqlWebApplicationFactory"/>) over every listing endpoint of the implemented stages (Etapa 1: the
-/// 19 catalogs). For each endpoint it seeds an active and a deleted row in company A and an active row
+/// 19 catalogs; Etapas 2–4: persons, security and tickets — the ticket cases live in the <c>.Tickets.cs</c> part). For each endpoint it seeds an active and a deleted row in company A and an active row
 /// in company B (global catalogs: an active and a deleted row), then checks the visibility invariants:
 /// <list type="bullet">
 /// <item>Manager / SuperAdminCompany of A with <c>includeDeleted=true</c> → only the active row of A
@@ -115,18 +115,18 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
 
         using (var manager = await CreateClientAsync(companyA, "Manager"))
         {
-            var forbidden = await manager.PostAsync(testCase.RestoreUrl(rows.DeletedA), content: null);
+            var forbidden = await manager.PostAsync(testCase.RestoreUrl(rows.DeletedA, rows.Tag), content: null);
             forbidden.StatusCode.Should().Be(HttpStatusCode.Forbidden, $"{caseName}: only SuperAdmin can restore");
         }
 
         using var superAdmin = await CreateClientAsync(companyA, "SuperAdmin");
-        var restored = await superAdmin.PostAsync(testCase.RestoreUrl(rows.DeletedA), content: null);
+        var restored = await superAdmin.PostAsync(testCase.RestoreUrl(rows.DeletedA, rows.Tag), content: null);
         restored.StatusCode.Should().Be(HttpStatusCode.OK, $"{caseName}: {await restored.Content.ReadAsStringAsync()}");
 
         var listed = await ListIdsAsync(superAdmin, testCase, rows, includeDeleted: false, companyId: null);
         listed.Should().BeEquivalentTo(new[] { rows.ActiveA, rows.DeletedA }, $"{caseName}: the restored row is back in the normal listing");
 
-        var again = await superAdmin.PostAsync(testCase.RestoreUrl(rows.DeletedA), content: null);
+        var again = await superAdmin.PostAsync(testCase.RestoreUrl(rows.DeletedA, rows.Tag), content: null);
         again.StatusCode.Should().Be(HttpStatusCode.Conflict, $"{caseName}: restoring an active row answers NOT_DELETED");
     }
 
@@ -496,10 +496,13 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
             return url;
         }
 
-        public string RestoreUrl(Guid id) => $"/api/v1/{RestoreRoute ?? Route}/{id}/restore";
+        /// <summary>
+        /// Builds the restore URL; a <c>{key}</c> placeholder (ticket attachments) takes the listing key.
+        /// </summary>
+        public string RestoreUrl(Guid id, string key) => $"/api/v1/{(RestoreRoute ?? Route).Replace("{key}", key)}/{id}/restore";
     }
 
-    private static readonly IReadOnlyDictionary<string, VisibilityCase> Cases = new Dictionary<string, VisibilityCase>
+    private static readonly IReadOnlyDictionary<string, VisibilityCase> Cases = WithTicketCases(new Dictionary<string, VisibilityCase>
     {
         ["Gender"] = new("Genders", "Genders", "name", true, (db, tag, a, b) => SeedTenantAsync(db, tag,
             (company, name) => Gender.Create(company, name[^6..], name), a, b)),
@@ -706,7 +709,7 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
             // DeclaredDate is still `timestamp without time zone` in the fork (SPEC 50 B): Npgsql only accepts Kind=Unspecified.
             return company => PersonFinancialProfile.Create(company, person[company], ranges[company], "Salary", new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Unspecified));
         }),
-    };
+    });
 
     private const string Creator = nameof(SoftDeleteVisibilityGuardPostgreSqlTests);
 
@@ -905,7 +908,7 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
 
                 var module = new SystemModule { Name = $"VM{Guid.NewGuid():N}"[..20], CreatedBy = Creator };
                 db.Add(module);
-                foreach (var resource in Cases.Values.Select(c => c.Resource).Concat(new[] { "Companies", "CompanyModules", "Users" }).Distinct())
+                foreach (var resource in Cases.Values.Select(c => c.Resource).Concat(new[] { "Companies", "CompanyModules", "Users", "TicketCompanyDefaults", "TicketAttachmentSettings" }).Distinct())
                 {
                     var option = new SystemOption
                     {

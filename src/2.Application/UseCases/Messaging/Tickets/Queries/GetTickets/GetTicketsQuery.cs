@@ -18,5 +18,7 @@ public record GetTicketsQuery(
     Guid? ProjectId = null,
     bool? IsVisibleToExternals = null,
     DateTime? FromDate = null,
-    DateTime? ToDate = null)
+    DateTime? ToDate = null,
+    bool? IncludeDeleted = null,
+    Guid? CompanyId = null)
     : IRequest<Response<PagedResult<TicketListItemDto>>>;

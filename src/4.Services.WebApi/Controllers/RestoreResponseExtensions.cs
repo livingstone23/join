@@ -21,7 +21,7 @@ public static class RestoreResponseExtensions
         return response.Message switch
         {
             "NOT_FOUND" => controller.NotFound(response),
-            "NOT_DELETED" or "PARENT_DELETED" or "ACTIVE_DUPLICATE_EXISTS" => controller.Conflict(response),
+            "NOT_DELETED" or "PARENT_DELETED" or "ACTIVE_DUPLICATE_EXISTS" or "MAX_FILES_PER_TICKET_REACHED" => controller.Conflict(response),
             "SUPERADMIN_REQUIRED" => controller.StatusCode(StatusCodes.Status403Forbidden, response),
             _ => controller.BadRequest(response)
         };

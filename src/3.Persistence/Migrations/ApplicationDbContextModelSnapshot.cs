@@ -2101,7 +2101,8 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasIndex("CompanyId")
                         .IsUnique()
-                        .HasDatabaseName("ix_ticketcompanydefaults_companyid");
+                        .HasDatabaseName("ux_ticketcompanydefaults_company_active")
+                        .HasFilter("\"gcrecord\" = 0");
 
                     b.HasIndex("ProjectDefaultId")
                         .HasDatabaseName("ix_ticketcompanydefaults_projectdefaultid");

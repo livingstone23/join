@@ -41,11 +41,14 @@ public sealed class GetTicketsQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("TenantId", currentUserService.CompanyId);
+        parameters.Add("TenantId", TenantResolver.Resolve(currentUserService, request.CompanyId));
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE t.CompanyId = @TenantId AND t.GcRecord = 0");
+        // SPEC 41: deleted tickets only for a SuperAdmin asking includeDeleted=true.
+        var whereBuilder = new StringBuilder(SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? "WHERE t.CompanyId = @TenantId"
+            : "WHERE t.CompanyId = @TenantId AND t.GcRecord = 0");
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -106,6 +109,7 @@ public sealed class GetTicketsQueryHandler(
         var sql = $"""
             SELECT
                 t.Id,
+                t.GcRecord,
                 t.CompanyId,
                 co.Name AS CompanyName,
                 t.Code,
@@ -173,6 +177,7 @@ public sealed class GetTicketsQueryHandler(
             items.Add(new TicketListItemDto
             {
                 Id = row.Id,
+                GcRecord = row.GcRecord,
                 CompanyId = row.CompanyId,
                 CompanyName = row.CompanyName,
                 Code = row.Code,
@@ -219,6 +224,7 @@ public sealed class GetTicketsQueryHandler(
     private sealed class TicketSlaRow
     {
         public Guid Id { get; init; }
+        public int GcRecord { get; init; }
         public Guid CompanyId { get; init; }
         public string? CompanyName { get; init; }
         public string Code { get; init; } = string.Empty;

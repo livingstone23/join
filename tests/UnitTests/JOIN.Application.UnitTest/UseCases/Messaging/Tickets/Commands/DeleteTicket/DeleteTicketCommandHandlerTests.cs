@@ -2,10 +2,13 @@ using AutoFixture;
 using FluentAssertions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.UnitTest.Common.TestDoubles;
+using JOIN.Application.UseCases.Messaging.Tickets;
 using JOIN.Application.UseCases.Messaging.Tickets.Commands;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
+using JOIN.Domain.Support;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Commands.DeleteTicket;
@@ -60,6 +63,63 @@ public sealed class DeleteTicketCommandHandlerTests
 
         context.TicketRepositoryMock.Verify(x => x.UpdateAsync(ticket), Times.Once);
         context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// SPEC 41 (Etapa 4): active follow-up tickets block the delete and nothing is marked.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTicketHasActiveFollowUps_ShouldReturnTicketInUse()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var ticketId = _fixture.Create<Guid>();
+        var context = new DeleteTicketCommandHandlerTestContext(companyId);
+        var ticket = CreateTicket(ticketId, companyId);
+        var followUp = CreateTicket(Guid.NewGuid(), companyId);
+        followUp.PrecedentTicketId = ticketId;
+        var deletedFollowUp = CreateTicket(Guid.NewGuid(), companyId);
+        deletedFollowUp.PrecedentTicketId = ticketId;
+        deletedFollowUp.MarkAsDeleted();
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(ticketId)).ReturnsAsync(ticket);
+        context.TicketRepositoryMock.SetupRows([ticket, followUp, deletedFollowUp]);
+
+        var response = await context.CreateHandler().Handle(new DeleteTicketCommand(ticketId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("TICKET_IN_USE");
+        response.Errors.Should().ContainSingle().Which.Should().Be("Active follow-up tickets: 1");
+        ticket.IsDeleted.Should().BeFalse();
+        context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// SPEC 41 (Etapa 4): the ticket's active attachments are deleted with the same stamp; already deleted ones keep theirs.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTicketHasAttachments_ShouldDeleteThemInCascadeWithTheSameStamp()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var ticketId = _fixture.Create<Guid>();
+        var context = new DeleteTicketCommandHandlerTestContext(companyId);
+        var ticket = CreateTicket(ticketId, companyId);
+        var active = new TicketDocument { CompanyId = companyId, TicketId = ticketId, OriginalName = "a.pdf" };
+        var earlier = new TicketDocument { CompanyId = companyId, TicketId = ticketId, OriginalName = "b.pdf" };
+        earlier.MarkAsDeleted(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var otherTicket = new TicketDocument { CompanyId = companyId, TicketId = Guid.NewGuid(), OriginalName = "c.pdf" };
+        context.UnitOfWorkMock.SetupRepositoryRows<TicketDocument>([active, earlier, otherTicket]);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.TicketRepositoryMock.Setup(x => x.GetAsync(ticketId)).ReturnsAsync(ticket);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(2);
+
+        var response = await context.CreateHandler().Handle(new DeleteTicketCommand(ticketId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        active.GcRecord.Should().Be(ticket.GcRecord);
+        earlier.GcRecord.Should().Be(BaseAuditableEntity.GetDeletionGcRecordStamp(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+        otherTicket.IsDeleted.Should().BeFalse();
     }
 
     /// <summary>
@@ -218,6 +278,8 @@ public sealed class DeleteTicketCommandHandlerTests
 
             SetupRepository(UnitOfWorkMock, CompanyRepositoryMock);
             SetupRepository(UnitOfWorkMock, TicketRepositoryMock);
+            TicketRepositoryMock.SetupRows([]);
+            UnitOfWorkMock.SetupRepositoryRows<TicketDocument>([]);
         }
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
@@ -229,7 +291,8 @@ public sealed class DeleteTicketCommandHandlerTests
         {
             return new DeleteTicketCommandHandler(
                 UnitOfWorkMock.Object,
-                CurrentUserServiceMock.Object);
+                CurrentUserServiceMock.Object,
+                new TicketCascadeCoordinator(UnitOfWorkMock.Object));
         }
 
         private static void SetupRepository<TEntity>(

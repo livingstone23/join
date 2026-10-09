@@ -3,6 +3,7 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Commands.CreateTicketUserCompany;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Commands.DeleteTicketUserCompany;
+using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Commands.RestoreTicketUserCompany;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Commands.UpdateTicketUserCompany;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetSystemWideTicketUserCompanies;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetTicketUserCompanies;
@@ -43,6 +44,8 @@ public class TicketUserCompaniesController(ISender sender) : ControllerBase
         [FromQuery] bool? isSuperAdminTicket = null,
         [FromQuery] bool? canFinishTicket = null,
         [FromQuery] bool? canResolveTicket = null,
+        [FromQuery] bool? includeDeleted = null,
+        [FromQuery] Guid? companyId = null,
         CancellationToken cancellationToken = default)
     {
         var response = await _sender.Send(
@@ -53,7 +56,9 @@ public class TicketUserCompaniesController(ISender sender) : ControllerBase
                 UserId = userId,
                 IsSuperAdminTicket = isSuperAdminTicket,
                 CanFinishTicket = canFinishTicket,
-                CanResolveTicket = canResolveTicket
+                CanResolveTicket = canResolveTicket,
+                IncludeDeleted = includeDeleted,
+                CompanyId = companyId
             },
             cancellationToken);
 
@@ -112,9 +117,13 @@ public class TicketUserCompaniesController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Response<TicketUserCompanyDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetById(
+        Guid id,
+        [FromQuery] bool? includeDeleted = null,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
     {
-        var response = await _sender.Send(new GetTicketUserCompanyByIdQuery(id), cancellationToken);
+        var response = await _sender.Send(new GetTicketUserCompanyByIdQuery(id, includeDeleted, companyId), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -251,5 +260,27 @@ public class TicketUserCompaniesController(ISender sender) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted ticket roster entry (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The ticket roster entry identifier.</param>
+    /// <param name="companyId">Optional explicit company, honored only for SuperAdmin.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new RestoreTicketUserCompanyCommand(id, companyId), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

@@ -38,4 +38,14 @@ public record GetTicketUserCompaniesQuery : IRequest<Response<PagedResult<Ticket
     /// Gets or sets an optional filter on the CanResolveTicket flag.
     /// </summary>
     public bool? CanResolveTicket { get; init; }
+
+    /// <summary>
+    /// Gets whether deleted rows are included. Honored only for <c>SuperAdmin</c> (SPEC 41, <see cref="SoftDeleteVisibility"/>).
+    /// </summary>
+    public bool? IncludeDeleted { get; init; }
+
+    /// <summary>
+    /// Gets an optional explicit company, honored only for <c>SuperAdmin</c> (<see cref="TenantResolver"/>).
+    /// </summary>
+    public Guid? CompanyId { get; init; }
 }

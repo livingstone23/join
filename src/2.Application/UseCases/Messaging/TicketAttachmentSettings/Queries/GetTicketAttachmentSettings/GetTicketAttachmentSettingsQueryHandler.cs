@@ -27,7 +27,12 @@ public sealed class GetTicketAttachmentSettingsQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        // SPEC 41: deleted rows only for a SuperAdmin asking includeDeleted=true.
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND tas.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 tas.Id,
                 tas.CompanyId,
@@ -41,12 +46,12 @@ public sealed class GetTicketAttachmentSettingsQueryHandler(
             FROM Messaging.TicketAttachmentSettings tas
             LEFT JOIN Common.Companies c ON c.Id = tas.CompanyId
             WHERE tas.CompanyId = @TenantId
-              AND tas.GcRecord = 0
+              {activeOnly}
             ORDER BY tas.Created DESC;
             """;
 
         var items = (await connection.QueryAsync<TicketAttachmentSettingsDto>(
-            new CommandDefinition(sql, new { TenantId = currentUserService.CompanyId }, cancellationToken: cancellationToken))).AsList();
+            new CommandDefinition(sql, new { TenantId = TenantResolver.Resolve(currentUserService, request.CompanyId) }, cancellationToken: cancellationToken))).AsList();
 
         return new Response<IReadOnlyCollection<TicketAttachmentSettingsDto>>
         {

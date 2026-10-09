@@ -45,7 +45,7 @@ public sealed class PostgreSqlSmokeTests : IClassFixture<PostgreSqlWebApplicatio
     /// <summary>
     /// Case 1 — the fork's migration history applies cleanly on an empty PostgreSQL: it starts with
     /// <c>InitialPostgres</c>, includes the incremental Npgsql migrations of the -post specs
-    /// (SPEC 40-post: <c>FilteredUniqueIndexesForSoftDelete</c>) and nothing is left pending.
+    /// (SPEC 40-post: <c>FilteredUniqueIndexesForSoftDelete</c>; SPEC 41-post: <c>Spec41FilterTicketCompanyDefaultsIndex</c>) and nothing is left pending.
     /// </summary>
     [Fact]
     public async Task Migrations_StartWithInitialPostgres_AndNoneArePending()
@@ -57,6 +57,7 @@ public sealed class PostgreSqlSmokeTests : IClassFixture<PostgreSqlWebApplicatio
         var applied = (await db.Database.GetAppliedMigrationsAsync()).ToList();
         applied.First().Should().EndWith("_InitialPostgres");
         applied.Should().Contain(m => m.EndsWith("_FilteredUniqueIndexesForSoftDelete"));
+        applied.Should().Contain(m => m.EndsWith("_Spec41FilterTicketCompanyDefaultsIndex"));
         (await db.Database.GetPendingMigrationsAsync()).Should().BeEmpty();
     }
 
@@ -88,7 +89,7 @@ public sealed class PostgreSqlSmokeTests : IClassFixture<PostgreSqlWebApplicatio
     }
 
     /// <summary>
-    /// Case 3 — each of the 25 filtered unique indexes (11 from SPEC 39 + 14 from SPEC 40-post) behaves at runtime as on SQL Server:
+    /// Case 3 — each of the 26 filtered unique indexes (11 from SPEC 39 + 14 from SPEC 40-post + 1 from SPEC 41-post) behaves at runtime as on SQL Server:
     /// a second active row with the same key is rejected by THAT index (not another
     /// constraint), and once the first row is soft-deleted (<c>gcrecord &lt;&gt; 0</c>) the same
     /// key can be inserted again. Every case runs in a transaction that is rolled back.
@@ -390,6 +391,9 @@ public sealed class PostgreSqlSmokeTests : IClassFixture<PostgreSqlWebApplicatio
             new() { ["code"] = "NULL" }),
         new("ux_regions_company_country_code", "admin.regions", RegionSourceSql,
             new() { ["name"] = "t.name || ' dup'" }),
+        // SPEC 41-post, Etapa 4 — one active ticket configuration per company.
+        new("ux_ticketcompanydefaults_company_active", "messaging.ticketcompanydefaults",
+            "SELECT id FROM messaging.ticketcompanydefaults WHERE gcrecord = 0 ORDER BY id LIMIT 1"),
     };
 
     // The seed creates no customers or regions: the source row is inserted inside the test transaction.

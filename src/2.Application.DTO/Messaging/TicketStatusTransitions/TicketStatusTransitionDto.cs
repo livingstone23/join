@@ -1,12 +1,14 @@
 using System;
 
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Messaging;
 
 /// <summary>
 /// Data Transfer Object (DTO) for a single allowed transition between two
 /// <c>TicketStatus</c> values inside a tenant's ticket workflow.
 /// </summary>
-public record TicketStatusTransitionDto
+public record TicketStatusTransitionDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the transition rule.

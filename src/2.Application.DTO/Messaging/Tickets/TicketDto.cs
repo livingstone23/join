@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Messaging;
 
 /// <summary>
 /// Data Transfer Object (DTO) that represents a ticket detail projection with flattened related data.
 /// </summary>
-public record TicketDto
+public record TicketDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the ticket identifier.

@@ -1,12 +1,14 @@
 using System;
 
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Messaging;
 
 /// <summary>
 /// Data Transfer Object (DTO) representing the link between a user and a company
 /// inside the ticket-management roster, with the user's ticket capabilities.
 /// </summary>
-public record TicketUserCompanyDto
+public record TicketUserCompanyDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the row.

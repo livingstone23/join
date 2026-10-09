@@ -29,8 +29,12 @@ public sealed class TicketCompanyDefaultConfiguration : IEntityTypeConfiguration
         builder.Property(x => x.UsePersonalizedCode)
             .IsRequired();
 
+        // Filtered unique index (SPEC 41, Etapa 4): one ACTIVE configuration per company, so a deleted one
+        // no longer blocks creating a new configuration (it used to fail the INSERT with a 500).
         builder.HasIndex(x => x.CompanyId)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("\"gcrecord\" = 0")
+            .HasDatabaseName("UX_TicketCompanyDefaults_Company_Active");
 
         builder.HasOne(x => x.TicketStatusDefault)
             .WithMany()

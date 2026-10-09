@@ -3,9 +3,11 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
 using JOIN.Application.UseCases.Messaging.TicketStatusTransitions.Commands.CreateTicketStatusTransition;
 using JOIN.Application.UseCases.Messaging.TicketStatusTransitions.Commands.DeleteTicketStatusTransition;
+using JOIN.Application.UseCases.Messaging.TicketStatusTransitions.Commands.RestoreTicketStatusTransition;
 using JOIN.Application.UseCases.Messaging.TicketStatusTransitions.Queries.GetTicketStatusTransitions;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JOIN.Services.WebApi.Controllers.Messaging;
@@ -33,10 +35,12 @@ public class TicketStatusTransitionsController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetAll(
         [FromQuery] Guid? fromStatusId = null,
+        [FromQuery] bool? includeDeleted = null,
+        [FromQuery] Guid? companyId = null,
         CancellationToken cancellationToken = default)
     {
         var response = await _sender.Send(
-            new GetTicketStatusTransitionsQuery { FromStatusId = fromStatusId },
+            new GetTicketStatusTransitionsQuery { FromStatusId = fromStatusId, IncludeDeleted = includeDeleted, CompanyId = companyId },
             cancellationToken);
 
         if (!response.IsSuccess)
@@ -117,5 +121,27 @@ public class TicketStatusTransitionsController(ISender sender) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted ticket status transition (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The ticket status transition identifier.</param>
+    /// <param name="companyId">Optional explicit company, honored only for SuperAdmin.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new RestoreTicketStatusTransitionCommand(id, companyId), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

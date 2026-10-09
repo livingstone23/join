@@ -10,4 +10,4 @@ namespace JOIN.Application.UseCases.Messaging.Tickets.Queries.GetTicketDocuments
 /// <c>MaxFilesPerTicket</c> de la configuración del tenant.
 /// </summary>
 /// <param name="TicketId">Identificador del ticket.</param>
-public record GetTicketDocumentsQuery(Guid TicketId) : IRequest<Response<IReadOnlyCollection<TicketDocumentDto>>>;
+public record GetTicketDocumentsQuery(Guid TicketId, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<IReadOnlyCollection<TicketDocumentDto>>>;

@@ -8,11 +8,13 @@ using MediatR;
 namespace JOIN.Application.UseCases.Messaging.Tickets.Commands;
 
 /// <summary>
-/// Handles soft-delete operations for tickets.
+/// Handles soft-delete operations for tickets. Active follow-up tickets block the delete (<c>TICKET_IN_USE</c>);
+/// otherwise the ticket and its active attachments are deleted with the same stamp (SPEC 41, Etapa 4).
 /// </summary>
 public sealed class DeleteTicketCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    TicketCascadeCoordinator cascadeCoordinator)
     : IRequestHandler<DeleteTicketCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
@@ -41,7 +43,15 @@ public sealed class DeleteTicketCommandHandler(
             return Response<Guid>.Error("TICKET_NOT_FOUND", ["Ticket not found for the current company."]);
         }
 
-        ticket.MarkAsDeleted();
+        var blockingReferences = await cascadeCoordinator.GetBlockingReferencesAsync(ticket.Id);
+        if (blockingReferences.Count > 0)
+        {
+            return Response<Guid>.Error("TICKET_IN_USE", blockingReferences);
+        }
+
+        var deletedAtUtc = DateTime.UtcNow;
+        ticket.MarkAsDeleted(deletedAtUtc);
+        await cascadeCoordinator.MarkChildrenAsDeletedAsync(ticket.Id, deletedAtUtc);
 
         await ticketRepository.UpdateAsync(ticket);
         var result = await _unitOfWork.SaveChangesAsync(cancellationToken);

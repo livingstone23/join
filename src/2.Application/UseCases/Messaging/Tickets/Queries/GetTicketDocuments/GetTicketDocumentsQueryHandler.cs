@@ -30,9 +30,15 @@ public sealed class GetTicketDocumentsQueryHandler(
         // anonymous inbound-channel webhooks). Compare as strings so such rows simply
         // get no user instead of failing the whole query on a GUID cast; CONCAT keeps
         // it portable across SQL Server and Postgres.
-        const string sql = """
+        // SPEC 41: deleted rows only for a SuperAdmin asking includeDeleted=true.
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND td.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 td.Id,
+                td.GcRecord,
                 td.TicketId,
                 td.TicketLogsId,
                 CASE td.DocumentType
@@ -54,14 +60,14 @@ public sealed class GetTicketDocumentsQueryHandler(
             LEFT JOIN Security.Users u ON CONCAT(u.Id, '') = td.CreatedBy
             WHERE td.TicketId = @TicketId
               AND td.CompanyId = @TenantId
-              AND td.GcRecord = 0
+              {activeOnly}
             ORDER BY td.Created DESC;
             """;
 
         var items = (await connection.QueryAsync<TicketDocumentDto>(
             new CommandDefinition(
                 sql,
-                new { request.TicketId, TenantId = currentUserService.CompanyId },
+                new { request.TicketId, TenantId = TenantResolver.Resolve(currentUserService, request.CompanyId) },
                 cancellationToken: cancellationToken))).AsList();
 
         return new Response<IReadOnlyCollection<TicketDocumentDto>>

@@ -1,11 +1,13 @@
 using System;
 
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Messaging;
 
 /// <summary>
 /// Represents the tenant default configuration used when creating tickets.
 /// </summary>
-public record TicketCompanyDefaultDto
+public record TicketCompanyDefaultDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the configuration identifier.
@@ -21,16 +23,6 @@ public record TicketCompanyDefaultDto
     /// Gets the tenant company display name.
     /// </summary>
     public string? CompanyName { get; init; }
-
-    /// <summary>
-    /// Gets the logical delete marker value.
-    /// </summary>
-    public int GcRecord { get; init; }
-
-    /// <summary>
-    /// Gets whether the configuration has been logically deleted.
-    /// </summary>
-    public bool IsDeleted => GcRecord != 0;
 
     /// <summary>
     /// Gets the ticket code prefix.
