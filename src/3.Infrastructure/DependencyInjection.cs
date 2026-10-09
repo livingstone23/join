@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http;
+using Dapper;
 using JOIN.Application.Interface;
 using JOIN.Infrastructure.Audit;
 using JOIN.Infrastructure.HealthChecks;
@@ -43,6 +44,9 @@ public static class DependencyInjection
         // because it holds no mutable state).
         // ------------------------------------------------------------------
         services.AddSingleton<ISqlConnectionFactory, SqlConnectionFactory>();
+
+        // Npgsql reads `date` columns as DateOnly; the DTOs expose DateTime (process-wide, idempotent).
+        SqlMapper.AddTypeHandler(new DateOnlyCompatibleDateTimeHandler());
 
         // ------------------------------------------------------------------
         // Security services

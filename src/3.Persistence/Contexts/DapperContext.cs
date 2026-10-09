@@ -6,7 +6,7 @@
 using System.Data;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-//using Npgsql;
+using Npgsql;
 
 
 
@@ -49,14 +49,12 @@ public class DapperContext
             throw new InvalidOperationException("Database connection string is not configured.");
         }
 
-        /*
-        if (_databaseProvider != null && _databaseProvider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase))
+        // Same provider switch as SqlConnectionFactory (Infrastructure); defaults to SQL Server.
+        return (_databaseProvider ?? "SqlServer").ToLowerInvariant() switch
         {
-            return new NpgsqlConnection(_connectionString);
-        }
-        */
-        
-        // Default to SQL Server if provider is missing or explicitly set to SqlServer
-        return new SqlConnection(_connectionString);
+            "postgresql" => new NpgsqlConnection(_connectionString),
+            "sqlserver" => new SqlConnection(_connectionString),
+            _ => throw new NotSupportedException($"The database provider '{_databaseProvider}' is not supported in JOIN CRM.")
+        };
     }
 }

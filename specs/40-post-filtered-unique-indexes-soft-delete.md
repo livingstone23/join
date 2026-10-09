@@ -93,7 +93,7 @@ builder.HasIndex(g => new { g.CompanyId, g.Name })
 `tests/IntegrationTests/Persistence/FilteredUniqueIndexesPostgreSqlTests.cs` (PostgreSQL real, `PostgreSqlWebApplicationFactory`, `postgres:17`):
 
 1. `PersonContact`: crear, borrar, recrear y volver a borrar el mismo contacto el mismo día → sin excepción (antes: violación de índice).
-2. `PUT /persons/{id}` tres veces en el mismo día quitando/agregando/quitando el mismo email → las tres devuelven 200. **Pendiente** del arreglo de `DapperContext` (ver Ajuste).
+2. `PUT /persons/{id}` tres veces en el mismo día quitando/agregando/quitando el mismo email → las tres devuelven 200. **Ejecutado (2026-10-09)** tras el arreglo de `DapperContext` (README, "Pendientes abiertos"): agregar/quitar/agregar/quitar el mismo email → cuatro 200, dos contactos con `gcrecord = 20261009`.
 3. `Gender`: dos géneros activos con el mismo nombre en la misma empresa → sigue fallando (la unicidad entre activos se preserva).
 4. `Gender`: mismo nombre en empresas distintas → permitido.
 5. `Region`: borrar y recrear con el mismo nombre/país dos veces el mismo día → sin excepción.
