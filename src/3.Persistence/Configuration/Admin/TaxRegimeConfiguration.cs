@@ -55,14 +55,16 @@ public class TaxRegimeConfiguration : IEntityTypeConfiguration<TaxRegime>
 
         // CRITICAL: A tenant cannot have two tax regimes with the exact same Code.
         // The GcRecord ensures that if they delete "REG-01", they can recreate it later.
-        builder.HasIndex(tr => new { tr.CompanyId, tr.Code, tr.GcRecord })
+        builder.HasIndex(tr => new { tr.CompanyId, tr.Code })
             .IsUnique()
-            .HasDatabaseName("IX_TaxRegimes_CompanyId_Code_GcRecord");
+            .HasFilter("\"gcrecord\" = 0")
+            .HasDatabaseName("UX_TaxRegimes_Company_Code");
 
         // A tenant cannot have two tax regimes with the exact same Name either.
-        builder.HasIndex(tr => new { tr.CompanyId, tr.Name, tr.GcRecord })
+        builder.HasIndex(tr => new { tr.CompanyId, tr.Name })
             .IsUnique()
-            .HasDatabaseName("IX_TaxRegimes_CompanyId_Name_GcRecord");
+            .HasFilter("\"gcrecord\" = 0")
+            .HasDatabaseName("UX_TaxRegimes_Company_Name");
 
         // --- Relationships ---
 

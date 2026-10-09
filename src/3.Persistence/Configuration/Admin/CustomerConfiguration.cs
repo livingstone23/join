@@ -57,13 +57,17 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
             .HasForeignKey(c => c.UserId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(c => new { c.CompanyId, c.CustomerCode, c.GcRecord })
+        builder.HasIndex(c => new { c.CompanyId, c.CustomerCode })
             .IsUnique()
-            .HasDatabaseName("IX_Customers_Company_CustomerCode_GcRecord");
+            .HasFilter("\"gcrecord\" = 0")
+            .HasDatabaseName("UX_Customers_Company_CustomerCode");
 
-        builder.HasIndex(c => new { c.CompanyId, c.PersonId, c.UserId, c.GcRecord })
+        builder.HasIndex(c => new { c.CompanyId, c.PersonId, c.UserId })
             .IsUnique()
-            .HasDatabaseName("IX_Customers_Company_Person_User_GcRecord");
+            .HasFilter("\"gcrecord\" = 0")
+            // NULLS NOT DISTINCT keeps SQL Server's NULL semantics (SPEC 40-post); UserId is required today, so it has no effect yet.
+            .AreNullsDistinct(false)
+            .HasDatabaseName("UX_Customers_Company_Person_User");
 
         builder.HasIndex(c => new { c.CompanyId, c.PersonLifecycleStage })
             .HasDatabaseName("IX_Customers_Company_PersonLifecycleStage");

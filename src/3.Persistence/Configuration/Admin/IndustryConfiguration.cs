@@ -57,14 +57,16 @@ public class IndustryConfiguration : IEntityTypeConfiguration<Industry>
         // CRITICAL: Multi-tenant unique constraints.
         // A tenant cannot have two industries with the exact same Code.
         // Including GcRecord allows deleted codes (> 0) to exist alongside an active one (0).
-        builder.HasIndex(i => new { i.CompanyId, i.Code, i.GcRecord })
+        builder.HasIndex(i => new { i.CompanyId, i.Code })
             .IsUnique()
-            .HasDatabaseName("IX_Industries_CompanyId_Code_GcRecord");
+            .HasFilter("\"gcrecord\" = 0")
+            .HasDatabaseName("UX_Industries_Company_Code");
 
         // A tenant cannot have two industries with the exact same Name.
-        builder.HasIndex(i => new { i.CompanyId, i.Name, i.GcRecord })
+        builder.HasIndex(i => new { i.CompanyId, i.Name })
             .IsUnique()
-            .HasDatabaseName("IX_Industries_CompanyId_Name_GcRecord");
+            .HasFilter("\"gcrecord\" = 0")
+            .HasDatabaseName("UX_Industries_Company_Name");
 
         // --- Relationships ---
 

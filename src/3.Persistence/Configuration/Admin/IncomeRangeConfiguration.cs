@@ -69,13 +69,15 @@ public class IncomeRangeConfiguration : IEntityTypeConfiguration<IncomeRange>
         // CRITICAL: Multi-tenant unique constraints.
         // Ensures that a single Tenant (Company) cannot create duplicate DisplayNames.
         // The GcRecord ensures soft-deleted records do not block new creations.
-        builder.HasIndex(ir => new { ir.CompanyId, ir.DisplayName, ir.GcRecord })
+        builder.HasIndex(ir => new { ir.CompanyId, ir.DisplayName })
             .IsUnique()
-            .HasDatabaseName("IX_IncomeRanges_CompanyId_DisplayName_GcRecord");
+            .HasFilter("\"gcrecord\" = 0")
+            .HasDatabaseName("UX_IncomeRanges_Company_DisplayName");
 
-        builder.HasIndex(ir => new { ir.CompanyId, ir.DisplayOrder, ir.GcRecord })
+        builder.HasIndex(ir => new { ir.CompanyId, ir.DisplayOrder })
             .IsUnique()
-            .HasDatabaseName("IX_IncomeRanges_CompanyId_DisplayOrder_GcRecord");
+            .HasFilter("\"gcrecord\" = 0")
+            .HasDatabaseName("UX_IncomeRanges_Company_DisplayOrder");
 
         // --- Relationships ---
 

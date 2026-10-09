@@ -56,13 +56,15 @@ public class GenderConfiguration : IEntityTypeConfiguration<Gender>
         // CRITICAL: Multi-tenant unique constraints.
         // Ensures that a specific Company cannot have duplicate Codes or Names.
         // Including GcRecord ensures that logically deleted records do not block the creation of new ones.
-        builder.HasIndex(g => new { g.CompanyId, g.Code, g.GcRecord })
+        builder.HasIndex(g => new { g.CompanyId, g.Code })
             .IsUnique()
-            .HasDatabaseName("IX_Genders_CompanyId_Code_GcRecord");
+            .HasFilter("\"gcrecord\" = 0")
+            .HasDatabaseName("UX_Genders_Company_Code");
 
-        builder.HasIndex(g => new { g.CompanyId, g.Name, g.GcRecord })
+        builder.HasIndex(g => new { g.CompanyId, g.Name })
             .IsUnique()
-            .HasDatabaseName("IX_Genders_CompanyId_Name_GcRecord");
+            .HasFilter("\"gcrecord\" = 0")
+            .HasDatabaseName("UX_Genders_Company_Name");
 
         // --- Relationships ---
 

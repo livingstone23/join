@@ -43,18 +43,20 @@ public sealed class PostgreSqlSmokeTests : IClassFixture<PostgreSqlWebApplicatio
     }
 
     /// <summary>
-    /// Case 1 — <c>InitialPostgres</c> applies cleanly on an empty PostgreSQL: it is the only
-    /// migration in the history and nothing is left pending after host startup.
+    /// Case 1 — the fork's migration history applies cleanly on an empty PostgreSQL: it starts with
+    /// <c>InitialPostgres</c>, includes the incremental Npgsql migrations of the -post specs
+    /// (SPEC 40-post: <c>FilteredUniqueIndexesForSoftDelete</c>) and nothing is left pending.
     /// </summary>
     [Fact]
-    public async Task Migration_InitialPostgres_IsTheOnlyAppliedMigration()
+    public async Task Migrations_StartWithInitialPostgres_AndNoneArePending()
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         db.Database.IsNpgsql().Should().BeTrue();
-        (await db.Database.GetAppliedMigrationsAsync()).Should().ContainSingle()
-            .Which.Should().EndWith("_InitialPostgres");
+        var applied = (await db.Database.GetAppliedMigrationsAsync()).ToList();
+        applied.First().Should().EndWith("_InitialPostgres");
+        applied.Should().Contain(m => m.EndsWith("_FilteredUniqueIndexesForSoftDelete"));
         (await db.Database.GetPendingMigrationsAsync()).Should().BeEmpty();
     }
 
@@ -86,7 +88,7 @@ public sealed class PostgreSqlSmokeTests : IClassFixture<PostgreSqlWebApplicatio
     }
 
     /// <summary>
-    /// Case 3 — each of the 11 filtered unique indexes behaves at runtime as on SQL Server:
+    /// Case 3 — each of the 25 filtered unique indexes (11 from SPEC 39 + 14 from SPEC 40-post) behaves at runtime as on SQL Server:
     /// a second active row with the same key is rejected by THAT index (not another
     /// constraint), and once the first row is soft-deleted (<c>gcrecord &lt;&gt; 0</c>) the same
     /// key can be inserted again. Every case runs in a transaction that is rolled back.
@@ -350,7 +352,65 @@ public sealed class PostgreSqlSmokeTests : IClassFixture<PostgreSqlWebApplicatio
             "SELECT id FROM messaging.ticketstatuses WHERE ispaused = TRUE AND gcrecord = 0 ORDER BY id LIMIT 1"),
         new("ux_ticketstatuses_company_final", "messaging.ticketstatuses",
             "SELECT id FROM messaging.ticketstatuses WHERE isfinal = TRUE AND gcrecord = 0 ORDER BY id LIMIT 1"),
+        // SPEC 40-post — the 14 indexes that used to carry GcRecord in their key. Where a table has a
+        // second unique index, the copy overrides that column so only the index under test fires.
+        new("ux_personcontacts_person_type_value", "admin.personcontacts",
+            "SELECT id FROM admin.personcontacts WHERE gcrecord = 0 ORDER BY id LIMIT 1"),
+        new("ux_persons_company_idtype_idnumber", "admin.persons",
+            "SELECT id FROM admin.persons WHERE gcrecord = 0 ORDER BY id LIMIT 1"),
+        new("ux_customers_company_customercode", "admin.customers", CustomerSourceSql,
+            new() { ["userid"] = "(SELECT u.id FROM security.users u WHERE u.id <> t.userid ORDER BY u.id LIMIT 1)" }),
+        new("ux_customers_company_person_user", "admin.customers", CustomerSourceSql,
+            new() { ["customercode"] = "'CSMOKE2'" }),
+        new("ux_genders_company_code", "admin.genders",
+            "SELECT id FROM admin.genders WHERE gcrecord = 0 ORDER BY id LIMIT 1",
+            new() { ["name"] = "t.name || ' dup'" }),
+        new("ux_genders_company_name", "admin.genders",
+            "SELECT id FROM admin.genders WHERE gcrecord = 0 ORDER BY id LIMIT 1",
+            new() { ["code"] = "left(md5(random()::text), 10)" }),
+        new("ux_industries_company_code", "admin.industries",
+            "SELECT id FROM admin.industries WHERE gcrecord = 0 ORDER BY id LIMIT 1",
+            new() { ["name"] = "t.name || ' dup'" }),
+        new("ux_industries_company_name", "admin.industries",
+            "SELECT id FROM admin.industries WHERE gcrecord = 0 ORDER BY id LIMIT 1",
+            new() { ["code"] = "left(md5(random()::text), 10)" }),
+        new("ux_taxregimes_company_code", "admin.taxregimes",
+            "SELECT id FROM admin.taxregimes WHERE gcrecord = 0 ORDER BY id LIMIT 1",
+            new() { ["name"] = "t.name || ' dup'" }),
+        new("ux_taxregimes_company_name", "admin.taxregimes",
+            "SELECT id FROM admin.taxregimes WHERE gcrecord = 0 ORDER BY id LIMIT 1",
+            new() { ["code"] = "left(md5(random()::text), 10)" }),
+        new("ux_incomeranges_company_displayname", "admin.incomeranges",
+            "SELECT id FROM admin.incomeranges WHERE gcrecord = 0 ORDER BY id LIMIT 1",
+            new() { ["displayorder"] = "t.displayorder + 1000" }),
+        new("ux_incomeranges_company_displayorder", "admin.incomeranges",
+            "SELECT id FROM admin.incomeranges WHERE gcrecord = 0 ORDER BY id LIMIT 1",
+            new() { ["displayname"] = "t.displayname || ' dup'" }),
+        new("ux_regions_company_country_name", "admin.regions", RegionSourceSql,
+            new() { ["code"] = "NULL" }),
+        new("ux_regions_company_country_code", "admin.regions", RegionSourceSql,
+            new() { ["name"] = "t.name || ' dup'" }),
     };
+
+    // The seed creates no customers or regions: the source row is inserted inside the test transaction.
+    private const string CustomerSourceSql =
+        """
+        INSERT INTO admin.customers
+            (id, personid, userid, customercode, personlifecyclestage, isactive, activatedat, created, gcrecord, companyid)
+        SELECT gen_random_uuid(), p.id, u.id, 'CSMOKE', 1, TRUE, NOW(), NOW(), 0, p.companyid
+        FROM admin.persons p CROSS JOIN security.users u
+        ORDER BY p.id, u.id LIMIT 1
+        RETURNING id
+        """;
+
+    private const string RegionSourceSql =
+        """
+        INSERT INTO admin.regions (id, name, code, countryid, created, gcrecord, companyid)
+        SELECT gen_random_uuid(), 'Smoke region', 'SMK', co.id, NOW(), 0, c.id
+        FROM common.countries co CROSS JOIN common.companies c
+        ORDER BY co.id, c.id LIMIT 1
+        RETURNING id
+        """;
 
     /// <summary>One filtered-index scenario; <see cref="ToString"/> names the xUnit case.</summary>
     public sealed record FilteredIndexCase(
