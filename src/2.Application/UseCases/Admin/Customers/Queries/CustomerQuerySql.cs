@@ -8,6 +8,7 @@ internal static class CustomerQuerySql
     internal const string SelectProjection = """
         SELECT
             cust.Id,
+            cust.GcRecord,
             cust.CompanyId,
             cust.PersonId,
             cust.UserId,

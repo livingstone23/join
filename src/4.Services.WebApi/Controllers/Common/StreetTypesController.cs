@@ -6,6 +6,8 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
+using JOIN.Services.WebApi.Controllers;
 
 
 
@@ -37,9 +39,9 @@ public class StreetTypesController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(Response<StreetTypeDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetStreetTypeByIdQuery(id), cancellationToken);
+        var response = await _mediator.Send(new GetStreetTypeByIdQuery(id, includeDeleted), cancellationToken);
         if (!response.IsSuccess)
         {
             return NotFound(response);
@@ -65,9 +67,10 @@ public class StreetTypesController(IMediator mediator) : ControllerBase
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string? searchTerm = null,
+        [FromQuery] bool? includeDeleted = null,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetStreetTypesPagedQuery(pageNumber, pageSize, searchTerm), cancellationToken);
+        var response = await _mediator.Send(new GetStreetTypesPagedQuery(pageNumber, pageSize, searchTerm, includeDeleted), cancellationToken);
         if (!response.IsSuccess)
         {
             return BadRequest(response);
@@ -167,5 +170,25 @@ public class StreetTypesController(IMediator mediator) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted street type (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The street type identifier.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new RestoreStreetTypeCommand(id, null), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

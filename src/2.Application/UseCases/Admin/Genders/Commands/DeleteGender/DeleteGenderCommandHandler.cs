@@ -26,7 +26,6 @@ public sealed class DeleteGenderCommandHandler(
 
         var companyId = currentUserService.CompanyId;
         var genderRepository = _unitOfWork.GetRepository<Gender>();
-        var personRepository = _unitOfWork.GetRepository<Person>();
 
         var entity = await genderRepository.GetAsync(request.Id);
         if (entity is null || entity.CompanyId != companyId || entity.GcRecord != 0)
@@ -34,15 +33,12 @@ public sealed class DeleteGenderCommandHandler(
             return Response<Guid>.Error("GENDER_NOT_FOUND", ["Gender not found."]);
         }
 
-        var persons = await personRepository.GetAllAsync();
-        var isInUse = persons.Any(person =>
-            person.CompanyId == companyId
-            && person.GcRecord == 0
-            && person.GenderId == request.Id);
+        var dependents = await new ActiveDependentsCheck(_unitOfWork)
+            .CountAsync<Person>(p => p.GcRecord == 0 && p.GenderId == request.Id, "persons");
 
-        if (isInUse)
+        if (dependents.HasDependents)
         {
-            return Response<Guid>.Error("GENDER_IN_USE", ["The gender is currently assigned to one or more persons and cannot be deleted."]);
+            return Response<Guid>.Error("GENDER_IN_USE", dependents.Details);
         }
 
         entity.MarkAsDeleted();

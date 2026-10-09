@@ -39,11 +39,15 @@ public sealed class GetPersonAddressByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND a.GcRecord = 0";
+
         var sql = $"""
             {PersonAddressQuerySql.SelectWithCatalogNames}
             WHERE a.Id = @Id
               AND a.CompanyId = @TenantId
-              AND a.GcRecord = 0;
+              {activeOnly};
             """;
 
         var address = await connection.QuerySingleOrDefaultAsync<PersonAddressReadRow>(
@@ -52,7 +56,7 @@ public sealed class GetPersonAddressByIdQueryHandler(
                 new
                 {
                     request.Id,
-                    TenantId = currentUserService.CompanyId
+                    TenantId = TenantResolver.Resolve(currentUserService, request.CompanyId)
                 },
                 cancellationToken: cancellationToken));
 

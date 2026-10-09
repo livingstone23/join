@@ -19,6 +19,7 @@ public sealed record GetSystemModulesQuery(
     int? PageNumber = null,
     int? PageSize = null,
     string? Name = null,
-    bool? IsActive = null)
+    bool? IsActive = null,
+    bool? IncludeDeleted = null)
     : IRequest<Response<PagedResult<SystemModuleDto>>>;
 

@@ -16,7 +16,8 @@ namespace JOIN.Application.UseCases.Admin.Areas.Queries;
 /// <param name="paginationOptions">Configurable pagination defaults for the area listing endpoint.</param>
 public sealed class GetAreasQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetAreasQuery, Response<PagedResult<AreaListItemDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -29,7 +30,10 @@ public sealed class GetAreasQueryHandler(
     /// <returns>A standardized paged response containing the matching areas.</returns>
     public async Task<Response<PagedResult<AreaListItemDto>>> Handle(GetAreasQuery request, CancellationToken cancellationToken)
     {
-        if (request.CompanyId == Guid.Empty)
+        // SPEC 41: the X-Company-Id header is only an explicit override, honored for SuperAdmin;
+        // every other caller always reads the company of their token (TenantResolver).
+        var companyId = TenantResolver.Resolve(currentUserService, request.CompanyId == Guid.Empty ? null : request.CompanyId);
+        if (companyId == Guid.Empty)
         {
             return Response<PagedResult<AreaListItemDto>>.Error(
                 "INVALID_COMPANY_ID",
@@ -49,11 +53,15 @@ public sealed class GetAreasQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("CompanyId", request.CompanyId);
+        parameters.Add("CompanyId", companyId);
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE a.CompanyId = @CompanyId AND a.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE a.CompanyId = @CompanyId");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND a.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
@@ -78,6 +86,7 @@ public sealed class GetAreasQueryHandler(
         var sql = $"""
             SELECT
                 a.Id,
+                a.GcRecord,
                 a.CompanyId,
                 c.Name AS CompanyName,
                 a.Name,

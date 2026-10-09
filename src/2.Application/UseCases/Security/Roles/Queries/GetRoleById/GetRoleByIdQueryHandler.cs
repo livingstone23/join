@@ -26,7 +26,11 @@ public sealed class GetRoleByIdQueryHandler(
             return Response<RoleDto>.Error("No se pudo identificar la compania del usuario actual para consultar el rol.");
         }
 
-        var role = await _roleRepository.GetByIdAsync(request.Id, companyId, cancellationToken);
+        var role = await _roleRepository.GetByIdAsync(
+            request.Id,
+            companyId,
+            includeDeleted: SoftDeleteVisibility.IncludeDeleted(_currentUserService, request.IncludeDeleted),
+            cancellationToken: cancellationToken);
         if (role is null)
         {
             return Response<RoleDto>.Error("Rol no encontrado o inactivo.");

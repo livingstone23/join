@@ -29,7 +29,6 @@ public sealed class DeleteTicketStatusCommandHandler(
         }
 
         var ticketStatusRepository = _unitOfWork.GetRepository<TicketStatus>();
-        var ticketRepository = _unitOfWork.GetRepository<Ticket>();
 
         var entity = await ticketStatusRepository.GetAsync(request.Id);
         if (entity is null)
@@ -37,12 +36,16 @@ public sealed class DeleteTicketStatusCommandHandler(
             return Response<Guid>.Error("TICKET_STATUS_NOT_FOUND", ["Ticket status not found."]);
         }
 
-        var tickets = await ticketRepository.GetAllAsync();
-        var isInUse = tickets.Any(ticket => ticket.GcRecord == 0 && ticket.TicketStatusId == request.Id);
+        var dependents = new ActiveDependentsCheck(_unitOfWork);
+        await dependents.CountAsync<Ticket>(t => t.GcRecord == 0 && t.TicketStatusId == request.Id, "tickets");
+        await dependents.CountAsync<TicketCompanyDefault>(d => d.GcRecord == 0 && d.TicketStatusDefaultId == request.Id, "ticket company defaults");
+        await dependents.CountAsync<TicketStatusTransition>(
+            tr => tr.GcRecord == 0 && (tr.FromStatusId == request.Id || tr.ToStatusId == request.Id),
+            "ticket status transitions");
 
-        if (isInUse)
+        if (dependents.HasDependents)
         {
-            return Response<Guid>.Error("TICKET_STATUS_IN_USE", ["The ticket status is currently linked to active tickets and cannot be deleted."]);
+            return Response<Guid>.Error("TICKET_STATUS_IN_USE", dependents.Details);
         }
 
         entity.MarkAsDeleted();

@@ -10,7 +10,9 @@ namespace JOIN.Application.UseCases.Common.StreetTypes.Queries;
 /// Handles street type detail queries using Dapper.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create DB-agnostic read connections.</param>
-public class GetStreetTypeByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+public class GetStreetTypeByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetStreetTypeByIdQuery, Response<StreetTypeDto>>
 {
     /// <summary>
@@ -20,14 +22,19 @@ public class GetStreetTypeByIdQueryHandler(ISqlConnectionFactory connectionFacto
     {
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND st.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 st.Id,
+                st.GcRecord,
                 st.Name,
                 st.Abbreviation,
                 st.IsActive
             FROM Common.StreetTypes st
-            WHERE st.Id = @Id AND st.GcRecord = 0;
+            WHERE st.Id = @Id {activeOnly};
             """;
 
         var parameters = new DynamicParameters();

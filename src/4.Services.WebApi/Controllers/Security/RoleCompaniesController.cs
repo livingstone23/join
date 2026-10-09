@@ -13,6 +13,7 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using JOIN.Services.WebApi.Controllers;
 
 
 
@@ -55,9 +56,9 @@ public class RoleCompaniesController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<Response<RoleCompanyDto>>> GetById(Guid id, [FromQuery] Guid? companyId, CancellationToken cancellationToken)
+    public async Task<ActionResult<Response<RoleCompanyDto>>> GetById(Guid id, [FromQuery] Guid? companyId, [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetRoleCompanyByIdQuery(id, companyId), cancellationToken);
+        var response = await _mediator.Send(new GetRoleCompanyByIdQuery(id, companyId, includeDeleted), cancellationToken);
         return MapGetByIdResponse(response);
     }
 
@@ -84,10 +85,10 @@ public class RoleCompaniesController(IMediator mediator) : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] Guid? companyId = null,
-        CancellationToken cancellationToken = default)
+        [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
         var response = await _mediator.Send(
-            new GetRoleCompaniesPagedQuery(roleId, isActive, page, pageSize, companyId),
+            new GetRoleCompaniesPagedQuery(roleId, isActive, page, pageSize, companyId, includeDeleted),
             cancellationToken);
 
         return MapMutationOrQueryResponse(response, successStatus: StatusCodes.Status200OK);
@@ -219,5 +220,24 @@ public class RoleCompaniesController(IMediator mediator) : ControllerBase
         };
 
         return new ObjectResult(response) { StatusCode = status };
+    }
+
+    /// <summary>
+    /// Restores a logically deleted role company link (SPEC 41, Etapa 3). Restricted to the SuperAdmin role.
+    /// </summary>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RestoreRoleCompanyLink(
+        Guid id,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new RestoreRoleCompanyCommand(id, companyId), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

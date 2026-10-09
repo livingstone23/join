@@ -2,12 +2,14 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
 using JOIN.Application.UseCases.Messaging.Tickets;
 using JOIN.Application.UseCases.Messaging.Tickets.Commands.DeleteTicketDocument;
+using JOIN.Application.UseCases.Messaging.Tickets.Commands.RestoreTicketDocument;
 using JOIN.Application.UseCases.Messaging.Tickets.Commands.UploadTicketDocument;
 using JOIN.Application.UseCases.Messaging.Tickets.Queries.DownloadTicketDocument;
 using JOIN.Application.UseCases.Messaging.Tickets.Queries.GetTicketDocuments;
 using JOIN.Domain.Security;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 
@@ -39,9 +41,13 @@ public class TicketDocumentsController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> List(Guid ticketId, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> List(
+        Guid ticketId,
+        [FromQuery] bool? includeDeleted = null,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
     {
-        var response = await _sender.Send(new GetTicketDocumentsQuery(ticketId), cancellationToken);
+        var response = await _sender.Send(new GetTicketDocumentsQuery(ticketId, includeDeleted, companyId), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -143,6 +149,30 @@ public class TicketDocumentsController(ISender sender) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted attachment of the ticket (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="ticketId">The ticket identifier.</param>
+    /// <param name="id">The attachment identifier.</param>
+    /// <param name="companyId">Optional explicit company, honored only for SuperAdmin.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid ticketId,
+        Guid id,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new RestoreTicketDocumentCommand(ticketId, id, companyId), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 
     /// <summary>

@@ -32,6 +32,14 @@ public sealed class DeleteIdentificationTypeCommandHandler(IUnitOfWork unitOfWor
                 ["Identification type not found."]);
         }
 
+        var dependents = await new ActiveDependentsCheck(_unitOfWork)
+            .CountAsync<Person>(p => p.GcRecord == 0 && p.IdentificationTypeId == request.Id, "persons");
+
+        if (dependents.HasDependents)
+        {
+            return Response<Guid>.Error("IDENTIFICATION_TYPE_IN_USE", dependents.Details);
+        }
+
         entity.IsActive = false;
         entity.MarkAsDeleted();
 

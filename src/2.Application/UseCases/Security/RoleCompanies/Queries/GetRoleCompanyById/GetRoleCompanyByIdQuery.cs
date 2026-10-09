@@ -12,4 +12,4 @@ namespace JOIN.Application.UseCases.Security.RoleCompanies.Queries.GetRoleCompan
 /// <see cref="CompanyId"/> overrides the token's tenant only for a real <c>SuperAdmin</c>
 /// (see <see cref="JOIN.Application.Common.TenantResolver"/>).
 /// </summary>
-public sealed record GetRoleCompanyByIdQuery(Guid Id, Guid? CompanyId = null) : IRequest<Response<RoleCompanyDto>>;
+public sealed record GetRoleCompanyByIdQuery(Guid Id, Guid? CompanyId = null, bool? IncludeDeleted = null) : IRequest<Response<RoleCompanyDto>>;

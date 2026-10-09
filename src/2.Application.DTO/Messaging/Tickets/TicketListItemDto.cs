@@ -1,11 +1,13 @@
 using System;
 
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Messaging;
 
 /// <summary>
 /// Data Transfer Object (DTO) that represents a paginated ticket row with flattened related data.
 /// </summary>
-public record TicketListItemDto
+public record TicketListItemDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the ticket identifier.

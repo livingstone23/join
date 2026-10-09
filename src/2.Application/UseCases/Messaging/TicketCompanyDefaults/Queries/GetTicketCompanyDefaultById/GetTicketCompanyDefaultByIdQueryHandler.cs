@@ -26,9 +26,15 @@ public sealed class GetTicketCompanyDefaultByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        // SPEC 41: deleted rows only for a SuperAdmin asking includeDeleted=true.
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND tcd.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 tcd.Id,
+                tcd.GcRecord,
                 tcd.CompanyId,
                 tcd.StartCode,
                 tcd.CodeSequenceLength,
@@ -55,11 +61,11 @@ public sealed class GetTicketCompanyDefaultByIdQueryHandler(
             LEFT JOIN Common.CommunicationChannels ch ON tcd.ChannelDefaultId = ch.Id
             WHERE tcd.Id = @Id
               AND tcd.CompanyId = @TenantId
-              AND tcd.GcRecord = 0;
+              {activeOnly};
             """;
 
         var item = await connection.QuerySingleOrDefaultAsync<TicketCompanyDefaultDto>(
-            new CommandDefinition(sql, new { request.Id, TenantId = currentUserService.CompanyId }, cancellationToken: cancellationToken));
+            new CommandDefinition(sql, new { request.Id, TenantId = TenantResolver.Resolve(currentUserService, request.CompanyId) }, cancellationToken: cancellationToken));
 
         if (item is null)
         {

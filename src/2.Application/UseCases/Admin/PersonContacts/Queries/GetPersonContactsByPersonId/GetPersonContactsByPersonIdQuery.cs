@@ -12,4 +12,4 @@ namespace JOIN.Application.UseCases.Admin.PersonContacts.Queries;
 /// Query that retrieves all active contacts for a given person in the current tenant.
 /// </summary>
 /// <param name="PersonId">The unique identifier of the person.</param>
-public sealed record GetPersonContactsByPersonIdQuery(Guid PersonId) : IRequest<Response<List<PersonContactResponseDto>>>;
+public sealed record GetPersonContactsByPersonIdQuery(Guid PersonId, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<List<PersonContactResponseDto>>>;

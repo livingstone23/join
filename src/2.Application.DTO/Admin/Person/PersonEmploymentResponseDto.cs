@@ -1,3 +1,5 @@
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Admin;
 
 
@@ -5,7 +7,7 @@ namespace JOIN.Application.DTO.Admin;
 /// <summary>
 /// Data transfer object representing a person employment payload exposed by Application queries.
 /// </summary>
-public sealed record PersonEmploymentResponseDto
+public sealed record PersonEmploymentResponseDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the person employment record.

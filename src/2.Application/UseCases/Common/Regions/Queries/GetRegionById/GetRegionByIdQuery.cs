@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Common.Regions.Queries;
 /// Query to retrieve a region catalog item by its unique identifier.
 /// </summary>
 /// <param name="Id">The unique identifier of the region to retrieve.</param>
-public sealed record GetRegionByIdQuery(Guid Id) : IRequest<Response<RegionDto>>;
+public sealed record GetRegionByIdQuery(Guid Id, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<RegionDto>>;

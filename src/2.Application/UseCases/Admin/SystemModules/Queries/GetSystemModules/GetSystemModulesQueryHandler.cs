@@ -20,7 +20,8 @@ namespace JOIN.Application.UseCases.Admin.SystemModules.Queries;
 /// <param name="paginationOptions">Configurable pagination defaults for the system module listing endpoint.</param>
 public sealed class GetSystemModulesQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetSystemModulesQuery, Response<PagedResult<SystemModuleDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -42,7 +43,11 @@ public sealed class GetSystemModulesQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE sm.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND sm.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
@@ -61,6 +66,7 @@ public sealed class GetSystemModulesQueryHandler(
         var sql = $"""
             SELECT
                 sm.Id,
+                sm.GcRecord,
                 sm.Name,
                 sm.Description,
                 sm.Icon,

@@ -38,11 +38,14 @@ public sealed class GetTicketUserCompaniesQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("TenantId", currentUserService.CompanyId);
+        parameters.Add("TenantId", TenantResolver.Resolve(currentUserService, request.CompanyId));
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE tuc.CompanyId = @TenantId AND tuc.GcRecord = 0");
+        // SPEC 41: deleted entries only for a SuperAdmin asking includeDeleted=true.
+        var whereBuilder = new StringBuilder(SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? "WHERE tuc.CompanyId = @TenantId"
+            : "WHERE tuc.CompanyId = @TenantId AND tuc.GcRecord = 0");
 
         if (request.UserId.HasValue && request.UserId.Value != Guid.Empty)
         {
@@ -73,6 +76,7 @@ public sealed class GetTicketUserCompaniesQueryHandler(
         var sql = $"""
             SELECT
                 tuc.Id,
+                tuc.GcRecord,
                 tuc.CompanyId,
                 co.Name AS CompanyName,
                 tuc.UserId,

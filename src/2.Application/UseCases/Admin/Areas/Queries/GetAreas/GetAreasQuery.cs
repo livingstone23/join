@@ -19,5 +19,6 @@ public sealed record GetAreasQuery(
     int? PageSize = null,
     string? Name = null,
     DateTime? CreatedFrom = null,
-    DateTime? CreatedTo = null)
+    DateTime? CreatedTo = null,
+    bool? IncludeDeleted = null)
     : IRequest<Response<PagedResult<AreaListItemDto>>>;

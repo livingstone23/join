@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Messaging.TimeUnits.Queries;
 /// Query to retrieve a time unit catalog item by its unique identifier.
 /// </summary>
 /// <param name="Id">The unique identifier of the time unit to retrieve.</param>
-public sealed record GetTimeUnitByIdQuery(Guid Id) : IRequest<Response<TimeUnitDto>>;
+public sealed record GetTimeUnitByIdQuery(Guid Id, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<TimeUnitDto>>;

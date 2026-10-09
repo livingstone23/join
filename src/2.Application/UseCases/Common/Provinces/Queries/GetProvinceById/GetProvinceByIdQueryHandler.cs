@@ -28,9 +28,14 @@ public sealed class GetProvinceByIdQueryHandler(
     {
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND p.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 p.Id,
+                p.GcRecord,
                 p.Name,
                 p.Code,
                 p.CountryId,
@@ -47,7 +52,7 @@ public sealed class GetProvinceByIdQueryHandler(
                AND r.GcRecord = 0
                AND r.CompanyId = @TenantId
             WHERE p.Id = @Id
-              AND p.GcRecord = 0;
+              {activeOnly};
             """;
 
         var province = await connection.QuerySingleOrDefaultAsync<ProvinceDto>(

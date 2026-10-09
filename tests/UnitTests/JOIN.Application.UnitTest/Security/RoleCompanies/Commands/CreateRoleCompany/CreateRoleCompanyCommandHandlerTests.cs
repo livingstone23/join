@@ -31,7 +31,7 @@ public sealed class CreateRoleCompanyCommandHandlerTests
 
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("INVALID_COMPANY_ID");
-        context.RoleRepositoryMock.Verify(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        context.RoleRepositoryMock.Verify(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
         context.RoleCompanyRepositoryMock.Verify(
             x => x.ExistsActiveLinkAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -48,7 +48,7 @@ public sealed class CreateRoleCompanyCommandHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((global::JOIN.Application.DTO.Security.RoleDto?)null);
 
         var handler = context.CreateHandler();
@@ -79,7 +79,7 @@ public sealed class CreateRoleCompanyCommandHandlerTests
         // and ExistsAndActiveAsync false. But the handler hits NotFound first. The path is unreachable in practice,
         // so we verify the message for the path that IS reachable.
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((global::JOIN.Application.DTO.Security.RoleDto?)null);
 
         var handler = context.CreateHandler();
@@ -100,7 +100,7 @@ public sealed class CreateRoleCompanyCommandHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new global::JOIN.Application.DTO.Security.RoleDto(
                 Guid.NewGuid(), "Admin", "ADMIN", null, false, null, DateTime.UtcNow));
         context.RoleRepositoryMock
@@ -131,7 +131,7 @@ public sealed class CreateRoleCompanyCommandHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new global::JOIN.Application.DTO.Security.RoleDto(
                 Guid.NewGuid(), "Admin", "ADMIN", null, false, null, DateTime.UtcNow));
         context.RoleRepositoryMock
@@ -172,7 +172,7 @@ public sealed class CreateRoleCompanyCommandHandlerTests
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns("user-1");
         context.RoleRepositoryMock
-            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(roleId, tenantId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new global::JOIN.Application.DTO.Security.RoleDto(
                 Guid.NewGuid(), "Admin", "ADMIN", null, false, null, DateTime.UtcNow));
         context.RoleRepositoryMock
@@ -196,8 +196,8 @@ public sealed class CreateRoleCompanyCommandHandlerTests
             })
             .Returns(Task.CompletedTask);
         context.RoleCompanyRepositoryMock
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), tenantId, It.IsAny<CancellationToken>()))
-            .Returns<Guid, Guid, CancellationToken>((id, _, _) =>
+            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), tenantId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .Returns<Guid, Guid, bool, CancellationToken>((id, _, _, _) =>
                 capturedId == id ? Task.FromResult<RoleCompanyDto?>(reloadDto) : Task.FromResult<RoleCompanyDto?>(null));
 
         var handler = context.CreateHandler();

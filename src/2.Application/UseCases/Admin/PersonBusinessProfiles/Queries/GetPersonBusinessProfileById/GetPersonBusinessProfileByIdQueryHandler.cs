@@ -35,9 +35,14 @@ public sealed class GetPersonBusinessProfileByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND pbp.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 pbp.Id,
+                pbp.GcRecord,
                 pbp.PersonId,
                 pbp.IndustryId,
                 i.Name  AS IndustryName,
@@ -58,7 +63,7 @@ public sealed class GetPersonBusinessProfileByIdQueryHandler(
                AND tr.GcRecord = 0
             WHERE pbp.Id = @Id
               AND pbp.CompanyId = @CompanyId
-              AND pbp.GcRecord = 0;
+              {activeOnly};
             """;
 
         var profile = await connection.QuerySingleOrDefaultAsync<PersonBusinessProfileResponseDto>(
@@ -67,7 +72,7 @@ public sealed class GetPersonBusinessProfileByIdQueryHandler(
                 new
                 {
                     request.Id,
-                    CompanyId = currentUserService.CompanyId
+                    CompanyId = TenantResolver.Resolve(currentUserService, request.CompanyId)
                 },
                 cancellationToken: cancellationToken));
 

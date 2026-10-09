@@ -18,7 +18,9 @@ public interface IGenericRepository<T> where T : class
     
     Task<bool> InsertAsync(T entity);
     Task<bool> UpdateAsync(T entity);
-    Task<bool> DeleteAsync(Guid id);
+
+    // No physical delete on purpose: the only delete in the system is the logical one
+    // (BaseAuditableEntity.MarkAsDeleted / GcRecord). DeleteAsync was removed in SPEC 41.
     
     #endregion
 

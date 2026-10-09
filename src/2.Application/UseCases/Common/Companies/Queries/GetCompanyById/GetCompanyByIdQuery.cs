@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Common.Companies.Queries;
 /// Query to retrieve a company by id.
 /// </summary>
 /// <param name="CompanyId">The company identifier.</param>
-public record GetCompanyByIdQuery(Guid CompanyId) : IRequest<Response<CompanyDto>>;
+public record GetCompanyByIdQuery(Guid CompanyId, bool? IncludeDeleted = null) : IRequest<Response<CompanyDto>>;

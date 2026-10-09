@@ -8,6 +8,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
+using JOIN.Services.WebApi.Controllers;
 
 
 
@@ -40,13 +41,14 @@ public class CompaniesController(IMediator mediator, ICurrentUserService current
     /// <param name="cancellationToken">Token used to cancel the request while the read operation is in progress.</param>
     /// <returns>A standardized response containing the requested company when it exists.</returns>
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = "SuperAdminCompany")]
+    // SPEC 41 (Etapa 3): SuperAdmin added — it sees the full company catalog, deleted ones included.
+    [Authorize(Roles = "SuperAdmin,SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<CompanyDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetCompanyByIdQuery(id), cancellationToken);
+        var response = await _mediator.Send(new GetCompanyByIdQuery(id, includeDeleted), cancellationToken);
         if (!response.IsSuccess)
         {
             return NotFound(response);
@@ -65,7 +67,8 @@ public class CompaniesController(IMediator mediator, ICurrentUserService current
     /// <param name="cancellationToken">Token used to cancel the request while the paged query executes.</param>
     /// <returns>A standardized paged response containing the requested company slice.</returns>
     [HttpGet]
-    [Authorize(Roles = "SuperAdminCompany")]
+    // SPEC 41 (Etapa 3): SuperAdmin added — it sees the full company catalog, deleted ones included.
+    [Authorize(Roles = "SuperAdmin,SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<PagedResult<CompanyListItemDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -73,9 +76,9 @@ public class CompaniesController(IMediator mediator, ICurrentUserService current
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string? searchTerm = null,
-        CancellationToken cancellationToken = default)
+        [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetCompaniesPagedQuery(pageNumber, pageSize, searchTerm), cancellationToken);
+        var response = await _mediator.Send(new GetCompaniesPagedQuery(pageNumber, pageSize, searchTerm, includeDeleted), cancellationToken);
         if (!response.IsSuccess)
         {
             return BadRequest(response);
@@ -177,6 +180,12 @@ public class CompaniesController(IMediator mediator, ICurrentUserService current
                 return NotFound(response);
             }
 
+            // SPEC 41: a company with active data cannot be deleted.
+            if (response.Message == "COMPANY_IN_USE")
+            {
+                return Conflict(response);
+            }
+
             return BadRequest(response);
         }
 
@@ -229,5 +238,23 @@ public class CompaniesController(IMediator mediator, ICurrentUserService current
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted company (SPEC 41, Etapa 3). Restricted to the SuperAdmin role.
+    /// </summary>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RestoreCompany(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new RestoreCompanyCommand(id), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

@@ -13,7 +13,9 @@ namespace JOIN.Application.UseCases.Security.SystemOptions.Commands;
 /// Handles soft delete operations for SystemOption.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
-public sealed class DeleteSystemOptionCommandHandler(IUnitOfWork unitOfWork)
+public sealed class DeleteSystemOptionCommandHandler(
+    IUnitOfWork unitOfWork,
+    SystemOptionCascadeCoordinator cascadeCoordinator)
     : IRequestHandler<DeleteSystemOptionCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
@@ -24,7 +26,6 @@ public sealed class DeleteSystemOptionCommandHandler(IUnitOfWork unitOfWork)
     public async Task<Response<Guid>> Handle(DeleteSystemOptionCommand request, CancellationToken cancellationToken)
     {
         var optionRepository = _unitOfWork.GetRepository<JOIN.Domain.Security.SystemOption>();
-        var roleOptionRepository = _unitOfWork.GetRepository<JOIN.Domain.Security.RoleSystemOption>();
 
         var entity = await optionRepository.GetAsync(request.Id);
         if (entity is null)
@@ -32,23 +33,19 @@ public sealed class DeleteSystemOptionCommandHandler(IUnitOfWork unitOfWork)
             return Response<Guid>.Error("SYSTEM_OPTION_NOT_FOUND", ["System option not found."]);
         }
 
-        // Verificar si tiene hijos activos
-        var children = await optionRepository.GetAllAsync();
-        var hasActiveChildren = children.Any(c => c.ParentId == request.Id && c.GcRecord == 0);
-        if (hasActiveChildren)
+        // SPEC 41 (decision 2026-10-08): child options are composition (deleted with the option, every level);
+        // role grants on the option or any descendant are references and block the delete.
+        var descendants = await cascadeCoordinator.GetActiveSubtreeAsync(entity.ModuleId, entity.Id);
+        var blocking = await cascadeCoordinator.GetBlockingReferencesAsync(descendants.Select(o => o.Id).Append(entity.Id).ToList());
+
+        if (blocking.Count > 0)
         {
-            return Response<Guid>.Error("SYSTEM_OPTION_IN_USE", ["The system option has active child options and cannot be deleted."]);
+            return Response<Guid>.Error("SYSTEM_OPTION_IN_USE", blocking);
         }
 
-        // Verificar si está asignado a roles activos
-        var roleOptions = await roleOptionRepository.GetAllAsync();
-        var isAssignedToRole = roleOptions.Any(ro => ro.SystemOptionId == request.Id && ro.GcRecord == 0);
-        if (isAssignedToRole)
-        {
-            return Response<Guid>.Error("SYSTEM_OPTION_IN_USE", ["The system option is currently assigned to one or more roles and cannot be deleted."]);
-        }
-
-        entity.MarkAsDeleted();
+        var deletedAtUtc = DateTime.UtcNow;
+        entity.MarkAsDeleted(deletedAtUtc);
+        await cascadeCoordinator.MarkAsDeletedAsync(descendants, deletedAtUtc);
         await optionRepository.UpdateAsync(entity);
         var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
 

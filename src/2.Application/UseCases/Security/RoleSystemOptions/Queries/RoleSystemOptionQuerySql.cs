@@ -12,6 +12,7 @@ internal static class RoleSystemOptionQuerySql
     internal const string SelectListProjection = """
         SELECT
             rso.Id,
+            rso.GcRecord,
             rso.CompanyId,
             c.Name AS CompanyName,
             rso.RoleId,
@@ -60,7 +61,7 @@ internal static class RoleSystemOptionQuerySql
     internal static (string WhereClause, DynamicParameters Parameters) BuildWhereClause(RoleSystemOptionQueryFilters filters)
     {
         var parameters = new DynamicParameters();
-        var whereBuilder = new StringBuilder("WHERE rso.GcRecord = 0");
+        var whereBuilder = new StringBuilder(filters.IncludeDeleted ? "WHERE 1 = 1" : "WHERE rso.GcRecord = 0");
 
         if (filters.RequireCompanyFilter || filters.CompanyId.HasValue)
         {
@@ -186,4 +187,5 @@ internal sealed record RoleSystemOptionQueryFilters(
     bool? CanExport = null,
     bool? CanExecute = null,
     bool? IsVisibleMenu = null,
-    int? OrderMenu = null);
+    int? OrderMenu = null,
+    bool IncludeDeleted = false);

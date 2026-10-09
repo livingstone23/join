@@ -1,6 +1,7 @@
 using JOIN.Application.Common;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Domain.Admin;
+using JOIN.Domain.Messaging;
 using MediatR;
 
 namespace JOIN.Application.UseCases.Admin.Areas.Commands;
@@ -33,6 +34,15 @@ public sealed class DeleteAreaCommandHandler(IUnitOfWork unitOfWork)
         if (entity is null || entity.CompanyId != request.CompanyId || entity.GcRecord != 0)
         {
             return Response<Guid>.Error("AREA_NOT_FOUND", ["Area not found."]);
+        }
+
+        var dependents = new ActiveDependentsCheck(_unitOfWork);
+        await dependents.CountAsync<Ticket>(t => t.GcRecord == 0 && t.AreaId == request.Id, "tickets");
+        await dependents.CountAsync<TicketCompanyDefault>(d => d.GcRecord == 0 && d.AreaDefaultId == request.Id, "ticket company defaults");
+
+        if (dependents.HasDependents)
+        {
+            return Response<Guid>.Error("AREA_IN_USE", dependents.Details);
         }
 
         entity.MarkAsDeleted();

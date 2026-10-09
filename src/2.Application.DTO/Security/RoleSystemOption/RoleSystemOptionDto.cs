@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Security;
 
 /// <summary>
 /// Data transfer object for detailed role-based option permissions in a company.
 /// </summary>
-public sealed record RoleSystemOptionDto
+public sealed record RoleSystemOptionDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the permission rule.

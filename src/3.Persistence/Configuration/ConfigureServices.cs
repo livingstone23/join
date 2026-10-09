@@ -18,6 +18,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
+using JOIN.Persistence.Repositories.Common;
 
 
 
@@ -90,6 +91,7 @@ public static class ConfigureServices
         // 5. REPOSITORIOS ESPECÍFICOS Y UNIT OF WORK
         // Registramos el repositorio de clientes explícitamente para permitir lógica personalizada.
         services.AddScoped<IPersonsRepository, PersonsRepository>();
+        services.AddScoped<ITenantDataInspector, TenantDataInspector>();
         services.AddScoped<IPersonAddressRepository, PersonAddressRepository>();
         services.AddScoped<IPersonContactRepository, PersonContactRepository>();
         services.AddScoped<IPersonEmploymentRepository, PersonEmploymentRepository>();

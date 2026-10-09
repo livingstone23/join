@@ -1,9 +1,11 @@
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Data Transfer Object representing a tenant-scoped tax regime catalog entry.
 /// </summary>
-public sealed record TaxRegimeDto
+public sealed record TaxRegimeDto : SoftDeletableDto
 {
     public Guid Id { get; init; }
     public Guid CompanyId { get; init; }

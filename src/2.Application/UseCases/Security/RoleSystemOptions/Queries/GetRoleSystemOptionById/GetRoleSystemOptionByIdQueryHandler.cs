@@ -18,7 +18,7 @@ public sealed class GetRoleSystemOptionByIdQueryHandler(
         GetRoleSystemOptionByIdQuery request,
         CancellationToken cancellationToken)
     {
-        var companyId = currentUserService.CompanyId;
+        var companyId = TenantResolver.Resolve(currentUserService, request.CompanyId);
         if (companyId == Guid.Empty)
         {
             return Response<RoleSystemOptionDto>.Error(
@@ -28,10 +28,13 @@ public sealed class GetRoleSystemOptionByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string whereClause = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND rso.GcRecord = 0";
+        var whereClause = $"""
             WHERE rso.Id = @Id
               AND rso.CompanyId = @CompanyId
-              AND rso.GcRecord = 0
+              {activeOnly}
             """;
 
         var roleSystemOption = await connection.QuerySingleOrDefaultAsync<RoleSystemOptionDto>(

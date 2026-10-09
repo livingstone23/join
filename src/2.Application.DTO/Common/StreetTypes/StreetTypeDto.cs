@@ -5,7 +5,7 @@ namespace JOIN.Application.DTO.Common;
 /// <summary>
 /// Data Transfer Object (DTO) representing a street type catalog item.
 /// </summary>
-public record StreetTypeDto
+public record StreetTypeDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the street type identifier.

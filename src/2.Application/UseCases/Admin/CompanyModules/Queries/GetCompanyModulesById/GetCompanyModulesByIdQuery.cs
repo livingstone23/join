@@ -9,5 +9,5 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Queries;
 /// </summary>
 /// <param name="Id">The unique identifier of the requested company module assignment.</param>
 /// <param name="CompanyId">The tenant identifier used to scope the result.</param>
-public sealed record GetCompanyModulesByIdQuery(Guid Id, Guid CompanyId)
+public sealed record GetCompanyModulesByIdQuery(Guid Id, Guid CompanyId, bool? IncludeDeleted = null)
     : IRequest<Response<CompanyModuleDto>>;

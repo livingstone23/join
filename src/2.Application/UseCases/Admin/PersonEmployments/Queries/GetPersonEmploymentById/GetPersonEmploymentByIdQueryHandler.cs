@@ -35,9 +35,14 @@ public sealed class GetPersonEmploymentByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 Id,
+                GcRecord,
                 PersonId,
                 EmployerName,
                 JobTitle,
@@ -49,7 +54,7 @@ public sealed class GetPersonEmploymentByIdQueryHandler(
             FROM Admin.PersonEmployments
             WHERE Id = @Id
               AND CompanyId = @CompanyId
-              AND GcRecord = 0;
+              {activeOnly};
             """;
 
         var employment = await connection.QuerySingleOrDefaultAsync<PersonEmploymentResponseDto>(
@@ -58,7 +63,7 @@ public sealed class GetPersonEmploymentByIdQueryHandler(
                 new
                 {
                     request.Id,
-                    CompanyId = currentUserService.CompanyId
+                    CompanyId = TenantResolver.Resolve(currentUserService, request.CompanyId)
                 },
                 cancellationToken: cancellationToken));
 

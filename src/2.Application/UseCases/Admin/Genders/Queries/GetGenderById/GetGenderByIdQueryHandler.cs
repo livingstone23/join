@@ -26,9 +26,15 @@ public sealed class GetGenderByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var companyId = TenantResolver.Resolve(currentUserService, request.CompanyId);
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND g.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 g.Id,
+                g.GcRecord,
                 g.CompanyId,
                 c.Name AS CompanyName,
                 g.Code,
@@ -41,13 +47,13 @@ public sealed class GetGenderByIdQueryHandler(
                AND c.GcRecord = 0
             WHERE g.Id = @Id
               AND g.CompanyId = @CompanyId
-              AND g.GcRecord = 0;
+              {activeOnly};
             """;
 
         var gender = await connection.QuerySingleOrDefaultAsync<GenderDto>(
             new CommandDefinition(
                 sql,
-                new { request.Id, CompanyId = currentUserService.CompanyId },
+                new { request.Id, CompanyId = companyId },
                 cancellationToken: cancellationToken));
 
         if (gender is null)

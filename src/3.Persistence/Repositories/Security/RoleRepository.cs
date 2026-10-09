@@ -21,11 +21,13 @@ public sealed class RoleRepository(
     private readonly ISqlConnectionFactory _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
 
     /// <inheritdoc />
-    public async Task<RoleDto?> GetByIdAsync(Guid id, Guid companyId, CancellationToken cancellationToken = default)
+    public async Task<RoleDto?> GetByIdAsync(Guid id, Guid companyId, bool includeDeleted = false, CancellationToken cancellationToken = default)
     {
         // PermissionsCount is a correlated subquery against RoleSystemOptions, scoped to (RoleId, CompanyId, GcRecord = 0).
         // Tenant isolation: a role with permissions in another CompanyId returns 0 here.
-        const string sql = """
+        // SPEC 41: deleted roles only when the handler resolved includeDeleted through SoftDeleteVisibility.
+        var activeOnly = includeDeleted ? string.Empty : "AND r.GcRecord = 0";
+        var sql = $"""
             SELECT
                 Id,
                 Name,
@@ -34,13 +36,14 @@ public sealed class RoleRepository(
                 IsSystemDefault,
                 CreatedBy,
                 Created,
-                (SELECT COUNT(*)
+                (SELECT CAST(COUNT(*) AS integer)
                  FROM Security.RoleSystemOptions rso
                  WHERE rso.RoleId = r.Id
                    AND rso.CompanyId = @CompanyId
-                   AND rso.GcRecord = 0) AS PermissionsCount
+                   AND rso.GcRecord = 0) AS PermissionsCount,
+                r.GcRecord
             FROM Security.Roles r
-            WHERE r.Id = @Id AND r.GcRecord = 0
+            WHERE r.Id = @Id {activeOnly}
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -55,12 +58,18 @@ public sealed class RoleRepository(
         int page,
         int pageSize,
         Guid companyId,
+        bool includeDeleted = false,
         CancellationToken cancellationToken = default)
     {
         var offset = (page - 1) * pageSize;
 
-        var whereClause = """
+        // SPEC 41: deleted roles are visible only to a SuperAdmin who asks (includeDeleted); for everyone
+        // else the listing is active-only, so isActive = false yields nothing. Before SPEC 41 isActive = null
+        // or false exposed deleted roles to any caller with read permission.
+        var activeOnly = includeDeleted ? string.Empty : "AND GcRecord = 0";
+        var whereClause = $"""
             WHERE (@nameFilter IS NULL OR Name LIKE CONCAT('%', @nameFilter, '%'))
+              {activeOnly}
               AND (@isActive IS NULL
                    OR ((@isActive = TRUE AND GcRecord = 0)
                        OR (@isActive = FALSE AND GcRecord <> 0)))
@@ -76,11 +85,12 @@ public sealed class RoleRepository(
                 IsSystemDefault,
                 CreatedBy,
                 Created,
-                (SELECT COUNT(*)
+                (SELECT CAST(COUNT(*) AS integer)
                  FROM Security.RoleSystemOptions rso
                  WHERE rso.RoleId = r.Id
                    AND rso.CompanyId = @CompanyId
-                   AND rso.GcRecord = 0) AS PermissionsCount
+                   AND rso.GcRecord = 0) AS PermissionsCount,
+                r.GcRecord
             FROM Security.Roles r
             {whereClause}
             ORDER BY Name ASC

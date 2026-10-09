@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Common.StreetTypes.Queries;
 /// Query to retrieve a street type by id.
 /// </summary>
 /// <param name="StreetTypeId">The street type identifier.</param>
-public record GetStreetTypeByIdQuery(Guid StreetTypeId) : IRequest<Response<StreetTypeDto>>;
+public record GetStreetTypeByIdQuery(Guid StreetTypeId, bool? IncludeDeleted = null) : IRequest<Response<StreetTypeDto>>;

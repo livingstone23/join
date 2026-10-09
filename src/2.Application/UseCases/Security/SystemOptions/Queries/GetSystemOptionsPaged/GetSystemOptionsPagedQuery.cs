@@ -14,5 +14,6 @@ namespace JOIN.Application.UseCases.Security.SystemOptions.Queries;
 public sealed record GetSystemOptionsPagedQuery(
     int? PageNumber = null,
     int? PageSize = null,
-    string? Name = null
+    string? Name = null,
+    bool? IncludeDeleted = null
 ) : IRequest<Response<PagedResult<SystemOptionListItemDto>>>;

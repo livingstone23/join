@@ -14,7 +14,9 @@ namespace JOIN.Application.UseCases.Admin.SystemModules.Queries;
 /// Handles single system module detail queries using Dapper.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
-public sealed class GetSystemModuleByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+public sealed class GetSystemModuleByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetSystemModuleByIdQuery, Response<SystemModuleDto>>
 {
     /// <summary>
@@ -26,9 +28,14 @@ public sealed class GetSystemModuleByIdQueryHandler(ISqlConnectionFactory connec
     public async Task<Response<SystemModuleDto>> Handle(GetSystemModuleByIdQuery request, CancellationToken cancellationToken)
     {
         using var connection = connectionFactory.CreateConnection();
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND sm.GcRecord = 0";
+
         var sql = $"""
             SELECT
                 sm.Id,
+                sm.GcRecord,
                 sm.Name,
                 sm.Description,
                 sm.Icon,
@@ -37,7 +44,7 @@ public sealed class GetSystemModuleByIdQueryHandler(ISqlConnectionFactory connec
                 sm.Created AS CreatedAt
             FROM Admin.SystemModules sm
             WHERE sm.Id = @Id
-              AND sm.GcRecord = 0;
+              {activeOnly};
             """;
 
         var entity = await connection.QuerySingleOrDefaultAsync<SystemModuleDto>(

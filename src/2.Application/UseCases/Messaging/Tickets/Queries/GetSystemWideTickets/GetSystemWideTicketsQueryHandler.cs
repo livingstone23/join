@@ -104,6 +104,7 @@ public sealed class GetSystemWideTicketsQueryHandler(
         var sql = $"""
             SELECT
                 t.Id,
+                t.GcRecord,
                 t.CompanyId,
                 co.Name AS CompanyName,
                 t.Code,
@@ -172,6 +173,7 @@ public sealed class GetSystemWideTicketsQueryHandler(
             items.Add(new TicketListItemDto
             {
                 Id = row.Id,
+                GcRecord = row.GcRecord,
                 CompanyId = row.CompanyId,
                 CompanyName = row.CompanyName,
                 Code = row.Code,
@@ -217,6 +219,7 @@ public sealed class GetSystemWideTicketsQueryHandler(
     private sealed class TicketSlaRow
     {
         public Guid Id { get; init; }
+        public int GcRecord { get; init; }
         public Guid CompanyId { get; init; }
         public string? CompanyName { get; init; }
         public string Code { get; init; } = string.Empty;

@@ -21,7 +21,7 @@ public sealed class GetIncomeRangesQueryHandler(
         if (currentUserService.CompanyId == Guid.Empty)
             return Response<PagedResult<IncomeRangeDto>>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
 
-        var companyId = currentUserService.CompanyId;
+        var companyId = TenantResolver.Resolve(currentUserService, request.CompanyId);
         var (pageNumber, pageSize) = _pagination.Sanitize(request.PageNumber, request.PageSize);
         var offset = (pageNumber - 1) * pageSize;
 
@@ -31,7 +31,11 @@ public sealed class GetIncomeRangesQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", pageSize);
 
-        var where = new StringBuilder("WHERE ir.CompanyId = @CompanyId AND ir.GcRecord = 0");
+        var where = new StringBuilder("WHERE ir.CompanyId = @CompanyId");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            where.Append(" AND ir.GcRecord = 0");
+        }
         if (!string.IsNullOrWhiteSpace(request.DisplayName))
         {
             where.Append(" AND ir.DisplayName LIKE @DisplayName");
@@ -53,7 +57,7 @@ public sealed class GetIncomeRangesQueryHandler(
         var whereClause = where.ToString();
 
         var sql = $"""
-            SELECT ir.Id, ir.CompanyId, c.Name AS CompanyName, ir.DisplayName, ir.MinimumValue, ir.MaximumValue, ir.CurrencyCode, ir.IsActive, ir.DisplayOrder, ir.Created AS CreatedAt
+            SELECT ir.Id, ir.GcRecord, ir.CompanyId, c.Name AS CompanyName, ir.DisplayName, ir.MinimumValue, ir.MaximumValue, ir.CurrencyCode, ir.IsActive, ir.DisplayOrder, ir.Created AS CreatedAt
             FROM Admin.IncomeRanges ir
             INNER JOIN Common.Companies c ON c.Id = ir.CompanyId AND c.GcRecord = 0
             {whereClause} ORDER BY ir.DisplayOrder ASC, ir.DisplayName ASC LIMIT @PageSize OFFSET @Offset;

@@ -5,7 +5,7 @@ namespace JOIN.Application.DTO.Common;
 /// <summary>
 /// Data Transfer Object (DTO) used for paginated communication channel responses.
 /// </summary>
-public record CommunicationChannelListItemDto
+public record CommunicationChannelListItemDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the communication channel identifier.

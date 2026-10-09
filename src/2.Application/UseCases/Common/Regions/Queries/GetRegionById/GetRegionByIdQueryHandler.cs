@@ -34,9 +34,14 @@ public sealed class GetRegionByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND r.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 r.Id,
+                r.GcRecord,
                 r.Name,
                 r.Code,
                 r.CountryId,
@@ -47,14 +52,14 @@ public sealed class GetRegionByIdQueryHandler(
                 ON c.Id = r.CountryId
                AND c.GcRecord = 0
             WHERE r.Id = @Id
-              AND r.GcRecord = 0
-              AND r.CompanyId = @TenantId;
+              AND r.CompanyId = @TenantId
+              {activeOnly};
             """;
 
         var region = await connection.QuerySingleOrDefaultAsync<RegionDto>(
             new CommandDefinition(
                 sql,
-                new { request.Id, TenantId = currentUserService.CompanyId },
+                new { request.Id, TenantId = TenantResolver.Resolve(currentUserService, request.CompanyId) },
                 cancellationToken: cancellationToken));
 
         if (region is null)

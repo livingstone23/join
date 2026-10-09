@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Common.Municipalities.Queries;
 /// Query to retrieve a municipality catalog item by its unique identifier.
 /// </summary>
 /// <param name="Id">The unique identifier of the municipality to retrieve.</param>
-public sealed record GetMunicipalityByIdQuery(Guid Id) : IRequest<Response<MunicipalityDto>>;
+public sealed record GetMunicipalityByIdQuery(Guid Id, bool? IncludeDeleted = null) : IRequest<Response<MunicipalityDto>>;

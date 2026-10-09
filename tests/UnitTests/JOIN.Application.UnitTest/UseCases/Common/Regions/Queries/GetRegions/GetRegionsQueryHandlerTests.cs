@@ -65,7 +65,7 @@ public sealed class GetRegionsQueryHandlerTests
         item.CountryName.Should().Be("Canada");
         item.CreatedAt.Should().Be(createdAt);
 
-        context.Connection.LastCommandText.Should().Contain("WHERE r.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain("AND r.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("r.Name LIKE @Name");
         context.Connection.LastCommandText.Should().Contain("r.Code = @Code");
         context.Connection.LastCommandText.Should().Contain("r.CountryId = @CountryId");

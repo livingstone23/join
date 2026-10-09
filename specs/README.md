@@ -97,7 +97,7 @@ Las filas 40–49 y 99 de la tabla anterior son las copias de `main` del 2026-10
 | Nº | Título | Estado | Depende de (según su encabezado) |
 |---|---|---|---|
 | 40-post | Índices únicos filtrados por soft-delete | Borrador | 39 |
-| 41-post | Visibilidad de registros borrados y restauración para SuperAdmin | Borrador | 38, 40-post |
+| 41-post | Visibilidad de registros borrados y restauración para SuperAdmin | Implementado | 38, 40-post |
 | 42-post | Valores iniciales del ticket desde `TicketCompanyDefaults` | Borrador | 41-post |
 | 43-post | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Borrador | 39 |
 | 44-post | Módulo Calendario: parametrización, calendarios y actividades | Borrador | 99-post, 43-post, 48-post |
@@ -195,5 +195,6 @@ Decisiones o verificaciones que no tienen spec propia todavía:
 | 41 | Al implementarla, incluir las entidades del calendario (44, 45, 46). |
 | 38 (F0) | Ejecutar `docs/migrations/spec-38-data-audit.sql` contra la base de desarrollo y pegar los conteos en el PR; si hay filas afectadas, decidir si se reasignan. |
 | 38 (D) | Smoke manual: un `SuperAdminCompany` solo ve su empresa y sus módulos, y no puede borrar empresas ni modificar módulos; validar con `join_frontb`. |
-| 40-post | `DapperContext.CreateConnection()` siempre crea `SqlConnection` (rama PostgreSQL comentada desde SPEC 39): los repositorios que lo usan (p. ej. `PersonsRepository`) fallan en PostgreSQL y `PUT /Persons` responde 500. Arreglo aparte; al hacerlo, ejecutar el caso D.2 de SPEC 40-post. |
+| ~~40-post~~ | ~~`DapperContext.CreateConnection()` siempre crea `SqlConnection`~~ Resuelto (2026-10-09, rama `fix-post-dapper-dateonly-and-dappercontext`): `DapperContext` elige Npgsql o SqlClient según `DatabaseProvider`, igual que `SqlConnectionFactory`, y un handler de Dapper (`DateOnlyCompatibleDateTimeHandler`) lee las columnas `date` (que Npgsql devuelve como `DateOnly`) en propiedades `DateTime`. Caso D.2 de SPEC 40-post ejecutado: cuatro `PUT /Persons` → 200. |
+| 41-post | `GetPersonByIdQueryHandler` lee direcciones y contactos como `dynamic` y accede a `a.Id`, `a.AddressLine1`…; en PostgreSQL las columnas llegan en minúsculas y `GET /Persons/{id}` responde 500 si la persona tiene direcciones o contactos. Arreglo aparte (alias entre comillas o DTO tipado). |
 | Proceso | Script de verificación de consistencia de specs (referencias inexistentes, nombres retirados, dependencias de specs pospuestas, specs fuera del índice). |

@@ -5,6 +5,7 @@ using JOIN.Application.UseCases.Admin.EntityStatuses.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
+using JOIN.Application.UnitTest.Common.TestDoubles;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Admin.EntityStatuses.Commands.DeleteEntityStatus;
@@ -112,9 +113,7 @@ public sealed class DeleteEntityStatusCommandHandlerTests
             .Setup(x => x.GetAsync(entity.Id))
             .ReturnsAsync(entity);
 
-        context.AreaRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(
+        context.AreaRepositoryMock.SetupRows(
             [
                 new Area
                 {
@@ -125,9 +124,7 @@ public sealed class DeleteEntityStatusCommandHandlerTests
                 }
             ]);
 
-        context.ProjectRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(Array.Empty<Project>());
+        context.ProjectRepositoryMock.SetupRows(Array.Empty<Project>());
 
         var handler = context.CreateHandler();
 
@@ -137,7 +134,7 @@ public sealed class DeleteEntityStatusCommandHandlerTests
         // Assert
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("ENTITY_STATUS_IN_USE");
-        response.Errors.Should().Contain("The entity status is currently assigned to areas or projects and cannot be deleted.");
+        response.Errors.Should().Contain("Active areas: 1");
     }
 
     /// <summary>
@@ -159,13 +156,9 @@ public sealed class DeleteEntityStatusCommandHandlerTests
             .Setup(x => x.GetAsync(entity.Id))
             .ReturnsAsync(entity);
 
-        context.AreaRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(Array.Empty<Area>());
+        context.AreaRepositoryMock.SetupRows(Array.Empty<Area>());
 
-        context.ProjectRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(
+        context.ProjectRepositoryMock.SetupRows(
             [
                 new Project
                 {
@@ -184,7 +177,7 @@ public sealed class DeleteEntityStatusCommandHandlerTests
         // Assert
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("ENTITY_STATUS_IN_USE");
-        response.Errors.Should().Contain("The entity status is currently assigned to areas or projects and cannot be deleted.");
+        response.Errors.Should().Contain("Active projects: 1");
     }
 
     /// <summary>
@@ -206,13 +199,9 @@ public sealed class DeleteEntityStatusCommandHandlerTests
             .Setup(x => x.GetAsync(entity.Id))
             .ReturnsAsync(entity);
 
-        context.AreaRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(Array.Empty<Area>());
+        context.AreaRepositoryMock.SetupRows(Array.Empty<Area>());
 
-        context.ProjectRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(Array.Empty<Project>());
+        context.ProjectRepositoryMock.SetupRows(Array.Empty<Project>());
 
         context.StatusRepositoryMock
             .Setup(x => x.UpdateAsync(entity))
@@ -253,13 +242,9 @@ public sealed class DeleteEntityStatusCommandHandlerTests
             .Setup(x => x.GetAsync(entity.Id))
             .ReturnsAsync(entity);
 
-        context.AreaRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(Array.Empty<Area>());
+        context.AreaRepositoryMock.SetupRows(Array.Empty<Area>());
 
-        context.ProjectRepositoryMock
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(Array.Empty<Project>());
+        context.ProjectRepositoryMock.SetupRows(Array.Empty<Project>());
 
         context.StatusRepositoryMock
             .Setup(x => x.UpdateAsync(entity))
@@ -270,6 +255,109 @@ public sealed class DeleteEntityStatusCommandHandlerTests
             .ReturnsAsync(1);
 
         var handler = context.CreateHandler();
+
+        // Act
+        var response = await handler.Handle(new DeleteEntityStatusCommand(entity.Id, companyId), CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeTrue();
+        response.Message.Should().Be("Entity status deleted successfully.");
+        response.Data.Should().Be(entity.Id);
+        entity.GcRecord.Should().BeGreaterThan(BaseAuditableEntity.ActiveGcRecord);
+
+        context.StatusRepositoryMock.Verify(x => x.UpdateAsync(entity), Times.Once);
+    }
+
+    /// <summary>
+    /// SPEC 41: every active child type blocks the delete and is listed in the errors.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenActiveDependentsExist_ShouldReturnInUseWithDetails()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var entity = CreateExistingEntityStatus(_fixture.Create<Guid>());
+        var context = new DeleteEntityStatusCommandTestContext();
+
+        context.CompanyRepositoryMock
+            .Setup(x => x.GetAsync(companyId))
+            .ReturnsAsync(new Company { Name = "JOIN CRM", TaxId = "RUC" });
+
+        context.StatusRepositoryMock
+            .Setup(x => x.GetAsync(entity.Id))
+            .ReturnsAsync(entity);
+
+        context.AreaRepositoryMock.SetupRows(Array.Empty<Area>());
+
+        context.ProjectRepositoryMock.SetupRows(Array.Empty<Project>());
+
+        context.StatusRepositoryMock
+            .Setup(x => x.UpdateAsync(entity))
+            .ReturnsAsync(true);
+
+        context.UnitOfWorkMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var handler = context.CreateHandler();
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new Area { CompanyId = Guid.NewGuid(), Name = "Support", EntityStatusId = entity.Id };
+        context.UnitOfWorkMock.SetupRepositoryRows<Area>([child1]);
+        var child2 = new Project { CompanyId = Guid.NewGuid(), Name = "Portal", EntityStatusId = entity.Id };
+        context.UnitOfWorkMock.SetupRepositoryRows<Project>([child2]);
+
+
+        // Act
+        var response = await handler.Handle(new DeleteEntityStatusCommand(entity.Id, companyId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("ENTITY_STATUS_IN_USE");
+        response.Errors.Should().Equal("Active areas: 1", "Active projects: 1");
+        entity.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
+    }
+
+    /// <summary>
+    /// SPEC 41: logically deleted children do not block the delete.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenDependentsAreDeleted_ShouldSoftDelete()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var entity = CreateExistingEntityStatus(_fixture.Create<Guid>());
+        var context = new DeleteEntityStatusCommandTestContext();
+
+        context.CompanyRepositoryMock
+            .Setup(x => x.GetAsync(companyId))
+            .ReturnsAsync(new Company { Name = "JOIN CRM", TaxId = "RUC" });
+
+        context.StatusRepositoryMock
+            .Setup(x => x.GetAsync(entity.Id))
+            .ReturnsAsync(entity);
+
+        context.AreaRepositoryMock.SetupRows(Array.Empty<Area>());
+
+        context.ProjectRepositoryMock.SetupRows(Array.Empty<Project>());
+
+        context.StatusRepositoryMock
+            .Setup(x => x.UpdateAsync(entity))
+            .ReturnsAsync(true);
+
+        context.UnitOfWorkMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var handler = context.CreateHandler();
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new Area { CompanyId = Guid.NewGuid(), Name = "Support", EntityStatusId = entity.Id };
+        child1.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<Area>([child1]);
+        var child2 = new Project { CompanyId = Guid.NewGuid(), Name = "Portal", EntityStatusId = entity.Id };
+        child2.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<Project>([child2]);
+
 
         // Act
         var response = await handler.Handle(new DeleteEntityStatusCommand(entity.Id, companyId), CancellationToken.None);
@@ -326,7 +414,7 @@ public sealed class DeleteEntityStatusCommandHandlerTests
             SetupRepository(UnitOfWorkMock, ProjectRepositoryMock);
         }
 
-        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
+        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new() { DefaultValue = DefaultValue.Mock };
         public Mock<IGenericRepository<Company>> CompanyRepositoryMock { get; } = new();
         public Mock<IGenericRepository<EntityStatus>> StatusRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Area>> AreaRepositoryMock { get; } = new();

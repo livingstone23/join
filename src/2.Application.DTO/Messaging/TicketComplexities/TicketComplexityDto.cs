@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Messaging;
 
 /// <summary>
 /// Data Transfer Object (DTO) representing a ticket complexity catalog item.
 /// </summary>
-public record TicketComplexityDto
+public record TicketComplexityDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the ticket complexity.

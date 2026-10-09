@@ -22,7 +22,8 @@ namespace JOIN.Application.UseCases.Security.SystemOptions.Queries;
 /// </summary>
 public sealed class GetSystemOptionsPagedQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetSystemOptionsPagedQuery, Response<PagedResult<SystemOptionListItemDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -38,7 +39,11 @@ public sealed class GetSystemOptionsPagedQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE o.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND o.GcRecord = 0");
+        }
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
             whereBuilder.Append(" AND o.Name LIKE @Name");
@@ -50,6 +55,7 @@ public sealed class GetSystemOptionsPagedQueryHandler(
         var sql = $@"
             SELECT
                 o.Id,
+                o.GcRecord,
                 o.ModuleId,
                 m.Name AS ModuleName,
                 o.Name,

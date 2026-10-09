@@ -6,6 +6,8 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
+using JOIN.Services.WebApi.Controllers;
 
 namespace JOIN.Services.WebApi.Controllers.Common;
 
@@ -43,9 +45,10 @@ public class ProvincesController(ISender sender) : ControllerBase
         [FromQuery] string? name = null,
         [FromQuery] string? code = null,
         [FromQuery] Guid? countryId = null,
+        [FromQuery] bool? includeDeleted = null,
         CancellationToken cancellationToken = default)
     {
-        var response = await _sender.Send(new GetProvincesQuery(pageNumber, pageSize, name, code, countryId), cancellationToken);
+        var response = await _sender.Send(new GetProvincesQuery(pageNumber, pageSize, name, code, countryId, includeDeleted), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -65,9 +68,9 @@ public class ProvincesController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Response<ProvinceDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
-        var response = await _sender.Send(new GetProvinceByIdQuery(id), cancellationToken);
+        var response = await _sender.Send(new GetProvinceByIdQuery(id, includeDeleted), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -172,5 +175,25 @@ public class ProvincesController(ISender sender) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted province (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The province identifier.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new RestoreProvinceCommand(id, null), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

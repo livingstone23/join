@@ -1,9 +1,11 @@
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Customer read model including related person and user display fields.
 /// </summary>
-public sealed record CustomerResponseDto
+public sealed record CustomerResponseDto : SoftDeletableDto
 {
     public Guid Id { get; init; }
     public Guid CompanyId { get; init; }

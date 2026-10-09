@@ -61,6 +61,7 @@ public sealed class GetSystemWideTicketComplexitiesQueryHandler(
         var sql = $"""
             SELECT
                 tc.Id,
+                tc.GcRecord,
                 tc.CompanyId,
                 c.Name AS CompanyName,
                 tc.Name,

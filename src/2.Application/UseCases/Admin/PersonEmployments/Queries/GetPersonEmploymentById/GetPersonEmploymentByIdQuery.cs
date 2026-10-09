@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Admin.PersonEmployments.Queries;
 /// Query that retrieves a person employment record by its unique identifier.
 /// </summary>
 /// <param name="Id">The unique identifier of the person employment record.</param>
-public sealed record GetPersonEmploymentByIdQuery(Guid Id) : IRequest<Response<PersonEmploymentResponseDto>>;
+public sealed record GetPersonEmploymentByIdQuery(Guid Id, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<PersonEmploymentResponseDto>>;

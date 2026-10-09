@@ -30,8 +30,6 @@ public sealed class DeleteEntityStatusCommandHandler(IUnitOfWork unitOfWork)
 
         var companyRepository = _unitOfWork.GetRepository<Company>();
         var statusRepository = _unitOfWork.GetRepository<EntityStatus>();
-        var areaRepository = _unitOfWork.GetRepository<Area>();
-        var projectRepository = _unitOfWork.GetRepository<Project>();
 
         var company = await companyRepository.GetAsync(request.CompanyId);
         if (company is null)
@@ -45,14 +43,13 @@ public sealed class DeleteEntityStatusCommandHandler(IUnitOfWork unitOfWork)
             return Response<Guid>.Error("ENTITY_STATUS_NOT_FOUND", ["Entity status not found."]);
         }
 
-        var areas = await areaRepository.GetAllAsync();
-        var projects = await projectRepository.GetAllAsync();
-        var isInUse = areas.Any(area => area.GcRecord == 0 && area.EntityStatusId == request.Id)
-                    || projects.Any(project => project.GcRecord == 0 && project.EntityStatusId == request.Id);
+        var dependents = new ActiveDependentsCheck(_unitOfWork);
+        await dependents.CountAsync<Area>(a => a.GcRecord == 0 && a.EntityStatusId == request.Id, "areas");
+        await dependents.CountAsync<Project>(p => p.GcRecord == 0 && p.EntityStatusId == request.Id, "projects");
 
-        if (isInUse)
+        if (dependents.HasDependents)
         {
-            return Response<Guid>.Error("ENTITY_STATUS_IN_USE", ["The entity status is currently assigned to areas or projects and cannot be deleted."]);
+            return Response<Guid>.Error("ENTITY_STATUS_IN_USE", dependents.Details);
         }
 
         entity.MarkAsDeleted();

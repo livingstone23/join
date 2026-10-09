@@ -6,6 +6,8 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
+using JOIN.Services.WebApi.Controllers;
+using Microsoft.AspNetCore.Authorization;
 
 
 
@@ -30,18 +32,20 @@ public class IncomeRangesController(ISender sender) : ControllerBase
         [FromQuery] string? displayName,
         [FromQuery] string? currencyCode,
         [FromQuery] bool? isActive,
+        [FromQuery] bool? includeDeleted = null,
+        [FromQuery] Guid? companyId = null,
         CancellationToken cancellationToken = default)
     {
-        var response = await _sender.Send(new GetIncomeRangesQuery(pageNumber, pageSize, displayName, currencyCode, isActive), cancellationToken);
+        var response = await _sender.Send(new GetIncomeRangesQuery(pageNumber, pageSize, displayName, currencyCode, isActive, includeDeleted, companyId), cancellationToken);
         return response.IsSuccess ? Ok(response) : BadRequest(response);
     }
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(Response<IncomeRangeDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted = null, [FromQuery] Guid? companyId = null, CancellationToken cancellationToken = default)
     {
-        var response = await _sender.Send(new GetIncomeRangeByIdQuery(id), cancellationToken);
+        var response = await _sender.Send(new GetIncomeRangeByIdQuery(id, includeDeleted, companyId), cancellationToken);
         if (!response.IsSuccess)
             return response.Message == "INCOME_RANGE_NOT_FOUND" ? NotFound(response) : BadRequest(response);
         return Ok(response);
@@ -101,5 +105,27 @@ public class IncomeRangesController(ISender sender) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted income range (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The income range identifier.</param>
+    /// <param name="companyId">Optional explicit company, honored only for SuperAdmin.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new RestoreIncomeRangeCommand(id, companyId), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

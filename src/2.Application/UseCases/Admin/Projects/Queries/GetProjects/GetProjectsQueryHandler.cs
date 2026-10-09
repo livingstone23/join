@@ -16,7 +16,8 @@ namespace JOIN.Application.UseCases.Admin.Projects.Queries;
 /// <param name="paginationOptions">Configurable pagination defaults for the project listing endpoint.</param>
 public sealed class GetProjectsQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetProjectsQuery, Response<PagedResult<ProjectDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -29,7 +30,10 @@ public sealed class GetProjectsQueryHandler(
     /// <returns>A standardized paged response containing the matching projects.</returns>
     public async Task<Response<PagedResult<ProjectDto>>> Handle(GetProjectsQuery request, CancellationToken cancellationToken)
     {
-        if (request.CompanyId == Guid.Empty)
+        // SPEC 41: the X-Company-Id header is only an explicit override, honored for SuperAdmin;
+        // every other caller always reads the company of their token (TenantResolver).
+        var companyId = TenantResolver.Resolve(currentUserService, request.CompanyId == Guid.Empty ? null : request.CompanyId);
+        if (companyId == Guid.Empty)
         {
             return Response<PagedResult<ProjectDto>>.Error(
                 "INVALID_COMPANY_ID",
@@ -42,11 +46,15 @@ public sealed class GetProjectsQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("CompanyId", request.CompanyId);
+        parameters.Add("CompanyId", companyId);
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE p.CompanyId = @CompanyId AND p.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE p.CompanyId = @CompanyId");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND p.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
@@ -65,6 +73,7 @@ public sealed class GetProjectsQueryHandler(
         var sql = $"""
             SELECT
                 p.Id,
+                p.GcRecord,
                 p.CompanyId,
                 c.Name AS CompanyName,
                 p.Name,

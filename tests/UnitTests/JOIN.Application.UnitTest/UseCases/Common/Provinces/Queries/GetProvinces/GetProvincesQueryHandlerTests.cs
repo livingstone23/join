@@ -69,7 +69,7 @@ public sealed class GetProvincesQueryHandlerTests
         item.RegionName.Should().Be("Pacific");
         item.CreatedAt.Should().Be(createdAt);
 
-        context.Connection.LastCommandText.Should().Contain("WHERE p.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain("AND p.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("p.Name LIKE @Name");
         context.Connection.LastCommandText.Should().Contain("p.Code = @Code");
         context.Connection.LastCommandText.Should().Contain("p.CountryId = @CountryId");

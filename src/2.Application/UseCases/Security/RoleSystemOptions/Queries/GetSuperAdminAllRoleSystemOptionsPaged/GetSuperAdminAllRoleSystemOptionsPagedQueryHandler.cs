@@ -12,7 +12,8 @@ namespace JOIN.Application.UseCases.Security.RoleSystemOptions.Queries;
 /// </summary>
 public sealed class GetSuperAdminAllRoleSystemOptionsPagedQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetSuperAdminAllRoleSystemOptionsPagedQuery, Response<PagedResult<RoleSystemOptionListItemDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -42,7 +43,8 @@ public sealed class GetSuperAdminAllRoleSystemOptionsPagedQueryHandler(
             CanExport: request.CanExport,
             CanExecute: request.CanExecute,
             IsVisibleMenu: request.IsVisibleMenu,
-            OrderMenu: request.OrderMenu));
+            OrderMenu: request.OrderMenu,
+            IncludeDeleted: SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)));
 
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);

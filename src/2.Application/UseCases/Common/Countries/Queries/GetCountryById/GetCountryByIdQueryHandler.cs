@@ -10,7 +10,9 @@ namespace JOIN.Application.UseCases.Common.Countries.Queries;
 /// Handles country detail queries using Dapper for high-performance reads.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create DB-agnostic read connections.</param>
-public class GetCountryByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+public class GetCountryByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetCountryByIdQuery, Response<CountryDto>>
 {
     /// <summary>
@@ -23,13 +25,18 @@ public class GetCountryByIdQueryHandler(ISqlConnectionFactory connectionFactory)
     {
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND c.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 c.Id,
+                c.GcRecord,
                 c.Name,
                 c.IsoCode
             FROM Common.Countries c
-            WHERE c.Id = @Id AND c.GcRecord = 0;
+            WHERE c.Id = @Id {activeOnly};
             """;
 
         var parameters = new DynamicParameters();

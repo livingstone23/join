@@ -7,4 +7,4 @@ namespace JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetTic
 /// <summary>
 /// Retrieves a single ticket-roster entry by id, scoped to the authenticated tenant.
 /// </summary>
-public record GetTicketUserCompanyByIdQuery(Guid Id) : IRequest<Response<TicketUserCompanyDto>>;
+public record GetTicketUserCompanyByIdQuery(Guid Id, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<TicketUserCompanyDto>>;

@@ -38,6 +38,11 @@ public enum LogType
     Finalization = 5,
 
     /// <summary>
+    /// Represents a SuperAdmin restoring a logically deleted ticket (SPEC 41, Etapa 4).
+    /// </summary>
+    Restoration = 6,
+
+    /// <summary>
     /// Backward-compatible alias for <see cref="StatusChange"/>.
     /// </summary>
     ChangeStatus = StatusChange,

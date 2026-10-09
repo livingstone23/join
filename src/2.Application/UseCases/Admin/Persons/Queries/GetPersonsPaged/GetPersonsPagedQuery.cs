@@ -31,5 +31,7 @@ public record GetPersonsPagedQuery(
     string? SecondLastName = null,
     string? CommercialName = null,
     Guid? IdentificationTypeId = null,
-    string? IdentificationNumber = null)
+    string? IdentificationNumber = null,
+    bool? IncludeDeleted = null,
+    Guid? CompanyId = null)
     : IRequest<Response<PagedResult<PersonListItemDto>>>;

@@ -10,7 +10,9 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Queries;
 /// Handles tenant-scoped company module detail queries using Dapper for high-performance reads.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
-public sealed class GetCompanyModulesByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+public sealed class GetCompanyModulesByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetCompanyModulesByIdQuery, Response<CompanyModuleDto>>
 {
     /// <summary>
@@ -30,9 +32,14 @@ public sealed class GetCompanyModulesByIdQueryHandler(ISqlConnectionFactory conn
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND cm.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 cm.Id,
+                cm.GcRecord,
                 cm.CompanyId,
                 c.Name AS CompanyName,
                 cm.ModuleId,
@@ -48,7 +55,7 @@ public sealed class GetCompanyModulesByIdQueryHandler(ISqlConnectionFactory conn
                AND sm.GcRecord = 0
             WHERE cm.Id = @Id
               AND cm.CompanyId = @CompanyId
-              AND cm.GcRecord = 0;
+              {activeOnly};
             """;
 
         var entity = await connection.QuerySingleOrDefaultAsync<CompanyModuleDto>(

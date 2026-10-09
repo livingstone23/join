@@ -1,3 +1,5 @@
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Messaging;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace JOIN.Application.DTO.Messaging;
 /// empresa. Una sola fila activa por tenant — el endpoint de listado
 /// tenant-scoped devuelve 0 o 1 elemento.
 /// </summary>
-public record TicketAttachmentSettingsDto
+public record TicketAttachmentSettingsDto : SoftDeletableDto
 {
     /// <summary>
     /// Identificador de la configuración.
@@ -21,16 +23,6 @@ public record TicketAttachmentSettingsDto
     /// Nombre del tenant (proyectado vía JOIN, solo display).
     /// </summary>
     public string? CompanyName { get; init; }
-
-    /// <summary>
-    /// Valor crudo de <c>GcRecord</c> — base del flag <see cref="IsDeleted"/>.
-    /// </summary>
-    public int GcRecord { get; init; }
-
-    /// <summary>
-    /// True cuando la fila fue soft-deleted.
-    /// </summary>
-    public bool IsDeleted => GcRecord != 0;
 
     /// <summary>
     /// Bitmask crudo de tipos permitidos — la lista legible está en

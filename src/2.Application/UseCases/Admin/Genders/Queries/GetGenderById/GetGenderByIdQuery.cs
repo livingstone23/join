@@ -8,5 +8,5 @@ namespace JOIN.Application.UseCases.Admin.Genders.Queries;
 /// Query used to retrieve a single tenant-scoped gender by its identifier.
 /// </summary>
 /// <param name="Id">The unique identifier of the requested gender.</param>
-public sealed record GetGenderByIdQuery(Guid Id)
+public sealed record GetGenderByIdQuery(Guid Id, bool? IncludeDeleted = null, Guid? CompanyId = null)
     : IRequest<Response<GenderDto>>;

@@ -65,7 +65,7 @@ public sealed class GetMunicipalitiesQueryHandlerTests
         item.ProvinceName.Should().Be("Managua Province");
         item.CreatedAt.Should().Be(createdAt);
 
-        context.Connection.LastCommandText.Should().Contain("WHERE m.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain("AND m.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("INNER JOIN Common.Provinces p");
         context.Connection.LastCommandText.Should().Contain("m.Name LIKE @Name");
         context.Connection.LastCommandText.Should().Contain("m.Code = @Code");
@@ -134,7 +134,7 @@ public sealed class GetMunicipalitiesQueryHandlerTests
 
         public GetMunicipalitiesQueryHandler CreateHandler()
         {
-            return new GetMunicipalitiesQueryHandler(ConnectionFactoryMock.Object, PaginationOptions);
+            return new GetMunicipalitiesQueryHandler(ConnectionFactoryMock.Object, PaginationOptions, new Mock<ICurrentUserService>().Object);
         }
     }
 }

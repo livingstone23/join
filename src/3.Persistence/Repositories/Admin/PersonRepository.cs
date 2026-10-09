@@ -33,7 +33,7 @@ public class PersonsRepository : GenericRepository<Person>, IPersonsRepository
         _dapperContext = dapperContext ?? throw new ArgumentNullException(nameof(dapperContext));
     }
 
-    // NOTE: InsertAsync, UpdateAsync, and DeleteAsync are inherited from GenericRepository.
+    // NOTE: InsertAsync and UpdateAsync are inherited from GenericRepository (no physical delete, SPEC 41).
     // They use EF Core's Change Tracking and the AuditableInterceptor automatically.
 
     #region Optimized Query Methods (Dapper)

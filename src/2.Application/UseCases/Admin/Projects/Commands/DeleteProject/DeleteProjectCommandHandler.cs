@@ -29,7 +29,6 @@ public sealed class DeleteProjectCommandHandler(IUnitOfWork unitOfWork)
         }
 
         var projectRepository = _unitOfWork.GetRepository<Project>();
-        var ticketRepository = _unitOfWork.GetRepository<Ticket>();
         var entity = await projectRepository.GetAsync(request.Id);
 
         if (entity is null || entity.CompanyId != request.CompanyId || entity.GcRecord != 0)
@@ -37,15 +36,13 @@ public sealed class DeleteProjectCommandHandler(IUnitOfWork unitOfWork)
             return Response<Guid>.Error("PROJECT_NOT_FOUND", ["Project not found."]);
         }
 
-        var tickets = await ticketRepository.GetAllAsync();
-        var isInUse = tickets.Any(ticket =>
-            ticket.CompanyId == request.CompanyId
-            && ticket.GcRecord == 0
-            && ticket.ProjectId == request.Id);
+        var dependents = new ActiveDependentsCheck(_unitOfWork);
+        await dependents.CountAsync<Ticket>(t => t.GcRecord == 0 && t.ProjectId == request.Id, "tickets");
+        await dependents.CountAsync<TicketCompanyDefault>(d => d.GcRecord == 0 && d.ProjectDefaultId == request.Id, "ticket company defaults");
 
-        if (isInUse)
+        if (dependents.HasDependents)
         {
-            return Response<Guid>.Error("PROJECT_IN_USE", ["The project is currently assigned to one or more tickets and cannot be deleted."]);
+            return Response<Guid>.Error("PROJECT_IN_USE", dependents.Details);
         }
 
         entity.MarkAsDeleted();

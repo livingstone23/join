@@ -1,9 +1,11 @@
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Data transfer object representing a customer contact payload exposed by Application queries and commands.
 /// </summary>
-public sealed record PersonContactResponseDto
+public sealed record PersonContactResponseDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the customer contact.

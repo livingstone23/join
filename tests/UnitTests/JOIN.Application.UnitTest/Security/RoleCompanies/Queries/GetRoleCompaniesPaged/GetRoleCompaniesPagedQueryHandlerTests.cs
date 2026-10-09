@@ -41,7 +41,7 @@ public sealed class GetRoleCompaniesPagedQueryHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleCompanyRepositoryMock
-            .Setup(x => x.GetPagedAsync(tenantId, null, null, 1, 20, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetPagedAsync(tenantId, null, null, 1, 20, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<RoleCompanyListItemDto>(), 0));
 
         var handler = context.CreateHandler();
@@ -64,7 +64,7 @@ public sealed class GetRoleCompaniesPagedQueryHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleCompanyRepositoryMock
-            .Setup(x => x.GetPagedAsync(tenantId, null, null, 1, 50, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetPagedAsync(tenantId, null, null, 1, 50, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<RoleCompanyListItemDto>(), 0));
 
         var handler = context.CreateHandler();
@@ -84,7 +84,7 @@ public sealed class GetRoleCompaniesPagedQueryHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleCompanyRepositoryMock
-            .Setup(x => x.GetPagedAsync(tenantId, null, null, 1, 20, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetPagedAsync(tenantId, null, null, 1, 20, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<RoleCompanyListItemDto>(), 0));
 
         var handler = context.CreateHandler();
@@ -104,7 +104,7 @@ public sealed class GetRoleCompaniesPagedQueryHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleCompanyRepositoryMock
-            .Setup(x => x.GetPagedAsync(tenantId, null, null, 1, 10, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetPagedAsync(tenantId, null, null, 1, 10, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<RoleCompanyListItemDto>(), 0));
 
         var handler = context.CreateHandler();
@@ -125,7 +125,7 @@ public sealed class GetRoleCompaniesPagedQueryHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tenantId);
         context.RoleCompanyRepositoryMock
-            .Setup(x => x.GetPagedAsync(tenantId, roleId, true, 2, 50, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetPagedAsync(tenantId, roleId, true, 2, 50, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<RoleCompanyListItemDto>(), 0));
 
         var handler = context.CreateHandler();

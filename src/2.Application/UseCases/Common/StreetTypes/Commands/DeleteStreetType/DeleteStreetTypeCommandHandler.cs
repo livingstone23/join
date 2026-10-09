@@ -1,5 +1,6 @@
 using JOIN.Application.Common;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
 using MediatR;
 
@@ -25,6 +26,14 @@ public class DeleteStreetTypeCommandHandler(IUnitOfWork unitOfWork)
         if (entity is null)
         {
             return Response<Guid>.Error("STREETTYPE_NOT_FOUND", ["Street type not found."]);
+        }
+
+        var dependents = await new ActiveDependentsCheck(_unitOfWork)
+            .CountAsync<PersonAddress>(a => a.GcRecord == 0 && a.StreetTypeId == request.Id, "person addresses");
+
+        if (dependents.HasDependents)
+        {
+            return Response<Guid>.Error("STREETTYPE_IN_USE", dependents.Details);
         }
 
         entity.MarkAsDeleted();

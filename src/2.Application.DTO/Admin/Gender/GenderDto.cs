@@ -1,9 +1,11 @@
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Data Transfer Object representing a tenant-scoped gender catalog entry.
 /// </summary>
-public sealed record GenderDto
+public sealed record GenderDto : SoftDeletableDto
 {
     public Guid Id { get; init; }
     public Guid CompanyId { get; init; }

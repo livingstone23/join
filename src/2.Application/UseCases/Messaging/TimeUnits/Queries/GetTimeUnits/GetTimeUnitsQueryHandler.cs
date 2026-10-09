@@ -39,11 +39,15 @@ public sealed class GetTimeUnitsQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         var parameters = new DynamicParameters();
-        parameters.Add("TenantId", _currentUserService.CompanyId);
+        parameters.Add("TenantId", TenantResolver.Resolve(_currentUserService, request.CompanyId));
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE tu.CompanyId = @TenantId AND tu.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE tu.CompanyId = @TenantId");
+        if (!SoftDeleteVisibility.IncludeDeleted(_currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND tu.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
@@ -62,6 +66,7 @@ public sealed class GetTimeUnitsQueryHandler(
         var sql = $"""
             SELECT
                 tu.Id,
+                tu.GcRecord,
                 tu.CompanyId,
                 c.Name AS CompanyName,
                 tu.Name,

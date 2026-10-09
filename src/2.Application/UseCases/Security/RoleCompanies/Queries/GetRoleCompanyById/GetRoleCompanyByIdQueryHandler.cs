@@ -31,7 +31,11 @@ public sealed class GetRoleCompanyByIdQueryHandler(
                 new[] { "El token no contiene un CompanyId válido." });
         }
 
-        var dto = await _roleCompanyRepository.GetByIdAsync(request.Id, tenantId, cancellationToken);
+        var dto = await _roleCompanyRepository.GetByIdAsync(
+            request.Id,
+            tenantId,
+            includeDeleted: SoftDeleteVisibility.IncludeDeleted(_currentUserService, request.IncludeDeleted),
+            cancellationToken: cancellationToken);
         if (dto is null)
         {
             return Response<RoleCompanyDto>.Error(

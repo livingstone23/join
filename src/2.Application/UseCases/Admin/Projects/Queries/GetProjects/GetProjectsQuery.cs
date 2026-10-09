@@ -17,5 +17,6 @@ public sealed record GetProjectsQuery(
     int? PageNumber = null,
     int? PageSize = null,
     string? Name = null,
-    Guid? EntityStatusId = null)
+    Guid? EntityStatusId = null,
+    bool? IncludeDeleted = null)
     : IRequest<Response<PagedResult<ProjectDto>>>;

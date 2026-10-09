@@ -15,4 +15,5 @@ public sealed record GetRolesDetailedQuery(
     string? Name,
     bool? IsActive,
     int Page = 1,
-    int PageSize = 20) : IRequest<Response<PagedResult<RoleDto>>>;
+    int PageSize = 20,
+    bool? IncludeDeleted = null) : IRequest<Response<PagedResult<RoleDto>>>;

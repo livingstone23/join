@@ -63,7 +63,7 @@ public sealed class GetCommunicationChannelsPagedQueryHandlerTests
         item.Name.Should().Be("WhatsApp");
         item.IsActive.Should().BeTrue();
 
-        context.Connection.LastCommandText.Should().Contain("WHERE cc.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain("AND cc.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("cc.Name LIKE @SearchTerm");
         context.Connection.LastCommandText.Should().Contain("cc.Provider LIKE @SearchTerm");
         context.Connection.LastCommandText.Should().Contain("cc.Code LIKE @SearchTerm");
@@ -164,7 +164,7 @@ public sealed class GetCommunicationChannelsPagedQueryHandlerTests
 
         public GetCommunicationChannelsPagedQueryHandler CreateHandler()
         {
-            return new GetCommunicationChannelsPagedQueryHandler(ConnectionFactoryMock.Object, PaginationOptions);
+            return new GetCommunicationChannelsPagedQueryHandler(ConnectionFactoryMock.Object, PaginationOptions, new Mock<ICurrentUserService>().Object);
         }
     }
 }

@@ -17,5 +17,7 @@ public sealed record GetIndustriesQuery(
     int? PageSize = null,
     string? Code = null,
     string? Name = null,
-    bool? IsActive = null)
+    bool? IsActive = null,
+    bool? IncludeDeleted = null,
+    Guid? CompanyId = null)
     : IRequest<Response<PagedResult<IndustryDto>>>;
