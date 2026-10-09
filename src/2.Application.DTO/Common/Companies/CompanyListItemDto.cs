@@ -5,7 +5,7 @@ namespace JOIN.Application.DTO.Common;
 /// <summary>
 /// Data Transfer Object (DTO) used for paginated company responses.
 /// </summary>
-public record CompanyListItemDto
+public record CompanyListItemDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the company identifier.

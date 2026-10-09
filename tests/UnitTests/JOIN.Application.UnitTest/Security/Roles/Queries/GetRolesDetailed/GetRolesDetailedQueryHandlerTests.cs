@@ -44,7 +44,7 @@ public sealed class GetRolesDetailedQueryHandlerTests
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
         var items = new List<RoleDto> { BuildRole("Admin") };
         context.RoleRepositoryMock
-            .Setup(x => x.GetPagedAsync("admin", true, 1, 20, companyId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetPagedAsync("admin", true, 1, 20, companyId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(((IReadOnlyList<RoleDto>)items, 1));
 
         var handler = context.CreateHandler();
@@ -71,8 +71,8 @@ public sealed class GetRolesDetailedQueryHandlerTests
         int capturedPage = 0;
 
         context.RoleRepositoryMock
-            .Setup(x => x.GetPagedAsync(null, null, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .Callback<string?, bool?, int, int, Guid, CancellationToken>((_, _, p, ps, _, _) =>
+            .Setup(x => x.GetPagedAsync(null, null, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .Callback<string?, bool?, int, int, Guid, bool, CancellationToken>((_, _, p, ps, _, _, _) =>
             {
                 capturedPage = p;
                 capturedPageSize = ps;
@@ -100,8 +100,8 @@ public sealed class GetRolesDetailedQueryHandlerTests
         int capturedPage = -1;
 
         context.RoleRepositoryMock
-            .Setup(x => x.GetPagedAsync(null, null, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .Callback<string?, bool?, int, int, Guid, CancellationToken>((_, _, p, _, _, _) => capturedPage = p)
+            .Setup(x => x.GetPagedAsync(null, null, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .Callback<string?, bool?, int, int, Guid, bool, CancellationToken>((_, _, p, _, _, _, _) => capturedPage = p)
             .ReturnsAsync((Array.Empty<RoleDto>(), 0));
 
         var handler = context.CreateHandler();
@@ -122,8 +122,8 @@ public sealed class GetRolesDetailedQueryHandlerTests
         int capturedPageSize = -1;
 
         context.RoleRepositoryMock
-            .Setup(x => x.GetPagedAsync(null, null, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .Callback<string?, bool?, int, int, Guid, CancellationToken>((_, _, _, ps, _, _) => capturedPageSize = ps)
+            .Setup(x => x.GetPagedAsync(null, null, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .Callback<string?, bool?, int, int, Guid, bool, CancellationToken>((_, _, _, ps, _, _, _) => capturedPageSize = ps)
             .ReturnsAsync((Array.Empty<RoleDto>(), 0));
 
         var handler = context.CreateHandler();
@@ -144,8 +144,8 @@ public sealed class GetRolesDetailedQueryHandlerTests
         string? capturedName = null;
 
         context.RoleRepositoryMock
-            .Setup(x => x.GetPagedAsync(It.IsAny<string?>(), It.IsAny<bool?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .Callback<string?, bool?, int, int, Guid, CancellationToken>((n, _, _, _, _, _) => capturedName = n)
+            .Setup(x => x.GetPagedAsync(It.IsAny<string?>(), It.IsAny<bool?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .Callback<string?, bool?, int, int, Guid, bool, CancellationToken>((n, _, _, _, _, _, _) => capturedName = n)
             .ReturnsAsync((Array.Empty<RoleDto>(), 0));
 
         var handler = context.CreateHandler();
@@ -164,7 +164,7 @@ public sealed class GetRolesDetailedQueryHandlerTests
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
         context.RoleRepositoryMock
-            .Setup(x => x.GetPagedAsync(null, null, 1, 20, companyId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetPagedAsync(null, null, 1, 20, companyId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(((IReadOnlyList<RoleDto>)new List<RoleDto>(), 55));
 
         var handler = context.CreateHandler();

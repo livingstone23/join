@@ -7,6 +7,7 @@ using JOIN.Application.UseCases.Security.Roles.Commands.DeleteRole;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
 using Microsoft.Extensions.Logging.Abstractions;
+using JOIN.Application.UnitTest.Common.TestDoubles;
 using Moq;
 
 namespace JOIN.Application.UnitTest.Security.Roles.Commands.DeleteRole;
@@ -166,8 +167,8 @@ public sealed class DeleteRoleCommandHandlerTests
     }
 
     /// <summary>
-    /// ROLE_HAS_USERS guard: a role with active assignments in the caller's tenant cannot be deleted.
-    /// The handler must short-circuit before touching Update/SaveChanges.
+    /// ROLE_HAS_USERS guard: a role with active assignments cannot be deleted. The handler must
+    /// short-circuit before touching Update/SaveChanges.
     /// </summary>
     [Fact]
     public async Task Handle_WhenRoleHasActiveUsers_ShouldReturnRoleHasUsersError()
@@ -176,19 +177,12 @@ public sealed class DeleteRoleCommandHandlerTests
         var companyId = Guid.NewGuid();
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
-        context.RoleRepositoryMock
-            .Setup(x => x.GetByIdForUpdateAsync(roleId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ApplicationRole
-            {
-                Id = roleId,
-                Name = "Custom",
-                NormalizedName = "CUSTOM",
-                IsSystemDefault = false,
-                GcRecord = 0
-            });
-        context.RoleRepositoryMock
-            .Setup(x => x.CountActiveUsersByRoleIdAsync(roleId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(2);
+        context.SetupCustomRole(roleId);
+        context.UnitOfWorkMock.SetupRepositoryRows<UserRoleCompany>(
+        [
+            new UserRoleCompany { RoleId = roleId, UserId = Guid.NewGuid(), CompanyId = companyId },
+            new UserRoleCompany { RoleId = roleId, UserId = Guid.NewGuid(), CompanyId = companyId }
+        ]);
 
         var handler = context.CreateHandler();
         var response = await handler.Handle(new DeleteRoleCommand(roleId), CancellationToken.None);
@@ -201,92 +195,99 @@ public sealed class DeleteRoleCommandHandlerTests
     }
 
     /// <summary>
-    /// count == 0 keeps the original happy path intact.
+    /// Deleted assignments do not block: the happy path stays intact.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenRoleHasZeroUsers_ShouldProceedToSoftDelete()
+    public async Task Handle_WhenRoleHasZeroActiveUsers_ShouldProceedToSoftDelete()
     {
         var roleId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         var context = new TestContext();
         context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
         context.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns("user-1");
-        context.RoleRepositoryMock
-            .Setup(x => x.GetByIdForUpdateAsync(roleId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ApplicationRole
-            {
-                Id = roleId,
-                Name = "Custom",
-                NormalizedName = "CUSTOM",
-                IsSystemDefault = false,
-                GcRecord = 0
-            });
-        context.RoleRepositoryMock
-            .Setup(x => x.CountActiveUsersByRoleIdAsync(roleId, companyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
+        context.SetupCustomRole(roleId);
+        var removed = new UserRoleCompany { RoleId = roleId, UserId = Guid.NewGuid(), CompanyId = companyId };
+        removed.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<UserRoleCompany>([removed]);
         context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var handler = context.CreateHandler();
         var response = await handler.Handle(new DeleteRoleCommand(roleId), CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
-        context.RoleRepositoryMock.Verify(x => x.CountActiveUsersByRoleIdAsync(roleId, companyId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>
-    /// Defense in depth: the count is tenant-scoped. Users assigned to the role in another tenant
-    /// must not block the delete here. Mock returns 0 because the spec filter excludes other-tenant rows.
+    /// SPEC 41 (decision 2026-10-08): a role is shared across companies, so users assigned in ANY company
+    /// block the delete (before SPEC 41 only the caller's tenant was counted).
     /// </summary>
     [Fact]
-    public async Task Handle_WhenRoleHasUsersInOtherTenant_ShouldProceedToSoftDelete()
+    public async Task Handle_WhenRoleHasUsersInOtherTenant_ShouldReturnRoleHasUsersError()
     {
         var roleId = Guid.NewGuid();
-        var callerCompanyId = Guid.NewGuid();
         var context = new TestContext();
-        context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(callerCompanyId);
+        context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.NewGuid());
+        context.SetupCustomRole(roleId);
+        context.UnitOfWorkMock.SetupRepositoryRows<UserRoleCompany>(
+            [new UserRoleCompany { RoleId = roleId, UserId = Guid.NewGuid(), CompanyId = Guid.NewGuid() }]);
+
+        var response = await context.CreateHandler().Handle(new DeleteRoleCommand(roleId), CancellationToken.None);
+
+        response.Message.Should().Be("ROLE_HAS_USERS");
+        context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// SPEC 41 (decision 2026-10-08): the role's permissions and company links are composition and are
+    /// soft-deleted with it, with the role's stamp.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenRoleHasPermissionsAndCompanyLinks_ShouldCascadeTheSameStamp()
+    {
+        var roleId = Guid.NewGuid();
+        var context = new TestContext();
+        context.CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(Guid.NewGuid());
         context.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns("user-1");
-        context.RoleRepositoryMock
-            .Setup(x => x.GetByIdForUpdateAsync(roleId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ApplicationRole
-            {
-                Id = roleId,
-                Name = "Custom",
-                NormalizedName = "CUSTOM",
-                IsSystemDefault = false,
-                GcRecord = 0
-            });
-        // Repo filter narrows to (roleId, callerCompanyId); other-tenant rows never reach the count.
-        context.RoleRepositoryMock
-            .Setup(x => x.CountActiveUsersByRoleIdAsync(roleId, callerCompanyId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
+        var role = context.SetupCustomRole(roleId);
+        var permission = new RoleSystemOption { RoleId = roleId, SystemOptionId = Guid.NewGuid(), CompanyId = Guid.NewGuid(), CanRead = true };
+        var otherRolePermission = new RoleSystemOption { RoleId = Guid.NewGuid(), SystemOptionId = Guid.NewGuid(), CompanyId = Guid.NewGuid() };
+        var link = new RoleCompany { RoleId = roleId, CompanyId = Guid.NewGuid() };
+        var permissions = context.UnitOfWorkMock.SetupRepositoryRows<RoleSystemOption>([permission, otherRolePermission]);
+        var links = context.UnitOfWorkMock.SetupRepositoryRows<RoleCompany>([link]);
         context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-        var handler = context.CreateHandler();
-        var response = await handler.Handle(new DeleteRoleCommand(roleId), CancellationToken.None);
+        var response = await context.CreateHandler().Handle(new DeleteRoleCommand(roleId), CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
-        // Ensure the count was queried exactly with the caller's tenant — never with a different one.
-        context.RoleRepositoryMock.Verify(
-            x => x.CountActiveUsersByRoleIdAsync(
-                roleId,
-                It.Is<Guid>(g => g == callerCompanyId),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
+        role.GcRecord.Should().BeGreaterThan(0);
+        permission.GcRecord.Should().Be(role.GcRecord);
+        link.GcRecord.Should().Be(role.GcRecord);
+        otherRolePermission.GcRecord.Should().Be(0, "only the deleted role's rows cascade");
+        permissions.Verify(x => x.UpdateAsync(permission), Times.Once);
+        links.Verify(x => x.UpdateAsync(link), Times.Once);
     }
 
     private sealed class TestContext
     {
-        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
+        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new() { DefaultValue = DefaultValue.Mock };
         public Mock<IRoleRepository> RoleRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
 
-        public TestContext()
+        // Default: no active users — the auto-mocked UserRoleCompany repository returns no rows (SPEC 41).
+
+        public ApplicationRole SetupCustomRole(Guid roleId)
         {
-            // Default: no active users. Individual tests override per (roleId, companyId) when relevant.
-            RoleRepositoryMock
-                .Setup(x => x.CountActiveUsersByRoleIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(0);
+            var role = new ApplicationRole
+            {
+                Id = roleId,
+                Name = "Custom",
+                NormalizedName = "CUSTOM",
+                IsSystemDefault = false,
+                GcRecord = 0
+            };
+            RoleRepositoryMock.Setup(x => x.GetByIdForUpdateAsync(roleId, It.IsAny<CancellationToken>())).ReturnsAsync(role);
+            return role;
         }
 
         public DeleteRoleCommandHandler CreateHandler()

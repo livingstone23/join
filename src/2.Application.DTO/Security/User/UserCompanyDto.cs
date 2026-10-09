@@ -1,10 +1,12 @@
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Security;
 
 /// <summary>
 /// Represents one company assignment associated with a user account.
 /// This DTO is primarily used by security and context-switching screens to show which companies are available to the user and which one is currently marked as default.
 /// </summary>
-public record UserCompanyDto
+public record UserCompanyDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the linked company.

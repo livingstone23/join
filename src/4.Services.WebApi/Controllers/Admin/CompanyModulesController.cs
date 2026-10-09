@@ -8,6 +8,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
+using JOIN.Services.WebApi.Controllers;
 
 namespace JOIN.Services.WebApi.Controllers.Admin;
 
@@ -51,7 +52,7 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
         [FromQuery] string? moduleName = null,
         [FromQuery] DateTime? createdFrom = null,
         [FromQuery] DateTime? createdTo = null,
-        CancellationToken cancellationToken = default)
+        [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
         var companyId = _currentUserService.CompanyId;
         if (companyId == Guid.Empty)
@@ -62,7 +63,7 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
         }
 
         var response = await _sender.Send(
-            new GetCompanyModulesQuery(companyId, pageNumber, pageSize, companyName, moduleName, createdFrom, createdTo),
+            new GetCompanyModulesQuery(companyId, pageNumber, pageSize, companyName, moduleName, createdFrom, createdTo, includeDeleted),
             cancellationToken);
 
         if (!response.IsSuccess)
@@ -99,10 +100,10 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
         [FromQuery] string? moduleName = null,
         [FromQuery] DateTime? createdFrom = null,
         [FromQuery] DateTime? createdTo = null,
-        CancellationToken cancellationToken = default)
+        [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
         var response = await _sender.Send(
-            new GetCompanyModulesQuery(companyId, pageNumber, pageSize, companyName, moduleName, createdFrom, createdTo),
+            new GetCompanyModulesQuery(companyId, pageNumber, pageSize, companyName, moduleName, createdFrom, createdTo, includeDeleted),
             cancellationToken);
 
         if (!response.IsSuccess)
@@ -127,7 +128,7 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(
         Guid id,
-        CancellationToken cancellationToken = default)
+        [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
         var companyId = _currentUserService.CompanyId;
         if (companyId == Guid.Empty)
@@ -137,7 +138,7 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
                 ["Authenticated token must contain a valid CompanyId claim."]));
         }
 
-        var response = await _sender.Send(new GetCompanyModulesByIdQuery(id, companyId), cancellationToken);
+        var response = await _sender.Send(new GetCompanyModulesByIdQuery(id, companyId, includeDeleted), cancellationToken);
         if (!response.IsSuccess)
         {
             if (response.Message == "COMPANY_MODULE_NOT_FOUND")
@@ -268,5 +269,24 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted company module (SPEC 41, Etapa 3). Restricted to the SuperAdmin role.
+    /// </summary>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RestoreCompanyModule(
+        Guid id,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new RestoreCompanyModuleCommand(id, companyId), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

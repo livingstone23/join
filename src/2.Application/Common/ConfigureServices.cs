@@ -99,6 +99,7 @@ public static class ConfigureServices
         services.AddScoped<TicketDtoAssembler>();
         services.AddScoped<TicketCodeGenerator>();
         services.AddScoped<SoftDeleteRestorer>();
+        services.AddScoped<RolePermissionCacheInvalidator>();
         services.AddScoped<PersonCascadeCoordinator>();
         services.AddScoped<SystemOptionCascadeCoordinator>();
 

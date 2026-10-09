@@ -45,7 +45,8 @@ public sealed class GetRoleCompaniesPagedQueryHandler(
             request.IsActive,
             sanitizedPage,
             sanitizedPageSize,
-            cancellationToken);
+            includeDeleted: SoftDeleteVisibility.IncludeDeleted(_currentUserService, request.IncludeDeleted),
+            cancellationToken: cancellationToken);
 
         var pagedResult = new PagedResult<RoleCompanyListItemDto>
         {

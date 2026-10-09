@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Text.Json.Serialization;
+
 namespace JOIN.Application.DTO.Security;
 
 /// <summary>
@@ -17,4 +20,21 @@ public sealed record RoleDto(
     bool IsSystemDefault,
     string? CreatedBy,
     DateTime Created,
-    int PermissionsCount = 0);
+    int PermissionsCount = 0,
+    [property: JsonIgnore] int GcRecord = 0)
+{
+    /// <summary>
+    /// Gets whether the role is logically deleted (SPEC 41). Positional record, so it cannot derive from
+    /// <see cref="JOIN.Application.DTO.Common.SoftDeletableDto"/>; same contract.
+    /// </summary>
+    public bool IsDeleted => GcRecord != 0;
+
+    /// <summary>
+    /// Gets the deletion date, or <c>null</c> for an active role.
+    /// </summary>
+    public DateOnly? DeletedOn =>
+        GcRecord != 0
+        && DateOnly.TryParseExact(GcRecord.ToString(CultureInfo.InvariantCulture), "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var deletedOn)
+            ? deletedOn
+            : null;
+}

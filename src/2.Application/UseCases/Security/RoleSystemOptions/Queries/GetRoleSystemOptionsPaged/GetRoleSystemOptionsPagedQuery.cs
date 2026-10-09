@@ -23,5 +23,6 @@ public sealed record GetRoleSystemOptionsPagedQuery(
     bool? CanExport = null,
     bool? CanExecute = null,
     bool? IsVisibleMenu = null,
-    int? OrderMenu = null)
+    int? OrderMenu = null,
+    bool? IncludeDeleted = null)
     : IRequest<Response<PagedResult<RoleSystemOptionListItemDto>>>;

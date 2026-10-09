@@ -106,6 +106,28 @@ public sealed class DeleteCompanyCommandHandlerTests
     }
 
     /// <summary>
+    /// SPEC 41 (decision 2026-10-08): a company with any active tenant data cannot be deleted.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenCompanyHasActiveData_ShouldReturnInUseAndNotDelete()
+    {
+        var context = new DeleteCompanyCommandTestContext();
+        var entity = new Company { Name = "JOIN", TaxId = "RUC-1" };
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(entity.Id)).ReturnsAsync(entity);
+        context.TenantDataInspectorMock
+            .Setup(x => x.GetActiveDataAsync(entity.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["Active Person: 3", "Active UserCompany: 1"]);
+
+        var response = await context.CreateHandler().Handle(new DeleteCompanyCommand(entity.Id), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("COMPANY_IN_USE");
+        response.Errors.Should().Equal("Active Person: 3", "Active UserCompany: 1");
+        entity.GcRecord.Should().Be(0);
+        context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
     /// Holds the reusable mocks and helper factory for the delete handler.
     /// </summary>
     private sealed class DeleteCompanyCommandTestContext
@@ -120,9 +142,21 @@ public sealed class DeleteCompanyCommandHandlerTests
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
         public Mock<IGenericRepository<Company>> CompanyRepositoryMock { get; } = new();
 
+        /// <summary>
+        /// No active tenant data by default (SPEC 41); the in-use test overrides it.
+        /// </summary>
+        public Mock<ITenantDataInspector> TenantDataInspectorMock { get; } = CreateInspector();
+
+        private static Mock<ITenantDataInspector> CreateInspector()
+        {
+            var mock = new Mock<ITenantDataInspector>();
+            mock.Setup(x => x.GetActiveDataAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+            return mock;
+        }
+
         public DeleteCompanyCommandHandler CreateHandler()
         {
-            return new DeleteCompanyCommandHandler(UnitOfWorkMock.Object);
+            return new DeleteCompanyCommandHandler(UnitOfWorkMock.Object, TenantDataInspectorMock.Object);
         }
     }
 }

@@ -2,7 +2,9 @@ using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
+using System.Linq.Expressions;
 using JOIN.Domain.Audit;
+using JOIN.Domain.Security;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
@@ -38,11 +40,12 @@ public sealed class DeleteRoleCommandHandler(
             return Response<bool>.Error("No se puede eliminar un rol del sistema. Es requerido para el funcionamiento de la aplicacion.");
         }
 
-        // Defense in depth: refuse to delete a role that still has active assignments in the caller's tenant.
-        // The count is CompanyId-scoped (RoleRepository.CountActiveUsersByRoleIdAsync filters by tenant),
-        // so users in other companies do not block the delete here.
-        var usersCount = await roleRepository.CountActiveUsersByRoleIdAsync(
-            existing.Id, currentUserService.CompanyId, cancellationToken);
+        // SPEC 41 (decision 2026-10-08): user assignments are references and block the delete in ANY
+        // company (a role is shared across companies through RoleCompany). Before SPEC 41 only the caller's
+        // tenant was counted, so a role still assigned in another company could be deleted.
+        var roleId = existing.Id;
+        var usersCount = (await unitOfWork.GetRepository<UserRoleCompany>()
+            .GetAllIncludingDeletedAsync(urc => urc.GcRecord == 0 && urc.RoleId == roleId)).Count();
         if (usersCount > 0)
         {
             logger.LogWarning(
@@ -67,9 +70,15 @@ public sealed class DeleteRoleCommandHandler(
 
         // Stamp GcRecord with the yyyyMMdd UTC int, matching the project-wide soft-delete convention
         // (see BaseAuditableEntity doc + Country/Person/Project/... handlers).
-        existing.GcRecord = BaseAuditableEntity.GetDeletionGcRecordStamp();
-        existing.LastModified = DateTime.UtcNow;
+        var deletedAtUtc = DateTime.UtcNow;
+        existing.GcRecord = BaseAuditableEntity.GetDeletionGcRecordStamp(deletedAtUtc);
+        existing.LastModified = deletedAtUtc;
         existing.LastModifiedBy = modifiedBy;
+
+        // SPEC 41 (decision 2026-10-08): the role's permissions and company links are composition and are
+        // soft-deleted with it, with the same stamp, so RestoreRole can bring them back together.
+        await MarkAsDeletedAsync<RoleSystemOption>(o => o.GcRecord == 0 && o.RoleId == roleId, deletedAtUtc);
+        await MarkAsDeletedAsync<RoleCompany>(rc => rc.GcRecord == 0 && rc.RoleId == roleId, deletedAtUtc);
 
         await roleRepository.UpdateAsync(existing, cancellationToken);
         var affected = await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -93,5 +102,16 @@ public sealed class DeleteRoleCommandHandler(
             Message = "Role deleted successfully.",
             Data = true
         };
+    }
+
+    private async Task MarkAsDeletedAsync<T>(Expression<Func<T, bool>> predicate, DateTime deletedAtUtc)
+        where T : BaseAuditableEntity
+    {
+        var repository = unitOfWork.GetRepository<T>();
+        foreach (var row in await repository.GetAllIncludingDeletedAsync(predicate))
+        {
+            row.MarkAsDeleted(deletedAtUtc);
+            await repository.UpdateAsync(row);
+        }
     }
 }

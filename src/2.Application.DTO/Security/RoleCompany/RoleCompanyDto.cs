@@ -1,3 +1,5 @@
+using JOIN.Application.DTO.Common;
+
 // Copyright (c) 2026-2027 JOIN Inc. All rights reserved.
 // See LICENSE in the project root for license information.
 
@@ -7,7 +9,7 @@ namespace JOIN.Application.DTO.Security.RoleCompany;
 /// Detailed data transfer object for a RoleCompany junction.
 /// CompanyId is intentionally omitted: it always comes from the caller's token.
 /// </summary>
-public sealed record RoleCompanyDto
+public sealed record RoleCompanyDto : SoftDeletableDto
 {
     public Guid Id { get; init; }
     public Guid RoleId { get; init; }

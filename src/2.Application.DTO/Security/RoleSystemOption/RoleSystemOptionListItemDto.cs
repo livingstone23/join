@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Security;
 
 /// <summary>
 /// Data transfer object for paged listings of role-system-option permissions.
 /// </summary>
-public sealed record RoleSystemOptionListItemDto
+public sealed record RoleSystemOptionListItemDto : SoftDeletableDto
 {
     public Guid Id { get; init; }
     public Guid CompanyId { get; init; }

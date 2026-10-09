@@ -17,4 +17,5 @@ public sealed record GetRoleCompaniesPagedQuery(
     bool? IsActive,
     int Page = 1,
     int PageSize = 20,
-    Guid? CompanyId = null) : IRequest<Response<PagedResult<RoleCompanyListItemDto>>>;
+    Guid? CompanyId = null,
+    bool? IncludeDeleted = null) : IRequest<Response<PagedResult<RoleCompanyListItemDto>>>;

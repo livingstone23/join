@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Data Transfer Object (DTO) representing a single row in the paginated company module listing.
 /// </summary>
-public sealed record CompanyModuleListItemDto
+public sealed record CompanyModuleListItemDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the company module assignment.

@@ -10,7 +10,9 @@ namespace JOIN.Application.UseCases.Security.UserCompanies.Queries.GetUserCompan
 /// Handles the retrieval of the companies linked to a user.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create engine-agnostic read connections.</param>
-public sealed class GetUserCompaniesQueryHandler(ISqlConnectionFactory connectionFactory)
+public sealed class GetUserCompaniesQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetUserCompaniesQuery, Response<IEnumerable<UserCompanyDto>>>
 {
     private const string UserExistsSql = """
@@ -22,6 +24,7 @@ public sealed class GetUserCompaniesQueryHandler(ISqlConnectionFactory connectio
 
     private const string UserCompaniesSql = """
         SELECT
+            uc.GcRecord,
             c.Id AS CompanyId,
             c.Name AS CompanyName,
             c.TaxId,
@@ -30,7 +33,7 @@ public sealed class GetUserCompaniesQueryHandler(ISqlConnectionFactory connectio
         INNER JOIN Common.Companies c
             ON c.Id = uc.CompanyId
         WHERE uc.UserId = @UserId
-          AND uc.GcRecord = 0
+          {0}
           AND c.GcRecord = 0
         ORDER BY c.Name;
         """;
@@ -60,13 +63,19 @@ public sealed class GetUserCompaniesQueryHandler(ISqlConnectionFactory connectio
         }
 
         var companies = (await connection.QueryAsync<UserCompanySqlRow>(
-            new CommandDefinition(UserCompaniesSql, new { request.UserId }, cancellationToken: cancellationToken)))
+            new CommandDefinition(
+                string.Format(
+                    UserCompaniesSql,
+                    SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted) ? string.Empty : "AND uc.GcRecord = 0"),
+                new { request.UserId },
+                cancellationToken: cancellationToken)))
             .Select(item => new UserCompanyDto
             {
                 CompanyId = item.CompanyId,
                 CompanyName = item.CompanyName ?? string.Empty,
                 TaxId = item.TaxId ?? string.Empty,
-                IsDefault = item.IsDefault
+                IsDefault = item.IsDefault,
+                GcRecord = item.GcRecord
             })
             .OrderByDescending(item => item.IsDefault)
             .ThenBy(item => item.CompanyName)
@@ -86,5 +95,6 @@ public sealed class GetUserCompaniesQueryHandler(ISqlConnectionFactory connectio
         public string? CompanyName { get; set; }
         public string? TaxId { get; set; }
         public bool IsDefault { get; set; }
+        public int GcRecord { get; set; }
     }
 }

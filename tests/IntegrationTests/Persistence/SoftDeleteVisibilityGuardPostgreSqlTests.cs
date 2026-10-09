@@ -65,9 +65,9 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
 
             var response = await GetListAsync(client, testCase, rows.Tag, includeDeleted: true, companyId: companyB);
 
-            if (testCase.SuperAdminOnly)
+            if (testCase.SuperAdminOnly || (testCase.ManagerForbidden && role == "Manager"))
             {
-                response.StatusCode.Should().Be(HttpStatusCode.Forbidden, $"{caseName} is restricted to SuperAdmin ({role})");
+                response.StatusCode.Should().Be(HttpStatusCode.Forbidden, $"{caseName} is restricted by role ({role})");
                 continue;
             }
 
@@ -98,7 +98,7 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
         var withDeleted = await ListIdsAsync(client, testCase, rows, includeDeleted: true, companyId: null);
         withDeleted.Should().BeEquivalentTo(new[] { rows.ActiveA, rows.DeletedA }, $"{caseName}: SuperAdmin sees active and deleted rows of the resolved company");
 
-        if (testCase.TenantScoped)
+        if (testCase.TenantScoped && testCase.CompanyOverride)
         {
             var otherCompany = await ListIdsAsync(client, testCase, rows, includeDeleted: true, companyId: companyB, useCompanyBKey: true);
             otherCompany.Should().BeEquivalentTo(new[] { rows.ActiveB!.Value }, $"{caseName}: SuperAdmin can request another company explicitly");
@@ -237,6 +237,216 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
         return (person.GcRecord, address.GcRecord);
     }
 
+    // ── Etapa 3: empresas, módulos de empresa, membresías y borrado de roles/empresas ──
+
+    [Fact]
+    public async Task Companies_DeletedCompanyIsVisibleOnlyToSuperAdmin_AndCanBeRestored()
+    {
+        var (companyA, _) = await SeedCompaniesAsync();
+        var tag = $"v{Guid.NewGuid():N}"[..12];
+        Guid deletedId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var deleted = new Company { Name = $"{tag}d", TaxId = $"T{Guid.NewGuid():N}"[..16], IsActive = true, GcRecord = DeletedStamp, CreatedBy = Creator };
+            db.Add(deleted);
+            await db.SaveChangesAsync();
+            deletedId = deleted.Id;
+        }
+
+        using var superAdmin = await CreateClientAsync(companyA, "SuperAdmin");
+        (await PagedIdsAsync(superAdmin, $"/api/v1/Companies?pageNumber=1&pageSize=100&searchTerm={tag}")).Should().NotContain(deletedId);
+        (await PagedIdsAsync(superAdmin, $"/api/v1/Companies?pageNumber=1&pageSize=100&searchTerm={tag}&includeDeleted=true")).Should().Contain(deletedId);
+
+        // GET /Companies is SuperAdmin/SuperAdminCompany only; a company admin sees its own company, never deleted ones.
+        using (var companyAdmin = await CreateClientAsync(companyA, "SuperAdminCompany"))
+        {
+            (await PagedIdsAsync(companyAdmin, $"/api/v1/Companies?pageNumber=1&pageSize=100&searchTerm={tag}&includeDeleted=true")).Should().NotContain(deletedId);
+        }
+
+        var restored = await superAdmin.PostAsync($"/api/v1/Companies/{deletedId}/restore", content: null);
+        restored.StatusCode.Should().Be(HttpStatusCode.OK, await restored.Content.ReadAsStringAsync());
+        (await PagedIdsAsync(superAdmin, $"/api/v1/Companies?pageNumber=1&pageSize=100&searchTerm={tag}")).Should().Contain(deletedId);
+    }
+
+    [Fact]
+    public async Task DeleteCompany_WithActiveData_ShouldAnswerConflict_WhileAnEmptyCompanyIsDeleted()
+    {
+        var (companyA, companyB) = await SeedCompaniesAsync();
+        using var superAdmin = await CreateClientAsync(companyA, "SuperAdmin");
+
+        // companyA holds the SuperAdmin's own membership (UserCompany) -> active data.
+        var inUse = await superAdmin.DeleteAsync($"/api/v1/Companies/{companyA}");
+        inUse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await inUse.Content.ReadAsStringAsync()).Should().Contain("COMPANY_IN_USE").And.Contain("Active UserCompany: 1");
+
+        var empty = await superAdmin.DeleteAsync($"/api/v1/Companies/{companyB}");
+        empty.StatusCode.Should().Be(HttpStatusCode.OK, await empty.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task CompanyModules_DeletedAssignmentIsVisibleToSuperAdmin_AndCanBeRestored()
+    {
+        var (companyA, _) = await SeedCompaniesAsync();
+        Guid assignmentId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var module = new SystemModule { Name = $"VM{Guid.NewGuid():N}"[..20], CreatedBy = Creator };
+            db.Add(module);
+            var assignment = new CompanyModule { CompanyId = companyA, ModuleId = module.Id, GcRecord = DeletedStamp, CreatedBy = Creator };
+            db.Add(assignment);
+            await db.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        using var superAdmin = await CreateClientAsync(companyA, "SuperAdmin");
+        var listUrl = $"/api/v1/CompanyModules/by-admin?companyId={companyA}&pageNumber=1&pageSize=100";
+        (await PagedIdsAsync(superAdmin, listUrl)).Should().NotContain(assignmentId);
+        (await PagedIdsAsync(superAdmin, listUrl + "&includeDeleted=true")).Should().Contain(assignmentId);
+
+        var restored = await superAdmin.PostAsync($"/api/v1/CompanyModules/{assignmentId}/restore?companyId={companyA}", content: null);
+        restored.StatusCode.Should().Be(HttpStatusCode.OK, await restored.Content.ReadAsStringAsync());
+        (await PagedIdsAsync(superAdmin, listUrl)).Should().Contain(assignmentId);
+    }
+
+    [Fact]
+    public async Task UserCompanies_RemovedMembershipIsVisibleToSuperAdmin_AndRestoreBringsItsRolesBack()
+    {
+        var (companyA, companyB) = await SeedCompaniesAsync();
+        Guid userId;
+        Guid assignmentId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = $"m{Guid.NewGuid():N}"[..12], Email = $"m{Guid.NewGuid():N}"[..12] + "@t.local" };
+            user.NormalizedUserName = user.UserName!.ToUpperInvariant();
+            user.NormalizedEmail = user.Email!.ToUpperInvariant();
+            user.SecurityStamp = Guid.NewGuid().ToString();
+            var role = NewRole($"v{Guid.NewGuid():N}"[..12]);
+            db.AddRange(user, role);
+            db.Add(new UserCompany { UserId = user.Id, CompanyId = companyA, IsDefault = true, CreatedBy = Creator });
+            // Removed membership in B together with its role assignment (same RemoveUserCompany stamp).
+            db.Add(new UserCompany { UserId = user.Id, CompanyId = companyB, GcRecord = DeletedStamp, CreatedBy = Creator });
+            var assignment = new UserRoleCompany { UserId = user.Id, CompanyId = companyB, RoleId = role.Id, GcRecord = DeletedStamp, CreatedBy = Creator };
+            db.Add(assignment);
+            await db.SaveChangesAsync();
+            userId = user.Id;
+            assignmentId = assignment.Id;
+        }
+
+        using var superAdmin = await CreateClientAsync(companyA, "SuperAdmin");
+        (await MembershipCompaniesAsync(superAdmin, userId, includeDeleted: false)).Should().BeEquivalentTo(new[] { companyA });
+        (await MembershipCompaniesAsync(superAdmin, userId, includeDeleted: true)).Should().BeEquivalentTo(new[] { companyA, companyB });
+
+        using (var manager = await CreateClientAsync(companyA, "Manager"))
+        {
+            // GET /Users/{id}/companies is SuperAdmin-only (pre-existing); a Manager cannot read memberships at all.
+            var forbidden = await manager.GetAsync($"/api/v1/Users/{userId}/companies?includeDeleted=true");
+            forbidden.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        }
+
+        var restored = await superAdmin.PostAsync($"/api/v1/Users/{userId}/companies/{companyB}/restore", content: null);
+        restored.StatusCode.Should().Be(HttpStatusCode.OK, await restored.Content.ReadAsStringAsync());
+        (await MembershipCompaniesAsync(superAdmin, userId, includeDeleted: false)).Should().BeEquivalentTo(new[] { companyA, companyB });
+
+        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await verifyDb.Set<UserRoleCompany>().IgnoreQueryFilters().AsNoTracking().SingleAsync(urc => urc.Id == assignmentId))
+            .GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord, "the role removed with the membership comes back with it");
+    }
+
+    [Fact]
+    public async Task DeleteRole_ShouldCascadeToPermissionsAndLinks_AndRestoreRoleBringsThemBack()
+    {
+        var (companyA, _) = await SeedCompaniesAsync();
+        var (roleId, permissionId, linkId) = await SeedRoleWithChildrenAsync(companyA);
+
+        using (var companyAdmin = await CreateClientAsync(companyA, "SuperAdminCompany"))
+        {
+            var deleted = await companyAdmin.DeleteAsync($"/api/v1/Roles/{roleId}");
+            deleted.StatusCode.Should().Be(HttpStatusCode.NoContent, await deleted.Content.ReadAsStringAsync());
+        }
+
+        var stamps = await ReadRoleStampsAsync(roleId, permissionId, linkId);
+        stamps.Role.Should().BeGreaterThan(0);
+        stamps.Permission.Should().Be(stamps.Role, "permissions are composition of the role");
+        stamps.Link.Should().Be(stamps.Role, "company links are composition of the role");
+
+        using var superAdmin = await CreateClientAsync(companyA, "SuperAdmin");
+        var restored = await superAdmin.PostAsync($"/api/v1/Roles/{roleId}/restore", content: null);
+        restored.StatusCode.Should().Be(HttpStatusCode.OK, await restored.Content.ReadAsStringAsync());
+        (await ReadRoleStampsAsync(roleId, permissionId, linkId)).Should().Be((0, 0, 0));
+    }
+
+    [Fact]
+    public async Task DeleteRole_WithUsersInAnotherCompany_ShouldAnswerConflict()
+    {
+        var (companyA, companyB) = await SeedCompaniesAsync();
+        var (roleId, _, _) = await SeedRoleWithChildrenAsync(companyA);
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var user = await db.Users.AsNoTracking().FirstAsync();
+            db.Add(new UserRoleCompany { UserId = user.Id, CompanyId = companyB, RoleId = roleId, CreatedBy = Creator });
+            await db.SaveChangesAsync();
+        }
+
+        using var companyAdmin = await CreateClientAsync(companyA, "SuperAdminCompany");
+        var response = await companyAdmin.DeleteAsync($"/api/v1/Roles/{roleId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict, "SPEC 41: users in ANY company block the delete");
+        (await response.Content.ReadAsStringAsync()).Should().Contain("ROLE_HAS_USERS");
+    }
+
+    private async Task<(Guid RoleId, Guid PermissionId, Guid LinkId)> SeedRoleWithChildrenAsync(Guid companyId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var role = NewRole($"v{Guid.NewGuid():N}"[..12]);
+        var module = new SystemModule { Name = $"VM{Guid.NewGuid():N}"[..20], CreatedBy = Creator };
+        db.AddRange(role, module);
+        var option = new SystemOption { ModuleId = module.Id, Name = "Opt", Route = $"/v/{Guid.NewGuid():N}", CreatedBy = Creator };
+        db.Add(option);
+        var permission = new RoleSystemOption { RoleId = role.Id, SystemOptionId = option.Id, CompanyId = companyId, CanRead = true, CreatedBy = Creator };
+        var link = new RoleCompany { RoleId = role.Id, CompanyId = companyId, CreatedBy = Creator };
+        db.AddRange(permission, link);
+        await db.SaveChangesAsync();
+        return (role.Id, permission.Id, link.Id);
+    }
+
+    private async Task<(int Role, int Permission, int Link)> ReadRoleStampsAsync(Guid roleId, Guid permissionId, Guid linkId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var role = await db.Set<ApplicationRole>().IgnoreQueryFilters().AsNoTracking().SingleAsync(r => r.Id == roleId);
+        var permission = await db.Set<RoleSystemOption>().IgnoreQueryFilters().AsNoTracking().SingleAsync(p => p.Id == permissionId);
+        var link = await db.Set<RoleCompany>().IgnoreQueryFilters().AsNoTracking().SingleAsync(l => l.Id == linkId);
+        return (role.GcRecord, permission.GcRecord, link.GcRecord);
+    }
+
+    private static async Task<IReadOnlyList<Guid>> PagedIdsAsync(HttpClient client, string url)
+    {
+        var response = await client.GetAsync(url);
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        using var document = JsonDocument.Parse(body);
+        return document.RootElement.GetProperty("data").GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid())
+            .ToList();
+    }
+
+    private static async Task<IReadOnlyList<Guid>> MembershipCompaniesAsync(HttpClient client, Guid userId, bool includeDeleted)
+    {
+        var response = await client.GetAsync($"/api/v1/Users/{userId}/companies" + (includeDeleted ? "?includeDeleted=true" : string.Empty));
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        using var document = JsonDocument.Parse(body);
+        return document.RootElement.GetProperty("data").EnumerateArray()
+            .Select(item => item.GetProperty("companyId").GetGuid())
+            .ToList();
+    }
+
     // ── catalog of listing endpoints ─────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -258,7 +468,9 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
         Func<ApplicationDbContext, string, Guid, Guid, Task<SeededRows>> Seed,
         bool SuperAdminOnly = false,
         bool CompanyByHeader = false,
-        string? RestoreRoute = null)
+        string? RestoreRoute = null,
+        bool CompanyOverride = true,
+        bool ManagerForbidden = false)
     {
         /// <summary>
         /// Builds the listing URL. A route with a <c>{key}</c> placeholder (per-person child listings) takes
@@ -268,7 +480,9 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
         {
             var url = Route.Contains("{key}")
                 ? $"/api/v1/{Route.Replace("{key}", key)}?pageNumber={page}"
-                : $"/api/v1/{Route}?pageNumber={page}&pageSize=100&{FilterParameter}={key}";
+                : string.IsNullOrEmpty(FilterParameter)
+                    ? $"/api/v1/{Route}?pageNumber={page}&pageSize=100"
+                    : $"/api/v1/{Route}?pageNumber={page}&pageSize=100&{FilterParameter}={key}";
             if (includeDeleted)
             {
                 url += "&includeDeleted=true";
@@ -365,6 +579,44 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
             await db.SaveChangesAsync();
             return await SeedGlobalAsync(db, tag, name => new SystemOption { ModuleId = module.Id, Name = name, Route = $"/{name}" });
         }, SuperAdminOnly: true),
+        // ── Etapa 3: seguridad y empresas ──
+        ["Role"] = new("Roles", "Roles/detailed", "name", false, async (db, tag, _, _) =>
+        {
+            var active = NewRole($"{tag}a");
+            var deleted = NewRole($"{tag}d");
+            deleted.GcRecord = DeletedStamp;
+            db.AddRange(active, deleted);
+            await db.SaveChangesAsync();
+            return new SeededRows(tag, active.Id, deleted.Id, null);
+        }, RestoreRoute: "Roles", ManagerForbidden: true),
+        ["RoleCompany"] = new("RoleCompanies", "RoleCompanies", string.Empty, true, async (db, tag, a, b) =>
+        {
+            var roleA = NewRole($"{tag}r1");
+            var roleB = NewRole($"{tag}r2");
+            db.AddRange(roleA, roleB);
+            // Different roles so restoring the deleted link never meets an active (RoleId, CompanyId) duplicate.
+            var activeA = new RoleCompany { RoleId = roleA.Id, CompanyId = a, CreatedBy = Creator };
+            var deletedA = new RoleCompany { RoleId = roleB.Id, CompanyId = a, GcRecord = DeletedStamp, CreatedBy = Creator };
+            var activeB = new RoleCompany { RoleId = roleA.Id, CompanyId = b, CreatedBy = Creator };
+            db.AddRange(activeA, deletedA, activeB);
+            await db.SaveChangesAsync();
+            return new SeededRows(tag, activeA.Id, deletedA.Id, activeB.Id);
+        }, ManagerForbidden: true),
+        ["RoleSystemOption"] = new("RoleSystemOption", "RoleSystemOptions", string.Empty, true, async (db, tag, a, b) =>
+        {
+            var role = NewRole($"{tag}r");
+            var module = new SystemModule { Name = $"M{tag}", CreatedBy = Creator };
+            db.AddRange(role, module);
+            var option1 = new SystemOption { ModuleId = module.Id, Name = $"{tag}1", Route = $"/{tag}/1", CreatedBy = Creator };
+            var option2 = new SystemOption { ModuleId = module.Id, Name = $"{tag}2", Route = $"/{tag}/2", CreatedBy = Creator };
+            db.AddRange(option1, option2);
+            var activeA = new RoleSystemOption { RoleId = role.Id, SystemOptionId = option1.Id, CompanyId = a, CanRead = true, CreatedBy = Creator };
+            var deletedA = new RoleSystemOption { RoleId = role.Id, SystemOptionId = option2.Id, CompanyId = a, CanRead = true, GcRecord = DeletedStamp, CreatedBy = Creator };
+            var activeB = new RoleSystemOption { RoleId = role.Id, SystemOptionId = option1.Id, CompanyId = b, CanRead = true, CreatedBy = Creator };
+            db.AddRange(activeA, deletedA, activeB);
+            await db.SaveChangesAsync();
+            return new SeededRows(tag, activeA.Id, deletedA.Id, activeB.Id);
+        }, CompanyOverride: false),
         // ── Etapa 2: personas ──
         ["Person"] = new("Persons", "Persons", "firstName", true, async (db, tag, a, b) =>
         {
@@ -490,6 +742,15 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
             await db.SaveChangesAsync();
             return new SeededRows(person[a].ToString(), activeA.Id, deletedA.Id, activeB.Id, person[b].ToString());
         }, RestoreRoute: route);
+
+    private static ApplicationRole NewRole(string name) => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = name,
+        NormalizedName = name.ToUpperInvariant(),
+        ConcurrencyStamp = Guid.NewGuid().ToString(),
+        CreatedBy = Creator
+    };
 
     private static async Task<Guid> SeedIdentificationTypeAsync(ApplicationDbContext db)
     {
@@ -644,7 +905,7 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
 
                 var module = new SystemModule { Name = $"VM{Guid.NewGuid():N}"[..20], CreatedBy = Creator };
                 db.Add(module);
-                foreach (var resource in Cases.Values.Select(c => c.Resource).Distinct())
+                foreach (var resource in Cases.Values.Select(c => c.Resource).Concat(new[] { "Companies", "CompanyModules", "Users" }).Distinct())
                 {
                     var option = new SystemOption
                     {
@@ -662,6 +923,8 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
                         CompanyId = companyId,
                         CanRead = true,
                         CanCreate = true,
+                        CanUpdate = true,
+                        CanDelete = true,
                         CreatedBy = Creator
                     });
                 }

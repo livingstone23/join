@@ -5,7 +5,7 @@ namespace JOIN.Application.DTO.Common;
 /// <summary>
 /// Data Transfer Object (DTO) representing a company catalog item.
 /// </summary>
-public record CompanyDto
+public record CompanyDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the company identifier.
