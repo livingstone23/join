@@ -1,9 +1,10 @@
-# SPEC 50 — `main_postgresql`: port de las specs 40–49 y pendientes para llevar QA a PostgreSQL
+# SPEC 50 — `main_postgresql`: pendientes para llevar QA a PostgreSQL
 
 > **Status:** Borrador
-> **Depends on:** SPEC 39 (fork `main_postgresql`, `Implementado`) y las specs 40–49 que estén implementadas en `main` cuando arranque esta spec (se portan aquí). Rama de trabajo: `spec-50-postgresql-qa-readiness`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql` — nunca hacia `main`.
+> **Historia (2026-10-09):** vuelve a Borrador por cambio de alcance. El usuario decidió traer las specs de `main` al fork como **serie `-post`** (copias adaptadas a PostgreSQL de 40–49, 51 y 99, implementadas desde cero en el fork; ver `specs/README.md` → "Serie `-post`"). Se elimina la sección 0 (único `git merge main` + migración `Port_Specs_40_49`) con su fase F0 y sus criterios; la sección F pasa a verificar la convención de la serie. El resto (A–E) no cambia.
+> **Depends on:** SPEC 39 (fork `main_postgresql`, `Implementado`). No depende de las `-post`; si alguna ya está implementada al arrancar, sus tests `*PostgreSqlTests` entran en la paridad de E. Rama de trabajo: `spec-50-postgresql-qa-readiness`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql` — nunca hacia `main`.
 > **Date:** 2026-10-07
-> **Objective:** Traer al fork todo lo implementado en `main` después de SPEC 39 (specs 40–49) y convertirlo a PostgreSQL, y cerrar los pendientes que SPEC 39 dejó documentados, para que `main_postgresql` pueda reemplazar a SQL Server en el entorno de QA: búsquedas sin distinción de mayúsculas, el tipo de `DeclaredDate`, la configuración y el aprovisionamiento de la base de QA, la paridad de la suite de integración contra PostgreSQL, y el procedimiento para portar al fork las specs que se implementen en `main`. Al terminar esta spec, QA pasa a PostgreSQL.
+> **Objective:** Cerrar los pendientes que SPEC 39 dejó documentados, para que `main_postgresql` pueda reemplazar a SQL Server en el entorno de QA: búsquedas sin distinción de mayúsculas, el tipo de `DeclaredDate`, la configuración y el aprovisionamiento de la base de QA, y la paridad de la suite de integración contra PostgreSQL. Al terminar esta spec, QA pasa a PostgreSQL.
 
 ---
 
@@ -18,7 +19,7 @@ SPEC 39 dejó `main_postgresql` funcionando de punta a punta (migración `Initia
 | Configuración de conexión | `appsettings.json` apunta a un Postgres local provisional (`localhost:5432`, `postgres/postgres`); `.env.example` sigue con el formato de SQL Server y no declara `DatabaseProvider` | No hay forma documentada de apuntar el despliegue de QA a su Postgres |
 | Base de QA | QA corre hoy sobre SQL Server (`join_db_qa`) | No existe la base Postgres de QA ni una decisión sobre sus datos |
 | Suite de integración existente (26 tests) | Corre contra `Testcontainers.MsSql`; en el fork no puede pasar y el paso de CI se quitó (SPEC 39, Scope H) | Solo los 27 smoke tests protegen el fork: login, MFA, sesiones, filtros globales y registro quedan sin cobertura de integración |
-| Specs implementadas en `main` después del fork | SPEC 39 decidió "fork permanente, sin sincronización automática". Plan acordado (2026-10-07): las specs 40–49 se implementan en `main` sobre SQL Server y se traen al fork **una sola vez**, en esta spec | Sin ese paso, QA arrancaría en PostgreSQL sin las funcionalidades de 40–49; y lo que llegue de `main` sin convertir (migraciones, `HasFilter`, SQL) rompe el fork |
+| Specs implementadas en `main` después del fork | ~~Plan del 2026-10-07: traerlas una sola vez en esta spec con un `git merge main`.~~ Reemplazado el 2026-10-09 por la serie `-post` (README) | Fuera de esta spec: cada `-post` se implementa en su propia rama desde `main_postgresql` |
 
 ---
 
@@ -26,16 +27,9 @@ SPEC 39 dejó `main_postgresql` funcionando de punta a punta (migración `Initia
 
 **In:**
 
-### 0. Traer `main` al fork y convertir las specs 40–49
+### ~~0. Traer `main` al fork y convertir las specs 40–49~~
 
-- **Flujo acordado:** las specs 40–49 se implementan en `main` (SQL Server), cada una con su rama `spec-NN-...` desde `main`. Esta spec se trabaja en `spec-50-postgresql-qa-readiness`, creada desde `main_postgresql`, que hace **un único** `git merge main` al inicio. `main` nunca recibe nada del fork.
-- **Por qué desde `main_postgresql` y no una rama temporal desde `main` con `merge main_postgresql`:** ambas direcciones producen los mismos conflictos y el mismo árbol final (git compara contra el ancestro común `8294abb`), pero esta deja la historia como "main entra al fork", sigue la convención `spec-NN-slug` y evita que una PR equivocada lleve el fork a `main`.
-- **Migraciones:** las migraciones de SQL Server que lleguen de `main` (y los cambios que traigan a `ApplicationDbContextModelSnapshot.cs`) se **descartan**; se genera una migración incremental nueva contra Npgsql desde la diferencia del modelo (`dotnet ef migrations add Port_Specs_40_49`), y se inspecciona su `Up()` igual que en SPEC 39 (F2.5).
-- **Conflictos:** se resuelven conservando la forma PostgreSQL del fork (nombres en minúsculas, `LIMIT/OFFSET`, `TRUE`/`FALSE`, etc.) y agregando la lógica nueva de `main`.
-- **Lo que git no marca:** el código de 40–49 en archivos nuevos o que el fork no tocó entra **sin conflicto y en sintaxis SQL Server**. Por eso, después del merge, se vuelve a correr la auditoría de T-SQL de SPEC 39 sobre **todo** `src/` (no solo sobre los conflictos) y se aplica la lista de verificación de la sección F a cada hallazgo.
-- **Validación:** `EXPLAIN` de toda sentencia SQL contra la base migrada (técnica de SPEC 39) y suite completa de tests (unitarios + integración, sección E).
-- **Recomendación para las specs 40–49 mientras se implementan en `main`** (reduce el trabajo de este paso; ya lo exige `CLAUDE.md`): SQL portable — `COALESCE` y no `ISNULL`, `CONCAT` y no `+`, paginación vía `GetPaginationClause`, `CASE WHEN ... THEN 1 ELSE 0 END` y no `CAST(... AS bit)`, sin `TOP`, corchetes ni `STRING_SPLIT`. Los `HasFilter` siempre requerirán conversión.
-
+Eliminada el 2026-10-09 (ver Historia): lo reemplaza la serie `-post`.
 
 ### A. Búsquedas sin distinción de mayúsculas (`LIKE` → `ILIKE`)
 
@@ -67,21 +61,16 @@ SPEC 39 dejó `main_postgresql` funcionando de punta a punta (migración `Initia
 - `GlobalQueryFiltersGuardTests` cambia su `UseSqlServer(...)` por `UseNpgsql(...)` (solo construye el modelo, no abre conexión).
 - Los 26 tests existentes (`RegisterEndpointTests`, `AccountSessionsRevokeTests`, `RoleUserSessionRepositoryIntegrationTests`, `MfaLoginChallengeTests`, `GlobalQueryFiltersIntegrationTests`, `GlobalQueryFiltersGuardTests`) deben pasar contra PostgreSQL; cualquier ajuste se limita a los tests salvo que revele un defecto real del fork, que se corrige y se anota.
 - CI: el job `integration-tests-postgres` corre la suite completa (sin `--filter`).
+- Los tests `*PostgreSqlTests` de las specs `-post` ya implementadas pasan a usar la factory unificada (mantienen el nombre).
 
-### F. Procedimiento para portar specs de `main` al fork
+### F. Procedimiento para traer specs de `main` al fork
 
-- Agregar a `specs/README.md` de `main_postgresql` una sección "Port al fork PostgreSQL" con la lista de verificación que se aplica cada vez que una spec se implementa en `main` y se trae a `main_postgresql`:
-  1. `HasFilter` → comillas dobles, nombres en minúsculas y `TRUE`/`FALSE` (convención `ApplyLowerCaseNaming`, SPEC 39).
-  2. `HasColumnType` → sin tipos exclusivos de SQL Server (`nvarchar(max)`, `datetime2`, `bit`, `uniqueidentifier`).
-  3. SQL Dapper → sin corchetes, `ISNULL`, `TOP`, `+` entre strings, `OFFSET...FETCH`, `SYSUTCDATETIME`, `STRING_SPLIT`, `TRY_CAST`, hints `WITH (...)`; booleanos con `TRUE`/`FALSE`; búsquedas con `ILIKE`.
-  4. Migraciones: no se copian las de `main`; se genera una migración incremental nueva en el fork contra Npgsql.
-  5. Validación: `EXPLAIN` de cada sentencia nueva contra la base migrada (técnica de SPEC 39) + `dotnet test` de la suite de integración.
-- Marcar en el índice qué specs de `main` ya están portadas (columna o nota).
+- **Resuelto por la serie `-post` (2026-10-09):** `specs/README.md` del fork tiene la sección "Serie `-post`" con las reglas de la serie, las convenciones PostgreSQL (incluida la lista de verificación que esta sección pedía: `HasFilter`, tipos, SQL Dapper, migraciones, `EXPLAIN`, tests) y el orden de implementación, y el índice lista el estado de cada `-post`.
+- Al cerrar esta spec solo se verifica que esa sección siga vigente y que el índice refleje el estado real de cada `-post`.
 
 **Out of scope:**
 
-- Specs de `main` que se implementen **después** de cerrar esta spec: se portan con el procedimiento de la sección F, cada una en su momento.
-- Specs 40–49 que no estén implementadas en `main` cuando arranque esta spec: quedan para el procedimiento de F.
+- Traer specs de `main` al fork: lo hace la serie `-post` (README), no esta spec.
 - El permiso `pull-requests: write` que falta en el `ci.yml` de **`main`** (mismo problema que corrigió SPEC 39 en el fork): pertenece a `main`, se resuelve allí.
 - Índices únicos por nombre sin distinción de mayúsculas a nivel de base (ver Decisiones).
 - Migración de datos desde la base SQL Server de QA, salvo que la Decisión pendiente 2 la incluya.
@@ -106,16 +95,6 @@ Sin cambios de dominio.
 ---
 
 ## Implementation plan
-
-### F0 — Traer `main` y convertir las specs 40–49
-
-1. `git checkout main_postgresql && git pull && git checkout -b spec-50-postgresql-qa-readiness && git merge main`.
-2. Resolver conflictos conservando la forma PostgreSQL del fork (Scope 0).
-3. Descartar las migraciones de SQL Server recibidas y el snapshot que traigan; restaurar el snapshot del fork; `dotnet ef migrations add Port_Specs_40_49` contra Npgsql; inspeccionar el `Up()` (sin `nvarchar`/`datetime2`/`uniqueidentifier`/`bit`/corchetes; `HasFilter` en minúsculas con `TRUE`).
-4. Auditoría de T-SQL sobre todo `src/` (script de SPEC 39) → convertir cada hallazgo con la lista de la sección F.
-5. `dotnet ef database update` sobre una base vacía (`InitialPostgres` + `Port_Specs_40_49`) y arranque de la API con seed.
-6. `EXPLAIN` de todo el SQL → 0 errores; `dotnet build -c Release` → 0 errores.
-7. Registrar en la spec, como "Ajuste por SPEC 50", qué specs de 40–49 se portaron y qué hallazgos aparecieron.
 
 ### F1 — `LIKE` → `ILIKE`
 
@@ -153,8 +132,7 @@ Sin cambios de dominio.
 
 ### F6 — Procedimiento de port
 
-1. Sección "Port al fork PostgreSQL" en `specs/README.md` (Scope F).
-2. Registrar el estado de port de las specs 40–49: "portada en SPEC 50" para las que entraron en F0, "pendiente" para el resto.
+1. Verificar la sección "Serie `-post`" de `specs/README.md` y el estado de cada `-post` en el índice (Scope F).
 
 ### F7 — Verificación final
 
@@ -167,12 +145,6 @@ Sin cambios de dominio.
 ---
 
 ## Acceptance criteria
-
-### F0 — Port de las specs 40–49
-- [ ] `main_postgresql` contiene todos los commits de `main` hasta el inicio de esta spec, sin ninguna migración de SQL Server en `src/3.Persistence/Migrations/`.
-- [ ] Existe la migración `Port_Specs_40_49` generada contra Npgsql y aplica limpio sobre `InitialPostgres`.
-- [ ] La auditoría de T-SQL sobre todo `src/` no encuentra ningún patrón exclusivo de SQL Server.
-- [ ] `EXPLAIN` de todas las sentencias SQL contra la base migrada → 0 errores.
 
 ### F1 — Búsquedas
 - [ ] Ningún archivo bajo `src/2.Application/UseCases` ni `src/3.Persistence/Repositories` contiene `LIKE` (solo `ILIKE`).
@@ -195,7 +167,7 @@ Sin cambios de dominio.
 - [ ] El job de CI corre la suite completa sin filtro.
 
 ### F6 — Port
-- [ ] `specs/README.md` del fork contiene el procedimiento de port y el estado de port de las specs 40–49.
+- [ ] `specs/README.md` del fork mantiene la sección "Serie `-post`" y el índice refleja el estado de cada `-post`.
 
 ### General
 - [ ] `dotnet build -c Release` → 0 errores, 0 warnings nuevos; gate de cobertura ≥ 90 %; CI verde en `main_postgresql`.
@@ -225,13 +197,12 @@ Sin cambios de dominio.
 | Algún test de integración existente revele un defecto real del fork no cubierto por los smoke tests de SPEC 39 | Es el objetivo de F5: se corrige en esta spec y se anota como "Ajuste por SPEC 50". |
 | `ILIKE` cambia resultados que algún usuario de QA esperaba sensibles a mayúsculas | Ningún filtro actual lo es en SQL Server; `ILIKE` restaura el comportamiento previo. |
 | Credenciales de QA filtradas al repo durante F3/F4 | Solo variables de entorno; revisión del diff antes de cada commit. |
-| Specs de `main` implementadas mientras esta spec está en curso | Se traen con un `git merge main` adicional antes de ejecutar F4 y se aplica F0.3–F0.6 sobre lo nuevo. |
-| Conflictos del merge de F0 resueltos a favor de `main` por error (reintroducen T-SQL o migraciones de SQL Server) | La auditoría de F0.4 y el criterio de aceptación de F0 los detectan; `EXPLAIN` y la suite completa confirman. |
+| Una `-post` implementada mientras esta spec está en curso cambia SQL que F1 convierte a `ILIKE` | Las `-post` ya escriben sus búsquedas con `ILIKE` (convención 6 del README); F1 se aplica sobre el estado de la rama al momento de implementarla. |
 | Una PR de esta rama dirigida a `main` llevaría todo PostgreSQL a `main` | La rama sale de `main_postgresql` y su PR apunta a `main_postgresql`; verificar la base de la PR antes de crearla. |
 
 ## What is **not** in this spec
 
-- Specs de `main` posteriores al cierre de esta spec (se portan con el procedimiento de F).
+- Traer specs de `main` al fork (serie `-post`).
 - Cambios en `main` (incluido su `ci.yml`).
 - Migración de datos de SQL Server, salvo que la Decisión 2 la incluya.
 - Cambios de dominio o de negocio.
