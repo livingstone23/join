@@ -16,7 +16,8 @@ namespace JOIN.Application.UseCases.Common.CommunicationChannels.Queries;
 /// <param name="paginationOptions">Configurable pagination defaults shared across paged endpoints.</param>
 public class GetCommunicationChannelsPagedQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetCommunicationChannelsPagedQuery, Response<PagedResult<CommunicationChannelListItemDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -35,7 +36,11 @@ public class GetCommunicationChannelsPagedQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE cc.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND cc.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
@@ -48,6 +53,7 @@ public class GetCommunicationChannelsPagedQueryHandler(
         var sql = $"""
             SELECT
                 cc.Id,
+                cc.GcRecord,
                 cc.Name,
                 cc.Provider,
                 cc.Code,

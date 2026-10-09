@@ -10,5 +10,5 @@ namespace JOIN.Application.UseCases.Common.Countries.Queries;
 /// <param name="PageNumber">The requested page number.</param>
 /// <param name="PageSize">The requested number of items per page.</param>
 /// <param name="SearchTerm">Optional search term to filter by country name.</param>
-public record GetCountriesPagedQuery(int PageNumber = 1, int PageSize = 10, string? SearchTerm = null)
+public record GetCountriesPagedQuery(int PageNumber = 1, int PageSize = 10, string? SearchTerm = null, bool? IncludeDeleted = null)
     : IRequest<Response<PagedResult<CountryListItemDto>>>;

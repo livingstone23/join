@@ -4,4 +4,4 @@ using MediatR;
 
 namespace JOIN.Application.UseCases.Admin.TaxRegimes.Queries;
 
-public sealed record GetTaxRegimeByIdQuery(Guid Id) : IRequest<Response<TaxRegimeDto>>;
+public sealed record GetTaxRegimeByIdQuery(Guid Id, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<TaxRegimeDto>>;

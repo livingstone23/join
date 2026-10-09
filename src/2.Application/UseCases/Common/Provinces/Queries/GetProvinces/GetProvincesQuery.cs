@@ -17,5 +17,6 @@ public record GetProvincesQuery(
     int? PageSize = null,
     string? Name = null,
     string? Code = null,
-    Guid? CountryId = null)
+    Guid? CountryId = null,
+    bool? IncludeDeleted = null)
     : IRequest<Response<PagedResult<ProvinceDto>>>;

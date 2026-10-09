@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Data Transfer Object (DTO) used for paginated identification type list responses.
 /// </summary>
-public sealed record IdentificationTypeListItemDto
+public sealed record IdentificationTypeListItemDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the identification type.

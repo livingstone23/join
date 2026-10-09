@@ -93,7 +93,7 @@ public sealed class GetStreetTypeByIdQueryHandlerTests
 
         public GetStreetTypeByIdQueryHandler CreateHandler()
         {
-            return new GetStreetTypeByIdQueryHandler(ConnectionFactoryMock.Object);
+            return new GetStreetTypeByIdQueryHandler(ConnectionFactoryMock.Object, new Mock<ICurrentUserService>().Object);
         }
     }
 }

@@ -100,7 +100,7 @@ public sealed class GetCommunicationChannelByIdQueryHandlerTests
 
         public GetCommunicationChannelByIdQueryHandler CreateHandler()
         {
-            return new GetCommunicationChannelByIdQueryHandler(ConnectionFactoryMock.Object);
+            return new GetCommunicationChannelByIdQueryHandler(ConnectionFactoryMock.Object, new Mock<ICurrentUserService>().Object);
         }
     }
 }

@@ -5,7 +5,7 @@ namespace JOIN.Application.DTO.Common;
 /// <summary>
 /// Data Transfer Object (DTO) representing a country catalog item.
 /// </summary>
-public record CountryDto
+public record CountryDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the country.

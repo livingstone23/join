@@ -4,6 +4,8 @@ using JOIN.Application.Interface.Persistence;
 using JOIN.Application.UseCases.Admin.Areas.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
+using JOIN.Application.UnitTest.Common.TestDoubles;
+using JOIN.Domain.Messaging;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Admin.Areas.Commands.DeleteArea;
@@ -151,6 +153,106 @@ public sealed class DeleteAreaCommandHandlerTests
     }
 
     /// <summary>
+    /// SPEC 41: every active child type blocks the delete and is listed in the errors.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenActiveDependentsExist_ShouldReturnInUseWithDetails()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var area = new Area
+        {
+            CompanyId = companyId,
+            Name = "Support",
+            EntityStatusId = _fixture.Create<Guid>(),
+            GcRecord = 0
+        };
+
+        var context = new DeleteAreaCommandTestContext();
+        context.AreaRepositoryMock
+            .Setup(x => x.GetAsync(area.Id))
+            .ReturnsAsync(area);
+
+        context.AreaRepositoryMock
+            .Setup(x => x.UpdateAsync(area))
+            .ReturnsAsync(true);
+
+        context.UnitOfWorkMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var handler = context.CreateHandler();
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new Ticket { CompanyId = Guid.NewGuid(), AreaId = area.Id };
+        context.UnitOfWorkMock.SetupRepositoryRows<Ticket>([child1]);
+        var child2 = new TicketCompanyDefault { CompanyId = Guid.NewGuid(), AreaDefaultId = area.Id };
+        context.UnitOfWorkMock.SetupRepositoryRows<TicketCompanyDefault>([child2]);
+
+
+        // Act
+        var response = await handler.Handle(new DeleteAreaCommand(area.Id, companyId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("AREA_IN_USE");
+        response.Errors.Should().Equal("Active tickets: 1", "Active ticket company defaults: 1");
+        area.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
+    }
+
+    /// <summary>
+    /// SPEC 41: logically deleted children do not block the delete.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenDependentsAreDeleted_ShouldSoftDelete()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var area = new Area
+        {
+            CompanyId = companyId,
+            Name = "Support",
+            EntityStatusId = _fixture.Create<Guid>(),
+            GcRecord = 0
+        };
+
+        var context = new DeleteAreaCommandTestContext();
+        context.AreaRepositoryMock
+            .Setup(x => x.GetAsync(area.Id))
+            .ReturnsAsync(area);
+
+        context.AreaRepositoryMock
+            .Setup(x => x.UpdateAsync(area))
+            .ReturnsAsync(true);
+
+        context.UnitOfWorkMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var handler = context.CreateHandler();
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new Ticket { CompanyId = Guid.NewGuid(), AreaId = area.Id };
+        child1.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<Ticket>([child1]);
+        var child2 = new TicketCompanyDefault { CompanyId = Guid.NewGuid(), AreaDefaultId = area.Id };
+        child2.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<TicketCompanyDefault>([child2]);
+
+
+        // Act
+        var response = await handler.Handle(new DeleteAreaCommand(area.Id, companyId), CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeTrue();
+        response.Message.Should().Be("Area deleted successfully.");
+        response.Data.Should().Be(area.Id);
+        area.GcRecord.Should().BeGreaterThan(BaseAuditableEntity.ActiveGcRecord);
+
+        context.AreaRepositoryMock.Verify(x => x.UpdateAsync(area), Times.Once);
+        context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
     /// Registers a repository in the mocked unit of work using the generic resolution pattern.
     /// </summary>
     private static void SetupRepository<TEntity>(
@@ -171,7 +273,7 @@ public sealed class DeleteAreaCommandHandlerTests
             SetupRepository(UnitOfWorkMock, AreaRepositoryMock);
         }
 
-        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
+        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new() { DefaultValue = DefaultValue.Mock };
         public Mock<IGenericRepository<Area>> AreaRepositoryMock { get; } = new();
 
         public DeleteAreaCommandHandler CreateHandler()

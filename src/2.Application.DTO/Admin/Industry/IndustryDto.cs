@@ -1,9 +1,11 @@
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Data Transfer Object (DTO) representing a tenant-scoped industry catalog entry.
 /// </summary>
-public sealed record IndustryDto
+public sealed record IndustryDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the industry.

@@ -59,7 +59,7 @@ public sealed class GetStreetTypesPagedQueryHandlerTests
         response.Data.TotalCount.Should().Be(5);
         response.Data.TotalPages.Should().Be(1);
 
-        context.Connection.LastCommandText.Should().Contain("WHERE st.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain("AND st.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("st.Name LIKE @SearchTerm");
         context.Connection.LastCommandText.Should().Contain("st.Abbreviation LIKE @SearchTerm");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
@@ -159,7 +159,7 @@ public sealed class GetStreetTypesPagedQueryHandlerTests
 
         public GetStreetTypesPagedQueryHandler CreateHandler()
         {
-            return new GetStreetTypesPagedQueryHandler(ConnectionFactoryMock.Object, PaginationOptions);
+            return new GetStreetTypesPagedQueryHandler(ConnectionFactoryMock.Object, PaginationOptions, new Mock<ICurrentUserService>().Object);
         }
     }
 }

@@ -3,6 +3,8 @@ using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.UseCases.Admin.IncomeRanges.Commands;
 using JOIN.Domain.Admin;
+using JOIN.Application.UnitTest.Common.TestDoubles;
+using JOIN.Domain.Audit;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Admin.IncomeRanges.Commands.DeleteIncomeRange;
@@ -39,8 +41,7 @@ public sealed class DeleteIncomeRangeCommandHandlerTests
     {
         var context = new TestContext(CompanyId);
         var entity = context.SetupExisting();
-        context.ProfileRepositoryMock.Setup(x => x.GetAllAsync())
-            .ReturnsAsync([PersonFinancialProfile.Create(CompanyId, Guid.NewGuid(), entity.Id, "Salary", DateTime.UtcNow)]);
+        context.ProfileRepositoryMock.SetupRows([PersonFinancialProfile.Create(CompanyId, Guid.NewGuid(), entity.Id, "Salary", DateTime.UtcNow)]);
 
         var response = await context.CreateHandler().Handle(new DeleteIncomeRangeCommand(entity.Id), CancellationToken.None);
 
@@ -52,7 +53,7 @@ public sealed class DeleteIncomeRangeCommandHandlerTests
     {
         var context = new TestContext(CompanyId);
         var entity = context.SetupExisting();
-        context.ProfileRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync([]);
+        context.ProfileRepositoryMock.SetupRows([]);
 
         var response = await context.CreateHandler().Handle(new DeleteIncomeRangeCommand(entity.Id), CancellationToken.None);
 
@@ -64,8 +65,56 @@ public sealed class DeleteIncomeRangeCommandHandlerTests
     {
         var context = new TestContext(CompanyId);
         var entity = context.SetupExisting();
-        context.ProfileRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync([]);
+        context.ProfileRepositoryMock.SetupRows([]);
         context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var response = await context.CreateHandler().Handle(new DeleteIncomeRangeCommand(entity.Id), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        response.Data.Should().Be(entity.Id);
+        entity.GcRecord.Should().NotBe(0);
+    }
+
+    /// <summary>
+    /// SPEC 41: every active child type blocks the delete and is listed in the errors.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenActiveDependentsExist_ShouldReturnInUseWithDetails()
+    {
+        var context = new TestContext(CompanyId);
+        var entity = context.SetupExisting();
+        context.ProfileRepositoryMock.SetupRows([]);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = PersonFinancialProfile.Create(Guid.NewGuid(), Guid.NewGuid(), entity.Id, "Salary", new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        context.UnitOfWorkMock.SetupRepositoryRows<PersonFinancialProfile>([child1]);
+
+
+        var response = await context.CreateHandler().Handle(new DeleteIncomeRangeCommand(entity.Id), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("INCOME_RANGE_IN_USE");
+        response.Errors.Should().Equal("Active financial profiles: 1");
+        entity.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
+    }
+
+    /// <summary>
+    /// SPEC 41: logically deleted children do not block the delete.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenDependentsAreDeleted_ShouldSoftDelete()
+    {
+        var context = new TestContext(CompanyId);
+        var entity = context.SetupExisting();
+        context.ProfileRepositoryMock.SetupRows([]);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = PersonFinancialProfile.Create(Guid.NewGuid(), Guid.NewGuid(), entity.Id, "Salary", new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        child1.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<PersonFinancialProfile>([child1]);
+
 
         var response = await context.CreateHandler().Handle(new DeleteIncomeRangeCommand(entity.Id), CancellationToken.None);
 
@@ -83,7 +132,7 @@ public sealed class DeleteIncomeRangeCommandHandlerTests
             UnitOfWorkMock.Setup(x => x.GetRepository<PersonFinancialProfile>()).Returns(ProfileRepositoryMock.Object);
         }
 
-        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
+        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new() { DefaultValue = DefaultValue.Mock };
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IGenericRepository<IncomeRange>> RepositoryMock { get; } = new();
         public Mock<IGenericRepository<PersonFinancialProfile>> ProfileRepositoryMock { get; } = new();

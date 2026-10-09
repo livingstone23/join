@@ -20,7 +20,6 @@ public sealed class DeleteTicketComplexityCommandHandler(IUnitOfWork unitOfWork)
     public async Task<Response<Guid>> Handle(DeleteTicketComplexityCommand request, CancellationToken cancellationToken)
     {
         var ticketComplexityRepository = _unitOfWork.GetRepository<TicketComplexity>();
-        var ticketRepository = _unitOfWork.GetRepository<Ticket>();
 
         var entity = await ticketComplexityRepository.GetAsync(request.Id);
         if (entity is null)
@@ -28,12 +27,13 @@ public sealed class DeleteTicketComplexityCommandHandler(IUnitOfWork unitOfWork)
             return Response<Guid>.Error("TICKET_COMPLEXITY_NOT_FOUND", ["Ticket complexity not found."]);
         }
 
-        var tickets = await ticketRepository.GetAllAsync();
-        var isInUse = tickets.Any(ticket => ticket.GcRecord == 0 && ticket.TicketComplexityId == request.Id);
+        var dependents = new ActiveDependentsCheck(_unitOfWork);
+        await dependents.CountAsync<Ticket>(t => t.GcRecord == 0 && t.TicketComplexityId == request.Id, "tickets");
+        await dependents.CountAsync<TicketCompanyDefault>(d => d.GcRecord == 0 && d.TicketComplexityDefaultId == request.Id, "ticket company defaults");
 
-        if (isInUse)
+        if (dependents.HasDependents)
         {
-            return Response<Guid>.Error("TICKET_COMPLEXITY_IN_USE", ["The ticket complexity is currently linked to active tickets and cannot be deleted."]);
+            return Response<Guid>.Error("TICKET_COMPLEXITY_IN_USE", dependents.Details);
         }
 
         entity.MarkAsDeleted();

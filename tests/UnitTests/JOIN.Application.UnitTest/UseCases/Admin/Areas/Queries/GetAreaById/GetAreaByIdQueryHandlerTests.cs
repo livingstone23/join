@@ -127,11 +127,24 @@ public sealed class GetAreaByIdQueryHandlerTests
         }
 
         public Mock<ISqlConnectionFactory> ConnectionFactoryMock { get; } = new();
+
+        /// <summary>
+        /// Current user. Defaults to a SuperAdmin so the X-Company-Id header (the explicit override)
+        /// is honored by TenantResolver, as these tests exercise the requested company (SPEC 41).
+        /// </summary>
+        public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = CreateSuperAdmin();
+
+        private static Mock<ICurrentUserService> CreateSuperAdmin()
+        {
+            var mock = new Mock<ICurrentUserService>();
+            mock.Setup(x => x.IsInRole("SuperAdmin")).Returns(true);
+            return mock;
+        }
         public FakeDbConnection Connection { get; } = new();
 
         public GetAreaByIdQueryHandler CreateHandler()
         {
-            return new GetAreaByIdQueryHandler(ConnectionFactoryMock.Object);
+            return new GetAreaByIdQueryHandler(ConnectionFactoryMock.Object, CurrentUserServiceMock.Object);
         }
     }
 }

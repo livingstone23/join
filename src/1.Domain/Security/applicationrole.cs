@@ -34,6 +34,15 @@ public class ApplicationRole : IdentityRole<Guid>, IAuditableEntity
     public string? LastModifiedBy { get; set; }
     public int GcRecord { get; set; } = 0;
 
+    /// <summary>
+    /// Restores a logically deleted record by resetting <see cref="GcRecord"/> to
+    /// <see cref="BaseAuditableEntity.ActiveGcRecord"/>. Idempotent (SPEC 41).
+    /// </summary>
+    public void Restore()
+    {
+        GcRecord = BaseAuditableEntity.ActiveGcRecord;
+    }
+
 
     
     // --- Navigation Properties ---

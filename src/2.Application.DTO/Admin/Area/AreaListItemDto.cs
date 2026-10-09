@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Data Transfer Object (DTO) used for paginated area list responses.
 /// </summary>
-public record AreaListItemDto
+public record AreaListItemDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the area.

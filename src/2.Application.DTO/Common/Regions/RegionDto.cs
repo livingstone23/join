@@ -5,7 +5,7 @@ namespace JOIN.Application.DTO.Common;
 /// <summary>
 /// Data Transfer Object (DTO) representing a region catalog item.
 /// </summary>
-public record RegionDto
+public record RegionDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the region.

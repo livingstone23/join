@@ -49,9 +49,13 @@ public sealed class GetRegionsQueryHandler(
         var parameters = new DynamicParameters();
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
-        parameters.Add("TenantId", currentUserService.CompanyId);
+        parameters.Add("TenantId", TenantResolver.Resolve(currentUserService, request.CompanyId));
 
-        var whereBuilder = new StringBuilder("WHERE r.GcRecord = 0 AND r.CompanyId = @TenantId");
+        var whereBuilder = new StringBuilder("WHERE r.CompanyId = @TenantId");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND r.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
@@ -76,6 +80,7 @@ public sealed class GetRegionsQueryHandler(
         var sql = $"""
             SELECT
                 r.Id,
+                r.GcRecord,
                 r.Name,
                 r.Code,
                 r.CountryId,

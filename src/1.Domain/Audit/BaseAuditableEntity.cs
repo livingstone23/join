@@ -43,6 +43,12 @@ public abstract class BaseAuditableEntity : BaseEntity, IAuditableEntity
     public int GcRecord { get; set; } = ActiveGcRecord;
 
     /// <summary>
+    /// Gets whether the entity is logically deleted (<see cref="GcRecord"/> different from
+    /// <see cref="ActiveGcRecord"/>). Computed, not mapped to a column.
+    /// </summary>
+    public bool IsDeleted => GcRecord != ActiveGcRecord;
+
+    /// <summary>
     /// Generates the logical delete stamp for <see cref="GcRecord"/> using UTC time.
     /// </summary>
     /// <param name="utcNow">Optional UTC date to use for deterministic scenarios.</param>
@@ -60,5 +66,14 @@ public abstract class BaseAuditableEntity : BaseEntity, IAuditableEntity
     public void MarkAsDeleted(DateTime? utcNow = null)
     {
         GcRecord = GetDeletionGcRecordStamp(utcNow);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted entity by resetting <see cref="GcRecord"/> to
+    /// <see cref="ActiveGcRecord"/>. Idempotent: restoring an active entity leaves it unchanged (SPEC 41).
+    /// </summary>
+    public void Restore()
+    {
+        GcRecord = ActiveGcRecord;
     }
 }

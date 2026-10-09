@@ -26,7 +26,6 @@ public sealed class DeleteIndustryCommandHandler(
 
         var companyId = currentUserService.CompanyId;
         var industryRepository = _unitOfWork.GetRepository<Industry>();
-        var businessProfileRepository = _unitOfWork.GetRepository<PersonBusinessProfile>();
 
         var entity = await industryRepository.GetAsync(request.Id);
         if (entity is null || entity.CompanyId != companyId || entity.GcRecord != 0)
@@ -34,15 +33,12 @@ public sealed class DeleteIndustryCommandHandler(
             return Response<Guid>.Error("INDUSTRY_NOT_FOUND", ["Industry not found."]);
         }
 
-        var businessProfiles = await businessProfileRepository.GetAllAsync();
-        var isInUse = businessProfiles.Any(profile =>
-            profile.CompanyId == companyId
-            && profile.GcRecord == 0
-            && profile.IndustryId == request.Id);
+        var dependents = await new ActiveDependentsCheck(_unitOfWork)
+            .CountAsync<PersonBusinessProfile>(p => p.GcRecord == 0 && p.IndustryId == request.Id, "business profiles");
 
-        if (isInUse)
+        if (dependents.HasDependents)
         {
-            return Response<Guid>.Error("INDUSTRY_IN_USE", ["The industry is currently assigned to one or more business profiles and cannot be deleted."]);
+            return Response<Guid>.Error("INDUSTRY_IN_USE", dependents.Details);
         }
 
         entity.MarkAsDeleted();

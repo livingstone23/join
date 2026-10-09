@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Data Transfer Object (DTO) representing a system module.
 /// </summary>
-public sealed record SystemModuleDto
+public sealed record SystemModuleDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the system module.

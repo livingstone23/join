@@ -24,7 +24,6 @@ public sealed class DeleteSystemOptionCommandHandler(IUnitOfWork unitOfWork)
     public async Task<Response<Guid>> Handle(DeleteSystemOptionCommand request, CancellationToken cancellationToken)
     {
         var optionRepository = _unitOfWork.GetRepository<JOIN.Domain.Security.SystemOption>();
-        var roleOptionRepository = _unitOfWork.GetRepository<JOIN.Domain.Security.RoleSystemOption>();
 
         var entity = await optionRepository.GetAsync(request.Id);
         if (entity is null)
@@ -32,20 +31,14 @@ public sealed class DeleteSystemOptionCommandHandler(IUnitOfWork unitOfWork)
             return Response<Guid>.Error("SYSTEM_OPTION_NOT_FOUND", ["System option not found."]);
         }
 
-        // Verificar si tiene hijos activos
-        var children = await optionRepository.GetAllAsync();
-        var hasActiveChildren = children.Any(c => c.ParentId == request.Id && c.GcRecord == 0);
-        if (hasActiveChildren)
-        {
-            return Response<Guid>.Error("SYSTEM_OPTION_IN_USE", ["The system option has active child options and cannot be deleted."]);
-        }
+        // Active child options and active role assignments both block the delete (SPEC 41).
+        var dependents = new ActiveDependentsCheck(_unitOfWork);
+        await dependents.CountAsync<JOIN.Domain.Security.SystemOption>(c => c.GcRecord == 0 && c.ParentId == request.Id, "child system options");
+        await dependents.CountAsync<JOIN.Domain.Security.RoleSystemOption>(ro => ro.GcRecord == 0 && ro.SystemOptionId == request.Id, "role system options");
 
-        // Verificar si está asignado a roles activos
-        var roleOptions = await roleOptionRepository.GetAllAsync();
-        var isAssignedToRole = roleOptions.Any(ro => ro.SystemOptionId == request.Id && ro.GcRecord == 0);
-        if (isAssignedToRole)
+        if (dependents.HasDependents)
         {
-            return Response<Guid>.Error("SYSTEM_OPTION_IN_USE", ["The system option is currently assigned to one or more roles and cannot be deleted."]);
+            return Response<Guid>.Error("SYSTEM_OPTION_IN_USE", dependents.Details);
         }
 
         entity.MarkAsDeleted();

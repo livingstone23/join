@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Admin;
 
 /// <summary>
 /// Data Transfer Object (DTO) used for paginated entity status list responses.
 /// </summary>
-public sealed record EntityStatusListItemDto
+public sealed record EntityStatusListItemDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the entity status.

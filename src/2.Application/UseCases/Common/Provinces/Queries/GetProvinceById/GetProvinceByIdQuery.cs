@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Common.Provinces.Queries;
 /// Query to retrieve a province catalog item by its identifier.
 /// </summary>
 /// <param name="Id">The province identifier.</param>
-public record GetProvinceByIdQuery(Guid Id) : IRequest<Response<ProvinceDto>>;
+public record GetProvinceByIdQuery(Guid Id, bool? IncludeDeleted = null) : IRequest<Response<ProvinceDto>>;

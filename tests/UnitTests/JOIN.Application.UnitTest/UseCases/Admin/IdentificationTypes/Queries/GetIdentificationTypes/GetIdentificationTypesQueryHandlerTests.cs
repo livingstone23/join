@@ -85,7 +85,7 @@ public sealed class GetIdentificationTypesQueryHandlerTests
         item.IsActive.Should().BeTrue();
         item.CreatedAt.Should().Be(createdAt);
 
-        context.Connection.LastCommandText.Should().Contain("WHERE it.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain("AND it.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("it.Name LIKE @Name");
         context.Connection.LastCommandText.Should().Contain("it.Created >= @CreatedDayStart AND it.Created < @CreatedDayEnd");
         context.Connection.LastCommandText.Should().Contain("it.Created >= @CreatedFrom");
@@ -180,7 +180,7 @@ public sealed class GetIdentificationTypesQueryHandlerTests
         {
             return new GetIdentificationTypesQueryHandler(
                 ConnectionFactoryMock.Object,
-                PaginationOptions);
+                PaginationOptions, new Mock<ICurrentUserService>().Object);
         }
     }
 }

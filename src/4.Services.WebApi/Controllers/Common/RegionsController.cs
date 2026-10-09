@@ -6,6 +6,8 @@ using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
+using JOIN.Services.WebApi.Controllers;
 
 namespace JOIN.Services.WebApi.Controllers.Common;
 
@@ -35,9 +37,11 @@ public class RegionsController(ISender sender) : ControllerBase
         [FromQuery] string? name = null,
         [FromQuery] string? code = null,
         [FromQuery] Guid? countryId = null,
+        [FromQuery] bool? includeDeleted = null,
+        [FromQuery] Guid? companyId = null,
         CancellationToken cancellationToken = default)
     {
-        var response = await _sender.Send(new GetRegionsQuery(pageNumber, pageSize, name, code, countryId), cancellationToken);
+        var response = await _sender.Send(new GetRegionsQuery(pageNumber, pageSize, name, code, countryId, includeDeleted, companyId), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -54,9 +58,9 @@ public class RegionsController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Response<RegionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted = null, [FromQuery] Guid? companyId = null, CancellationToken cancellationToken = default)
     {
-        var response = await _sender.Send(new GetRegionByIdQuery(id), cancellationToken);
+        var response = await _sender.Send(new GetRegionByIdQuery(id, includeDeleted, companyId), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -157,5 +161,27 @@ public class RegionsController(ISender sender) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted region (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The region identifier.</param>
+    /// <param name="companyId">Optional explicit company, honored only for SuperAdmin.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new RestoreRegionCommand(id, companyId), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

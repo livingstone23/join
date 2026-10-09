@@ -10,7 +10,9 @@ namespace JOIN.Application.UseCases.Admin.IdentificationTypes.Queries;
 /// Handles single identification type detail queries using Dapper.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create database-agnostic read connections.</param>
-public sealed class GetIdentificationTypeByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+public sealed class GetIdentificationTypeByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetIdentificationTypeByIdQuery, Response<IdentificationTypeDto>>
 {
     /// <summary>
@@ -23,9 +25,14 @@ public sealed class GetIdentificationTypeByIdQueryHandler(ISqlConnectionFactory 
     {
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND it.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 it.Id,
+                it.GcRecord,
                 it.Name,
                 it.Description,
                 it.ValidationPattern,
@@ -33,7 +40,7 @@ public sealed class GetIdentificationTypeByIdQueryHandler(ISqlConnectionFactory 
                 it.Created AS CreatedAt
             FROM Admin.IdentificationTypes it
             WHERE it.Id = @Id
-              AND it.GcRecord = 0;
+              {activeOnly};
             """;
 
         var entity = await connection.QuerySingleOrDefaultAsync<IdentificationTypeDto>(

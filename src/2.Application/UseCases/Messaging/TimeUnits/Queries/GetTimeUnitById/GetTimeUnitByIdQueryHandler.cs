@@ -27,9 +27,14 @@ public sealed class GetTimeUnitByIdQueryHandler(ISqlConnectionFactory connection
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(_currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND tu.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 tu.Id,
+                tu.GcRecord,
                 tu.CompanyId,
                 c.Name AS CompanyName,
                 tu.Name,
@@ -40,11 +45,11 @@ public sealed class GetTimeUnitByIdQueryHandler(ISqlConnectionFactory connection
             LEFT JOIN Common.Companies c ON c.Id = tu.CompanyId
             WHERE tu.Id = @Id
               AND tu.CompanyId = @TenantId
-              AND tu.GcRecord = 0;
+              {activeOnly};
             """;
 
         var timeUnit = await connection.QuerySingleOrDefaultAsync<TimeUnitDto>(
-            new CommandDefinition(sql, new { request.Id, TenantId = _currentUserService.CompanyId }, cancellationToken: cancellationToken));
+            new CommandDefinition(sql, new { request.Id, TenantId = TenantResolver.Resolve(_currentUserService, request.CompanyId) }, cancellationToken: cancellationToken));
 
         if (timeUnit is null)
         {

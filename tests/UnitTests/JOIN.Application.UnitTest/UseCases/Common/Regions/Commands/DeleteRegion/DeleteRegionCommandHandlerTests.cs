@@ -4,6 +4,8 @@ using JOIN.Application.Interface.Persistence;
 using JOIN.Application.UseCases.Common.Regions.Commands;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
+using JOIN.Application.UnitTest.Common.TestDoubles;
+using JOIN.Domain.Admin;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Common.Regions.Commands.DeleteRegion;
@@ -49,7 +51,7 @@ public sealed class DeleteRegionCommandHandlerTests
         var entity = CreateRegion(regionId);
 
         context.RegionRepositoryMock.Setup(x => x.GetAsync(regionId)).ReturnsAsync(entity);
-        context.ProvinceRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(new[]
+        context.ProvinceRepositoryMock.SetupRows(new[]
         {
             new Province { Name = "Managua", Code = "MN", CountryId = Guid.NewGuid(), RegionId = regionId, GcRecord = 0 }
         });
@@ -62,7 +64,7 @@ public sealed class DeleteRegionCommandHandlerTests
         // Assert
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("REGION_IN_USE");
-        response.Errors.Should().Contain("The region is currently linked to active provinces and cannot be deleted.");
+        response.Errors.Should().Contain("Active provinces: 1");
     }
 
     /// <summary>
@@ -77,7 +79,7 @@ public sealed class DeleteRegionCommandHandlerTests
         var entity = CreateRegion(regionId);
 
         context.RegionRepositoryMock.Setup(x => x.GetAsync(regionId)).ReturnsAsync(entity);
-        context.ProvinceRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<Province>());
+        context.ProvinceRepositoryMock.SetupRows(Array.Empty<Province>());
         context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
 
         var handler = context.CreateHandler();
@@ -104,9 +106,77 @@ public sealed class DeleteRegionCommandHandlerTests
         var entity = CreateRegion(regionId);
 
         context.RegionRepositoryMock.Setup(x => x.GetAsync(regionId)).ReturnsAsync(entity);
-        context.ProvinceRepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<Province>());
+        context.ProvinceRepositoryMock.SetupRows(Array.Empty<Province>());
 
         var handler = context.CreateHandler();
+
+        // Act
+        var response = await handler.Handle(new DeleteRegionCommand(regionId), CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeTrue();
+        response.Message.Should().Be("Region deleted successfully.");
+        response.Data.Should().Be(regionId);
+        entity.GcRecord.Should().BeGreaterThan(BaseAuditableEntity.ActiveGcRecord);
+        context.RegionRepositoryMock.Verify(x => x.UpdateAsync(entity), Times.Once);
+    }
+
+    /// <summary>
+    /// SPEC 41: every active child type blocks the delete and is listed in the errors.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenActiveDependentsExist_ShouldReturnInUseWithDetails()
+    {
+        // Arrange
+        var regionId = _fixture.Create<Guid>();
+        var context = new DeleteRegionCommandTestContext();
+        var entity = CreateRegion(regionId);
+
+        context.RegionRepositoryMock.Setup(x => x.GetAsync(regionId)).ReturnsAsync(entity);
+        context.ProvinceRepositoryMock.SetupRows(Array.Empty<Province>());
+
+        var handler = context.CreateHandler();
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new Province { Name = "Managua", Code = "MN", CountryId = Guid.NewGuid(), RegionId = regionId };
+        context.UnitOfWorkMock.SetupRepositoryRows<Province>([child1]);
+        var child2 = new PersonAddress { CompanyId = Guid.NewGuid(), PersonId = Guid.NewGuid(), RegionId = regionId };
+        context.UnitOfWorkMock.SetupRepositoryRows<PersonAddress>([child2]);
+
+
+        // Act
+        var response = await handler.Handle(new DeleteRegionCommand(regionId), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("REGION_IN_USE");
+        response.Errors.Should().Equal("Active provinces: 1", "Active person addresses: 1");
+        entity.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
+    }
+
+    /// <summary>
+    /// SPEC 41: logically deleted children do not block the delete.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenDependentsAreDeleted_ShouldSoftDelete()
+    {
+        // Arrange
+        var regionId = _fixture.Create<Guid>();
+        var context = new DeleteRegionCommandTestContext();
+        var entity = CreateRegion(regionId);
+
+        context.RegionRepositoryMock.Setup(x => x.GetAsync(regionId)).ReturnsAsync(entity);
+        context.ProvinceRepositoryMock.SetupRows(Array.Empty<Province>());
+
+        var handler = context.CreateHandler();
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new Province { Name = "Managua", Code = "MN", CountryId = Guid.NewGuid(), RegionId = regionId };
+        child1.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<Province>([child1]);
+        var child2 = new PersonAddress { CompanyId = Guid.NewGuid(), PersonId = Guid.NewGuid(), RegionId = regionId };
+        child2.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<PersonAddress>([child2]);
+
 
         // Act
         var response = await handler.Handle(new DeleteRegionCommand(regionId), CancellationToken.None);
@@ -148,7 +218,7 @@ public sealed class DeleteRegionCommandHandlerTests
             UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         }
 
-        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
+        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new() { DefaultValue = DefaultValue.Mock };
         public Mock<IGenericRepository<Region>> RegionRepositoryMock { get; } = new();
         public Mock<IGenericRepository<Province>> ProvinceRepositoryMock { get; } = new();
 

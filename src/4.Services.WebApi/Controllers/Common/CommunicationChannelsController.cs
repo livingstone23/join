@@ -7,6 +7,8 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 using JOIN.Domain.Security;
+using Microsoft.AspNetCore.Authorization;
+using JOIN.Services.WebApi.Controllers;
 
 
 
@@ -46,9 +48,9 @@ public class CommunicationChannelsController(IMediator mediator) : ControllerBas
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetCommunicationChannelByIdQuery(id), cancellationToken);
+        var response = await _mediator.Send(new GetCommunicationChannelByIdQuery(id, includeDeleted), cancellationToken);
         if (!response.IsSuccess)
         {
             return NotFound(response);
@@ -78,9 +80,10 @@ public class CommunicationChannelsController(IMediator mediator) : ControllerBas
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string? searchTerm = null,
+        [FromQuery] bool? includeDeleted = null,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetCommunicationChannelsPagedQuery(pageNumber, pageSize, searchTerm), cancellationToken);
+        var response = await _mediator.Send(new GetCommunicationChannelsPagedQuery(pageNumber, pageSize, searchTerm, includeDeleted), cancellationToken);
         if (!response.IsSuccess)
         {
             return BadRequest(response);
@@ -187,5 +190,25 @@ public class CommunicationChannelsController(IMediator mediator) : ControllerBas
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted communication channel (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The communication channel identifier.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new RestoreCommunicationChannelCommand(id, null), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

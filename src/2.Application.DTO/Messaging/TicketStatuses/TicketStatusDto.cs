@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Messaging;
 
 /// <summary>
 /// Data Transfer Object (DTO) representing a ticket status catalog item.
 /// </summary>
-public record TicketStatusDto
+public record TicketStatusDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the ticket status.

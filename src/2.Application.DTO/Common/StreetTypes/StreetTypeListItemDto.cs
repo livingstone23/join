@@ -5,7 +5,7 @@ namespace JOIN.Application.DTO.Common;
 /// <summary>
 /// Data Transfer Object (DTO) used for paginated street type responses.
 /// </summary>
-public record StreetTypeListItemDto
+public record StreetTypeListItemDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the street type identifier.

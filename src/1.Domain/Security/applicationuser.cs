@@ -118,6 +118,15 @@ public class ApplicationUser : IdentityUser<Guid>, IAuditableEntity
     public string? LastModifiedBy { get; set; }
     public int GcRecord { get; set; } = 0;
 
+    /// <summary>
+    /// Restores a logically deleted record by resetting <see cref="GcRecord"/> to
+    /// <see cref="BaseAuditableEntity.ActiveGcRecord"/>. Idempotent (SPEC 41).
+    /// </summary>
+    public void Restore()
+    {
+        GcRecord = BaseAuditableEntity.ActiveGcRecord;
+    }
+
     // --- Navigation Properties ---
     public virtual ICollection<UserCompany> UserCompanies { get; set; } = new List<UserCompany>();
     public virtual ICollection<UserRoleCompany> UserRoleCompanies { get; set; } = new List<UserRoleCompany>();

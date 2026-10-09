@@ -91,7 +91,7 @@ public sealed class GetMunicipalityByIdQueryHandlerTests
 
         public GetMunicipalityByIdQueryHandler CreateHandler()
         {
-            return new GetMunicipalityByIdQueryHandler(ConnectionFactoryMock.Object);
+            return new GetMunicipalityByIdQueryHandler(ConnectionFactoryMock.Object, new Mock<ICurrentUserService>().Object);
         }
     }
 }

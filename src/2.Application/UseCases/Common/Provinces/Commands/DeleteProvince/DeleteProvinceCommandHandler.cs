@@ -24,8 +24,6 @@ public sealed class DeleteProvinceCommandHandler(IUnitOfWork unitOfWork)
     public async Task<Response<Guid>> Handle(DeleteProvinceCommand request, CancellationToken cancellationToken)
     {
         var provinceRepository = _unitOfWork.GetRepository<Province>();
-        var municipalityRepository = _unitOfWork.GetRepository<Municipality>();
-        var customerAddressRepository = _unitOfWork.GetRepository<PersonAddress>();
 
         var provinceEntity = await provinceRepository.GetAsync(request.Id);
         if (provinceEntity is null)
@@ -33,14 +31,13 @@ public sealed class DeleteProvinceCommandHandler(IUnitOfWork unitOfWork)
             return Response<Guid>.Error("PROVINCE_NOT_FOUND", ["Province not found."]);
         }
 
-        var municipalities = await municipalityRepository.GetAllAsync();
-        var customerAddresses = await customerAddressRepository.GetAllAsync();
-        var isInUse = municipalities.Any(m => m.GcRecord == 0 && m.ProvinceId == request.Id)
-                    || customerAddresses.Any(address => address.GcRecord == 0 && address.ProvinceId == request.Id);
+        var dependents = new ActiveDependentsCheck(_unitOfWork);
+        await dependents.CountAsync<Municipality>(m => m.GcRecord == 0 && m.ProvinceId == request.Id, "municipalities");
+        await dependents.CountAsync<PersonAddress>(a => a.GcRecord == 0 && a.ProvinceId == request.Id, "person addresses");
 
-        if (isInUse)
+        if (dependents.HasDependents)
         {
-            return Response<Guid>.Error("PROVINCE_IN_USE", ["The province is currently linked to municipalities or customer addresses and cannot be deleted."]);
+            return Response<Guid>.Error("PROVINCE_IN_USE", dependents.Details);
         }
 
         provinceEntity.MarkAsDeleted();

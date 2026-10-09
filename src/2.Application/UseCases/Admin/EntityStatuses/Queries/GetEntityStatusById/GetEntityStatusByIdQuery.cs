@@ -9,5 +9,5 @@ namespace JOIN.Application.UseCases.Admin.EntityStatuses.Queries;
 /// </summary>
 /// <param name="Id">The unique identifier of the requested entity status.</param>
 /// <param name="CompanyId">The tenant identifier used to validate the request scope.</param>
-public sealed record GetEntityStatusByIdQuery(Guid Id, Guid CompanyId)
+public sealed record GetEntityStatusByIdQuery(Guid Id, Guid CompanyId, bool? IncludeDeleted = null)
     : IRequest<Response<EntityStatusDto>>;

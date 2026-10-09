@@ -1,11 +1,12 @@
 using System;
+using JOIN.Application.DTO.Common;
 
 namespace JOIN.Application.DTO.Messaging;
 
 /// <summary>
 /// Data Transfer Object (DTO) representing a time unit catalog item.
 /// </summary>
-public record TimeUnitDto
+public record TimeUnitDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the time unit.

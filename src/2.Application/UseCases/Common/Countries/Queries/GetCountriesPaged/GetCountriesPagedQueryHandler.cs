@@ -16,7 +16,8 @@ namespace JOIN.Application.UseCases.Common.Countries.Queries;
 /// <param name="paginationOptions">Configurable pagination defaults shared across paged endpoints.</param>
 public class GetCountriesPagedQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    IOptions<PaginationSettings> paginationOptions)
+    IOptions<PaginationSettings> paginationOptions,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetCountriesPagedQuery, Response<PagedResult<CountryListItemDto>>>
 {
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
@@ -38,7 +39,11 @@ public class GetCountriesPagedQueryHandler(
         parameters.Add("Offset", offset);
         parameters.Add("PageSize", sanitizedPageSize);
 
-        var whereBuilder = new StringBuilder("WHERE c.GcRecord = 0");
+        var whereBuilder = new StringBuilder("WHERE 1 = 1");
+        if (!SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted))
+        {
+            whereBuilder.Append(" AND c.GcRecord = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
@@ -51,6 +56,7 @@ public class GetCountriesPagedQueryHandler(
         var sql = $"""
             SELECT
                 c.Id,
+                c.GcRecord,
                 c.Name,
                 c.IsoCode
             FROM Common.Countries c

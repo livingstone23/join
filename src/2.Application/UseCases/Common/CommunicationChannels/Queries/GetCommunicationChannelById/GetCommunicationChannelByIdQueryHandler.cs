@@ -10,7 +10,9 @@ namespace JOIN.Application.UseCases.Common.CommunicationChannels.Queries;
 /// Handles communication channel detail queries using Dapper.
 /// </summary>
 /// <param name="connectionFactory">Factory used to create DB-agnostic read connections.</param>
-public class GetCommunicationChannelByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+public class GetCommunicationChannelByIdQueryHandler(
+    ISqlConnectionFactory connectionFactory,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetCommunicationChannelByIdQuery, Response<CommunicationChannelDto>>
 {
     /// <summary>
@@ -20,15 +22,20 @@ public class GetCommunicationChannelByIdQueryHandler(ISqlConnectionFactory conne
     {
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND cc.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 cc.Id,
+                cc.GcRecord,
                 cc.Name,
                 cc.Provider,
                 cc.Code,
                 cc.IsActive
             FROM Common.CommunicationChannels cc
-            WHERE cc.Id = @Id AND cc.GcRecord = 0;
+            WHERE cc.Id = @Id {activeOnly};
             """;
 
         var parameters = new DynamicParameters();

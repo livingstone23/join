@@ -4,6 +4,7 @@ using JOIN.Application.Interface.Persistence;
 using JOIN.Application.UseCases.Admin.IdentificationTypes.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
+using JOIN.Application.UnitTest.Common.TestDoubles;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Admin.IdentificationTypes.Commands.DeleteIdentificationType;
@@ -158,6 +159,100 @@ public sealed class DeleteIdentificationTypeCommandHandlerTests
     }
 
     /// <summary>
+    /// SPEC 41: every active child type blocks the delete and is listed in the errors.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenActiveDependentsExist_ShouldReturnInUseWithDetails()
+    {
+        // Arrange
+        var entity = new IdentificationType
+        {
+            Name = "Passport",
+            IsActive = true,
+            GcRecord = 0
+        };
+
+        var context = new DeleteIdentificationTypeCommandTestContext();
+        var command = new DeleteIdentificationTypeCommand(entity.Id);
+        var handler = context.CreateHandler();
+
+        context.RepositoryMock
+            .Setup(x => x.GetAsync(entity.Id))
+            .ReturnsAsync(entity);
+
+        context.RepositoryMock
+            .Setup(x => x.UpdateAsync(entity))
+            .ReturnsAsync(true);
+
+        context.UnitOfWorkMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new Person { CompanyId = Guid.NewGuid(), IdentificationTypeId = entity.Id };
+        context.UnitOfWorkMock.SetupRepositoryRows<Person>([child1]);
+
+
+        // Act
+        var response = await handler.Handle(command, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("IDENTIFICATION_TYPE_IN_USE");
+        response.Errors.Should().Equal("Active persons: 1");
+        entity.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
+    }
+
+    /// <summary>
+    /// SPEC 41: logically deleted children do not block the delete.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenDependentsAreDeleted_ShouldSoftDelete()
+    {
+        // Arrange
+        var entity = new IdentificationType
+        {
+            Name = "Passport",
+            IsActive = true,
+            GcRecord = 0
+        };
+
+        var context = new DeleteIdentificationTypeCommandTestContext();
+        var command = new DeleteIdentificationTypeCommand(entity.Id);
+        var handler = context.CreateHandler();
+
+        context.RepositoryMock
+            .Setup(x => x.GetAsync(entity.Id))
+            .ReturnsAsync(entity);
+
+        context.RepositoryMock
+            .Setup(x => x.UpdateAsync(entity))
+            .ReturnsAsync(true);
+
+        context.UnitOfWorkMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        // Arrange: one row per child type that blocks the delete (SPEC 41).
+        var child1 = new Person { CompanyId = Guid.NewGuid(), IdentificationTypeId = entity.Id };
+        child1.MarkAsDeleted();
+        context.UnitOfWorkMock.SetupRepositoryRows<Person>([child1]);
+
+
+        // Act
+        var response = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeTrue();
+        response.Message.Should().Be("Identification type deleted successfully.");
+        response.Data.Should().Be(entity.Id);
+        entity.IsActive.Should().BeFalse();
+        entity.GcRecord.Should().BeGreaterThan(BaseAuditableEntity.ActiveGcRecord);
+
+        context.RepositoryMock.Verify(x => x.UpdateAsync(entity), Times.Once);
+        context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
     /// Registers a repository in the mocked unit of work using the generic resolution pattern.
     /// </summary>
     private static void SetupRepository<TEntity>(Mock<IUnitOfWork> unitOfWorkMock, Mock<IGenericRepository<TEntity>> repositoryMock)
@@ -176,7 +271,7 @@ public sealed class DeleteIdentificationTypeCommandHandlerTests
             SetupRepository(UnitOfWorkMock, RepositoryMock);
         }
 
-        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
+        public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new() { DefaultValue = DefaultValue.Mock };
         public Mock<IGenericRepository<IdentificationType>> RepositoryMock { get; } = new();
 
         public DeleteIdentificationTypeCommandHandler CreateHandler()

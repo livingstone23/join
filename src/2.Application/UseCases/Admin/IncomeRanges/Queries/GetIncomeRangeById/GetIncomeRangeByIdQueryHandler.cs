@@ -17,15 +17,20 @@ public sealed class GetIncomeRangeByIdQueryHandler(
             return Response<IncomeRangeDto>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
 
         using var connection = connectionFactory.CreateConnection();
-        const string sql = """
-            SELECT ir.Id, ir.CompanyId, c.Name AS CompanyName, ir.DisplayName, ir.MinimumValue, ir.MaximumValue, ir.CurrencyCode, ir.IsActive, ir.DisplayOrder, ir.Created AS CreatedAt
+        var companyId = TenantResolver.Resolve(currentUserService, request.CompanyId);
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND ir.GcRecord = 0";
+
+        var sql = $"""
+            SELECT ir.Id, ir.GcRecord, ir.CompanyId, c.Name AS CompanyName, ir.DisplayName, ir.MinimumValue, ir.MaximumValue, ir.CurrencyCode, ir.IsActive, ir.DisplayOrder, ir.Created AS CreatedAt
             FROM Admin.IncomeRanges ir
             INNER JOIN Common.Companies c ON c.Id = ir.CompanyId AND c.GcRecord = 0
-            WHERE ir.Id = @Id AND ir.CompanyId = @CompanyId AND ir.GcRecord = 0;
+            WHERE ir.Id = @Id AND ir.CompanyId = @CompanyId {activeOnly};
             """;
 
         var item = await connection.QuerySingleOrDefaultAsync<IncomeRangeDto>(
-            new CommandDefinition(sql, new { request.Id, CompanyId = currentUserService.CompanyId }, cancellationToken: cancellationToken));
+            new CommandDefinition(sql, new { request.Id, CompanyId = companyId }, cancellationToken: cancellationToken));
 
         if (item is null)
             return Response<IncomeRangeDto>.Error("INCOME_RANGE_NOT_FOUND", ["Income range not found."]);

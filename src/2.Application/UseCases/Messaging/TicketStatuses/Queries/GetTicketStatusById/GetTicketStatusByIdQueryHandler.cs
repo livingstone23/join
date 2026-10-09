@@ -28,9 +28,14 @@ public sealed class GetTicketStatusByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
-        const string sql = """
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND ts.GcRecord = 0";
+
+        var sql = $"""
             SELECT
                 ts.Id,
+                ts.GcRecord,
                 ts.CompanyId,
                 c.Name AS CompanyName,
                 ts.Name,
@@ -45,11 +50,11 @@ public sealed class GetTicketStatusByIdQueryHandler(
             INNER JOIN Common.Companies c ON c.Id = ts.CompanyId
             WHERE ts.Id = @Id
               AND ts.CompanyId = @TenantId
-              AND ts.GcRecord = 0;
+              {activeOnly};
             """;
 
         var ticketStatus = await connection.QuerySingleOrDefaultAsync<TicketStatusDto>(
-            new CommandDefinition(sql, new { request.Id, TenantId = currentUserService.CompanyId }, cancellationToken: cancellationToken));
+            new CommandDefinition(sql, new { request.Id, TenantId = TenantResolver.Resolve(currentUserService, request.CompanyId) }, cancellationToken: cancellationToken));
 
         if (ticketStatus is null)
         {

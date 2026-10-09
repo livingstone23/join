@@ -1,5 +1,6 @@
 using JOIN.Application.Common;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
 using MediatR;
 
@@ -23,7 +24,6 @@ public sealed class DeleteRegionCommandHandler(IUnitOfWork unitOfWork)
     public async Task<Response<Guid>> Handle(DeleteRegionCommand request, CancellationToken cancellationToken)
     {
         var regionRepository = _unitOfWork.GetRepository<Region>();
-        var provinceRepository = _unitOfWork.GetRepository<Province>();
 
         var regionEntity = await regionRepository.GetAsync(request.Id);
         if (regionEntity is null)
@@ -31,14 +31,13 @@ public sealed class DeleteRegionCommandHandler(IUnitOfWork unitOfWork)
             return Response<Guid>.Error("REGION_NOT_FOUND", ["Region not found."]);
         }
 
-        var provinces = await provinceRepository.GetAllAsync();
-        var isInUse = provinces.Any(province =>
-            province.GcRecord == 0
-            && province.RegionId == request.Id);
+        var dependents = new ActiveDependentsCheck(_unitOfWork);
+        await dependents.CountAsync<Province>(p => p.GcRecord == 0 && p.RegionId == request.Id, "provinces");
+        await dependents.CountAsync<PersonAddress>(a => a.GcRecord == 0 && a.RegionId == request.Id, "person addresses");
 
-        if (isInUse)
+        if (dependents.HasDependents)
         {
-            return Response<Guid>.Error("REGION_IN_USE", ["The region is currently linked to active provinces and cannot be deleted."]);
+            return Response<Guid>.Error("REGION_IN_USE", dependents.Details);
         }
 
         regionEntity.MarkAsDeleted();

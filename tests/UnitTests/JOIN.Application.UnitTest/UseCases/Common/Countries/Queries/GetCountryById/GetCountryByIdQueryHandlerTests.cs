@@ -91,7 +91,7 @@ public sealed class GetCountryByIdQueryHandlerTests
 
         public GetCountryByIdQueryHandler CreateHandler()
         {
-            return new GetCountryByIdQueryHandler(ConnectionFactoryMock.Object);
+            return new GetCountryByIdQueryHandler(ConnectionFactoryMock.Object, new Mock<ICurrentUserService>().Object);
         }
     }
 }

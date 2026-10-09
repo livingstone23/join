@@ -8,5 +8,5 @@ namespace JOIN.Application.UseCases.Admin.Industries.Queries;
 /// Query used to retrieve a single tenant-scoped industry by its identifier.
 /// </summary>
 /// <param name="Id">The unique identifier of the requested industry.</param>
-public sealed record GetIndustryByIdQuery(Guid Id)
+public sealed record GetIndustryByIdQuery(Guid Id, bool? IncludeDeleted = null, Guid? CompanyId = null)
     : IRequest<Response<IndustryDto>>;

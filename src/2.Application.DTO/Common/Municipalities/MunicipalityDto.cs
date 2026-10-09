@@ -5,7 +5,7 @@ namespace JOIN.Application.DTO.Common;
 /// <summary>
 /// Data Transfer Object (DTO) representing a municipality catalog item.
 /// </summary>
-public record MunicipalityDto
+public record MunicipalityDto : SoftDeletableDto
 {
     /// <summary>
     /// Gets the unique identifier of the municipality.
