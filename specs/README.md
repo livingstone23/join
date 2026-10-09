@@ -195,4 +195,5 @@ Decisiones o verificaciones que no tienen spec propia todavía:
 | 41 | Al implementarla, incluir las entidades del calendario (44, 45, 46). |
 | 38 (F0) | Ejecutar `docs/migrations/spec-38-data-audit.sql` contra la base de desarrollo y pegar los conteos en el PR; si hay filas afectadas, decidir si se reasignan. |
 | 38 (D) | Smoke manual: un `SuperAdminCompany` solo ve su empresa y sus módulos, y no puede borrar empresas ni modificar módulos; validar con `join_frontb`. |
+| 40-post | `DapperContext.CreateConnection()` siempre crea `SqlConnection` (rama PostgreSQL comentada desde SPEC 39): los repositorios que lo usan (p. ej. `PersonsRepository`) fallan en PostgreSQL y `PUT /Persons` responde 500. Arreglo aparte; al hacerlo, ejecutar el caso D.2 de SPEC 40-post. |
 | Proceso | Script de verificación de consistencia de specs (referencias inexistentes, nombres retirados, dependencias de specs pospuestas, specs fuera del índice). |

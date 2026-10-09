@@ -8,6 +8,7 @@
 > **Related:** SPEC 38 (query filters), SPEC 39 (fork PostgreSQL — la sintaxis de `HasFilter` es específica del proveedor).
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-09-28)
 > **Ajuste por SPEC 40 (implementación, 2026-10-07):** (1) Nombres definitivos siguiendo el ejemplo `UX_<Tabla>_Company_<…>` (se normaliza `CompanyId` → `Company`): `UX_PersonContacts_Person_Type_Value`, `UX_Persons_Company_IdType_IdNumber`, `UX_Customers_Company_CustomerCode`, `UX_Customers_Company_Person_User`, `UX_Genders_Company_Code|Name`, `UX_Industries_Company_Code|Name`, `UX_TaxRegimes_Company_Code|Name`, `UX_IncomeRanges_Company_DisplayName|DisplayOrder`, `UX_Regions_Company_Country_Name|Code`. (2) `Region.Code` es nullable y en `main` el índice viejo tenía el filtro automático que EF agrega en SQL Server (`[Code] IS NOT NULL`); para no cambiar el comportamiento con códigos nulos, `UX_Regions_Company_Country_Code` usa `HasFilter("\"code\" IS NOT NULL AND \"gcrecord\" = 0")` (los otros 13 usan `"gcrecord" = 0`). En el fork el filtro de `Code` es obligatorio, porque Npgsql no agrega ese filtro automático.
+> **Ajuste por SPEC 40-post (implementación, 2026-10-09):** (1) `Customer.UserId` es obligatorio (`Guid`, columna `NOT NULL`) en el fork y en `main`; la premisa de "`UserId` nullable" de la SPEC 40 original era incorrecta. `UX_Customers_Company_Person_User` conserva `.AreNullsDistinct(false)` como estaba acordado, pero hoy no tiene efecto; se quitan el caso D.6 y su criterio de aceptación. (2) El caso D.2 (`PUT /persons` tres veces) y el smoke HTTP no se pueden ejecutar: `DapperContext.CreateConnection()` del fork siempre crea `SqlConnection` (rama PostgreSQL comentada desde SPEC 39), y `PUT /Persons` responde 500 antes de llegar a los índices. Se corrige aparte (decisión del usuario; pendiente en `specs/README.md`); el comportamiento que D.2 validaba lo cubre D.1 a nivel de base.
 > **Objective:** Reemplazar los 14 índices únicos que incluyen `GcRecord` como columna de la clave por índices únicos **filtrados** (`WHERE GcRecord = 0`), el patrón que el sistema ya usa en otros 7 índices, para que la unicidad aplique solo a registros activos y los registros borrados nunca choquen entre sí.
 
 ---
@@ -18,17 +19,16 @@
 |---|---|---|
 | Filtro de los 14 índices | `.HasFilter("[GcRecord] = 0")` | `.HasFilter("\"gcrecord\" = 0")` |
 | `UX_Regions_Company_Country_Code` | `[Code] IS NOT NULL AND [GcRecord] = 0` | `"code" IS NOT NULL AND "gcrecord" = 0`. El filtro de `Code` es obligatorio: Npgsql no agrega el `IS NOT NULL` automático que EF pone en SQL Server a un índice único sobre columna nula. |
-| `UX_Customers_Company_Person_User` (`UserId` nulo) | SQL Server trata dos `NULL` como iguales: dos clientes activos de la misma persona sin usuario chocan | `.AreNullsDistinct(false)` → `NULLS NOT DISTINCT` (PostgreSQL 15+; `postgres:17` en desarrollo y CI). Mismo comportamiento que `main` (decisión del usuario, 2026-10-09). |
+| `UX_Customers_Company_Person_User` | SQL Server trata dos `NULL` como iguales | `.AreNullsDistinct(false)` → `NULLS NOT DISTINCT` (PostgreSQL 15+), decisión del usuario 2026-10-09. Hoy sin efecto: `UserId` es obligatorio (ver Ajuste). |
 | Nombres físicos | `UX_Genders_Company_Name` | `HasDatabaseName("UX_Genders_Company_Name")` se conserva; la convención `ApplyLowerCaseNaming` lo deja como `ux_genders_company_name` en la base. |
 | Migración | `FilteredUniqueIndexesForSoftDelete` contra SQL Server | Misma, generada contra Npgsql: 14 `DropIndex` + 14 `CreateIndex` con `filter: "\"gcrecord\" = 0"` (y `"code" IS NOT NULL AND ...` en Regions) y la anotación `NullsDistinct = false` en el de clientes. |
 | Violación del índice | `SqlException` 2601/2627 | `PostgresException` `23505` con `ConstraintName` = el índice; `GlobalExceptionHandler` ya responde 409 `DUPLICATE_KEY` (SPEC 39). |
 | Tests | `UniqueIndexSoftDeleteGuardTests` y `FilteredUniqueIndexesIntegrationTests` sobre `CustomWebApplicationFactory` (MsSql) | `UniqueIndexSoftDeleteGuardPostgreSqlTests` (solo modelo) y `FilteredUniqueIndexesPostgreSqlTests` sobre `PostgreSqlWebApplicationFactory`. Además, la teoría de índices filtrados de `PostgreSqlSmokeTests` (caso 3) suma los 14 índices nuevos. |
 
 Casos de prueba que cambian respecto de `main`:
-- **D.6 (nuevo):** dos `Customer` activos de la misma persona y empresa con `UserId` nulo → `23505` sobre `ux_customers_company_person_user` (prueba `NULLS NOT DISTINCT`).
 - **D.7 (nuevo):** dos `Region` activas del mismo país con `Code` nulo → permitido (prueba el filtro `"code" IS NOT NULL`).
 
-Verificación con Docker (convención 12 del README): arrancar la API contra `postgres:17`, comprobar en `pg_indexes` que los 14 índices existen con su `WHERE` y repetir el escenario de `UpdatePersonCommandHandler.SyncContacts` (quitar/agregar/quitar el mismo email el mismo día → tres 200).
+Verificación con Docker (convención 12 del README): arrancar la API contra `postgres:17`, comprobar en `pg_indexes` que los 14 índices existen con su `WHERE` y repetir el escenario de `UpdatePersonCommandHandler.SyncContacts` (quitar/agregar/quitar el mismo email el mismo día → tres 200). El escenario HTTP queda pendiente del arreglo de `DapperContext` (ver Ajuste).
 
 ---
 
@@ -93,11 +93,10 @@ builder.HasIndex(g => new { g.CompanyId, g.Name })
 `tests/IntegrationTests/Persistence/FilteredUniqueIndexesPostgreSqlTests.cs` (PostgreSQL real, `PostgreSqlWebApplicationFactory`, `postgres:17`):
 
 1. `PersonContact`: crear, borrar, recrear y volver a borrar el mismo contacto el mismo día → sin excepción (antes: violación de índice).
-2. `PUT /persons/{id}` tres veces en el mismo día quitando/agregando/quitando el mismo email → las tres devuelven 200.
+2. `PUT /persons/{id}` tres veces en el mismo día quitando/agregando/quitando el mismo email → las tres devuelven 200. **Pendiente** del arreglo de `DapperContext` (ver Ajuste).
 3. `Gender`: dos géneros activos con el mismo nombre en la misma empresa → sigue fallando (la unicidad entre activos se preserva).
 4. `Gender`: mismo nombre en empresas distintas → permitido.
 5. `Region`: borrar y recrear con el mismo nombre/país dos veces el mismo día → sin excepción.
-6. `Customer`: dos clientes activos de la misma persona y empresa con `UserId` nulo → violación (`23505`), igual que en `main` (`NULLS NOT DISTINCT`).
 7. `Region`: dos regiones activas del mismo país con `Code` nulo → permitido (filtro `"code" IS NOT NULL`).
 
 **Out of scope:**
@@ -139,13 +138,12 @@ builder.HasIndex(g => new { g.CompanyId, g.Name })
 
 ## Acceptance criteria
 
-- [ ] Los 14 índices de la tabla A son únicos filtrados por `GcRecord = 0`, sin `GcRecord` en la clave.
-- [ ] Ningún índice único del modelo incluye `GcRecord` en la clave (test de guarda).
-- [ ] Borrar dos veces el mismo valor natural el mismo día no produce error.
-- [ ] Dos registros activos con el mismo valor natural siguen siendo rechazados.
-- [ ] La migración tiene solo los 14 `DropIndex` + 14 `CreateIndex`.
-- [ ] `UX_Customers_Company_Person_User` rechaza dos clientes activos de la misma persona sin usuario (`NULLS NOT DISTINCT`).
-- [ ] Suite de integración PostgreSQL (`~PostgreSql`) en verde.
+- [x] Los 14 índices de la tabla A son únicos filtrados por `GcRecord = 0`, sin `GcRecord` en la clave.
+- [x] Ningún índice único del modelo incluye `GcRecord` en la clave (test de guarda).
+- [x] Borrar dos veces el mismo valor natural el mismo día no produce error.
+- [x] Dos registros activos con el mismo valor natural siguen siendo rechazados.
+- [x] La migración tiene solo los 14 `DropIndex` + 14 `CreateIndex`.
+- [x] Suite de integración PostgreSQL (`~PostgreSql`) en verde.
 
 ---
 
@@ -155,5 +153,5 @@ builder.HasIndex(g => new { g.CompanyId, g.Name })
 |--------|------------|
 | Algún test o handler compara el nombre del índice viejo al capturar `DbUpdateException`. | F3.3 los busca por nombre antes de mergear. |
 | El `Down()` de la migración falla si ya hay borrados duplicados del mismo día. | Documentado. El rollback reintroduciría el bug; si se necesita, limpiar duplicados antes. |
-| PostgreSQL trata los `NULL` como distintos en índices únicos y no agrega filtros `IS NOT NULL` automáticos. | `NULLS NOT DISTINCT` en el índice de clientes y filtro explícito de `Code` en regiones; casos D.6 y D.7. |
+| PostgreSQL trata los `NULL` como distintos en índices únicos y no agrega filtros `IS NOT NULL` automáticos. | `NULLS NOT DISTINCT` en el índice de clientes y filtro explícito de `Code` en regiones; caso D.7. |
 | SPEC 41 restaura un registro borrado cuando ya existe uno activo con la misma clave → violación del índice filtrado. | SPEC 41 exige validar el duplicado activo antes de restaurar y devolver un error de negocio, no un 500. |
