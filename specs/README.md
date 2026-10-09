@@ -13,6 +13,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 - Los números **no se reutilizan ni se reordenan**. Si una spec se divide, la parte que sale toma un número nuevo y ambas lo dicen en su encabezado (ejemplo: SPEC 99 → SPEC 47).
 - **Excepción autorizada (2026-10-05):** por decisión del usuario se renumeró una sola vez: la 37 (canales `WEB`/`APP`) pasó a **99** y las 38–49 bajaron un número (38→37 … 49→48). Las referencias se actualizaron en ambos repositorios. Una spec citada con su número anterior en un commit o conversación previa a esa fecha debe traducirse con esta tabla.
 - El nombre del archivo es `NN-tema-en-ingles.md` y el título empieza con `# SPEC NN — `.
+- **Serie `-post`** (2026-10-09): copias de specs de `main` adaptadas a PostgreSQL, `NN-post-tema.md`; no consumen números (ver "Serie `-post`").
 
 ### Estados
 | Estado | Significado | Quién lo asigna |
@@ -86,8 +87,27 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 47 | Ingesta de tickets por WhatsApp y correo | **Pospuesto** | 34, 35, 36, 99, 42, 43 |
 | 48 | Bloqueo de APIs y menú por módulo activo de la empresa | Borrador | 43 |
 | 49 | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Borrador | 36 |
-| 50 | `main_postgresql`: port de 40–49 y pendientes para llevar QA a PostgreSQL | Borrador | 39, 40–49 |
+| 50 | `main_postgresql`: pendientes para llevar QA a PostgreSQL (el port de 40–49 pasó a la serie `-post`) | Borrador | 39 |
 | 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
+
+### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)
+
+Las filas 40–49 y 99 de la tabla anterior son las copias de `main` del 2026-10-07: se conservan como referencia y no se implementan en el fork. Las que se implementan aquí son estas:
+
+| Nº | Título | Estado | Depende de (según su encabezado) |
+|---|---|---|---|
+| 40-post | Índices únicos filtrados por soft-delete | Borrador | 39 |
+| 41-post | Visibilidad de registros borrados y restauración para SuperAdmin | Borrador | 38, 40-post |
+| 42-post | Valores iniciales del ticket desde `TicketCompanyDefaults` | Borrador | 41-post |
+| 43-post | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Borrador | 39 |
+| 44-post | Módulo Calendario: parametrización, calendarios y actividades | Borrador | 99-post, 43-post, 48-post |
+| 45-post | Calendario: ingreso por canales (agente) y personas pendientes | **Pospuesto** | 43-post, 44-post, 48-post |
+| 46-post | Calendario: estructura para sincronizar con Google Calendar | Borrador | 44-post |
+| 47-post | Ingesta de tickets por WhatsApp y correo | **Pospuesto** | 34, 35, 36, 99-post, 42-post, 43-post |
+| 48-post | Bloqueo de APIs y menú por módulo activo de la empresa | Borrador | 43-post |
+| 49-post | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Borrador | 36 |
+| 51-post | Invalidación de la caché de permisos con la clave `permissions:v2` | Borrador | 17, 25 |
+| 99-post | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
 
 ---
 
@@ -105,9 +125,57 @@ Orden sugerido de implementación (cada uno requiere `Aprobado`):
 
 En paralelo, sin dependencias con lo anterior: **38 → 40 → 41** (query filters, índices filtrados, restauración) y **39** (fork PostgreSQL, `Implementado` en `main_postgresql`).
 
-**Cierre de etapa — 50:** las specs 40–49 se implementan en `main` (SQL Server). La **50** sale de `main_postgresql`, hace un único `git merge main`, convierte a PostgreSQL todo lo de 40–49 (migración incremental Npgsql, `HasFilter`, SQL) y cierra los pendientes de QA; su PR va a `main_postgresql`, nunca a `main`. Después, QA pasa a PostgreSQL.
+**En este fork (2026-10-09):** las specs de `main` se implementan como serie `-post` (orden en "Serie `-post`"). La **50** queda solo con los pendientes para llevar QA a PostgreSQL; su antigua sección 0 (un único `git merge main`) se descartó.
 
 **Etapa posterior** (`Pospuesto`): **45** (agente de canales del calendario) y **47** (tickets por WhatsApp y correo), después de concluir Tickets y Calendar.
+
+---
+
+## Serie `-post` (specs de `main` adaptadas a PostgreSQL)
+
+Decisión del usuario (2026-10-09): las specs 40–49, 51 y 99 de `main` se copian a este fork como **specs `-post`**, idénticas en negocio pero adaptadas a PostgreSQL, y se **implementan desde cero** en `main_postgresql` (no se traen commits de `main`). Reemplaza el "único `git merge main`" que planteaba la sección 0 de SPEC 50.
+
+### Reglas de la serie
+
+- **Archivo:** `NN-post-<nombre-original>.md` (ejemplo: `40-post-filtered-unique-indexes-soft-delete.md`). **Título:** `# SPEC NN-post — …`. **Cita:** "SPEC 40-post" (dentro del fork) o "BE-40-post" (desde `join_frontb`).
+- **No consumen números:** el sufijo `-post` marca una copia de la spec `NN` de `main`; el siguiente número libre no cambia.
+- **Estado propio:** toda `-post` nace en `Borrador` (las copias de specs `Pospuesto` en `main` conservan `Pospuesto`). Su estado en el fork es independiente del de `main`.
+- **Lectura:** dentro de una `-post`, toda referencia a una spec de la serie (40–49, 51, 99) se lee como su versión `-post`. Si el texto copiado de `main` y la sección "Adaptación a PostgreSQL" de la spec difieren, prevalece esta última.
+- **Copias anteriores:** los archivos `40-…md` a `49-…md` y `99-…md` sin sufijo son copias de `main` del 2026-10-07; se conservan sin tocar como referencia y **no** se implementan en el fork.
+- **Rama de trabajo:** `spec-NN-post-<nombre>`, creada desde `main_postgresql`, PR hacia `main_postgresql` (nunca hacia `main`).
+
+### Convenciones PostgreSQL (aplican a toda `-post`)
+
+1. **Nombres físicos en minúsculas** (`ApplyLowerCaseNaming`, SPEC 39): esquemas, tablas, columnas, PK/FK e índices. En C# y en las specs se usan los nombres lógicos (`Messaging.Tickets`, `UX_Genders_Company_Name`); en la base son `messaging.tickets`, `ux_genders_company_name`. El SQL crudo va sin comillas; solo se citan palabras reservadas, en minúsculas (`sm."order"`).
+2. **`HasFilter`:** SQL crudo en minúsculas y entre comillas dobles, booleanos con `TRUE`/`FALSE`: `"gcrecord" = 0`, `"isinitial" = TRUE AND "gcrecord" = 0`, `"code" IS NOT NULL AND "gcrecord" = 0`. Npgsql **no** agrega el filtro automático `IS NOT NULL` que EF pone en SQL Server a los índices únicos sobre columnas nulas: si hace falta, se escribe.
+3. **`NULL` en índices únicos:** PostgreSQL trata dos `NULL` como distintos; SQL Server, como iguales. Cuando el comportamiento de `main` depende de que choquen, el índice usa `.AreNullsDistinct(false)` (`NULLS NOT DISTINCT`, PostgreSQL 15+).
+4. **Tipos:** `nvarchar(n)` → `varchar(n)`; `nvarchar(max)` → `text`; `bit` → `boolean`; `uniqueidentifier` → `uuid`; `datetime2` → `timestamp with time zone` (lo que Npgsql usa para `DateTime`); `date` → `date` (`DateOnly`); `time` → `time` (`TimeOnly`).
+5. **`DateTime` en UTC:** Npgsql rechaza escribir en `timestamp with time zone` un `DateTime` que no sea `Kind=Utc` (columnas y parámetros Dapper). Todo valor que venga de un request o de una librería se normaliza con `ToUniversalTime()` / `DateTime.SpecifyKind(..., DateTimeKind.Utc)` antes de guardarlo o de usarlo como parámetro.
+6. **SQL Dapper:** sin corchetes; `COALESCE`; booleanos `= TRUE`/`= FALSE`; `CAST(... AS boolean)` o una expresión booleana directa (no `CASE ... THEN 1 ELSE 0`); `CONCAT(...)` o `||`; `NOW()`; paginación literal `LIMIT @PageSize OFFSET @Offset` (sin branch por proveedor); listas con `= ANY(@Ids)` (arreglo) o la expansión `IN @Ids` de Dapper; **búsquedas de texto con `ILIKE`** (conserva la búsqueda sin distinción de mayúsculas que da la colación de SQL Server; las búsquedas existentes las convierte SPEC 50 A).
+7. **Migraciones:** cada `-post` genera su propia migración incremental contra Npgsql desde `src/4.Services.WebApi` (`dotnet ef migrations add <Nombre> --project ../3.Persistence --startup-project .`) e inspecciona el `Up()` (sin `nvarchar`/`datetime2`/`bit`/corchetes; filtros en minúsculas). Nunca se copian migraciones de `main`. Las migraciones de datos (`migrationBuilder.Sql`) se escriben en SQL de PostgreSQL (`gen_random_uuid()`, `NOW()`, nombres en minúsculas).
+8. **Bloqueos:** `pg_advisory_xact_lock(...)` en lugar de `sp_getapplock`; `SELECT ... FOR UPDATE` en lugar de `WITH (UPDLOCK, HOLDLOCK)`.
+9. **Violación de índice único:** `PostgresException` con `SqlState = 23505` (y `ConstraintName`); `GlobalExceptionHandler` ya la responde como 409 `DUPLICATE_KEY` (SPEC 39). Si un handler necesita reconocer la violación de un índice concreto, lo hace un servicio de Persistence/Infrastructure (Application no referencia Npgsql).
+10. **Validación del SQL:** `EXPLAIN` de cada sentencia nueva contra la base migrada (técnica de SPEC 39).
+11. **Tests:** los unitarios que afirman texto SQL afirman el SQL de PostgreSQL. Los de integración usan `PostgreSqlWebApplicationFactory` (`postgres:17`) y su clase termina en `PostgreSqlTests`, para entrar al filtro `FullyQualifiedName~PostgreSql` del job `integration-tests-postgres` (hasta que SPEC 50 E unifique las factories). Comando: `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 dotnet test tests/IntegrationTests/JOIN.IntegrationTests.csproj --filter "FullyQualifiedName~PostgreSql"`.
+12. **Verificación con Docker** (smoke manual de cada `-post`, decisión del usuario 2026-10-09; `docker-compose.yml` no cambia):
+
+    ```bash
+    docker run --name join-pg-spec -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:17
+    DatabaseProvider=PostgreSQL \
+    ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=join_db;Username=postgres;Password=postgres" \
+    dotnet run --project src/4.Services.WebApi
+    # smoke de la spec (curl), luego detener la API y:
+    docker rm -f join-pg-spec
+    ```
+
+    Cuando la spec toca la imagen de la API (`Dockerfile`), el smoke se repite con la imagen: `docker build -t join-api-pg .` y `docker run` con las mismas variables, usando `Host=host.docker.internal`.
+
+### Orden de implementación en el fork
+
+1. **40-post** → **41-post** (etapas 1–4) → **99-post** → **42-post** → **43-post** → **48-post** → **44-post** → **46-post**. Es el mismo orden en que se implementaron o se implementarán en `main`; 41-post necesita 40-post, y 42-post usa el bloqueo de borrado de 41-post.
+2. **49-post** y **51-post**: sin dependencias con lo anterior, en cualquier momento.
+3. **45-post** y **47-post**: `Pospuesto`, igual que en `main`.
+4. **50**: pendientes para llevar QA a PostgreSQL (sin su antigua sección 0), cuando el usuario lo decida.
 
 ---
 
