@@ -107,6 +107,51 @@ public sealed class GetPersonByIdQueryHandlerTests
     }
 
     /// <summary>
+    /// PostgreSQL returns unquoted column names in lowercase (<c>id</c>, <c>addressline1</c>): addresses
+    /// and contacts must still map. They used to be read as <c>dynamic</c>, so <c>a.Id</c> was null and
+    /// <c>GET /Persons/{id}</c> answered 500 for any person with addresses or contacts.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenColumnNamesAreLowercase_ShouldStillMapAddressesAndContacts()
+    {
+        // Arrange
+        var companyId = _fixture.Create<Guid>();
+        var customerId = _fixture.Create<Guid>();
+        var context = new GetPersonByIdQueryHandlerTestContext(companyId);
+
+        context.Connection.SetResults(
+            CreatePersonDetailResultSet(customerId, companyId),
+            Lowercase(CreateAddressResultSet()),
+            Lowercase(CreateContactResultSet()),
+            FakeResultSet.Empty("id", "employername", "jobtitle", "startdate", "enddate", "iscurrent", "isactive"),
+            FakeResultSet.Empty("id", "industryid", "industryname", "taxregimeid", "taxregimename", "website", "foundationdate", "isactive"),
+            FakeResultSet.Empty("id", "incomerangeid", "incomerangename", "sourceoffunds", "declareddate", "iscurrent", "isactive"));
+
+        // Act
+        var response = await context.CreateHandler().Handle(new GetPersonByIdQuery(customerId), CancellationToken.None);
+
+        // Assert
+        response.IsSuccess.Should().BeTrue();
+        var detail = response.Data!;
+        detail.Addresses.Should().HaveCount(2);
+        detail.Addresses!.Should().OnlyContain(a => a.Id != Guid.Empty);
+        detail.Addresses.First().AddressLine1.Should().Be("Main street 100");
+        detail.Addresses.First().IsDefault.Should().BeTrue();
+        detail.Addresses.First().CreatedAt.Should().Be("2026-04-19 14:30");
+        detail.Addresses.Last().RegionId.Should().BeNull();
+        detail.Contacts.Should().HaveCount(2);
+        detail.Contacts!.First().Id.Should().NotBe(Guid.Empty);
+        detail.Contacts.First().ContactType.Should().Be("2");
+        detail.Contacts.First().IsPrimary.Should().BeTrue();
+    }
+
+    private static FakeResultSet Lowercase(FakeResultSet source)
+    {
+        return new FakeResultSet(source.Rows.Select(row =>
+            (IDictionary<string, object?>)row.ToDictionary(kv => kv.Key.ToLowerInvariant(), kv => kv.Value)));
+    }
+
+    /// <summary>
     /// Verifies the not-found branch when the current tenant has no matching customer.
     /// </summary>
     [Fact]

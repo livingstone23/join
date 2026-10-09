@@ -181,8 +181,10 @@ public class GetPersonByIdQueryHandler(
                 ["Person not found."]);
         }
 
-        var addressesRaw = (await multi.ReadAsync<dynamic>()).ToList();
-        var contactsRaw = (await multi.ReadAsync<dynamic>()).ToList();
+        // Typed rows, not dynamic: Dapper maps typed properties case-insensitively, while a DapperRow
+        // keeps the provider's column names (lowercase on PostgreSQL), so `a.Id` came back null.
+        var addressesRaw = (await multi.ReadAsync<AddressRow>()).ToList();
+        var contactsRaw = (await multi.ReadAsync<ContactRow>()).ToList();
         var employments = (await multi.ReadAsync<PersonEmploymentDetailDto>()).ToList();
         var businessProfiles = (await multi.ReadAsync<PersonBusinessProfileDetailDto>()).ToList();
         var financialProfiles = (await multi.ReadAsync<PersonFinancialProfileDetailDto>()).ToList();
@@ -205,16 +207,14 @@ public class GetPersonByIdQueryHandler(
                 RegionName = a.RegionName,
                 ProvinceName = a.ProvinceName,
                 MunicipalityName = a.MunicipalityName,
-                CreatedAt = a.Created != null
-                    ? ((DateTime)a.Created).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
-                    : string.Empty
+                CreatedAt = a.Created?.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? string.Empty
             }).ToList()
             : null;
 
         var contacts = contactsRaw.Count > 0
             ? contactsRaw.Select(c =>
             {
-                var contactTypeCode = Convert.ToInt32(c.ContactType, CultureInfo.InvariantCulture);
+                var contactTypeCode = c.ContactType;
                 var contactTypeName = Enum.IsDefined(typeof(ContactType), contactTypeCode)
                     ? ((ContactType)contactTypeCode).GetDisplayName()
                     : string.Empty;
@@ -227,9 +227,7 @@ public class GetPersonByIdQueryHandler(
                     ContactValue = c.ContactValue ?? string.Empty,
                     IsPrimary = c.IsPrimary ?? false,
                     Comments = c.Comments,
-                    CreatedAt = c.Created != null
-                        ? ((DateTime)c.Created).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
-                        : string.Empty
+                    CreatedAt = c.Created?.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? string.Empty
                 };
             }).ToList()
             : null;
@@ -248,5 +246,37 @@ public class GetPersonByIdQueryHandler(
                 FinancialProfiles = financialProfiles.Count > 0 ? financialProfiles : null
             }
         };
+    }
+
+    /// <summary>Address row of the detail query (columns of the second result set).</summary>
+    private sealed class AddressRow
+    {
+        public Guid Id { get; init; }
+        public string? AddressLine1 { get; init; }
+        public string? AddressLine2 { get; init; }
+        public string? ZipCode { get; init; }
+        public bool? IsDefault { get; init; }
+        public Guid? StreetTypeId { get; init; }
+        public string? StreetTypeName { get; init; }
+        public Guid? CountryId { get; init; }
+        public string? CountryName { get; init; }
+        public Guid? RegionId { get; init; }
+        public string? RegionName { get; init; }
+        public Guid? ProvinceId { get; init; }
+        public string? ProvinceName { get; init; }
+        public Guid? MunicipalityId { get; init; }
+        public string? MunicipalityName { get; init; }
+        public DateTime? Created { get; init; }
+    }
+
+    /// <summary>Contact row of the detail query (columns of the third result set).</summary>
+    private sealed class ContactRow
+    {
+        public Guid Id { get; init; }
+        public int ContactType { get; init; }
+        public string? ContactValue { get; init; }
+        public bool? IsPrimary { get; init; }
+        public string? Comments { get; init; }
+        public DateTime? Created { get; init; }
     }
 }
