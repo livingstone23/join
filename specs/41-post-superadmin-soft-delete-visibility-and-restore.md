@@ -6,6 +6,7 @@
 > **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 99) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
 > **Depends on:** SPEC 38 (query filters, ya en el fork), SPEC 40-post (índices únicos filtrados — la unicidad debe aplicar solo a activos para poder restaurar sin colisiones).
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-09-28)
+> **Ajuste por SPEC 41-post (implementación, 2026-10-09):** etapas 1 a 4 implementadas en el fork, sin cambio de lógica respecto del texto aprobado. (1) **Origen del código:** cada etapa se armó aplicando el diff de `src`/`tests` del commit de esa etapa en `main` (`2a855e5`, `9d3315c`, `5c4000c`, `8f6ad50`) con `git apply --3way` y adaptándolo a PostgreSQL; ningún commit de `main` entra en la historia del fork. La migración de la Etapa 4 no se copió: se generó contra Npgsql. (2) **Ramas:** una por etapa (`spec-41-post-etapa-1-catalogos`, `-etapa-2-personas`, `-etapa-3-seguridad`, `-etapa-4-tickets`), encadenadas: cada una sale de la anterior porque las previas aún no estaban integradas en `main_postgresql`. Reemplaza a la rama única de la cabecera. (3) **Arreglo previo, fuera de esta spec** (rama `fix-post-dapper-dateonly-and-dappercontext`, decisión del usuario, mergeada en la Etapa 2): `DapperContext` abre `NpgsqlConnection` y un handler de Dapper lee las columnas `date` (que Npgsql devuelve como `DateOnly`) en propiedades `DateTime`; sin él, `GET /PersonEmployment` y el test de guarda de empleos respondían 500. Cierra el pendiente de SPEC 40-post y ejecuta su caso D.2. (4) **Adaptaciones PostgreSQL:** `RoleRepository` proyecta `CAST(COUNT(*) AS integer) AS PermissionsCount`, porque `COUNT(*)` es `bigint` y `RoleDto` es un record posicional (`GET /Roles/detailed` respondía 500); los conflictos de `RoleRepository`/`RoleCompanyRepository` conservan la sintaxis del fork (`LIMIT/OFFSET`, `LIKE CONCAT`, sin corchetes); `TicketCompanyDefaultConfiguration` filtra con `"gcrecord" = 0`. (5) **Tests:** `SoftDeleteVisibilityGuardPostgreSqlTests` (parcial + `.Tickets.cs`) sobre `PostgreSqlWebApplicationFactory`; el sembrado de `PersonFinancialProfile` usa `DateTimeKind.Unspecified` porque `DeclaredDate` sigue siendo `timestamp` (SPEC 50 B); `PostgreSqlSmokeTests` suma el índice `ux_ticketcompanydefaults_company_active` (26 índices filtrados) y comprueba la migración. (6) **Hallazgo pendiente:** `GET /Persons/{id}` responde 500 si la persona tiene direcciones o contactos (lectura `dynamic` con columnas en minúsculas); es anterior a esta spec y quedó en `specs/README.md` → "Pendientes abiertos".
 > **Historia (2026-10-08, Etapa 4):** vuelve a Borrador por cambio de lógica al planificar la Etapa 4: `Ticket` pasa a ser padre de composición de `TicketDocument` (cascada), los tickets de seguimiento activos bloquean el borrado de un ticket, se agrega `LogType.Restoration` y se filtra el índice único de `TicketCompanyDefault`. Las etapas 1 a 3 ya están implementadas y no cambian.
 > **Historia (2026-10-08):** vuelve a Borrador por cambio de lógica del borrado (sección E, "Borrado en cascada de composición"). Las etapas 1 y 2 ya implementadas se ajustan cuando la spec se vuelva a aprobar.
 > **Historia (2026-10-07):** al planificar la Etapa 1, el usuario decidió que un hijo no se restaura mientras su padre siga borrado, incluidas las referencias a catálogos (reemplaza la decisión del 2026-09-28 que lo permitía), y que los endpoints `system-wide` de SuperAdmin quedan sin cambios. Se agregaron el plan y el inventario de la Etapa 1.
@@ -375,18 +376,20 @@ Este test también cubre el hueco que SPEC 38 dejó abierto: una query Dapper nu
 
 ## Acceptance criteria
 
+> **Ajuste por SPEC 41-post (2026-10-09, cierre):** criterios verificados en el fork con: build Release; unit tests 2508 en verde con cobertura de líneas 92,43 %; integración `~PostgreSql` 162/162 (guarda de visibilidad de las 4 etapas, restore y cascadas); y 35 llamadas a los endpoints contra la API sobre `postgres:17` (convención 12): `includeDeleted` ignorado para Manager, `NOT_DELETED`, `ACTIVE_DUPLICATE_EXISTS`, `PARENT_DELETED`, `GENDER_IN_USE`, `PERSON_IN_USE`, `COMPANY_IN_USE`, `TICKET_IN_USE`, cascadas y restauración de persona, rol y ticket, y `LogType` `Restoration`. Las marcas default/principal/actual al restaurar las cubren los unit tests de la Etapa 2.
+
 > **Ajuste por SPEC 41 (2026-10-08, cierre):** criterios verificados al cerrar la Etapa 4 (test de guarda de visibilidad, tests de restore y de cascada en verde; `DeleteAsync` eliminado y sin borrados físicos en el código). El criterio de cascada se completa con los padres de composición agregados en las etapas 3 y 4.
 
-- [ ] Ningún rol distinto de `SuperAdmin` puede ver registros borrados ni datos de otra empresa, aunque envíe `includeDeleted=true` o `companyId`.
-- [ ] `SuperAdmin` ve activos y borrados con `includeDeleted=true`, dentro de la empresa resuelta por `TenantResolver`.
-- [ ] `SuperAdmin` puede restaurar cualquier entidad de las etapas implementadas; las de la sección F no son restaurables.
-- [ ] Restaurar nunca produce un 500 por índice único: el duplicado activo se detecta antes y devuelve `ACTIVE_DUPLICATE_EXISTS`.
-- [ ] No se puede restaurar un hijo cuyo padre está borrado.
-- [ ] Un padre con referencias activas no se puede borrar (`<ENTIDAD>_IN_USE` lista las referencias). Un padre de composición (`Person`, `SystemModule`, `SystemOption`, `ApplicationRole`, `UserCompany`, `Ticket`) borra en cascada (soft delete) a sus hijos de composición, y restaurarlo restaura los de esa misma cascada.
-- [ ] No existe ningún borrado físico en el código (`DeleteAsync` eliminado de `IGenericRepository`).
-- [ ] Los invariantes de default/principal/actual se mantienen al restaurar.
-- [ ] El test de guarda de visibilidad cubre todos los endpoints de listado de las etapas implementadas.
-- [ ] Gate de cobertura ≥ 90% y suite de integración en verde en cada etapa.
+- [x] Ningún rol distinto de `SuperAdmin` puede ver registros borrados ni datos de otra empresa, aunque envíe `includeDeleted=true` o `companyId`.
+- [x] `SuperAdmin` ve activos y borrados con `includeDeleted=true`, dentro de la empresa resuelta por `TenantResolver`.
+- [x] `SuperAdmin` puede restaurar cualquier entidad de las etapas implementadas; las de la sección F no son restaurables.
+- [x] Restaurar nunca produce un 500 por índice único: el duplicado activo se detecta antes y devuelve `ACTIVE_DUPLICATE_EXISTS`.
+- [x] No se puede restaurar un hijo cuyo padre está borrado.
+- [x] Un padre con referencias activas no se puede borrar (`<ENTIDAD>_IN_USE` lista las referencias). Un padre de composición (`Person`, `SystemModule`, `SystemOption`, `ApplicationRole`, `UserCompany`, `Ticket`) borra en cascada (soft delete) a sus hijos de composición, y restaurarlo restaura los de esa misma cascada.
+- [x] No existe ningún borrado físico en el código (`DeleteAsync` eliminado de `IGenericRepository`).
+- [x] Los invariantes de default/principal/actual se mantienen al restaurar.
+- [x] El test de guarda de visibilidad cubre todos los endpoints de listado de las etapas implementadas.
+- [x] Gate de cobertura ≥ 90% y suite de integración en verde en cada etapa.
 
 ---
 
