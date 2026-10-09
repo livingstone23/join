@@ -8,6 +8,7 @@ using JOIN.Application.Interface.Persistence;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
+using JOIN.Domain.Security;
 using Moq;
 
 namespace JOIN.Application.UnitTest.Common;
@@ -177,6 +178,115 @@ public sealed class SoftDeleteRestorerTests
 
         response.IsSuccess.Should().BeTrue();
         country.IsDeleted.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RestoreAsync_WhenChecksPass_ShouldRunBeforeRestoreBeforeRestoring()
+    {
+        var context = new TestContext();
+        var gender = context.SetupDeletedGender(CompanyId);
+        context.SetupSaveChanges(1);
+        bool? wasDeletedDuringHook = null;
+
+        var response = await context.CreateRestorer().RestoreAsync<Gender>(
+            gender.Id,
+            null,
+            beforeRestore: (entity, _) =>
+            {
+                wasDeletedDuringHook = entity.IsDeleted;
+                return Task.CompletedTask;
+            });
+
+        response.IsSuccess.Should().BeTrue();
+        wasDeletedDuringHook.Should().BeTrue("the hook runs right before the restore");
+        gender.IsDeleted.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RestoreAsync_WhenAnActiveDuplicateExists_ShouldNotRunBeforeRestore()
+    {
+        var context = new TestContext();
+        var gender = context.SetupDeletedGender(CompanyId);
+        var hookCalled = false;
+
+        await context.CreateRestorer().RestoreAsync<Gender>(
+            gender.Id,
+            null,
+            activeDuplicateExists: (_, _) => Task.FromResult(true),
+            beforeRestore: (_, _) =>
+            {
+                hookCalled = true;
+                return Task.CompletedTask;
+            });
+
+        hookCalled.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RestoreAsync_WhenCascadeSucceeds_ShouldPassTheOriginalStampAndRestore()
+    {
+        var context = new TestContext();
+        var gender = context.SetupDeletedGender(CompanyId);
+        var stamp = gender.GcRecord;
+        context.SetupSaveChanges(1);
+        int? receivedStamp = null;
+
+        var response = await context.CreateRestorer().RestoreAsync<Gender>(
+            gender.Id,
+            null,
+            restoreCascade: (_, originalStamp, _) =>
+            {
+                receivedStamp = originalStamp;
+                return Task.FromResult<Response<Guid>?>(null);
+            });
+
+        response.IsSuccess.Should().BeTrue();
+        receivedStamp.Should().Be(stamp);
+        gender.IsDeleted.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RestoreAsync_WhenCascadeFails_ShouldAbortWithoutSaving()
+    {
+        var context = new TestContext();
+        var gender = context.SetupDeletedGender(CompanyId);
+
+        var response = await context.CreateRestorer().RestoreAsync<Gender>(
+            gender.Id,
+            null,
+            restoreCascade: (_, _, _) => Task.FromResult<Response<Guid>?>(Response<Guid>.Error("PARENT_DELETED", ["child"])));
+
+        response.Message.Should().Be("PARENT_DELETED");
+        gender.IsDeleted.Should().BeTrue();
+        context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(20260928, true)]
+    public async Task IsParentDeletedAsync_ForIdentityUser_ShouldReadItsGcRecord(int gcRecord, bool expected)
+    {
+        var context = new TestContext();
+        var user = new ApplicationUser { Id = Guid.NewGuid(), GcRecord = gcRecord };
+        var userRepositoryMock = new Mock<IGenericRepository<ApplicationUser>>();
+        userRepositoryMock.Setup(x => x.GetIncludingDeletedAsync(user.Id)).ReturnsAsync(user);
+        context.UnitOfWorkMock.Setup(x => x.GetRepository<ApplicationUser>()).Returns(userRepositoryMock.Object);
+
+        var isDeleted = await context.CreateRestorer().IsParentDeletedAsync<ApplicationUser>(user.Id);
+
+        isDeleted.Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task IsParentDeletedAsync_WhenParentIsMissing_ShouldBeTrue()
+    {
+        var context = new TestContext();
+        var repositoryMock = new Mock<IGenericRepository<Country>>();
+        context.UnitOfWorkMock.Setup(x => x.GetRepository<Country>()).Returns(repositoryMock.Object);
+
+        var isDeleted = await context.CreateRestorer().IsParentDeletedAsync<Country>(Guid.NewGuid());
+
+        isDeleted.Should().BeTrue();
     }
 
     private sealed class TestContext

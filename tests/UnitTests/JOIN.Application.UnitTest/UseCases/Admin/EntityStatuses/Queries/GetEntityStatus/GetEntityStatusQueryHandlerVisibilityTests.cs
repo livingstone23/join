@@ -25,7 +25,7 @@ public sealed class GetEntityStatusQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetEntityStatusQuery(TokenCompanyId, IncludeDeleted: null));
 
-        context.Connection.LastCommandText.Should().Contain("es.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" es.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetEntityStatusQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetEntityStatusQuery(TokenCompanyId, IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().Contain("es.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" es.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetEntityStatusQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetEntityStatusQuery(TokenCompanyId, IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().NotContain("es.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" es.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("es.GcRecord,");
     }
 

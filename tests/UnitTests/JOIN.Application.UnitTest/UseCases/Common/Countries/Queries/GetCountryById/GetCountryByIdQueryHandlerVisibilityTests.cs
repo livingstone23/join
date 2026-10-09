@@ -25,7 +25,7 @@ public sealed class GetCountryByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetCountryByIdQuery(Guid.NewGuid(), IncludeDeleted: null));
 
-        context.Connection.LastCommandText.Should().Contain("c.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" c.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetCountryByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetCountryByIdQuery(Guid.NewGuid(), IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().Contain("c.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" c.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetCountryByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetCountryByIdQuery(Guid.NewGuid(), IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().NotContain("c.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" c.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("c.GcRecord,");
     }
 

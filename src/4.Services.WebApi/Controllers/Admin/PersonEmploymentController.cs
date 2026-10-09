@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 using DeletePersonEmploymentCommand = JOIN.Application.UseCases.Admin.PersonEmployments.Commands.DeletePersonEmploymentCommand;
 using UpdatePersonEmploymentCommand = JOIN.Application.UseCases.Admin.PersonEmployments.Commands.UpdatePersonEmploymentCommand;
+using Microsoft.AspNetCore.Authorization;
+using JOIN.Services.WebApi.Controllers;
 
 
 
@@ -38,9 +40,9 @@ public class PersonEmploymentController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(Response<PersonEmploymentResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted = null, [FromQuery] Guid? companyId = null, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetPersonEmploymentByIdQuery(id), cancellationToken);
+        var response = await _mediator.Send(new GetPersonEmploymentByIdQuery(id, includeDeleted, companyId), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -125,9 +127,9 @@ public class PersonEmploymentController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(Response<List<PersonEmploymentResponseDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetByPersonId(Guid personId, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetByPersonId(Guid personId, [FromQuery] bool? includeDeleted = null, [FromQuery] Guid? companyId = null, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetPersonEmploymentsByPersonIdQuery(personId), cancellationToken);
+        var response = await _mediator.Send(new GetPersonEmploymentsByPersonIdQuery(personId, includeDeleted, companyId), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -162,5 +164,27 @@ public class PersonEmploymentController(IMediator mediator) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Restores a logically deleted person employment (SPEC 41). Restricted to the SuperAdmin role.
+    /// </summary>
+    /// <param name="id">The person employment identifier.</param>
+    /// <param name="companyId">Optional explicit company, honored only for SuperAdmin.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<Guid>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new RestorePersonEmploymentCommand(id, companyId), cancellationToken);
+        return this.ToRestoreResult(response);
     }
 }

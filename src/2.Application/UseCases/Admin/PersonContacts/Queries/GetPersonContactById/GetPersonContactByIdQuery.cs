@@ -12,4 +12,4 @@ namespace JOIN.Application.UseCases.Admin.PersonContacts.Queries;
 /// Query that retrieves a single person contact by its unique identifier.
 /// </summary>
 /// <param name="Id">The unique identifier of the person contact.</param>
-public sealed record GetPersonContactByIdQuery(Guid Id) : IRequest<Response<PersonContactResponseDto>>;
+public sealed record GetPersonContactByIdQuery(Guid Id, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<PersonContactResponseDto>>;

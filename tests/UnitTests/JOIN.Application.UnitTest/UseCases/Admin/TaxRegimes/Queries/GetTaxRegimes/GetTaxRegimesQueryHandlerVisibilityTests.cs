@@ -25,7 +25,7 @@ public sealed class GetTaxRegimesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetTaxRegimesQuery(IncludeDeleted: null, CompanyId: null));
 
-        context.Connection.LastCommandText.Should().Contain("tr.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" tr.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetTaxRegimesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetTaxRegimesQuery(IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().Contain("tr.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" tr.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetTaxRegimesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetTaxRegimesQuery(IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().NotContain("tr.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" tr.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("tr.GcRecord,");
     }
 

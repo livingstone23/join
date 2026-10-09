@@ -11,6 +11,7 @@ internal static class PersonAddressQuerySql
     internal const string SelectWithCatalogNames = """
         SELECT
             a.Id,
+            a.GcRecord,
             a.PersonId,
             a.AddressLine1,
             a.AddressLine2,
@@ -39,6 +40,7 @@ internal static class PersonAddressQuerySql
         new()
         {
             Id = row.Id,
+            GcRecord = row.GcRecord,
             PersonId = row.PersonId,
             AddressLine1 = row.AddressLine1 ?? string.Empty,
             AddressLine2 = row.AddressLine2,
@@ -64,6 +66,7 @@ internal static class PersonAddressQuerySql
 internal sealed class PersonAddressReadRow
 {
     public Guid Id { get; init; }
+    public int GcRecord { get; init; }
     public Guid PersonId { get; init; }
     public string? AddressLine1 { get; init; }
     public string? AddressLine2 { get; init; }

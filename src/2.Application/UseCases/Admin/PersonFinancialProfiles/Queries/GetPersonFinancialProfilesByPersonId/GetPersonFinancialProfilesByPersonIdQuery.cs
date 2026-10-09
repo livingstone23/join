@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Admin.PersonFinancialProfiles.Queries;
 /// Query that retrieves all financial profiles for a specific person in the current tenant.
 /// </summary>
 /// <param name="PersonId">The unique identifier of the person.</param>
-public sealed record GetPersonFinancialProfilesByPersonIdQuery(Guid PersonId) : IRequest<Response<List<PersonFinancialProfileResponseDto>>>;
+public sealed record GetPersonFinancialProfilesByPersonIdQuery(Guid PersonId, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<List<PersonFinancialProfileResponseDto>>>;

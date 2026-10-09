@@ -25,7 +25,7 @@ public sealed class GetSystemModulesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetSystemModulesQuery(IncludeDeleted: null));
 
-        context.Connection.LastCommandText.Should().Contain("sm.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" sm.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetSystemModulesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetSystemModulesQuery(IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().Contain("sm.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" sm.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetSystemModulesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetSystemModulesQuery(IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().NotContain("sm.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" sm.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("sm.GcRecord,");
     }
 

@@ -25,7 +25,7 @@ public sealed class GetTicketComplexitiesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetTicketComplexitiesQuery(IncludeDeleted: null, CompanyId: null));
 
-        context.Connection.LastCommandText.Should().Contain("tc.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" tc.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetTicketComplexitiesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetTicketComplexitiesQuery(IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().Contain("tc.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" tc.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetTicketComplexitiesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetTicketComplexitiesQuery(IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().NotContain("tc.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" tc.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("tc.GcRecord,");
     }
 

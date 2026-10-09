@@ -25,7 +25,7 @@ public sealed class GetIncomeRangesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetIncomeRangesQuery(IncludeDeleted: null, CompanyId: null));
 
-        context.Connection.LastCommandText.Should().Contain("ir.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" ir.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetIncomeRangesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetIncomeRangesQuery(IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().Contain("ir.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" ir.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetIncomeRangesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetIncomeRangesQuery(IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().NotContain("ir.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" ir.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("ir.GcRecord,");
     }
 

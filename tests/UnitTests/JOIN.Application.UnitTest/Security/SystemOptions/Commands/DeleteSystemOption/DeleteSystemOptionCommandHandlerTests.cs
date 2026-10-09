@@ -1,6 +1,7 @@
 using FluentAssertions;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.UnitTest.Common.TestDoubles;
+using JOIN.Application.UseCases.Security.SystemOptions;
 using JOIN.Application.UseCases.Security.SystemOptions.Commands;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
@@ -37,7 +38,7 @@ public sealed class DeleteSystemOptionCommandHandlerTests
 
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("SYSTEM_OPTION_IN_USE");
-        response.Errors.Should().Equal("Active child system options: 1", "Active role system options: 1");
+        response.Errors.Should().Equal("Active role system options: 1");
         entity.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
     }
 
@@ -77,6 +78,45 @@ public sealed class DeleteSystemOptionCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenADescendantIsGrantedToARole_ShouldReturnInUse()
+    {
+        var context = new TestContext();
+        var entity = context.SetupExisting();
+        var child = NewOption(parentId: entity.Id);
+        child.ModuleId = entity.ModuleId;
+        var grandChild = NewOption(parentId: child.Id);
+        grandChild.ModuleId = entity.ModuleId;
+        context.OptionRepositoryMock.SetupRows([entity, child, grandChild]);
+        context.UnitOfWorkMock.SetupRepositoryRows<RoleSystemOption>([new RoleSystemOption { RoleId = Guid.NewGuid(), SystemOptionId = grandChild.Id }]);
+
+        var response = await context.CreateHandler().Handle(new DeleteSystemOptionCommand(entity.Id), CancellationToken.None);
+
+        response.Message.Should().Be("SYSTEM_OPTION_IN_USE");
+        response.Errors.Should().Equal("Active role system options: 1");
+    }
+
+    [Fact]
+    public async Task Handle_WhenOptionHasChildren_ShouldCascadeToEveryLevel()
+    {
+        var context = new TestContext();
+        var entity = context.SetupExisting();
+        var child = NewOption(parentId: entity.Id);
+        child.ModuleId = entity.ModuleId;
+        var grandChild = NewOption(parentId: child.Id);
+        grandChild.ModuleId = entity.ModuleId;
+        var sibling = NewOption();
+        sibling.ModuleId = entity.ModuleId;
+        context.OptionRepositoryMock.SetupRows([entity, child, grandChild, sibling]);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var response = await context.CreateHandler().Handle(new DeleteSystemOptionCommand(entity.Id), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        new[] { child.GcRecord, grandChild.GcRecord }.Should().OnlyContain(g => g == entity.GcRecord && g > 0);
+        sibling.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord, "only the subtree is deleted");
+    }
+
+    [Fact]
     public async Task Handle_WhenSaveAffectsNoRows_ShouldReturnDeleteFailed()
     {
         var context = new TestContext();
@@ -113,6 +153,6 @@ public sealed class DeleteSystemOptionCommandHandlerTests
             return entity;
         }
 
-        public DeleteSystemOptionCommandHandler CreateHandler() => new(UnitOfWorkMock.Object);
+        public DeleteSystemOptionCommandHandler CreateHandler() => new(UnitOfWorkMock.Object, new SystemOptionCascadeCoordinator(UnitOfWorkMock.Object));
     }
 }

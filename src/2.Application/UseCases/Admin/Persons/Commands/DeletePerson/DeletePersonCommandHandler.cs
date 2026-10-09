@@ -18,7 +18,8 @@ namespace JOIN.Application.UseCases.Admin.Persons.Commands;
 /// <param name="currentUserService">Current tenant context.</param>
 public class DeletePersonCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService) : IRequestHandler<DeletePersonCommand, Response<Guid>>
+    ICurrentUserService currentUserService,
+    PersonCascadeCoordinator cascadeCoordinator) : IRequestHandler<DeletePersonCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
 
@@ -54,19 +55,17 @@ public class DeletePersonCommandHandler(
                 ["Person not found for the current company."]);
         }
 
+        // SPEC 41 (decision 2026-10-08): references with a life of their own block the delete;
+        // the composition children are soft-deleted with the person, with the same stamp.
+        var blockingReferences = await cascadeCoordinator.GetBlockingReferencesAsync(request.Id);
+        if (blockingReferences.Count > 0)
+        {
+            return Response<Guid>.Error("PERSON_IN_USE", blockingReferences);
+        }
+
         var deletedAtUtc = DateTime.UtcNow;
-
         customerEntity.MarkAsDeleted(deletedAtUtc);
-
-        foreach (var address in customerEntity.Addresses.Where(a => a.GcRecord == 0))
-        {
-            address.MarkAsDeleted(deletedAtUtc);
-        }
-
-        foreach (var contact in customerEntity.Contacts.Where(c => c.GcRecord == 0))
-        {
-            contact.MarkAsDeleted(deletedAtUtc);
-        }
+        await cascadeCoordinator.MarkChildrenAsDeletedAsync(customerEntity, deletedAtUtc);
 
         await _unitOfWork.Persons.UpdateAsync(customerEntity);
         var result = await _unitOfWork.SaveChangesAsync(cancellationToken);

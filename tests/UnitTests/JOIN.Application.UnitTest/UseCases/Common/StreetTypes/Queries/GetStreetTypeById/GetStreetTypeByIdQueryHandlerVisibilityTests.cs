@@ -25,7 +25,7 @@ public sealed class GetStreetTypeByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetStreetTypeByIdQuery(Guid.NewGuid(), IncludeDeleted: null));
 
-        context.Connection.LastCommandText.Should().Contain("st.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" st.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetStreetTypeByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetStreetTypeByIdQuery(Guid.NewGuid(), IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().Contain("st.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" st.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetStreetTypeByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetStreetTypeByIdQuery(Guid.NewGuid(), IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().NotContain("st.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" st.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("st.GcRecord,");
     }
 

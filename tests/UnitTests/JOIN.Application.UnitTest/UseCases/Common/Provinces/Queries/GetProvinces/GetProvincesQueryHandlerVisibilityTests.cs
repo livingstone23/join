@@ -25,7 +25,7 @@ public sealed class GetProvincesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetProvincesQuery(IncludeDeleted: null));
 
-        context.Connection.LastCommandText.Should().Contain("p.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" p.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetProvincesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetProvincesQuery(IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().Contain("p.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" p.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetProvincesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetProvincesQuery(IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().NotContain("p.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" p.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("p.GcRecord,");
     }
 

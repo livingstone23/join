@@ -25,7 +25,7 @@ public sealed class GetCountriesPagedQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetCountriesPagedQuery(IncludeDeleted: null));
 
-        context.Connection.LastCommandText.Should().Contain("c.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" c.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetCountriesPagedQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetCountriesPagedQuery(IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().Contain("c.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" c.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetCountriesPagedQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetCountriesPagedQuery(IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().NotContain("c.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" c.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("c.GcRecord,");
     }
 

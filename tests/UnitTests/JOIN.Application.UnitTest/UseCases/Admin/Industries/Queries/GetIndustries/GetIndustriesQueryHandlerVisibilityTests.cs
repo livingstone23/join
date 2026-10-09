@@ -25,7 +25,7 @@ public sealed class GetIndustriesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetIndustriesQuery(IncludeDeleted: null, CompanyId: null));
 
-        context.Connection.LastCommandText.Should().Contain("i.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" i.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetIndustriesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetIndustriesQuery(IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().Contain("i.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" i.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetIndustriesQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetIndustriesQuery(IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().NotContain("i.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" i.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("i.GcRecord,");
     }
 

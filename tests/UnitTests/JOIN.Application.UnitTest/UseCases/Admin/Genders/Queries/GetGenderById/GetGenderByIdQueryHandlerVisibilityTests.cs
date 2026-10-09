@@ -25,7 +25,7 @@ public sealed class GetGenderByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetGenderByIdQuery(Guid.NewGuid(), IncludeDeleted: null, CompanyId: null));
 
-        context.Connection.LastCommandText.Should().Contain("g.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" g.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetGenderByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetGenderByIdQuery(Guid.NewGuid(), IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().Contain("g.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" g.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetGenderByIdQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetGenderByIdQuery(Guid.NewGuid(), IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().NotContain("g.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" g.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("g.GcRecord,");
     }
 

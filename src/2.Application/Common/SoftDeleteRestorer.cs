@@ -25,6 +25,11 @@ public sealed class SoftDeleteRestorer(IUnitOfWork unitOfWork, ICurrentUserServi
     /// <param name="requestedCompanyId">Optional tenant override, resolved through <see cref="TenantResolver"/>.</param>
     /// <param name="isParentDeleted">Returns <c>true</c> when a parent of the entity is still deleted.</param>
     /// <param name="activeDuplicateExists">Returns <c>true</c> when an active row already holds the entity's natural key.</param>
+    /// <param name="beforeRestore">Optional step run after every check passed and right before the restore, e.g. to
+    /// drop a default/primary/current flag another active row already holds (SPEC 41, Etapa 2).</param>
+    /// <param name="restoreCascade">Optional step for composition parents (SPEC 41, decision 2026-10-08): receives the
+    /// entity and its original <c>GcRecord</c> stamp, restores the children deleted in the same cascade and returns
+    /// <c>null</c>, or an error response that aborts the whole restore (nothing is saved).</param>
     /// <param name="cancellationToken">A cancellation token for the operation.</param>
     /// <returns>The restored entity id, or <c>NOT_FOUND</c>, <c>NOT_DELETED</c>, <c>PARENT_DELETED</c>,
     /// <c>ACTIVE_DUPLICATE_EXISTS</c> or <c>RESTORE_FAILED</c>.</returns>
@@ -33,6 +38,8 @@ public sealed class SoftDeleteRestorer(IUnitOfWork unitOfWork, ICurrentUserServi
         Guid? requestedCompanyId,
         Func<TEntity, CancellationToken, Task<bool>>? isParentDeleted = null,
         Func<TEntity, CancellationToken, Task<bool>>? activeDuplicateExists = null,
+        Func<TEntity, CancellationToken, Task>? beforeRestore = null,
+        Func<TEntity, int, CancellationToken, Task<Response<Guid>?>>? restoreCascade = null,
         CancellationToken cancellationToken = default)
         where TEntity : BaseAuditableEntity
     {
@@ -71,6 +78,20 @@ public sealed class SoftDeleteRestorer(IUnitOfWork unitOfWork, ICurrentUserServi
                 [$"An active {entityName} with the same unique key already exists."]);
         }
 
+        if (beforeRestore is not null)
+        {
+            await beforeRestore(entity, cancellationToken);
+        }
+
+        if (restoreCascade is not null)
+        {
+            var cascadeError = await restoreCascade(entity, entity.GcRecord, cancellationToken);
+            if (cascadeError is not null)
+            {
+                return cascadeError;
+            }
+        }
+
         entity.Restore();
 
         var result = await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -92,10 +113,11 @@ public sealed class SoftDeleteRestorer(IUnitOfWork unitOfWork, ICurrentUserServi
     /// exists. Used by the <c>isParentDeleted</c> checks: a child is never restored before its parent.
     /// </summary>
     public async Task<bool> IsParentDeletedAsync<TParent>(Guid parentId)
-        where TParent : BaseAuditableEntity
+        where TParent : class, IAuditableEntity
     {
+        // IAuditableEntity (not BaseAuditableEntity) so Identity parents such as ApplicationUser qualify.
         var parent = await unitOfWork.GetRepository<TParent>().GetIncludingDeletedAsync(parentId);
-        return parent is null || parent.IsDeleted;
+        return parent is null || parent.GcRecord != BaseAuditableEntity.ActiveGcRecord;
     }
 
     /// <summary>

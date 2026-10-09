@@ -25,7 +25,7 @@ public sealed class GetRegionsQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetRegionsQuery(IncludeDeleted: null, CompanyId: null));
 
-        context.Connection.LastCommandText.Should().Contain("r.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" r.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetRegionsQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetRegionsQuery(IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().Contain("r.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" r.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetRegionsQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetRegionsQuery(IncludeDeleted: true, CompanyId: TokenCompanyId));
 
-        context.Connection.LastCommandText.Should().NotContain("r.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" r.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("r.GcRecord,");
     }
 

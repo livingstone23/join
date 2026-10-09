@@ -8,4 +8,4 @@ namespace JOIN.Application.UseCases.Admin.PersonFinancialProfiles.Queries;
 /// Query that retrieves a person financial profile by its unique identifier.
 /// </summary>
 /// <param name="Id">The unique identifier of the person financial profile record.</param>
-public sealed record GetPersonFinancialProfileByIdQuery(Guid Id) : IRequest<Response<PersonFinancialProfileResponseDto>>;
+public sealed record GetPersonFinancialProfileByIdQuery(Guid Id, bool? IncludeDeleted = null, Guid? CompanyId = null) : IRequest<Response<PersonFinancialProfileResponseDto>>;

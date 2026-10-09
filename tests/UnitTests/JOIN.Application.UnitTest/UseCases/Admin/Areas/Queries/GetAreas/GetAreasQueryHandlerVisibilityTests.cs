@@ -25,7 +25,7 @@ public sealed class GetAreasQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetAreasQuery(TokenCompanyId, IncludeDeleted: null));
 
-        context.Connection.LastCommandText.Should().Contain("a.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" a.GcRecord = 0");
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GetAreasQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetAreasQuery(TokenCompanyId, IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().Contain("a.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain(" a.GcRecord = 0");
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GetAreasQueryHandlerVisibilityTests
 
         await context.HandleAsync(new GetAreasQuery(TokenCompanyId, IncludeDeleted: true));
 
-        context.Connection.LastCommandText.Should().NotContain("a.GcRecord = 0");
+        context.Connection.LastCommandText.Should().NotContain(" a.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("a.GcRecord,");
     }
 

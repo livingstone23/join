@@ -2,6 +2,7 @@ using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Security;
+using JOIN.Application.UseCases.Security.SystemOptions;
 using MediatR;
 
 namespace JOIN.Application.UseCases.Security.SystemOptions.Commands;
@@ -12,7 +13,8 @@ namespace JOIN.Application.UseCases.Security.SystemOptions.Commands;
 /// </summary>
 public sealed class RestoreSystemOptionCommandHandler(
     ICurrentUserService currentUserService,
-    SoftDeleteRestorer restorer)
+    SoftDeleteRestorer restorer,
+    SystemOptionCascadeCoordinator cascadeCoordinator)
     : IRequestHandler<RestoreSystemOptionCommand, Response<Guid>>
 {
     /// <inheritdoc />
@@ -34,6 +36,8 @@ public sealed class RestoreSystemOptionCommandHandler(
             isParentDeleted: async (entity, _) =>
                 await restorer.IsParentDeletedAsync<SystemModule>(entity.ModuleId)
                 || (entity.ParentId is { } parentId && await restorer.IsParentDeletedAsync<SystemOption>(parentId)),
+            // SPEC 41 (decision 2026-10-08): bring back the children deleted in the same cascade.
+            restoreCascade: (entity, stamp, _) => cascadeCoordinator.RestoreSubtreeAsync(entity.ModuleId, entity.Id, stamp),
             cancellationToken: cancellationToken);
     }
 }

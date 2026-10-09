@@ -6,6 +6,7 @@ using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
 using JOIN.Application.UnitTest.Common.TestDoubles;
+using JOIN.Application.UseCases.Security.SystemOptions;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Admin.SystemModules.Commands.DeleteSystemModule;
@@ -74,7 +75,7 @@ public sealed class DeleteSystemModuleCommandHandlerTests
     /// Verifies the in-use protection branch when the module is linked to active system options.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenSystemModuleIsInUse_ShouldReturnInUseError()
+    public async Task Handle_WhenAnOptionIsGrantedToARole_ShouldReturnInUseError()
     {
         // Arrange
         var entity = CreateExistingModule(_fixture.Create<Guid>());
@@ -86,24 +87,48 @@ public sealed class DeleteSystemModuleCommandHandlerTests
             .Setup(x => x.GetAsync(entity.Id))
             .ReturnsAsync(entity);
 
-        context.SystemOptionRepositoryMock.SetupRows(
-            [
-                new SystemOption
-                {
-                    ModuleId = entity.Id,
-                    Name = "Manage Persons",
-                    Route = "/customers",
-                    GcRecord = 0
-                }
-            ]);
+        var option = new SystemOption
+        {
+            ModuleId = entity.Id,
+            Name = "Manage Persons",
+            Route = "/customers",
+            GcRecord = 0
+        };
+        context.SystemOptionRepositoryMock.SetupRows([option]);
+        context.UnitOfWorkMock.SetupRepositoryRows<RoleSystemOption>([new RoleSystemOption { RoleId = Guid.NewGuid(), SystemOptionId = option.Id }]);
 
         // Act
         var response = await handler.Handle(command, CancellationToken.None);
 
-        // Assert
+        // Assert: SPEC 41 (decision 2026-10-08) — options are composition, role grants are references.
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("SYSTEM_MODULE_IN_USE");
-        response.Errors.Should().Contain("Active system options: 1");
+        response.Errors.Should().Equal("Active role system options: 1");
+        option.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
+    }
+
+    /// <summary>
+    /// SPEC 41 (decision 2026-10-08): deleting a module soft-deletes all its active options (every level)
+    /// with the module's stamp.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenModuleHasOptions_ShouldCascadeToEveryLevel()
+    {
+        var entity = CreateExistingModule(_fixture.Create<Guid>());
+        var context = new DeleteSystemModuleCommandTestContext();
+        context.RepositoryMock.Setup(x => x.GetAsync(entity.Id)).ReturnsAsync(entity);
+        context.RepositoryMock.Setup(x => x.UpdateAsync(entity)).ReturnsAsync(true);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        var root = new SystemOption { ModuleId = entity.Id, Name = "Admin", Route = "/admin" };
+        var child = new SystemOption { ModuleId = entity.Id, Name = "Persons", Route = "/admin/persons", ParentId = root.Id };
+        var grandChild = new SystemOption { ModuleId = entity.Id, Name = "Addresses", Route = "/admin/persons/addresses", ParentId = child.Id };
+        context.SystemOptionRepositoryMock.SetupRows([root, child, grandChild]);
+
+        var response = await context.CreateHandler().Handle(new DeleteSystemModuleCommand(entity.Id), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        new[] { root.GcRecord, child.GcRecord, grandChild.GcRecord }.Should().OnlyContain(g => g == entity.GcRecord && g > 0);
+        context.SystemOptionRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<SystemOption>()), Times.Exactly(3));
     }
 
     /// <summary>
@@ -218,7 +243,7 @@ public sealed class DeleteSystemModuleCommandHandlerTests
 
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("SYSTEM_MODULE_IN_USE");
-        response.Errors.Should().Equal("Active system options: 1", "Active company modules: 1");
+        response.Errors.Should().Equal("Active company modules: 1");
         entity.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
     }
 
@@ -316,7 +341,7 @@ public sealed class DeleteSystemModuleCommandHandlerTests
 
         public DeleteSystemModuleCommandHandler CreateHandler()
         {
-            return new DeleteSystemModuleCommandHandler(UnitOfWorkMock.Object);
+            return new DeleteSystemModuleCommandHandler(UnitOfWorkMock.Object, new SystemOptionCascadeCoordinator(UnitOfWorkMock.Object));
         }
     }
 }

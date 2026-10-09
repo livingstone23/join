@@ -27,11 +27,15 @@ public sealed class GetCustomerByIdQueryHandler(
 
         using var connection = connectionFactory.CreateConnection();
 
+        var activeOnly = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted)
+            ? string.Empty
+            : "AND cust.GcRecord = 0";
+
         var sql = $"""
             {CustomerQuerySql.SelectProjection}
             WHERE cust.Id = @Id
               AND cust.CompanyId = @TenantId
-              AND cust.GcRecord = 0;
+              {activeOnly};
             """;
 
         var customer = await connection.QuerySingleOrDefaultAsync<CustomerResponseDto>(
@@ -40,7 +44,7 @@ public sealed class GetCustomerByIdQueryHandler(
                 new
                 {
                     request.Id,
-                    TenantId = currentUserService.CompanyId
+                    TenantId = TenantResolver.Resolve(currentUserService, request.CompanyId)
                 },
                 cancellationToken: cancellationToken));
 
