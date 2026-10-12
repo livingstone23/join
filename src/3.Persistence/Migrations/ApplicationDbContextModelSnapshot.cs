@@ -1072,6 +1072,116 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("personfinancialprofiles", "admin");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Admin.PersonPendingConfirmation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ChannelIdentifier")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("channelidentifier");
+
+                    b.Property<Guid>("CommunicationChannelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("communicationchannelid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customerid");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("personid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTime>("RequestedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requestedutc");
+
+                    b.Property<string>("ResolutionNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("resolutionnotes");
+
+                    b.Property<Guid?>("ResolvedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resolvedbyuserid");
+
+                    b.Property<DateTime?>("ResolvedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolvedutc");
+
+                    b.Property<Guid?>("ReviewEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revieweventid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_personpendingconfirmations");
+
+                    b.HasIndex("CommunicationChannelId")
+                        .HasDatabaseName("ix_personpendingconfirmations_communicationchannelid");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_personpendingconfirmations_customerid");
+
+                    b.HasIndex("PersonId")
+                        .HasDatabaseName("ix_personpendingconfirmations_personid");
+
+                    b.HasIndex("ResolvedByUserId")
+                        .HasDatabaseName("ix_personpendingconfirmations_resolvedbyuserid");
+
+                    b.HasIndex("ReviewEventId")
+                        .HasDatabaseName("ix_personpendingconfirmations_revieweventid");
+
+                    b.HasIndex("CompanyId", "PersonId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_personpendingconfirmations_company_person_pending")
+                        .HasFilter("\"status\" = 1 AND \"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "Status", "RequestedUtc")
+                        .HasDatabaseName("ix_personpendingconfirmations_company_status_requestedutc")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("personpendingconfirmations", "admin");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Admin.Project", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5295,6 +5405,60 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("IncomeRange");
 
                     b.Navigation("Person");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Admin.PersonPendingConfirmation", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.CommunicationChannel", "CommunicationChannel")
+                        .WithMany()
+                        .HasForeignKey("CommunicationChannelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_personpendingconfirmations_communicationchannels_communicat~");
+
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_personpendingconfirmations_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Admin.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_personpendingconfirmations_customers_customerid");
+
+                    b.HasOne("JOIN.Domain.Admin.Person", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_personpendingconfirmations_persons_personid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "ResolvedByUser")
+                        .WithMany()
+                        .HasForeignKey("ResolvedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_personpendingconfirmations_users_resolvedbyuserid");
+
+                    b.HasOne("JOIN.Domain.Calendars.CalendarEvent", "ReviewEvent")
+                        .WithMany()
+                        .HasForeignKey("ReviewEventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_personpendingconfirmations_events_revieweventid");
+
+                    b.Navigation("CommunicationChannel");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Person");
+
+                    b.Navigation("ResolvedByUser");
+
+                    b.Navigation("ReviewEvent");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Admin.Project", b =>

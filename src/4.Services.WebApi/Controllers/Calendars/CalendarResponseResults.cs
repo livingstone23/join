@@ -30,7 +30,8 @@ public static class CalendarResponseResults
         CalendarErrorCodes.CalendarNameDuplicate,
         CalendarErrorCodes.CalendarIsDefault,
         CalendarErrorCodes.CalendarHasActiveEvents,
-        CalendarErrorCodes.UserHoursOutOfCompanyRange
+        CalendarErrorCodes.UserHoursOutOfCompanyRange,
+        CalendarErrorCodes.IntakeContactBelongsToOtherPerson
     ];
 
     private static readonly HashSet<string> Unprocessable =
@@ -49,7 +50,7 @@ public static class CalendarResponseResults
         _ when message.EndsWith("_NOT_FOUND", StringComparison.Ordinal) => StatusCodes.Status404NotFound,
         _ when Conflicts.Contains(message) => StatusCodes.Status409Conflict,
         _ when Unprocessable.Contains(message) => StatusCodes.Status422UnprocessableEntity,
-        CalendarErrorCodes.OthersPermissionRequired => StatusCodes.Status403Forbidden,
+        CalendarErrorCodes.OthersPermissionRequired or CalendarErrorCodes.IntakeCompanyNotAllowed => StatusCodes.Status403Forbidden,
         _ => StatusCodes.Status400BadRequest
     };
 

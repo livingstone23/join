@@ -15,6 +15,9 @@ internal sealed class LockFreeUnitOfWork(UnitOfWork inner) : IUnitOfWork
 {
     public int LockRequests { get; private set; }
 
+    /// <summary> When set, the next schedule lock throws it (simulates a database error raised mid-command). </summary>
+    public Exception? ScheduleLockFailure { get; set; }
+
     public IPersonsRepository Persons => inner.Persons;
     public IPersonAddressRepository PersonAddresses => inner.PersonAddresses;
     public IPersonContactRepository PersonContacts => inner.PersonContacts;
@@ -36,6 +39,12 @@ internal sealed class LockFreeUnitOfWork(UnitOfWork inner) : IUnitOfWork
     public Task AcquireScheduleLockAsync(Guid companyId, Guid ownerUserId, CancellationToken cancellationToken = default)
     {
         LockRequests++;
+        if (ScheduleLockFailure is { } failure)
+        {
+            ScheduleLockFailure = null;
+            throw failure;
+        }
+
         return Task.CompletedTask;
     }
 

@@ -1495,3 +1495,139 @@ curl -s -X POST "$BASE_URL/api/v1/CalendarUserNonWorkingPeriods/me" \
 | `CALENDAR_OTHERS_PERMISSION_REQUIRED` | 403 | Status change from the panel without CalendarOthers.CanUpdate |
 | `CALENDAR_INVALID_LINK` | 400 | A linked Person/Customer/Ticket/Project belongs to another company (or is missing) |
 | `MODULE_NOT_ENABLED` | 403 | Calendar module inactive for the company (SPEC 48) |
+
+## Calendar channel agent and pending persons (SPEC 45)
+
+The channel agent (n8n over WhatsApp, e-mail…) is a service user with the `Agent` role (`agent@join.com` in
+development). It only has the `CalendarChannelIntake` resource (read, create, update; no delete, no `CalendarOthers`,
+no `Persons`). Supervisors review the persons it registers in the `PersonPendingConfirmations` inbox (menu option
+`PendingPersons`).
+
+**The company is always the one of the token.** The `X-Company-Id` header is ignored for an authenticated user, so an
+agent that serves several companies picks one with `GET /companies` and switches with
+`POST /api/v1/workspaces/switch-company` (the endpoint checks the agent's `UserCompany` and returns a new token).
+
+**Deployment per company (outside JOIN-001):** link the service user to the company (`UserCompany`) and assign by hand,
+from the roles screen, `CalendarChannelIntake` to the `Agent` role (Read, Create, Update) and `PendingPersons` to the
+reviewers (Read, Update). Without those rows the endpoints answer `403`. The company also needs the Calendar module,
+its `CalendarCompany` and the `PERSON_REVIEW` activity type enabled.
+
+**Token rotation:** the agent renews with `POST /api/v1/Auth/refresh`. If its token leaks, revoke its sessions from the
+security screen and change the password of the service user; every activity it touched keeps `OriginUserId` and the
+channel in the log.
+
+### 1. Company context
+
+```bash
+# 1.1 Login as the service user.
+AGENT_TOKEN=$(curl -s -X POST "$BASE_URL/api/v1/users/login" -H "Content-Type: application/json" \
+  -d '{"email":"agent@join.com","password":"ABCabc123*"}' | jq -r .data.token)
+
+# 1.2 Companies of the agent with the calendar operational (Agent or SuperAdmin role; 403 otherwise).
+curl -s "$BASE_URL/api/v1/CalendarChannelIntake/companies?search=join" -H "Authorization: Bearer $AGENT_TOKEN"
+
+# 1.3 Switch to the company the person chose; use the new token from here on.
+AGENT_TOKEN=$(curl -s -X POST "$BASE_URL/api/v1/workspaces/switch-company" -H "Authorization: Bearer $AGENT_TOKEN" \
+  -H "Content-Type: application/json" -d "{\"companyId\":\"$TENANT_ID\"}" | jq -r .data.accessToken)
+```
+
+### 2. Who is writing
+
+```bash
+# 2.1 By the number the channel reports (digits compared; also the last 8 digits). Only id and name come back.
+# { found, personId, fullName, hasPendingConfirmation, ambiguous } — ambiguous=true: ask for the identification.
+curl -s "$BASE_URL/api/v1/CalendarChannelIntake/persons/lookup?channelCode=WHATSAPP&identifier=%2B50588887777" \
+  -H "Authorization: Bearer $AGENT_TOKEN"
+
+# 2.2 By identification.
+curl -s "$BASE_URL/api/v1/CalendarChannelIntake/identification-types" -H "Authorization: Bearer $AGENT_TOKEN"
+curl -s "$BASE_URL/api/v1/CalendarChannelIntake/persons/lookup?identificationTypeId=$ID_TYPE&identificationNumber=001-010190-0001A" \
+  -H "Authorization: Bearer $AGENT_TOKEN"
+
+# 2.3 Register an unknown person → 201 { personId, created: true, pendingConfirmationId, reviewEventId }.
+# An existing identification → 200 { created: false } and nothing changes (the new number is NOT added to it).
+# The number of another person → 409 CALENDAR_INTAKE_CONTACT_BELONGS_TO_OTHER_PERSON.
+# Creates a "Revisar persona creada" (PERSON_REVIEW) activity for the company's default user.
+curl -s -X POST "$BASE_URL/api/v1/CalendarChannelIntake/persons" -H "Authorization: Bearer $AGENT_TOKEN" \
+  -H "Content-Type: application/json" -d '{
+    "personType": 1, "firstName": "Ana", "lastName": "López",
+    "identificationTypeId": "'$ID_TYPE'", "identificationNumber": "001-010190-0001A",
+    "phone": "+50588887777", "reason": "Quiere una cita para revisar su contrato",
+    "originChannelCode": "WHATSAPP", "originIdentifier": "+50588887777", "originReference": "wamid.HBgM1"
+  }'
+```
+
+### 3. With whom and when
+
+```bash
+# 3.1 The user who attends the person, by exact e-mail only (no names, no listing).
+curl -s "$BASE_URL/api/v1/CalendarChannelIntake/users/lookup?email=maria@empresa.com" -H "Authorization: Bearer $AGENT_TOKEN"
+
+# 3.2 Free slots (userId optional → default user). Max 14 days. { timeZone, slots: [{ startUtc, endUtc }] }
+curl -s "$BASE_URL/api/v1/CalendarChannelIntake/availability?activityCode=APPOINTMENT&from=2026-10-12T06:00:00Z&to=2026-10-17T06:00:00Z" \
+  -H "Authorization: Bearer $AGENT_TOKEN"
+```
+
+### 4. Book, reschedule, cancel
+
+```bash
+# 4.1 Create → 201. Without targetUserEmail, or with one that does not match, it goes to the default user
+# (routedToDefaultUser: true; an unmatched e-mail is noted in the description). The same originReference again → 200
+# { isDuplicate: true } with the existing activity (also under concurrent retries). 409/422 = pick another slot.
+curl -s -X POST "$BASE_URL/api/v1/CalendarChannelIntake/events" -H "Authorization: Bearer $AGENT_TOKEN" \
+  -H "Content-Type: application/json" -d '{
+    "activityCode": "APPOINTMENT", "title": "Cita: revisión de contrato", "summary": "Revisar la cláusula 4",
+    "start": "2026-10-13T10:00:00-06:00", "targetUserEmail": "maria@empresa.com",
+    "requesterPersonId": "'$PERSON_ID'", "originChannelCode": "WHATSAPP",
+    "originIdentifier": "+50588887777", "originReference": "wamid.HBgM2"
+  }'
+
+# 4.2 The person's activities (not cancelled, never the internal review), from today, max 90 days.
+curl -s "$BASE_URL/api/v1/CalendarChannelIntake/events?requesterPersonId=$PERSON_ID" -H "Authorization: Bearer $AGENT_TOKEN"
+
+# 4.3 Reschedule (keeps the duration without end; a series changes only occurrenceStartUtc unless scope is sent).
+# Status → CalendarCompany.RescheduledByOthersStatusCompanyId. The same originReference again does not apply twice.
+curl -s -X PUT "$BASE_URL/api/v1/CalendarChannelIntake/events/$EVENT_ID/reschedule" -H "Authorization: Bearer $AGENT_TOKEN" \
+  -H "Content-Type: application/json" -d '{
+    "requesterPersonId": "'$PERSON_ID'", "start": "2026-10-14T15:00:00-06:00",
+    "originChannelCode": "WHATSAPP", "originIdentifier": "+50588887777", "originReference": "wamid.HBgM3",
+    "notes": "Prefiere la tarde"
+  }'
+
+# 4.4 Cancel (reason required). A closed activity → 400 CALENDAR_INTAKE_EVENT_ALREADY_CLOSED.
+curl -s -X POST "$BASE_URL/api/v1/CalendarChannelIntake/events/$EVENT_ID/cancel" -H "Authorization: Bearer $AGENT_TOKEN" \
+  -H "Content-Type: application/json" -d '{
+    "requesterPersonId": "'$PERSON_ID'", "reason": "Ya no puede asistir",
+    "originChannelCode": "WHATSAPP", "originIdentifier": "+50588887777"
+  }'
+```
+
+### 5. Pending persons inbox
+
+```bash
+# 5.1 Inbox: status 1=Pending (default), 2=Confirmed, 3=LinkedToCustomer, 4=Discarded; most recent first.
+curl -s "$BASE_URL/api/v1/PersonPendingConfirmations?status=1&search=lopez&page=1&pageSize=20" -H "Authorization: Bearer $TOKEN"
+
+# 5.2 Detail with the person's contacts and activities.
+curl -s "$BASE_URL/api/v1/PersonPendingConfirmations/$PENDING_ID" -H "Authorization: Bearer $TOKEN"
+
+# 5.3 Resolve (notes required to discard; discarding keeps the person). Completes the review activity.
+curl -s -X POST "$BASE_URL/api/v1/PersonPendingConfirmations/$PENDING_ID/resolve" -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" -d '{"status":"Discarded","notes":"Spam"}'
+
+# 5.4 Link to an existing customer of the same person.
+curl -s -X POST "$BASE_URL/api/v1/PersonPendingConfirmations/$PENDING_ID/link-customer" -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" -d "{\"customerId\":\"$CUSTOMER_ID\"}"
+```
+
+| Code | HTTP | When |
+|------|------|------|
+| `CALENDAR_INTAKE_COMPANY_NOT_ALLOWED` | 403 | `GET /companies` by a user without the Agent or SuperAdmin role |
+| `CALENDAR_INTAKE_INVALID_CHANNEL` | 400 | Channel is not WHATSAPP, TWILIO, TELEGRAM or SENDGRID, or is inactive |
+| `CALENDAR_INTAKE_LOOKUP_CRITERIA_REQUIRED` | 400 | Lookup without channelCode+identifier nor identification pair |
+| `CALENDAR_INTAKE_CONTACT_BELONGS_TO_OTHER_PERSON` | 409 | The phone/e-mail belongs to another person of the company |
+| `CALENDAR_INTAKE_TARGET_USER_HAS_NO_CALENDAR` | 400 | The company's default user has no calendar (configuration error) |
+| `CALENDAR_INTAKE_EVENT_ALREADY_CLOSED` | 400 | Reschedule/cancel of an activity in a final status |
+| `CALENDAR_EVENT_NOT_FOUND` | 404 | The activity is not of the identified person (or is the internal review) |
+| `PERSON_PENDING_NOT_FOUND` / `PERSON_PENDING_ALREADY_RESOLVED` | 404 / 400 | Unknown pending / not in Pending |
+| `PERSON_PENDING_INVALID_CUSTOMER` | 400 | The customer is not of the company or of the same person |
