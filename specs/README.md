@@ -107,7 +107,7 @@ Las filas 40–49 y 99 de la tabla anterior son las copias de `main` del 2026-10
 | 48-post | Bloqueo de APIs y menú por módulo activo de la empresa | Borrador | 43-post |
 | 49-post | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Borrador | 36 |
 | 51-post | Invalidación de la caché de permisos con la clave `permissions:v2` | Borrador | 17, 25 |
-| 99-post | Canales internos `WEB` y `APP` en el catálogo de canales | Aprobado (implementada en la rama `spec-99-post-ticket-inbound-channels`; falta pasar a Implementado) | — |
+| 99-post | Canales internos `WEB` y `APP` en el catálogo de canales | Implementado | — |
 
 ---
 
