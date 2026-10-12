@@ -14,6 +14,7 @@ using JOIN.Application.UseCases.Admin.PersonContacts;
 using JOIN.Application.UseCases.Admin.PersonEmployments;
 using JOIN.Application.UseCases.Admin.PersonBusinessProfiles;
 using JOIN.Application.UseCases.Admin.PersonFinancialProfiles;
+using JOIN.Application.UseCases.Calendars.ChannelIntake;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies;
 using JOIN.Application.UseCases.Messaging.Tickets;
 using JOIN.Application.Mappings;
@@ -126,6 +127,9 @@ public static class ConfigureServices
         services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarCompanies.CalendarCompanySettingsValidator>();
         services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarCompanies.CalendarCompanyProvisioning>();
         services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarStatusCompanies.CalendarStatusCompanyRemovalGuard>();
+
+        // SPEC 45 — channel agent intake.
+        services.AddScoped<IntakeRequesterResolver>();
 
         return services;
     

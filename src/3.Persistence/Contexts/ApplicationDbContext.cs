@@ -48,6 +48,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<PersonAddress> PersonAddresses => Set<PersonAddress>();
     public DbSet<PersonContact> PersonContacts => Set<PersonContact>();
+    // SPEC 45 — pending confirmations of people created by a channel agent.
+    public DbSet<PersonPendingConfirmation> PersonPendingConfirmations => Set<PersonPendingConfirmation>();
     public DbSet<EntityStatus> EntityStatuses => Set<EntityStatus>();
     public DbSet<IdentificationType> IdentificationTypes => Set<IdentificationType>();
     public DbSet<Project> Projects => Set<Project>();
@@ -236,6 +238,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<Person>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<PersonAddress>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<PersonContact>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        // SPEC 45 — pending confirmations are tenant-owned, soft-deleted like every BaseTenantEntity.
+        builder.Entity<PersonPendingConfirmation>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<Project>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<Area>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<UserCommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
@@ -250,6 +254,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<PersonBusinessProfile>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<PersonEmployment>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<PersonFinancialProfile>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<PersonPendingConfirmation>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
         // Messaging / Tickets
         builder.Entity<Ticket>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);

@@ -3108,7 +3108,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Livingstone23", "Admin", "livingstone23@gmail.com", "ABCabc123*", "Admin", false, true),
         new("Manager", "Test", "manager@join.com", "ABCabc123*", "Manager", false),
         new("Supervisor", "Test", "supervisor@join.com", "ABCabc123*", "Supervisor", false),
-        new("SimpleUser", "Test", "simpleuser@join.com", "ABCabc123*", "UsuarioSimple", false)
+        new("SimpleUser", "Test", "simpleuser@join.com", "ABCabc123*", "UsuarioSimple", false),
+        // SPEC 45 — service user for the channel agent.
+        new("Agent", "Dev", "agent@join.local", "ABCabc123*", "Agent", false)
     ];
 
     private static List<RoleSystemOptionSeed> GetAdminFullSystemOptionPermissionSeeds()
@@ -3276,7 +3278,11 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("CalendarPanel", "/calendar/panel", "@Icons.Material.Filled.ViewTimeline", "Calendar", "Calendar", "CalendarOthers", true, true, true, true),
         new("ActivityConfirmation", "/calendar/activity-confirmation", "@Icons.Material.Filled.EventAvailable", "Calendar", "Calendar", "CalendarActivityConfirmation", false, false, true, false, IsVisibleMenu: false),
         new("CalendarSettings", "/calendar/settings", "@Icons.Material.Filled.EditCalendar", "Calendar", "Calendar", "CalendarSettings", true, true, true, true, CanExecute: true),
-        new("CalendarCatalogs", "/calendar/catalogs", "@Icons.Material.Filled.Category", "Calendar", "Calendar", "CalendarCatalogs", true, true, true, true)
+        new("CalendarCatalogs", "/calendar/catalogs", "@Icons.Material.Filled.Category", "Calendar", "Calendar", "CalendarCatalogs", true, true, true, true),
+
+        // SPEC 45 — channel agent intake (no menu) and pending-persons inbox.
+        new("CalendarChannelIntake", "/calendar/channel-intake", "@Icons.Material.Filled.SmartToy", "Calendar", "Calendar", "CalendarChannelIntake", true, true, true, false, IsVisibleMenu: false),
+        new("PendingPersons", "/customers/pending-persons", "@Icons.Material.Filled.PersonSearch", "Customers", "CustomersMenu", "PersonPendingConfirmations", true, false, true, false)
 
     ];
 
@@ -3424,7 +3430,22 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Coordinador", "CalendarPanel", true, false, false, false),
         new("Coordinador", "ActivityConfirmation", false, false, true, false),
         new("UsuarioSimple", "MyCalendar", true, true, true, true),
-        new("UsuarioSimple", "ActivityConfirmation", false, false, true, false)
+        new("UsuarioSimple", "ActivityConfirmation", false, false, true, false),
+
+        // SPEC 45 — channel agent (CalendarChannelIntake) and pending-persons inbox. Admin and
+        // SuperAdminCompany get full access through PrivilegedRoleNames; Agent now has the
+        // intake rows (no CanDelete, no PendingPersons — that's the supervisor's job).
+        new("SuperAdmin", "CalendarChannelIntake", true, true, true, false),
+        new("SuperAdmin", "PendingPersons", true, false, true, false),
+        new("Agent", "CalendarChannelIntake", true, true, true, false),
+        new("Manager", "CalendarChannelIntake", false, false, false, false),
+        new("Manager", "PendingPersons", true, false, true, false),
+        new("Supervisor", "CalendarChannelIntake", false, false, false, false),
+        new("Supervisor", "PendingPersons", true, false, true, false),
+        new("Coordinador", "CalendarChannelIntake", false, false, false, false),
+        new("Coordinador", "PendingPersons", true, false, true, false),
+        new("UsuarioSimple", "CalendarChannelIntake", false, false, false, false),
+        new("UsuarioSimple", "PendingPersons", false, false, false, false)
 
     ];
 
