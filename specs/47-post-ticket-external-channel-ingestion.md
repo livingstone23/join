@@ -1,6 +1,6 @@
 # SPEC 47-post — Ingesta de tickets por canales externos: WhatsApp y correo (etapa posterior)
 
-> **Status:** Pospuesto
+> **Status:** Aprobado
 > **Origen:** copia de SPEC 47 de `main` (estado allí al copiarla: Pospuesto), adaptada a PostgreSQL para el fork `main_postgresql`. Se implementa **desde cero** en el fork, sin traer commits de `main` (decisión del usuario, 2026-10-09).
 > **Rama de trabajo:** `spec-47-post-ticket-external-channel-ingestion`, creada desde `main_postgresql`; PR hacia `main_postgresql`, nunca hacia `main`.
 > **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 99) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
