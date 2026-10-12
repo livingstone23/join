@@ -29,7 +29,8 @@ public sealed class CreateTicketCommandValidator : AbstractValidator<CreateTicke
             .WithMessage("El puntaje de esfuerzo no puede ser negativo.");
 
         RuleFor(x => x.TicketStatusId)
-            .NotEqual(Guid.Empty).WithMessage("Ticket status is required.");
+            .Must(value => !value.HasValue || value.Value != Guid.Empty)
+            .WithMessage("Ticket status id is invalid.");
 
         RuleFor(x => x.TicketComplexityId)
             .NotEqual(Guid.Empty).WithMessage("Ticket complexity is required.");

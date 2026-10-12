@@ -82,7 +82,7 @@ public sealed class UpdateTicketCompanyDefaultCommandHandlerTests
     /// Verifies every invalid-reference branch handled by the update validation method.
     /// </summary>
     [Theory]
-    [InlineData("Status", "INVALID_TICKET_STATUS", "The provided default ticket status does not exist.")]
+    [InlineData("Status", "TICKET_STATUS_DEFAULT_INVALID", "The default ticket status must exist, be active, not final and belong to the current company.")]
     [InlineData("Complexity", "INVALID_TICKET_COMPLEXITY", "The provided default ticket complexity does not exist.")]
     [InlineData("TimeUnit", "INVALID_TIME_UNIT", "The provided default time unit does not exist.")]
     [InlineData("Area", "INVALID_AREA", "The provided default area does not exist for the current tenant.")]
@@ -319,6 +319,42 @@ public sealed class UpdateTicketCompanyDefaultCommandHandlerTests
     }
 
     /// <summary>
+    /// SPEC 42 — the default status must be one ticket creation would accept: active, not final,
+    /// not deleted and from the current company.
+    /// </summary>
+    [Theory]
+    [InlineData("Inactive")]
+    [InlineData("Final")]
+    [InlineData("Deleted")]
+    [InlineData("OtherCompany")]
+    public async Task Handle_WhenDefaultStatusIsNotUsableAsInitial_ShouldReturnStatusDefaultInvalid(string defect)
+    {
+        var companyId = _fixture.Create<Guid>();
+        var requestId = _fixture.Create<Guid>();
+        var context = new UpdateTicketCompanyDefaultTestContext(companyId, isAuthenticated: true);
+        var request = CreateCommandForSingleReference(requestId, "Status");
+        var status = new TicketStatus { Name = "Closed", CompanyId = companyId };
+        switch (defect)
+        {
+            case "Inactive": status.IsActive = false; break;
+            case "Final": status.IsFinal = true; break;
+            case "Deleted": status.MarkAsDeleted(); break;
+            default: status.CompanyId = Guid.NewGuid(); break;
+        }
+
+        context.RepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketCompanyDefault>());
+        context.TicketStatusRepositoryMock
+            .Setup(x => x.GetAsync(request.TicketStatusDefaultId!.Value))
+            .ReturnsAsync(status);
+        context.RepositoryMock.Setup(x => x.GetAsync(requestId)).ReturnsAsync(CreateExistingEntity(requestId, companyId));
+        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("TICKET_STATUS_DEFAULT_INVALID");
+        context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
     /// Configures all reference repositories to return valid rows.
     /// </summary>
     private static void SetupValidReferences(
@@ -327,7 +363,7 @@ public sealed class UpdateTicketCompanyDefaultCommandHandlerTests
     {
         context.TicketStatusRepositoryMock
             .Setup(x => x.GetAsync(request.TicketStatusDefaultId!.Value))
-            .ReturnsAsync(new TicketStatus { Name = "Open" });
+            .ReturnsAsync(new TicketStatus { Name = "Open", CompanyId = context.CurrentUserServiceMock.Object.CompanyId });
 
         context.TicketComplexityRepositoryMock
             .Setup(x => x.GetAsync(request.TicketComplexityDefaultId!.Value))

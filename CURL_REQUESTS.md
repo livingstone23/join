@@ -801,6 +801,8 @@ Error codes returned by the ticket endpoints map to HTTP status as follows:
 | `TICKET_REASSIGN_FORBIDDEN` / `TICKET_FINISH_FORBIDDEN` | 403 |
 | `TARGET_NOT_ELIGIBLE_RESOLVER` / `INVALID_ASSIGNED_USER` / `INVALID_ASSIGNED_USER_TENANT` / `INVALID_ASSIGNED_USER_NOT_RESOLVER` / `INVALID_TICKET_STATUS` / `TICKET_STATUS_NOT_FINAL` / `INVALID_LOG_TYPE` | 400 |
 | `USE_FINISH_TICKET_FOR_FINAL_STATUS` / `TICKET_STATUS_TRANSITION_NOT_ALLOWED` (SPEC 37) | 400 |
+| `TICKET_DEFAULT_STATUS_NOT_CONFIGURED` / `TICKET_DEFAULT_STATUS_INVALID` (create without `ticketStatusId`, SPEC 42) | 400 |
+| `TICKET_STATUS_DEFAULT_INVALID` (`POST`/`PUT /TicketCompanyDefaults` with a status that is missing, inactive, final or of another company, SPEC 42) | 400 |
 | `TICKET_ALREADY_FINISHED` | 409 |
 | `REASSIGN_FAILED` / `FINISH_FAILED` / `ADD_NOTE_FAILED` (save affected no rows) | 400 |
 
@@ -851,6 +853,10 @@ curl -s "$BASE_URL/api/v1/Tickets/$ID" \
 # 3. Create — optional initial assignment; if AssignedToUserId is supplied,
 #    the target must hold CanResolveTicket = 1 in the tenant's TicketUserCompany
 #    roster (otherwise 400 INVALID_ASSIGNED_USER_NOT_RESOLVER).
+#    ticketStatusId is optional (SPEC 42). When sent, it must be an active,
+#    non-final status of the current company — any of them, not only the
+#    configured initial one; SPEC 37 transition rules do not apply on create.
+#    Otherwise 400 INVALID_TICKET_STATUS.
 curl -s -X POST "$BASE_URL/api/v1/Tickets" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Company-Id: $TENANT_ID" \
@@ -880,6 +886,26 @@ curl -s -X POST "$BASE_URL/api/v1/Tickets" \
 # Returns 400 INVALID_ASSIGNED_USER / INVALID_ASSIGNED_USER_TENANT /
 #   INVALID_ASSIGNED_USER_NOT_RESOLVER when the destination is not a roster
 #   resolver of the current tenant.
+
+# 3b. Create without ticketStatusId (SPEC 42) — the ticket starts in the
+#     company's TicketCompanyDefaults.TicketStatusDefaultId.
+curl -s -X POST "$BASE_URL/api/v1/Tickets" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Portal returns 500 on checkout",
+    "description": "Customer cannot complete purchase flow.",
+    "estimatedTime": 4,
+    "consumedTime": 0,
+    "ticketComplexityId": "33333333-3333-3333-3333-333333333333",
+    "timeUnitId": "44444444-4444-4444-4444-444444444444",
+    "channelId": "55555555-5555-5555-5555-555555555555"
+  }'
+# Returns 400 TICKET_DEFAULT_STATUS_NOT_CONFIGURED when the company has no
+#   TicketCompanyDefaults row or the row has no TicketStatusDefaultId.
+# Returns 400 TICKET_DEFAULT_STATUS_INVALID when the configured status is
+#   deleted, inactive, final or of another company.
 ```
 
 ```bash

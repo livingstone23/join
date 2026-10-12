@@ -41,6 +41,8 @@ public partial class TicketMapper : ITicketMapper
     [MapperIgnoreTarget(nameof(Ticket.PrecedentTicket))]
     [MapperIgnoreTarget(nameof(Ticket.Notifications))]
     [MapperIgnoreTarget(nameof(Ticket.ChildTickets))]
+    [MapperIgnoreTarget(nameof(Ticket.TicketStatusId))]
+    [MapperIgnoreSource(nameof(CreateTicketCommand.TicketStatusId))]
     public partial Ticket ToEntity(CreateTicketCommand command);
 
     /// <summary>

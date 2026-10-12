@@ -1630,7 +1630,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     {
         var openStatusId = await _context.TicketStatuses
             .IgnoreQueryFilters()
-            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0 && x.IsInitial)
+            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0 && x.IsInitial && x.IsActive && !x.IsFinal)
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync();
 
