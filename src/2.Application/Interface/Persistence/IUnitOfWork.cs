@@ -1,4 +1,5 @@
 using JOIN.Application.Interface.Persistence.Admin;
+using JOIN.Application.Interface.Persistence.Calendars;
 using JOIN.Application.Interface.Persistence.Security;
 
 namespace JOIN.Application.Interface.Persistence;
@@ -21,6 +22,7 @@ public interface IUnitOfWork : IDisposable
     IRoleSystemOptionsRepository RoleSystemOptions { get; }
     ICompanyModuleRepository CompanyModules { get; }
     IUserCompanyRepository UserCompanies { get; }
+    ICalendarEventRepository CalendarEvents { get; }
 
     // --- 2. Scalable Access ---
     // This allows access to any entity without modifying this interface ever again
@@ -41,5 +43,14 @@ public interface IUnitOfWork : IDisposable
     Task BeginTransactionAsync(CancellationToken cancellationToken = default);
     Task CommitAsync(CancellationToken cancellationToken = default);
     Task RollbackAsync(CancellationToken cancellationToken = default);
+
+    // --- 5. Calendar schedule lock (SPEC 44) ---
+
+    /// <summary>
+    /// Takes a transaction-scoped application lock on <c>(companyId, ownerUserId)</c> so two concurrent commands
+    /// cannot both pass the overlap check for the same user. Released when the transaction commits or rolls back
+    /// (PostgreSQL <c>pg_advisory_xact_lock</c>). Must run inside the command's transaction.
+    /// </summary>
+    Task AcquireScheduleLockAsync(Guid companyId, Guid ownerUserId, CancellationToken cancellationToken = default);
 
 }

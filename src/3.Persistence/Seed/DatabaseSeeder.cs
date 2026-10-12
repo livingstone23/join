@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 using JOIN.Application.Interface;
 using JOIN.Domain.Admin;
+using JOIN.Domain.Calendars;
+using JOIN.Domain.Calendars.Enums;
 using JOIN.Domain.Common;
 using JOIN.Domain.Enums;
 using JOIN.Domain.Messaging;
@@ -77,6 +79,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     public async Task SeedDefaultCatalogsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
     {
         await SeedMessagingCatalogsForCompanyAsync(companyId, cancellationToken);
+        await SeedCalendarCatalogsForCompanyAsync(companyId, cancellationToken);
     }
 
     /// <summary>
@@ -218,6 +221,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedCommunicationChannelsAsync();
             var defaultTimeUnitId = await SeedMessagingCatalogsForCompanyAsync(joinCompanyId);
             await SeedMessagingCatalogsForCompanyAsync(privateCompanyId);
+            await SeedCalendarGlobalCatalogsAsync();
+            await SeedCalendarCatalogsForCompanyAsync(joinCompanyId);
+            await SeedCalendarCatalogsForCompanyAsync(privateCompanyId);
             await SeedSystemModulesAsync();
             await SeedCompanyModulesAsync();
             await SeedSystemOptionsAsync();
@@ -239,6 +245,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedTicketUserCompaniesAsync(joinCompanyId);
             await SeedTicketAttachmentSettingsAsync(joinCompanyId);
             await SeedTicketAttachmentSettingsAsync(privateCompanyId);
+            await SeedJoinCalendarAsync(joinCompanyId);
 
             // 7. Entidades operacionales (Clientes)
             await SeedJoinPersonsAsync(joinCompanyId, idTypeId);
@@ -2072,6 +2079,306 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     /// SPEC 43: modules renamed to English. The seed finds a module by its previous name and updates that
     /// row in place (same Id), so <c>CompanyModules</c> and <c>SystemOptions</c> keep pointing at it.
     /// </summary>
+    // ============================================================
+    // CALENDAR MODULE (SPEC 44)
+    // ============================================================
+
+    private static readonly CalendarActivitySeed[] CalendarActivitySeeds =
+    [
+        new(CalendarCodes.Activities.Meeting, "Reunión", 60, AllowsOverlap: false, RequiresBusinessHours: true, "#1E88E5", 1),
+        new(CalendarCodes.Activities.Appointment, "Cita", 60, AllowsOverlap: false, RequiresBusinessHours: true, "#43A047", 2),
+        new(CalendarCodes.Activities.Task, "Tarea", 30, AllowsOverlap: true, RequiresBusinessHours: true, "#FB8C00", 3),
+        new(CalendarCodes.Activities.Reminder, "Recordatorio", 15, AllowsOverlap: true, RequiresBusinessHours: false, "#8E24AA", 4),
+        new(CalendarCodes.Activities.PersonReview, "Revisión de persona", 15, AllowsOverlap: true, RequiresBusinessHours: false, "#E53935", 5)
+    ];
+
+    private static readonly CalendarStatusSeed[] CalendarStatusSeeds =
+    [
+        new(CalendarCodes.Statuses.Pending, "Pendiente de confirmación", BlocksTime: true, IsFinal: false, "#FDD835", 1),
+        new(CalendarCodes.Statuses.Confirmed, "Confirmada", BlocksTime: true, IsFinal: false, "#43A047", 2),
+        new(CalendarCodes.Statuses.Rescheduled, "Reprogramada", BlocksTime: true, IsFinal: false, "#FB8C00", 3),
+        new(CalendarCodes.Statuses.Cancelled, "Anulada", BlocksTime: false, IsFinal: true, "#9E9E9E", 4),
+        new(CalendarCodes.Statuses.Completed, "Completada", BlocksTime: true, IsFinal: true, "#546E7A", 5)
+    ];
+
+    /// <summary>
+    /// Seeds the global calendar catalogs (activity types and statuses), idempotent by <c>Code</c>. Rows that
+    /// already exist are never overwritten: the SuperAdmin may have edited them.
+    /// </summary>
+    private async Task SeedCalendarGlobalCatalogsAsync()
+    {
+        var activityCodes = await _context.CalendarActivities
+            .IgnoreQueryFilters()
+            .Where(x => x.GcRecord == 0)
+            .Select(x => x.Code)
+            .ToListAsync();
+
+        var statusCodes = await _context.CalendarStatuses
+            .IgnoreQueryFilters()
+            .Where(x => x.GcRecord == 0)
+            .Select(x => x.Code)
+            .ToListAsync();
+
+        var inserted = 0;
+
+        foreach (var seed in CalendarActivitySeeds.Where(seed => !activityCodes.Contains(seed.Code)))
+        {
+            _context.CalendarActivities.Add(new CalendarActivity
+            {
+                Code = seed.Code,
+                Name = seed.Name,
+                Color = seed.Color,
+                DefaultDurationMinutes = seed.DurationMinutes,
+                AllowsOverlap = seed.AllowsOverlap,
+                RequiresBusinessHours = seed.RequiresBusinessHours,
+                IsActive = true,
+                SortOrder = seed.SortOrder,
+                CreatedBy = "System_Seeder"
+            });
+            inserted++;
+        }
+
+        foreach (var seed in CalendarStatusSeeds.Where(seed => !statusCodes.Contains(seed.Code)))
+        {
+            _context.CalendarStatuses.Add(new CalendarStatus
+            {
+                Code = seed.Code,
+                Name = seed.Name,
+                Color = seed.Color,
+                BlocksTime = seed.BlocksTime,
+                IsFinal = seed.IsFinal,
+                IsActive = true,
+                SortOrder = seed.SortOrder,
+                CreatedBy = "System_Seeder"
+            });
+            inserted++;
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        _logger.LogInformation("Calendar global catalogs seed finished. Inserted: {Inserted}", inserted);
+    }
+
+    /// <inheritdoc />
+    public async Task<CalendarCatalogSyncResult> SeedCalendarCatalogsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        var globalStatuses = await _context.CalendarStatuses
+            .IgnoreQueryFilters()
+            .Where(x => x.GcRecord == 0 && x.IsActive)
+            .OrderBy(x => x.SortOrder)
+            .ToListAsync(cancellationToken);
+
+        var globalActivities = await _context.CalendarActivities
+            .IgnoreQueryFilters()
+            .Where(x => x.GcRecord == 0 && x.IsActive)
+            .OrderBy(x => x.SortOrder)
+            .ToListAsync(cancellationToken);
+
+        var companyStatuses = await _context.CalendarStatusCompanies
+            .IgnoreQueryFilters()
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0)
+            .ToListAsync(cancellationToken);
+
+        var companyActivityIds = await _context.CalendarActivityCompanies
+            .IgnoreQueryFilters()
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0)
+            .Select(x => x.CalendarActivityId)
+            .ToListAsync(cancellationToken);
+
+        var statusesAdded = 0;
+        foreach (var status in globalStatuses.Where(status => companyStatuses.All(x => x.CalendarStatusId != status.Id)))
+        {
+            var companyStatus = new CalendarStatusCompany
+            {
+                CompanyId = companyId,
+                CalendarStatusId = status.Id,
+                Name = status.Name,
+                Color = status.Color,
+                IsActive = true,
+                SortOrder = status.SortOrder,
+                CreatedBy = "System_Seeder"
+            };
+            _context.CalendarStatusCompanies.Add(companyStatus);
+            companyStatuses.Add(companyStatus);
+            statusesAdded++;
+        }
+
+        var pendingStatus = globalStatuses.FirstOrDefault(x => x.Code == CalendarCodes.Statuses.Pending);
+        var pendingCompanyStatus = pendingStatus is null
+            ? null
+            : companyStatuses.FirstOrDefault(x => x.CalendarStatusId == pendingStatus.Id);
+
+        var activitiesAdded = 0;
+        var missingActivities = globalActivities.Where(activity => !companyActivityIds.Contains(activity.Id)).ToList();
+
+        if (pendingCompanyStatus is null && missingActivities.Count > 0)
+        {
+            _logger.LogWarning(
+                "Calendar activity types were not copied to company {CompanyId}: the global status {Code} is missing or inactive.",
+                companyId,
+                CalendarCodes.Statuses.Pending);
+        }
+        else
+        {
+            foreach (var activity in missingActivities)
+            {
+                _context.CalendarActivityCompanies.Add(new CalendarActivityCompany
+                {
+                    CompanyId = companyId,
+                    CalendarActivityId = activity.Id,
+                    Name = activity.Name,
+                    Color = activity.Color,
+                    DefaultDurationMinutes = activity.DefaultDurationMinutes,
+                    AllowsOverlap = activity.AllowsOverlap,
+                    RequiresBusinessHours = activity.RequiresBusinessHours,
+                    InitialCalendarStatusCompanyId = pendingCompanyStatus!.Id,
+                    IsActive = true,
+                    SortOrder = activity.SortOrder,
+                    CreatedBy = "System_Seeder"
+                });
+                activitiesAdded++;
+            }
+        }
+
+        if (statusesAdded > 0 || activitiesAdded > 0)
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        return new CalendarCatalogSyncResult(activitiesAdded, statusesAdded);
+    }
+
+    /// <summary>
+    /// Development data of the master company JOIN-001 (SPEC 44): the Calendar module enabled, its
+    /// <see cref="CalendarCompany"/> (default user = the company's SuperAdmin, 08:00–17:00, America/Managua,
+    /// reschedule status RESCHEDULED) and the default calendar of every seeded user. Idempotent.
+    /// </summary>
+    private async Task SeedJoinCalendarAsync(Guid joinCompanyId)
+    {
+        var calendarModuleId = await _context.SystemModules
+            .IgnoreQueryFilters()
+            .Where(m => m.Name == "Calendar" && m.GcRecord == 0)
+            .Select(m => m.Id)
+            .FirstOrDefaultAsync();
+
+        if (calendarModuleId == Guid.Empty)
+        {
+            _logger.LogWarning("Calendar seed for JOIN-001 skipped: the Calendar system module was not found.");
+            return;
+        }
+
+        var companyModule = await _context.CompanyModules
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(cm => cm.CompanyId == joinCompanyId && cm.ModuleId == calendarModuleId && cm.GcRecord == 0);
+
+        if (companyModule is null)
+        {
+            _context.CompanyModules.Add(new CompanyModule
+            {
+                CompanyId = joinCompanyId,
+                ModuleId = calendarModuleId,
+                IsActive = true,
+                CreatedBy = "System_Seeder"
+            });
+        }
+
+        var seedEmails = GetDefaultUserSeeds().Select(x => x.Email).ToList();
+        var seededUsers = await _context.ApplicationUsers
+            .IgnoreQueryFilters()
+            .Where(u => u.Email != null && seedEmails.Contains(u.Email) && u.GcRecord == 0)
+            .ToListAsync();
+
+        var defaultUser = seededUsers.FirstOrDefault(u => u.Email == "lcano@join.com")
+            ?? seededUsers.FirstOrDefault(u => u.IsSuperAdminCompany);
+
+        var calendarCompany = await _context.CalendarCompanies
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.CompanyId == joinCompanyId && x.GcRecord == 0);
+
+        if (calendarCompany is null)
+        {
+            var rescheduledStatusId = await _context.CalendarStatusCompanies
+                .IgnoreQueryFilters()
+                .Where(x => x.CompanyId == joinCompanyId
+                    && x.GcRecord == 0
+                    && x.CalendarStatus.Code == CalendarCodes.Statuses.Rescheduled)
+                .Select(x => x.Id)
+                .FirstOrDefaultAsync();
+
+            if (defaultUser is null || rescheduledStatusId == Guid.Empty)
+            {
+                _logger.LogWarning("Calendar seed for JOIN-001 skipped: default user or RESCHEDULED status not found.");
+                await _context.SaveChangesAsync();
+                return;
+            }
+
+            calendarCompany = new CalendarCompany
+            {
+                CompanyId = joinCompanyId,
+                DefaultActivityUserId = defaultUser.Id,
+                TimeZone = "America/Managua",
+                IsOpen24Hours = false,
+                BusinessHoursStart = new TimeOnly(8, 0),
+                BusinessHoursEnd = new TimeOnly(17, 0),
+                DefaultCalendarName = "Mi calendario",
+                RescheduledByOthersStatusCompanyId = rescheduledStatusId,
+                CreatedBy = "System_Seeder"
+            };
+            _context.CalendarCompanies.Add(calendarCompany);
+        }
+
+        var memberIds = await _context.UserCompanies
+            .IgnoreQueryFilters()
+            .Where(uc => uc.CompanyId == joinCompanyId && uc.GcRecord == 0)
+            .Select(uc => uc.UserId)
+            .ToListAsync();
+
+        var provisionedIds = await _context.CalendarUserConfigurations
+            .IgnoreQueryFilters()
+            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .Select(x => x.UserId)
+            .ToListAsync();
+
+        var provisioned = 0;
+        foreach (var user in seededUsers.Where(u => memberIds.Contains(u.Id) && !provisionedIds.Contains(u.Id)))
+        {
+            var calendar = new UserCalendar
+            {
+                CompanyId = joinCompanyId,
+                OwnerUserId = user.Id,
+                Name = calendarCompany.DefaultCalendarName,
+                Color = "#1E88E5",
+                IsActive = true,
+                SortOrder = 1,
+                CreatedBy = "System_Seeder"
+            };
+            _context.UserCalendars.Add(calendar);
+            _context.CalendarUserConfigurations.Add(new CalendarUserConfiguration
+            {
+                CompanyId = joinCompanyId,
+                UserId = user.Id,
+                DefaultCalendarId = calendar.Id,
+                WorkDays = CalendarWorkDays.Weekdays,
+                DefaultView = CalendarViewType.Week,
+                WeekStartsOn = DayOfWeek.Monday,
+                CreatedBy = "System_Seeder"
+            });
+            provisioned++;
+        }
+
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Calendar seed for JOIN-001 finished. Users provisioned: {Provisioned}", provisioned);
+    }
+
+    private sealed record CalendarActivitySeed(
+        string Code, string Name, int DurationMinutes, bool AllowsOverlap, bool RequiresBusinessHours, string Color, int SortOrder);
+
+    private sealed record CalendarStatusSeed(
+        string Code, string Name, bool BlocksTime, bool IsFinal, string Color, int SortOrder);
+
     private static readonly IReadOnlyDictionary<string, string> LegacySystemModuleNames = new Dictionary<string, string>
     {
         ["Administracion"] = "Administration",
@@ -2082,13 +2389,14 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     /// <summary>
     /// SPEC 43: module catalog (name, description, icon, base flag, order). Also read by
     /// <see cref="ComputeMenuPermissionsSeedChecksum"/> — do not duplicate this list elsewhere.
-    /// The "Calendar" module (optional, Order 4) is added by SPEC 44.
     /// </summary>
     private static List<SystemModuleSeed> GetSystemModuleSeeds() =>
     [
         new("Administration", "Administrative management module", "fa-solid fa-building", IsBase: true, Order: 1),
         new("Customers", "Customer management module", "fa-solid fa-users", IsBase: true, Order: 2),
         new("Tickets", "Ticket management module", "fa-solid fa-ticket", IsBase: true, Order: 3),
+        // SPEC 44: optional module, enabled per company by the SuperAdmin.
+        new("Calendar", "Calendar and activities module", "fa-solid fa-calendar-days", IsBase: false, Order: 4),
         new("Security", "Security module", "fa-solid fa-shield-halved", IsBase: true, Order: 99)
     ];
 
@@ -2960,7 +3268,15 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // SPEC 29 — bitácora de seguridad. Read-only; other flags left at false so the
         // DynamicAuthorizationFilter denies anything other than GET. Without this row
         // the AuditController would 403 for everyone except SuperAdmin.
-        new("AuditLog", "/security/audit-log", "@Icons.Material.Filled.HistoryEdu", "Security", "Security", "Audit", true, false, false, false)
+        new("AuditLog", "/security/audit-log", "@Icons.Material.Filled.HistoryEdu", "Security", "Security", "Audit", true, false, false, false),
+
+        // SPEC 44 — calendar module. Option names are definitive for the frontend; ControllerName is the resource.
+        new("Calendar", "/calendar", "@Icons.Material.Filled.CalendarMonth", "Calendar", null, null, false, false, false, false),
+        new("MyCalendar", "/calendar/my-calendar", "@Icons.Material.Filled.Today", "Calendar", "Calendar", "Calendar", true, true, true, true),
+        new("CalendarPanel", "/calendar/panel", "@Icons.Material.Filled.ViewTimeline", "Calendar", "Calendar", "CalendarOthers", true, true, true, true),
+        new("ActivityConfirmation", "/calendar/activity-confirmation", "@Icons.Material.Filled.EventAvailable", "Calendar", "Calendar", "CalendarActivityConfirmation", false, false, true, false, IsVisibleMenu: false),
+        new("CalendarSettings", "/calendar/settings", "@Icons.Material.Filled.EditCalendar", "Calendar", "Calendar", "CalendarSettings", true, true, true, true, CanExecute: true),
+        new("CalendarCatalogs", "/calendar/catalogs", "@Icons.Material.Filled.Category", "Calendar", "Calendar", "CalendarCatalogs", true, true, true, true)
 
     ];
 
@@ -3086,7 +3402,29 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "TicketAttachmentSettings", true, false, false, false),
         new("Supervisor", "TicketDocuments", true, true, false, false, CanDownload: true),
         new("UsuarioSimple", "TicketAttachmentSettings", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
-        new("UsuarioSimple", "TicketDocuments", true, true, false, false, CanDownload: true, CanExport: false, CanExecute: false)
+        new("UsuarioSimple", "TicketDocuments", true, true, false, false, CanDownload: true, CanExport: false, CanExecute: false),
+
+        // SPEC 44 — calendar. Rows reference the OPTION name (MyCalendar → resource Calendar, CalendarPanel →
+        // CalendarOthers, ActivityConfirmation → CalendarActivityConfirmation). Admin and SuperAdminCompany get
+        // full access through PrivilegedRoleNames; Agent and Person get nothing here (Agent: SPEC 45).
+        new("SuperAdmin", "MyCalendar", true, true, true, true),
+        new("SuperAdmin", "CalendarPanel", true, true, true, true),
+        new("SuperAdmin", "ActivityConfirmation", false, false, true, false),
+        new("SuperAdmin", "CalendarSettings", true, true, true, true, CanExecute: true),
+        new("SuperAdmin", "CalendarCatalogs", true, true, true, true),
+        new("Manager", "MyCalendar", true, true, true, true),
+        new("Manager", "CalendarPanel", true, true, true, true),
+        new("Manager", "ActivityConfirmation", false, false, true, false),
+        new("Manager", "CalendarSettings", true, true, true, false),
+        new("Supervisor", "MyCalendar", true, true, true, true),
+        new("Supervisor", "CalendarPanel", true, true, true, false),
+        new("Supervisor", "ActivityConfirmation", false, false, true, false),
+        new("Supervisor", "CalendarSettings", true, false, false, false),
+        new("Coordinador", "MyCalendar", true, true, true, true),
+        new("Coordinador", "CalendarPanel", true, false, false, false),
+        new("Coordinador", "ActivityConfirmation", false, false, true, false),
+        new("UsuarioSimple", "MyCalendar", true, true, true, true),
+        new("UsuarioSimple", "ActivityConfirmation", false, false, true, false)
 
     ];
 

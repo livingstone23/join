@@ -100,7 +100,7 @@ Las filas 40–49 y 99 de la tabla anterior son las copias de `main` del 2026-10
 | 41-post | Visibilidad de registros borrados y restauración para SuperAdmin | Implementado | 38, 40-post |
 | 42-post | Valores iniciales del ticket desde `TicketCompanyDefaults` | Implementado | 41-post |
 | 43-post | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Implementado | 39 |
-| 44-post | Módulo Calendario: parametrización, calendarios y actividades | Borrador | 99-post, 43-post, 48-post |
+| 44-post | Módulo Calendario: parametrización, calendarios y actividades | **Aprobado** | 99-post, 43-post, 48-post |
 | 45-post | Calendario: ingreso por canales (agente) y personas pendientes | **Pospuesto** | 43-post, 44-post, 48-post |
 | 46-post | Calendario: estructura para sincronizar con Google Calendar | Borrador | 44-post |
 | 47-post | Ingesta de tickets por WhatsApp y correo | **Pospuesto** | 34, 35, 36, 99-post, 42-post, 43-post |
@@ -172,7 +172,7 @@ Decisión del usuario (2026-10-09): las specs 40–49, 51 y 99 de `main` se copi
 
 ### Orden de implementación en el fork
 
-1. **40-post** → **41-post** (etapas 1–4) → **99-post** → **42-post** → **43-post** → **48-post** → **44-post** → **46-post**. Es el mismo orden en que se implementaron o se implementarán en `main`; 41-post necesita 40-post, y 42-post usa el bloqueo de borrado de 41-post. **Ajuste (2026-10-09, decisión del usuario):** 42-post se implementó antes que 99-post; no dependen entre sí.
+1. **40-post** → **41-post** (etapas 1–4) → **99-post** → **42-post** → **43-post** → **48-post** → **44-post** → **46-post**. Es el mismo orden en que se implementaron o se implementarán en `main`; 41-post necesita 40-post, y 42-post usa el bloqueo de borrado de 41-post. **Ajuste (2026-10-09, decisión del usuario):** 42-post se implementó antes que 99-post; no dependen entre sí. **Ajuste (2026-10-12, decisión del usuario):** 44-post se implementa antes que 48-post; hasta que 48-post exista, el módulo Calendario queda sembrado pero el filtro global no bloquea sus APIs por módulo inactivo.
 2. **49-post** y **51-post**: sin dependencias con lo anterior, en cualquier momento.
 3. **45-post** y **47-post**: `Pospuesto`, igual que en `main`.
 4. **50**: pendientes para llevar QA a PostgreSQL (sin su antigua sección 0), cuando el usuario lo decida.

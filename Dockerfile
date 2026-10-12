@@ -35,7 +35,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
 # Install ICU and disable Globalization Invariant Mode so SqlClient can parse
 # culture-aware connection strings. The base aspnet:alpine image sets
 # DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1; icu-libs alone is not enough.
-RUN apk add --no-cache icu-libs
+# tzdata (SPEC 44-post): the calendar module resolves IANA zones such as
+# "America/Managua" with TimeZoneInfo; alpine ships without the zone database.
+RUN apk add --no-cache icu-libs tzdata
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 WORKDIR /app

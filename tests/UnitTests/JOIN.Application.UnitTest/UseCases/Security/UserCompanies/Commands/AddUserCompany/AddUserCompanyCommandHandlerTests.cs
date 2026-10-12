@@ -1,3 +1,4 @@
+using JOIN.Application.UseCases.Calendars.Common;
 using FluentAssertions;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
@@ -284,6 +285,7 @@ public sealed class AddUserCompanyCommandHandlerTests
             UnitOfWorkMock.Object,
             CurrentUserServiceMock.Object,
             PermissionServiceMock.Object,
-            AuditLoggerMock.Object);
+            AuditLoggerMock.Object,
+            new CalendarUserProvisioner(new Mock<IUnitOfWork> { DefaultValue = DefaultValue.Mock }.Object));
     }
 }

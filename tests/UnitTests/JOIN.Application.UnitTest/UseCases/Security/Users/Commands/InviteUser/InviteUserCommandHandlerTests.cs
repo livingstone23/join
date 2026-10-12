@@ -1,3 +1,4 @@
+using JOIN.Application.UseCases.Calendars.Common;
 using AutoFixture;
 using FluentAssertions;
 using JOIN.Application.Common.Options;
@@ -213,6 +214,7 @@ public sealed class InviteUserCommandHandlerTests
             EmailServiceMock.Object,
             AppUrls,
             SecurityEventLoggerMock.Object,
-            AuditLoggerMock.Object);
+            AuditLoggerMock.Object,
+            new CalendarUserProvisioner(new Mock<IUnitOfWork> { DefaultValue = DefaultValue.Mock }.Object));
     }
 }

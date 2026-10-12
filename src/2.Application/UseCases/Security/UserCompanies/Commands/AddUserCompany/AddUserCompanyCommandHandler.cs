@@ -4,6 +4,7 @@ using JOIN.Application.DTO.Security;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
+using JOIN.Application.UseCases.Calendars.Common;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
 using MediatR;
@@ -24,7 +25,8 @@ public sealed class AddUserCompanyCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
     IPermissionService permissionService,
-    IAuditLogger auditLogger)
+    IAuditLogger auditLogger,
+    CalendarUserProvisioner calendarUserProvisioner)
     : IRequestHandler<AddUserCompanyCommand, Response<AddUserCompanyResultDto>>
 {
     // Lightweight index of every membership row (active + soft-deleted) for the
@@ -137,6 +139,9 @@ public sealed class AddUserCompanyCommandHandler(
                 entity.LastModifiedBy = currentUserService.UserId;
                 await membershipRepository.UpdateAsync(entity);
             }
+
+            // SPEC 44: the reactivated membership gets its default calendar when the company has the module.
+            await calendarUserProvisioner.EnsureUserCalendarAsync(request.CompanyId, request.UserId, cancellationToken);
         }
         else
         {
@@ -154,6 +159,9 @@ public sealed class AddUserCompanyCommandHandler(
                 CreatedBy = currentUserService.UserId
             };
             await membershipRepository.InsertAsync(fresh);
+
+            // SPEC 44: default calendar for the new member (no-op without the module or CalendarCompanies).
+            await calendarUserProvisioner.EnsureUserCalendarAsync(request.CompanyId, request.UserId, cancellationToken);
         }
 
         // -- Roles: soft-delete every active assignment outside the requested set,

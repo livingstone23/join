@@ -1403,6 +1403,989 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("auditlogs", "security");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarActivity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AllowsOverlap")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allowsoverlap");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("color");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("DefaultDurationMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("defaultdurationminutes");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("icon");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<bool>("RequiresBusinessHours")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requiresbusinesshours");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activities");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_calendaractivities_code_active")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("activities", "calendar");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarActivityCompany", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AllowsOverlap")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allowsoverlap");
+
+                    b.Property<Guid>("CalendarActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calendaractivityid");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("color");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("DefaultDurationMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("defaultdurationminutes");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<Guid>("InitialCalendarStatusCompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("initialcalendarstatuscompanyid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<bool>("RequiresBusinessHours")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requiresbusinesshours");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activitycompanies");
+
+                    b.HasIndex("CalendarActivityId")
+                        .HasDatabaseName("ix_activitycompanies_calendaractivityid");
+
+                    b.HasIndex("InitialCalendarStatusCompanyId")
+                        .HasDatabaseName("ix_activitycompanies_initialcalendarstatuscompanyid");
+
+                    b.HasIndex("CompanyId", "CalendarActivityId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_calendaractivitycompanies_company_activity_active")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("activitycompanies", "calendar");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarCompany", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<TimeOnly?>("BusinessHoursEnd")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("businesshoursend");
+
+                    b.Property<TimeOnly?>("BusinessHoursStart")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("businesshoursstart");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<Guid>("DefaultActivityUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("defaultactivityuserid");
+
+                    b.Property<string>("DefaultCalendarName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("defaultcalendarname");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsOpen24Hours")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isopen24hours");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<Guid>("RescheduledByOthersStatusCompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rescheduledbyothersstatuscompanyid");
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("timezone");
+
+                    b.HasKey("Id")
+                        .HasName("pk_calendarcompanies");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_calendarcompanies_company_active")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.HasIndex("DefaultActivityUserId")
+                        .HasDatabaseName("ix_calendarcompanies_defaultactivityuserid");
+
+                    b.HasIndex("RescheduledByOthersStatusCompanyId")
+                        .HasDatabaseName("ix_calendarcompanies_rescheduledbyothersstatuscompanyid");
+
+                    b.ToTable("calendarcompanies", "calendar");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarCompanyNonWorkingDay", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsRecurringYearly")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isrecurringyearly");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id")
+                        .HasName("pk_companynonworkingdays");
+
+                    b.HasIndex("CompanyId", "Date")
+                        .IsUnique()
+                        .HasDatabaseName("ux_calendarcompanynonworkingdays_company_date_active")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("companynonworkingdays", "calendar");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CalendarActivityCompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calendaractivitycompanyid");
+
+                    b.Property<Guid>("CalendarId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calendarid");
+
+                    b.Property<Guid>("CalendarStatusCompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calendarstatuscompanyid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customerid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("description");
+
+                    b.Property<DateTime>("EndUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("endutc");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsAllDay")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isallday");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("location");
+
+                    b.Property<Guid>("OriginChannelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("originchannelid");
+
+                    b.Property<string>("OriginIdentifier")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("originidentifier");
+
+                    b.Property<string>("OriginReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("originreference");
+
+                    b.Property<int>("OriginType")
+                        .HasColumnType("integer")
+                        .HasColumnName("origintype");
+
+                    b.Property<Guid?>("OriginUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("originuserid");
+
+                    b.Property<DateTime?>("OriginalStartUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("originalstartutc");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owneruserid");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("projectid");
+
+                    b.Property<DateTime?>("RecurrenceEndUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recurrenceendutc");
+
+                    b.Property<string>("RecurrenceRule")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("recurrencerule");
+
+                    b.Property<Guid?>("RequesterPersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requesterpersonid");
+
+                    b.Property<Guid?>("SeriesMasterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("seriesmasterid");
+
+                    b.Property<DateTime>("StartUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("startutc");
+
+                    b.Property<Guid?>("StatusChangedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("statuschangedbyuserid");
+
+                    b.Property<DateTime?>("StatusChangedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("statuschangedutc");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("summary");
+
+                    b.Property<Guid?>("TicketId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ticketid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("VideoCallUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("videocallurl");
+
+                    b.HasKey("Id")
+                        .HasName("pk_events");
+
+                    b.HasIndex("CalendarActivityCompanyId")
+                        .HasDatabaseName("ix_events_calendaractivitycompanyid");
+
+                    b.HasIndex("CalendarStatusCompanyId")
+                        .HasDatabaseName("ix_events_calendarstatuscompanyid");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_events_customerid");
+
+                    b.HasIndex("OriginChannelId")
+                        .HasDatabaseName("ix_events_originchannelid");
+
+                    b.HasIndex("OriginUserId")
+                        .HasDatabaseName("ix_events_originuserid");
+
+                    b.HasIndex("OwnerUserId")
+                        .HasDatabaseName("ix_events_owneruserid");
+
+                    b.HasIndex("ProjectId")
+                        .HasDatabaseName("ix_events_projectid");
+
+                    b.HasIndex("RequesterPersonId")
+                        .HasDatabaseName("ix_calendarevents_requesterperson")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.HasIndex("StatusChangedByUserId")
+                        .HasDatabaseName("ix_events_statuschangedbyuserid");
+
+                    b.HasIndex("TicketId")
+                        .HasDatabaseName("ix_calendarevents_ticket")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.HasIndex("CalendarId", "StartUtc")
+                        .HasDatabaseName("ix_calendarevents_calendar_range")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.HasIndex("SeriesMasterId", "OriginalStartUtc")
+                        .IsUnique()
+                        .HasDatabaseName("ux_calendarevents_seriesmaster_originalstart_active")
+                        .HasFilter("\"seriesmasterid\" IS NOT NULL AND \"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "OriginChannelId", "OriginReference")
+                        .IsUnique()
+                        .HasDatabaseName("ux_calendarevents_company_channel_originreference_active")
+                        .HasFilter("\"originreference\" IS NOT NULL AND \"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "OwnerUserId", "RecurrenceEndUtc")
+                        .HasDatabaseName("ix_calendarevents_owner_recurring")
+                        .HasFilter("\"recurrencerule\" IS NOT NULL AND \"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "OwnerUserId", "StartUtc", "EndUtc")
+                        .HasDatabaseName("ix_calendarevents_owner_range")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("events", "calendar");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarEventLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer")
+                        .HasColumnName("action");
+
+                    b.Property<string>("ActorIdentifier")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("actoridentifier");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actoruserid");
+
+                    b.Property<Guid>("CalendarEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calendareventid");
+
+                    b.Property<Guid>("ChannelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("channelid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<DateTime?>("NewEndUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("newendutc");
+
+                    b.Property<DateTime?>("NewStartUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("newstartutc");
+
+                    b.Property<Guid?>("NewStatusCompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("newstatuscompanyid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTime>("OccurredUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurredutc");
+
+                    b.Property<DateTime?>("PreviousEndUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("previousendutc");
+
+                    b.Property<DateTime?>("PreviousStartUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("previousstartutc");
+
+                    b.Property<Guid?>("PreviousStatusCompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("previousstatuscompanyid");
+
+                    b.HasKey("Id")
+                        .HasName("pk_eventlogs");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_eventlogs_actoruserid");
+
+                    b.HasIndex("CalendarEventId")
+                        .HasDatabaseName("ix_eventlogs_calendareventid");
+
+                    b.HasIndex("ChannelId")
+                        .HasDatabaseName("ix_eventlogs_channelid");
+
+                    b.HasIndex("CompanyId", "CalendarEventId", "OccurredUtc")
+                        .HasDatabaseName("ix_calendareventlogs_company_event_occurred")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("eventlogs", "calendar");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarStatus", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("BlocksTime")
+                        .HasColumnType("boolean")
+                        .HasColumnName("blockstime");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("color");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isactive");
+
+                    b.Property<bool>("IsFinal")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isfinal");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_statuses");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_calendarstatuses_code_active")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("statuses", "calendar");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarStatusCompany", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CalendarStatusId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calendarstatusid");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("color");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_statuscompanies");
+
+                    b.HasIndex("CalendarStatusId")
+                        .HasDatabaseName("ix_statuscompanies_calendarstatusid");
+
+                    b.HasIndex("CompanyId", "CalendarStatusId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_calendarstatuscompanies_company_status_active")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("statuscompanies", "calendar");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarUserConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<TimeOnly?>("BusinessHoursEnd")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("businesshoursend");
+
+                    b.Property<TimeOnly?>("BusinessHoursStart")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("businesshoursstart");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<Guid>("DefaultCalendarId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("defaultcalendarid");
+
+                    b.Property<int>("DefaultView")
+                        .HasColumnType("integer")
+                        .HasColumnName("defaultview");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("userid");
+
+                    b.Property<int>("WeekStartsOn")
+                        .HasColumnType("integer")
+                        .HasColumnName("weekstartson");
+
+                    b.Property<int>("WorkDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("workdays");
+
+                    b.HasKey("Id")
+                        .HasName("pk_userconfigurations");
+
+                    b.HasIndex("DefaultCalendarId")
+                        .HasDatabaseName("ix_userconfigurations_defaultcalendarid");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_userconfigurations_userid");
+
+                    b.HasIndex("CompanyId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_calendaruserconfigurations_company_user_active")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("userconfigurations", "calendar");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarUserNonWorkingPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("enddate");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<int>("Reason")
+                        .HasColumnType("integer")
+                        .HasColumnName("reason");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("startdate");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("userid");
+
+                    b.HasKey("Id")
+                        .HasName("pk_usernonworkingperiods");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_usernonworkingperiods_userid");
+
+                    b.HasIndex("CompanyId", "UserId", "StartDate", "EndDate")
+                        .HasDatabaseName("ix_calendarusernonworkingperiods_company_user_range")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("usernonworkingperiods", "calendar");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.UserCalendar", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("color");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owneruserid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_usercalendars");
+
+                    b.HasIndex("OwnerUserId")
+                        .HasDatabaseName("ix_usercalendars_owneruserid");
+
+                    b.HasIndex("CompanyId", "OwnerUserId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_usercalendars_company_owner_name_active")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("usercalendars", "calendar");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Common.CommunicationChannel", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4377,6 +5360,322 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarActivityCompany", b =>
+                {
+                    b.HasOne("JOIN.Domain.Calendars.CalendarActivity", "CalendarActivity")
+                        .WithMany("ActivityCompanies")
+                        .HasForeignKey("CalendarActivityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_activitycompanies_activities_calendaractivityid");
+
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_activitycompanies_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Calendars.CalendarStatusCompany", "InitialCalendarStatusCompany")
+                        .WithMany()
+                        .HasForeignKey("InitialCalendarStatusCompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_activitycompanies_statuscompanies_initialcalendarstatuscomp~");
+
+                    b.Navigation("CalendarActivity");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("InitialCalendarStatusCompany");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarCompany", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_calendarcompanies_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "DefaultActivityUser")
+                        .WithMany()
+                        .HasForeignKey("DefaultActivityUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_calendarcompanies_users_defaultactivityuserid");
+
+                    b.HasOne("JOIN.Domain.Calendars.CalendarStatusCompany", "RescheduledByOthersStatusCompany")
+                        .WithMany()
+                        .HasForeignKey("RescheduledByOthersStatusCompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_calendarcompanies_statuscompanies_rescheduledbyothersstatus~");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("DefaultActivityUser");
+
+                    b.Navigation("RescheduledByOthersStatusCompany");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarCompanyNonWorkingDay", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_companynonworkingdays_companies_companyid");
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarEvent", b =>
+                {
+                    b.HasOne("JOIN.Domain.Calendars.CalendarActivityCompany", "CalendarActivityCompany")
+                        .WithMany()
+                        .HasForeignKey("CalendarActivityCompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_events_activitycompanies_calendaractivitycompanyid");
+
+                    b.HasOne("JOIN.Domain.Calendars.UserCalendar", "Calendar")
+                        .WithMany("Events")
+                        .HasForeignKey("CalendarId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_events_usercalendars_calendarid");
+
+                    b.HasOne("JOIN.Domain.Calendars.CalendarStatusCompany", "CalendarStatusCompany")
+                        .WithMany()
+                        .HasForeignKey("CalendarStatusCompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_events_statuscompanies_calendarstatuscompanyid");
+
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_events_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Admin.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_events_customers_customerid");
+
+                    b.HasOne("JOIN.Domain.Common.CommunicationChannel", "OriginChannel")
+                        .WithMany()
+                        .HasForeignKey("OriginChannelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_events_communicationchannels_originchannelid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "OriginUser")
+                        .WithMany()
+                        .HasForeignKey("OriginUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_events_users_originuserid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "OwnerUser")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_events_users_owneruserid");
+
+                    b.HasOne("JOIN.Domain.Admin.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_events_projects_projectid");
+
+                    b.HasOne("JOIN.Domain.Admin.Person", "RequesterPerson")
+                        .WithMany()
+                        .HasForeignKey("RequesterPersonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_events_persons_requesterpersonid");
+
+                    b.HasOne("JOIN.Domain.Calendars.CalendarEvent", "SeriesMaster")
+                        .WithMany("Exceptions")
+                        .HasForeignKey("SeriesMasterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_events_events_seriesmasterid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "StatusChangedByUser")
+                        .WithMany()
+                        .HasForeignKey("StatusChangedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_events_users_statuschangedbyuserid");
+
+                    b.HasOne("JOIN.Domain.Messaging.Ticket", "Ticket")
+                        .WithMany()
+                        .HasForeignKey("TicketId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_events_tickets_ticketid");
+
+                    b.Navigation("Calendar");
+
+                    b.Navigation("CalendarActivityCompany");
+
+                    b.Navigation("CalendarStatusCompany");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("OriginChannel");
+
+                    b.Navigation("OriginUser");
+
+                    b.Navigation("OwnerUser");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("RequesterPerson");
+
+                    b.Navigation("SeriesMaster");
+
+                    b.Navigation("StatusChangedByUser");
+
+                    b.Navigation("Ticket");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarEventLog", b =>
+                {
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "ActorUser")
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_eventlogs_users_actoruserid");
+
+                    b.HasOne("JOIN.Domain.Calendars.CalendarEvent", "CalendarEvent")
+                        .WithMany("Logs")
+                        .HasForeignKey("CalendarEventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_eventlogs_events_calendareventid");
+
+                    b.HasOne("JOIN.Domain.Common.CommunicationChannel", "Channel")
+                        .WithMany()
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_eventlogs_communicationchannels_channelid");
+
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_eventlogs_companies_companyid");
+
+                    b.Navigation("ActorUser");
+
+                    b.Navigation("CalendarEvent");
+
+                    b.Navigation("Channel");
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarStatusCompany", b =>
+                {
+                    b.HasOne("JOIN.Domain.Calendars.CalendarStatus", "CalendarStatus")
+                        .WithMany("StatusCompanies")
+                        .HasForeignKey("CalendarStatusId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_statuscompanies_statuses_calendarstatusid");
+
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_statuscompanies_companies_companyid");
+
+                    b.Navigation("CalendarStatus");
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarUserConfiguration", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_userconfigurations_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Calendars.UserCalendar", "DefaultCalendar")
+                        .WithMany()
+                        .HasForeignKey("DefaultCalendarId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_userconfigurations_usercalendars_defaultcalendarid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_userconfigurations_users_userid");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("DefaultCalendar");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarUserNonWorkingPeriod", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_usernonworkingperiods_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_usernonworkingperiods_users_userid");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.UserCalendar", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_usercalendars_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "OwnerUser")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_usercalendars_users_owneruserid");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("OwnerUser");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Common.Municipality", b =>
                 {
                     b.HasOne("JOIN.Domain.Common.Province", "Province")
@@ -5134,6 +6433,28 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("CompanyModules");
 
                     b.Navigation("SystemOptions");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarActivity", b =>
+                {
+                    b.Navigation("ActivityCompanies");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarEvent", b =>
+                {
+                    b.Navigation("Exceptions");
+
+                    b.Navigation("Logs");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarStatus", b =>
+                {
+                    b.Navigation("StatusCompanies");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.UserCalendar", b =>
+                {
+                    b.Navigation("Events");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Common.CommunicationChannel", b =>

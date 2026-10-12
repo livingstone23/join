@@ -90,7 +90,7 @@ public sealed class SystemMenuSeedPostgreSqlTests : IClassFixture<PostgreSqlWebA
 
         var modules = await db.SystemModules.IgnoreQueryFilters().Where(m => m.GcRecord == 0).ToListAsync();
         var moduleIds = modules.ToDictionary(m => m.Name, m => m.Id);
-        var options = await db.SystemOptions.IgnoreQueryFilters().Where(o => o.GcRecord == 0).ToListAsync();
+        var options = await db.SystemOptions.IgnoreQueryFilters().Where(o => o.GcRecord == 0 && !o.Route.StartsWith("/calendar")).ToListAsync();
         var snapshot = new MenuSnapshot(
             moduleIds,
             options.ToDictionary(o => o.Id, o => o.Name),
@@ -142,12 +142,13 @@ public sealed class SystemMenuSeedPostgreSqlTests : IClassFixture<PostgreSqlWebA
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
+        // SPEC 44-post adds the optional Calendar module and its /calendar options (left untouched by the revert).
         var modules = await db.SystemModules.IgnoreQueryFilters().Where(m => m.GcRecord == 0).ToListAsync();
-        modules.Select(m => m.Name).Should().BeEquivalentTo(["Administration", "Customers", "Tickets", "Security"]);
-        modules.Should().OnlyContain(m => m.IsBase);
+        modules.Select(m => m.Name).Should().BeEquivalentTo(["Administration", "Customers", "Tickets", "Calendar", "Security"]);
+        modules.Should().OnlyContain(m => m.IsBase == (m.Name != "Calendar"));
         modules.ToDictionary(m => m.Name, m => m.Id).Should().BeEquivalentTo(snapshot.ModuleIdsByNewName, "modules are renamed in place");
 
-        var options = await db.SystemOptions.IgnoreQueryFilters().Where(o => o.GcRecord == 0).ToListAsync();
+        var options = await db.SystemOptions.IgnoreQueryFilters().Where(o => o.GcRecord == 0 && !o.Route.StartsWith("/calendar")).ToListAsync();
         options.ToDictionary(o => o.Id, o => o.Name).Should().BeEquivalentTo(snapshot.OptionNewNamesById,
             "every option keeps its Id and gets its new name; nothing is duplicated");
         options.Select(o => o.Route).Should().OnlyHaveUniqueItems();

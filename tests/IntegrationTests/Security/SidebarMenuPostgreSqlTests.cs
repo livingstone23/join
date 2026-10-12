@@ -81,7 +81,9 @@ public sealed class SidebarMenuPostgreSqlTests : IClassFixture<PostgreSqlWebAppl
         var joinCompanyId = await JoinCompanyIdAsync();
         items.Should().NotBeEmpty();
         items.Should().OnlyContain(item => item.GetProperty("companyId").GetGuid() == joinCompanyId);
-        items.Should().OnlyContain(item => item.GetProperty("isBase").GetBoolean(), "the seed only assigns base modules");
+        // The seed only assigns base modules; the optional Calendar module is the JOIN-001 development data of SPEC 44-post.
+        items.Should().OnlyContain(item => item.GetProperty("isBase").GetBoolean() || item.GetProperty("moduleName").GetString() == "Calendar",
+            "the seed only assigns base modules");
     }
 
     private async Task<HttpClient> LoginAsync(string email)

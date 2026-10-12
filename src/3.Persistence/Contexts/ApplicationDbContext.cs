@@ -5,6 +5,7 @@ using System.Reflection;
 using JOIN.Application.Interface;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
+using JOIN.Domain.Calendars;
 using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
@@ -112,6 +113,21 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<TicketUserCompany> TicketUserCompanies => Set<TicketUserCompany>();
     public DbSet<TicketAttachmentSettings> TicketAttachmentSettings => Set<TicketAttachmentSettings>();
     public DbSet<TicketDocument> TicketDocuments => Set<TicketDocument>();
+
+
+
+    // --- 7. CALENDAR MODULE (SPEC 44) ---
+    public DbSet<CalendarActivity> CalendarActivities => Set<CalendarActivity>();
+    public DbSet<CalendarActivityCompany> CalendarActivityCompanies => Set<CalendarActivityCompany>();
+    public DbSet<CalendarStatus> CalendarStatuses => Set<CalendarStatus>();
+    public DbSet<CalendarStatusCompany> CalendarStatusCompanies => Set<CalendarStatusCompany>();
+    public DbSet<CalendarCompany> CalendarCompanies => Set<CalendarCompany>();
+    public DbSet<CalendarCompanyNonWorkingDay> CalendarCompanyNonWorkingDays => Set<CalendarCompanyNonWorkingDay>();
+    public DbSet<CalendarUserConfiguration> CalendarUserConfigurations => Set<CalendarUserConfiguration>();
+    public DbSet<CalendarUserNonWorkingPeriod> CalendarUserNonWorkingPeriods => Set<CalendarUserNonWorkingPeriod>();
+    public DbSet<UserCalendar> UserCalendars => Set<UserCalendar>();
+    public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
+    public DbSet<CalendarEventLog> CalendarEventLogs => Set<CalendarEventLog>();
 
 
 
@@ -255,6 +271,17 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<CompanyModule>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<RoleSystemOption>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
+        // Calendar (SPEC 44)
+        builder.Entity<CalendarActivityCompany>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CalendarStatusCompany>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CalendarCompany>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CalendarCompanyNonWorkingDay>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CalendarUserConfiguration>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CalendarUserNonWorkingPeriod>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<UserCalendar>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CalendarEvent>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CalendarEventLog>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+
 
         // --- 2. SHARED CATALOGS (SOFT DELETE ONLY) ---
         // These are global or system-wide catalogs where we only care if they are deleted.
@@ -274,6 +301,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
         // System Configuration (catalog of modules; the tenant-scoped link lives in CompanyModule above)
         builder.Entity<SystemModule>().HasQueryFilter(e => e.GcRecord == 0);
+
+        // Calendar global catalogs (SPEC 44): the list of every possible type and status, no owning company.
+        builder.Entity<CalendarActivity>().HasQueryFilter(e => e.GcRecord == 0);
+        builder.Entity<CalendarStatus>().HasQueryFilter(e => e.GcRecord == 0);
 
 
 

@@ -6,6 +6,7 @@ using FluentValidation;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Admin;
 using JOIN.Application.UseCases.Admin.PersonAddresses;
+using JOIN.Application.UseCases.Calendars.Common;
 using JOIN.Application.UseCases.Admin.Persons;
 using JOIN.Application.UseCases.Security.SystemOptions;
 using JOIN.Application.UseCases.Security.Auth.Login;
@@ -105,6 +106,26 @@ public static class ConfigureServices
         services.AddScoped<PersonCascadeCoordinator>();
         services.AddScoped<SystemOptionCascadeCoordinator>();
         services.AddScoped<TicketCascadeCoordinator>();
+
+        // SPEC 44 — calendar module.
+        services.AddScoped<ICalendarMapper, CalendarMapper>();
+        services.AddScoped<CalendarCompanyGuard>();
+        services.AddScoped<CalendarCatalogReader>();
+        services.AddScoped<CalendarUserProvisioner>();
+        services.AddScoped<CalendarUserDefaultCoordinator>();
+        services.AddScoped<CalendarEventInitialStatusResolver>();
+        services.AddScoped<CalendarEventLogWriter>();
+        services.AddScoped<CalendarEventScheduleGuard>();
+        services.AddScoped<CalendarEventCommandProcessor>();
+        services.AddScoped<CalendarQueryReader>();
+        services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarPanel.CalendarPanelAccess>();
+        services.AddScoped<CalendarEventQueryService>();
+        services.AddScoped<JOIN.Application.UseCases.Calendars.UserCalendars.UserCalendarCommandContext>();
+        services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarUserNonWorkingPeriods.CalendarNonWorkingPeriodWriter>();
+        services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarUserConfigurations.CalendarUserConfigurationQuery>();
+        services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarCompanies.CalendarCompanySettingsValidator>();
+        services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarCompanies.CalendarCompanyProvisioning>();
+        services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarStatusCompanies.CalendarStatusCompanyRemovalGuard>();
 
         return services;
     

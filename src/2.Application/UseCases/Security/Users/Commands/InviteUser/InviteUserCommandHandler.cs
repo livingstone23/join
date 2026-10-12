@@ -7,6 +7,7 @@ using JOIN.Application.DTO.Security.User;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
+using JOIN.Application.UseCases.Calendars.Common;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Security;
 using MediatR;
@@ -30,7 +31,8 @@ public sealed class InviteUserCommandHandler(
     IEmailService emailService,
     IOptions<AppUrlsOptions> appUrls,
     ISecurityEventLogger securityEventLogger,
-    IAuditLogger auditLogger)
+    IAuditLogger auditLogger,
+    CalendarUserProvisioner calendarUserProvisioner)
     : IRequestHandler<InviteUserCommand, Response<InviteUserResultDto>>
 {
     private readonly UserManager<ApplicationUser> _userManager = userManager;
@@ -167,6 +169,10 @@ public sealed class InviteUserCommandHandler(
                 };
                 await _unitOfWork.GetRepository<UserCompany>().InsertAsync(userCompany);
                 userCompanyCreated = true;
+
+                // SPEC 44: default calendar when the company has the Calendar module and its configuration;
+                // otherwise the user stays pending until CalendarCompanies is created.
+                await calendarUserProvisioner.EnsureUserCalendarAsync(companyId, user.Id, cancellationToken);
             }
 
             await ReplaceUserRoleCompaniesAsync(user.Id, companyId, request.RoleIds, cancellationToken);

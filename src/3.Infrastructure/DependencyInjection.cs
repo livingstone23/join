@@ -53,6 +53,7 @@ public static class DependencyInjection
         // ------------------------------------------------------------------
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IPermissionService, PermissionService>();
+        services.AddSingleton<ICalendarRecurrenceExpander, JOIN.Infrastructure.Calendars.IcalRecurrenceExpander>();
         services.AddScoped<ISecurityEventLogger, SecurityEventLogger>();
         services.AddScoped<IAuditLogger, AuditLogger>();
         services.AddScoped<IMfaTotpValidator, MfaTotpValidator>();

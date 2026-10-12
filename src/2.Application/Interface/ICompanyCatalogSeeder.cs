@@ -16,5 +16,22 @@ public interface ICompanyCatalogSeeder
     /// <param name="cancellationToken">Token used to cancel the seeding process.</param>
     Task SeedDefaultCatalogsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Copies to the company every active global calendar activity type and status it does not have yet, with
+    /// the company's <c>PENDING</c> status as the initial status of the new types (SPEC 44). Idempotent. Does not
+    /// create <c>CalendarCompany</c>: choosing its default user is a human decision.
+    /// </summary>
+    /// <param name="companyId">Identifier of the company that receives the catalogs.</param>
+    /// <param name="cancellationToken">Token used to cancel the seeding process.</param>
+    /// <returns>How many activity types and statuses were added.</returns>
+    Task<CalendarCatalogSyncResult> SeedCalendarCatalogsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
+
 
 }
+
+/// <summary>
+/// Result of <see cref="ICompanyCatalogSeeder.SeedCalendarCatalogsForCompanyAsync"/>.
+/// </summary>
+/// <param name="ActivitiesAdded">Activity types copied to the company.</param>
+/// <param name="StatusesAdded">Statuses copied to the company.</param>
+public sealed record CalendarCatalogSyncResult(int ActivitiesAdded, int StatusesAdded);
