@@ -598,22 +598,22 @@ public sealed class CalendarEventCommandProcessor(
 
     private async Task<Response<bool>> ValidateLinksAsync(Guid companyId, ICalendarEventInput input)
     {
-        if (input.RequesterPersonId is { } personId && !IsLinkValid(await unitOfWork.GetRepository<Person>().GetAsync(personId), companyId))
+        if (input.RequesterPersonId is { } personId && !await IsLinkValidAsync<Person>(personId, companyId))
         {
             return InvalidLink("requesterPersonId");
         }
 
-        if (input.CustomerId is { } customerId && !IsLinkValid(await unitOfWork.GetRepository<Customer>().GetAsync(customerId), companyId))
+        if (input.CustomerId is { } customerId && !await IsLinkValidAsync<Customer>(customerId, companyId))
         {
             return InvalidLink("customerId");
         }
 
-        if (input.TicketId is { } ticketId && !IsLinkValid(await unitOfWork.GetRepository<Ticket>().GetAsync(ticketId), companyId))
+        if (input.TicketId is { } ticketId && !await IsLinkValidAsync<Ticket>(ticketId, companyId))
         {
             return InvalidLink("ticketId");
         }
 
-        if (input.ProjectId is { } projectId && !IsLinkValid(await unitOfWork.GetRepository<Project>().GetAsync(projectId), companyId))
+        if (input.ProjectId is { } projectId && !await IsLinkValidAsync<Project>(projectId, companyId))
         {
             return InvalidLink("projectId");
         }
@@ -621,8 +621,14 @@ public sealed class CalendarEventCommandProcessor(
         return Ok(true);
     }
 
-    private static bool IsLinkValid(Domain.Audit.BaseTenantEntity? entity, Guid companyId) =>
-        entity is not null && entity.CompanyId == companyId && entity.GcRecord == 0;
+    /// <summary>
+    /// R9: the linked record exists, is not deleted and belongs to the company (read only).
+    /// </summary>
+    private async Task<bool> IsLinkValidAsync<T>(Guid id, Guid companyId)
+        where T : Domain.Audit.BaseTenantEntity =>
+        (await unitOfWork.GetRepository<T>()
+            .GetAllIncludingDeletedAsync(x => x.Id == id && x.CompanyId == companyId && x.GcRecord == 0))
+        .Any();
 
     private static Response<bool> InvalidLink(string field) =>
         Response<bool>.Error(CalendarErrorCodes.InvalidLink, [$"{field} does not exist in the current company."]);

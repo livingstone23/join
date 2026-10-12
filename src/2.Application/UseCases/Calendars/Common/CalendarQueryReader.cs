@@ -14,7 +14,7 @@ namespace JOIN.Application.UseCases.Calendars.Common;
 /// <c>CompanyId = @TenantId AND GcRecord = 0</c>; ranges are <c>timestamptz</c> parameters in UTC, owners and masters
 /// are arrays (<c>= ANY(@Owners)</c>).
 /// </summary>
-public sealed class CalendarQueryReader(ISqlConnectionFactory connectionFactory, ICalendarRecurrenceExpander expander)
+public sealed class CalendarQueryReader(ICalendarRecurrenceExpander expander)
 {
     /// <summary> Maximum range of a view query: a month view with its edge weeks. </summary>
     public const int MaxRangeDays = 62;

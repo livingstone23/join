@@ -7,6 +7,26 @@
 > **Depends on:** SPEC 99-post (canal `WEB` como origen de las actividades creadas desde la aplicación), SPEC 48-post (bloqueo por módulo en el filtro global), SPEC 43-post (`SystemModule.IsBase`, `ModuleName` en `SystemOptionSeed`, rutas con guion y solo SuperAdmin habilita módulos). Es prerequisito de SPEC 45-post y SPEC 46-post.
 > **Related:** SPEC 40 (índices únicos filtrados por `GcRecord = 0` — mismo patrón en todos los índices de esta spec), SPEC 39 (fork PostgreSQL — nombres en minúsculas y forma de `HasFilter`), SPEC 42 (patrón "valores iniciales desde la configuración de la empresa").
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-09-29)
+> **Ajuste por SPEC 44-post (implementación, 2026-10-12):** implementada en la rama `spec-44-post-calendar-core` desde cero.
+> (1) **Orden:** se implementó antes que 48-post (decisión del usuario). El criterio "sin el módulo activo ningún
+> endpoint permite registrar" queda pendiente de 48-post; mientras tanto el módulo solo filtra el menú (SPEC 43-post) y
+> el provisioner. (2) **Validar después de guardar:** los comandos de actividades guardan y luego ejecutan
+> `CalendarEventScheduleGuard` dentro de la misma transacción; un error hace rollback (`TransactionBehavior`). Así la
+> validación ve la serie real (cortes y excepciones). (3) **Lecturas de los comandos:** con
+> `ICalendarEventRepository` (EF, misma conexión) y `IUnitOfWork.AcquireScheduleLockAsync` (`pg_advisory_xact_lock`).
+> (4) **Provisión:** el calendario automático usa color `#1E88E5` y deja el horario del usuario vacío, de modo que se
+> usa el de la empresa. Así un cambio de horario de la empresa no choca con todos los usuarios. (5) **Seed JOIN-001:**
+> el usuario por defecto es el SuperAdmin `lcano@join.com`. (6) **Borrar un tipo de la empresa con actividades:** se
+> desactiva y responde 200 con `data = false` y `CALENDAR_ACTIVITY_IN_USE` en `errors`. Un error haría rollback de la
+> desactivación. (7) **Borrar una ocurrencia (`scope = 1`):** crea o actualiza su excepción en el estado `CANCELLED`
+> de la empresa, porque el modelo no tiene EXDATE. Borrar una excepción directamente devuelve la ocurrencia a la serie.
+> (8) **`scope = 3` (Series):** el cuerpo trae la ocurrencia editada; la serie se desplaza la misma diferencia y las
+> claves de las excepciones la siguen. (9) **HTTP:** `*_NOT_FOUND` responde 404, los conflictos 409, R5 responde 422,
+> `CALENDAR_OTHERS_PERMISSION_REQUIRED` 403 y el resto 400. (10) **Panel:** el chequeo adicional de
+> `CalendarOthers.CanUpdate` exime al SuperAdmin, igual que el filtro global. (11) **Paginación:** acepta `page` y
+> `pageNumber`. (12) **Tests:** 186 unitarios del calendario (InMemory con el `UnitOfWork` real y el expander de
+> Ical.Net), una prueba de arquitectura por IL y 6 pruebas `CalendarFlowPostgreSqlTests`. Se ajustaron dos tests de
+> 43-post que suponían 4 módulos.
 > **Objective:** Crear el módulo Calendario en su propio esquema `Calendar`: un catálogo global de tipos de actividad y de estados que cada empresa habilita y ajusta, la configuración de calendario por empresa (usuario por defecto, horario hábil, zona horaria, feriados), la configuración por usuario (calendario por defecto, horario de contrato, días hábiles, periodos no hábiles), los calendarios de cada usuario y sus actividades (puntuales, de día completo y periódicas), con validación de superposición y de horario hábil, un panel para consultar calendarios de otros usuarios de la misma empresa y todas las APIs que el frontend necesita para las vistas de día, semana y mes.
 
 ---
@@ -855,35 +875,35 @@ Configuraciones EF (`Configuration/Calendars/`), `DbSet`s, query filters explíc
 ## Acceptance criteria
 
 ### Datos
-- [ ] Existe el esquema `Calendar` (físico `calendar`) con las 11 tablas de esta spec; ninguna tabla nueva queda en otro esquema.
-- [ ] Todas las entidades tenant heredan de `BaseTenantEntity`; los dos catálogos globales, de `BaseAuditableEntity`.
-- [ ] Todos los índices únicos son filtrados por `GcRecord = 0` y ninguno incluye `GcRecord` en la clave.
-- [ ] Un usuario no puede tener dos filas de `CalendarUserConfiguration` activas en la misma empresa (índice único) y por lo tanto nunca tiene dos calendarios por defecto.
+- [x] Existe el esquema `Calendar` (físico `calendar`) con las 11 tablas de esta spec; ninguna tabla nueva queda en otro esquema.
+- [x] Todas las entidades tenant heredan de `BaseTenantEntity`; los dos catálogos globales, de `BaseAuditableEntity`.
+- [x] Todos los índices únicos son filtrados por `GcRecord = 0` y ninguno incluye `GcRecord` en la clave.
+- [x] Un usuario no puede tener dos filas de `CalendarUserConfiguration` activas en la misma empresa (índice único) y por lo tanto nunca tiene dos calendarios por defecto.
 
 ### Parametrización
-- [ ] Una empresa nueva nace con todos los tipos y estados globales activos copiados a sus tablas, con `PENDING` como estado inicial.
-- [ ] Solo se pueden crear actividades de tipos usables (activos en global y en empresa).
-- [ ] La duración, el color, la superposición y el horario hábil que aplican son los de `CalendarActivityCompany`, no los del global.
-- [ ] `CalendarCompany` exige usuario por defecto de la empresa, zona IANA válida y horario válido o 24 horas.
-- [ ] El horario de un usuario no puede salir del horario de la empresa.
+- [x] Una empresa nueva nace con todos los tipos y estados globales activos copiados a sus tablas, con `PENDING` como estado inicial.
+- [x] Solo se pueden crear actividades de tipos usables (activos en global y en empresa).
+- [x] La duración, el color, la superposición y el horario hábil que aplican son los de `CalendarActivityCompany`, no los del global.
+- [x] `CalendarCompany` exige usuario por defecto de la empresa, zona IANA válida y horario válido o 24 horas.
+- [x] El horario de un usuario no puede salir del horario de la empresa.
 
 ### Operación
-- [ ] Al asignar un usuario a una empresa con `CalendarCompany`, se le crea "Mi calendario" como predeterminado; sin `CalendarCompany` no se crea nada, y al crearla se provisionan todos los pendientes.
-- [ ] Dos actividades que no permiten superposición no pueden coincidir para el mismo usuario, aunque estén en calendarios distintos; una pendiente bloquea y una anulada no.
-- [ ] Nadie, salvo el dueño, puede crearle una actividad que requiere horario hábil fuera de su horario, en un día que no trabaja, en sus periodos no hábiles o en un feriado de la empresa. Los recordatorios no tienen esa restricción.
-- [ ] Las actividades periódicas (diaria, semanal, mensual, anual, cada N, fin por fecha, por cantidad o sin fin) se expanden correctamente en las vistas, y se pueden modificar o anular por ocurrencia, desde una ocurrencia en adelante o la serie completa.
-- [ ] Anular exige motivo, conserva la actividad y deja registro en la bitácora; cualquier cambio queda en `CalendarEventLog` con canal y actor.
-- [ ] `GET /CalendarEvents` devuelve lo necesario para las vistas de día, semana y mes en una sola llamada.
-- [ ] El panel solo muestra usuarios de la empresa actual y exige `CalendarOthers`.
+- [x] Al asignar un usuario a una empresa con `CalendarCompany`, se le crea "Mi calendario" como predeterminado; sin `CalendarCompany` no se crea nada, y al crearla se provisionan todos los pendientes.
+- [x] Dos actividades que no permiten superposición no pueden coincidir para el mismo usuario, aunque estén en calendarios distintos; una pendiente bloquea y una anulada no.
+- [x] Nadie, salvo el dueño, puede crearle una actividad que requiere horario hábil fuera de su horario, en un día que no trabaja, en sus periodos no hábiles o en un feriado de la empresa. Los recordatorios no tienen esa restricción.
+- [x] Las actividades periódicas (diaria, semanal, mensual, anual, cada N, fin por fecha, por cantidad o sin fin) se expanden correctamente en las vistas, y se pueden modificar o anular por ocurrencia, desde una ocurrencia en adelante o la serie completa.
+- [x] Anular exige motivo, conserva la actividad y deja registro en la bitácora; cualquier cambio queda en `CalendarEventLog` con canal y actor.
+- [x] `GET /CalendarEvents` devuelve lo necesario para las vistas de día, semana y mes en una sola llamada.
+- [x] El panel solo muestra usuarios de la empresa actual y exige `CalendarOthers`.
 - [ ] Sin el módulo activo en `CompanyModule` (y con `Modules:EnforceCompanyModules = true`, SPEC 48), ningún endpoint del módulo permite registrar calendarios ni actividades.
-- [ ] Ningún endpoint de esta spec crea, modifica ni borra registros fuera del esquema `Calendar`; las entidades del CRM y de seguridad solo se leen.
-- [ ] Los permisos de administración de la empresa se siembran para `SuperAdminCompany`, no para `Admin`.
+- [x] Ningún endpoint de esta spec crea, modifica ni borra registros fuera del esquema `Calendar`; las entidades del CRM y de seguridad solo se leen.
+- [x] Los permisos de administración de la empresa se siembran para `SuperAdminCompany`, no para `Admin`.
 
 ### General
-- [ ] Todas las consultas son Dapper con `WHERE CompanyId = @TenantId AND GcRecord = 0`; los comandos usan `IUnitOfWork`.
-- [ ] Cobertura ≥ 90%, cero warnings nuevos.
-- [ ] Toda fecha `*Utc` se guarda y se consulta con `Kind=Utc` (sin excepciones de Npgsql).
-- [ ] La imagen Docker de la API resuelve la zona `America/Managua` (`tzdata`).
+- [x] Todas las consultas son Dapper con `WHERE CompanyId = @TenantId AND GcRecord = 0`; los comandos usan `IUnitOfWork`.
+- [x] Cobertura ≥ 90%, cero warnings nuevos.
+- [x] Toda fecha `*Utc` se guarda y se consulta con `Kind=Utc` (sin excepciones de Npgsql).
+- [x] La imagen Docker de la API resuelve la zona `America/Managua` (`tzdata`).
 
 ---
 
