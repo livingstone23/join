@@ -186,6 +186,7 @@ public sealed class UpdateSystemModuleCommandHandlerTests
         response.Data.Description.Should().Be("Person management");
         response.Data.Icon.Should().Be("fa-users");
         response.Data.IsActive.Should().BeTrue();
+        response.Data.IsBase.Should().BeTrue("SPEC 43: IsBase is editable from the CRUD");
         response.Data.Order.Should().Be(5);
 
         entity.Name.Should().Be("CRM");
@@ -208,6 +209,7 @@ public sealed class UpdateSystemModuleCommandHandlerTests
             Description = "  Person management  ",
             Icon = "  fa-users  ",
             IsActive = true,
+            IsBase = true,
             Order = 5
         };
     }

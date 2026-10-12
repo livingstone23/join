@@ -42,6 +42,11 @@ public class SystemModuleConfiguration : IEntityTypeConfiguration<SystemModule>
 
         builder.Property(m => m.Order);
 
+        // SPEC 43: base modules are assigned to companies by the seed; optional ones by a SuperAdmin.
+        builder.Property(m => m.IsBase)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         // --- Relationships ---
 
         // One-to-many relationship with SystemOption

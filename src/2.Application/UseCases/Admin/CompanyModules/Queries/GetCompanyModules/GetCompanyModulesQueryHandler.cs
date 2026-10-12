@@ -52,10 +52,15 @@ public sealed class GetCompanyModulesQueryHandler(
             whereBuilder.Append(" AND cm.GcRecord = 0");
         }
 
-        if (request.CompanyId.HasValue)
+        // SPEC 43: a SuperAdmin sees every company (or the one requested); anybody else only their own company.
+        var companyFilter = currentUserService.IsInRole("SuperAdmin")
+            ? request.CompanyId
+            : currentUserService.CompanyId;
+
+        if (companyFilter.HasValue)
         {
             whereBuilder.Append(" AND cm.CompanyId = @CompanyId");
-            parameters.Add("CompanyId", request.CompanyId.Value);
+            parameters.Add("CompanyId", companyFilter.Value);
         }
 
         if (!string.IsNullOrWhiteSpace(request.CompanyName))
@@ -92,6 +97,7 @@ public sealed class GetCompanyModulesQueryHandler(
                 c.Name AS CompanyName,
                 cm.ModuleId,
                 sm.Name AS ModuleName,
+                sm.IsBase,
                 cm.IsActive,
                 cm.Created AS CreatedAt
             FROM Admin.CompanyModules cm

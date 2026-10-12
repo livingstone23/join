@@ -1160,6 +1160,12 @@ namespace JOIN.Persistence.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("isactive");
 
+                    b.Property<bool>("IsBase")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("isbase");
+
                     b.Property<DateTime?>("LastModified")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("lastmodified");

@@ -186,10 +186,49 @@ public sealed class GetCompanyModulesQueryHandlerTests
     /// <summary>
     /// Holds the reusable mocks and fake connection used by the company module query tests.
     /// </summary>
+    /// <summary>
+    /// SPEC 43: a SuperAdminCompany only lists its own company's modules, whatever company it requests.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenUserIsNotSuperAdmin_ShouldForceTheTokenCompany()
+    {
+        var tokenCompanyId = Guid.NewGuid();
+        var context = new GetCompanyModulesQueryTestContext(useNpgsqlConnection: true, isSuperAdmin: false, tokenCompanyId: tokenCompanyId);
+        context.Connection.SetResults(EmptyItems(), FakeResultSet.FromScalar(0));
+
+        var response = await context.CreateHandler().Handle(new GetCompanyModulesQuery(CompanyId: Guid.NewGuid()), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        context.Connection.LastCommandText.Should().Contain("cm.CompanyId = @CompanyId");
+        context.Connection.CapturedParameters["CompanyId"].Should().Be(tokenCompanyId);
+    }
+
+    /// <summary>
+    /// SPEC 43: a SuperAdmin without a requested company lists every company, and the list exposes IsBase.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenSuperAdminRequestsNoCompany_ShouldListEveryCompanyWithIsBase()
+    {
+        var context = new GetCompanyModulesQueryTestContext(useNpgsqlConnection: true, isSuperAdmin: true);
+        context.Connection.SetResults(EmptyItems(), FakeResultSet.FromScalar(0));
+
+        var response = await context.CreateHandler().Handle(new GetCompanyModulesQuery(), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        context.Connection.LastCommandText.Should().NotContain("cm.CompanyId = @CompanyId");
+        context.Connection.LastCommandText.Should().Contain("sm.IsBase");
+    }
+
+    private static FakeResultSet EmptyItems() =>
+        FakeResultSet.Empty("Id", "CompanyId", "CompanyName", "ModuleId", "ModuleName", "IsBase", "IsActive", "CreatedAt");
+
     private sealed class GetCompanyModulesQueryTestContext
     {
-        public GetCompanyModulesQueryTestContext(bool useNpgsqlConnection)
+        // SPEC 43: the existing cases request explicit companies, which only a SuperAdmin can do.
+        public GetCompanyModulesQueryTestContext(bool useNpgsqlConnection, bool isSuperAdmin = true, Guid? tokenCompanyId = null)
         {
+            CurrentUserServiceMock.Setup(x => x.IsInRole("SuperAdmin")).Returns(isSuperAdmin);
+            CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(tokenCompanyId ?? Guid.NewGuid());
             Connection = useNpgsqlConnection ? new FakeNpgsqlDbConnection() : new FakeDbConnection();
             ConnectionFactoryMock.Setup(x => x.CreateConnection()).Returns(Connection);
             PaginationOptions = Options.Create(new PaginationSettings
@@ -201,6 +240,7 @@ public sealed class GetCompanyModulesQueryHandlerTests
         }
 
         public Mock<ISqlConnectionFactory> ConnectionFactoryMock { get; } = new();
+        public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public FakeDbConnection Connection { get; }
         public IOptions<PaginationSettings> PaginationOptions { get; }
 
@@ -208,7 +248,7 @@ public sealed class GetCompanyModulesQueryHandlerTests
         {
             return new GetCompanyModulesQueryHandler(
                 ConnectionFactoryMock.Object,
-                PaginationOptions, new Mock<ICurrentUserService>().Object);
+                PaginationOptions, CurrentUserServiceMock.Object);
         }
     }
 }

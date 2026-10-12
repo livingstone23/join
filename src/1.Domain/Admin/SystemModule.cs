@@ -39,6 +39,18 @@ public class SystemModule : BaseAuditableEntity
     /// </summary>
     public int? Order { get; set; }
 
+    /// <summary>
+    /// Indicates whether this module is a BASE module: part of the minimum set every company must have.
+    /// Base modules are the ones the seed assigns to companies in <c>Admin.CompanyModules</c>; optional
+    /// modules (IsBase = false, e.g. "Calendar") are enabled per company by a SuperAdmin.
+    /// <para>
+    /// This flag does NOT control access by itself: what a company can see and use is always decided by
+    /// its <see cref="CompanyModule"/> rows (active or not). IsBase only decides which modules are
+    /// assigned automatically.
+    /// </para>
+    /// </summary>
+    public bool IsBase { get; set; }
+
     // --- Navigation Properties ---
     public virtual ICollection<CompanyModule> CompanyModules { get; set; } = new List<CompanyModule>();
     public virtual ICollection<SystemOption> SystemOptions { get; set; } = new List<SystemOption>();

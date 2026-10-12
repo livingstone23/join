@@ -14,7 +14,10 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
 /// <param name="currentUserService">Resolves the JWT-driven tenant and role context.</param>
-public sealed class UpdateCompanyModulesCommandHandler(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
+public sealed class UpdateCompanyModulesCommandHandler(
+    IUnitOfWork unitOfWork,
+    ICurrentUserService currentUserService,
+    CompanyPermissionCacheInvalidator cacheInvalidator)
     : IRequestHandler<UpdateCompanyModulesCommand, Response<CompanyModuleDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
@@ -55,6 +58,7 @@ public sealed class UpdateCompanyModulesCommandHandler(IUnitOfWork unitOfWork, I
             return Response<CompanyModuleDto>.Error("COMPANY_MODULE_NOT_FOUND", ["Company module not found."]);
         }
 
+        // SPEC 43 (A9): only the assignment changes; role permissions and module data are kept as they are.
         entity.IsActive = request.IsActive;
 
         await _unitOfWork.GetRepository<CompanyModule>().UpdateAsync(entity);
@@ -63,6 +67,9 @@ public sealed class UpdateCompanyModulesCommandHandler(IUnitOfWork unitOfWork, I
         {
             return Response<CompanyModuleDto>.Error("UPDATE_FAILED", ["No records were affected while updating the company module assignment."]);
         }
+
+        // SPEC 43: the company's menu and permissions change right away, not when the cache expires.
+        await cacheInvalidator.InvalidateAsync(entity.CompanyId, cancellationToken);
 
         var module = await moduleRepository.GetAsync(entity.ModuleId);
 
@@ -77,6 +84,7 @@ public sealed class UpdateCompanyModulesCommandHandler(IUnitOfWork unitOfWork, I
                 CompanyName = company.Name,
                 ModuleId = entity.ModuleId,
                 ModuleName = module?.Name ?? string.Empty,
+                IsBase = module?.IsBase ?? false,
                 IsActive = entity.IsActive,
                 CreatedAt = entity.Created
             }

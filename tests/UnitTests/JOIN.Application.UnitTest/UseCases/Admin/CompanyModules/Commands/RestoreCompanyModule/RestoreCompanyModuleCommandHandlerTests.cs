@@ -77,6 +77,37 @@ public sealed class RestoreCompanyModuleCommandHandlerTests
         entity.IsDeleted.Should().BeFalse();
     }
 
+    /// <summary>
+    /// SPEC 43: a restored module shows up in the company's menu right away (cache dropped for its users).
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenRestored_ShouldInvalidateTheCompanyUsersCache()
+    {
+        var context = new TestContext();
+        var entity = context.SetupDeleted();
+        context.SetupSaveChanges(1);
+        var userId = Guid.NewGuid();
+        context.UnitOfWorkMock.SetupRepositoryRows(new[] { new JOIN.Domain.Security.UserCompany { UserId = userId, CompanyId = CompanyId } });
+
+        var response = await context.CreateHandler().Handle(new RestoreCompanyModuleCommand(entity.Id), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        context.PermissionServiceMock.Verify(x => x.InvalidateUserCacheAsync(CompanyId, userId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WhenRestoreFails_ShouldNotInvalidateTheCache()
+    {
+        var context = new TestContext();
+        var entity = context.SetupDeleted();
+        context.SetupSaveChanges(0);
+
+        var response = await context.CreateHandler().Handle(new RestoreCompanyModuleCommand(entity.Id), CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        context.PermissionServiceMock.VerifyNoOtherCalls();
+    }
+
     [Fact]
     public async Task Handle_WhenParentCompany0IsDeleted_ShouldReturnParentDeleted()
     {
@@ -131,6 +162,7 @@ public sealed class RestoreCompanyModuleCommandHandlerTests
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new() { DefaultValue = DefaultValue.Mock };
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
+        public Mock<IPermissionService> PermissionServiceMock { get; } = new();
         public Mock<IGenericRepository<CompanyModule>> EntityRepositoryMock { get; } = new();
         public Company Parent0 { get; } = WithId(new Company { Name = "JOIN", TaxId = "RUC-1" }, CompanyId);
         public Mock<IGenericRepository<Company>> Parent0RepositoryMock { get; } = new();
@@ -150,6 +182,9 @@ public sealed class RestoreCompanyModuleCommandHandlerTests
             => UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(affectedRows);
 
         public RestoreCompanyModuleCommandHandler CreateHandler()
-            => new(CurrentUserServiceMock.Object, new SoftDeleteRestorer(UnitOfWorkMock.Object, CurrentUserServiceMock.Object));
+            => new(
+                CurrentUserServiceMock.Object,
+                new SoftDeleteRestorer(UnitOfWorkMock.Object, CurrentUserServiceMock.Object),
+                new CompanyPermissionCacheInvalidator(UnitOfWorkMock.Object, PermissionServiceMock.Object));
     }
 }

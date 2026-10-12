@@ -1,12 +1,13 @@
 # SPEC 43-post — Módulos por empresa: módulos base, opciones conectadas a su módulo, menú filtrado y rutas en inglés
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Origen:** copia de SPEC 43 de `main` (estado allí al copiarla: Borrador), adaptada a PostgreSQL para el fork `main_postgresql`. Se implementa **desde cero** en el fork, sin traer commits de `main` (decisión del usuario, 2026-10-09).
 > **Rama de trabajo:** `spec-43-post-company-modules-menu-and-english-routes`, creada desde `main_postgresql`; PR hacia `main_postgresql`, nunca hacia `main`.
 > **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 99) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
 > **Depends on:** SPEC 39 (fork). Ninguna otra para implementarse.
 > **Related:** SPEC 44 (módulo `Calendar`, opcional), SPEC 48 (bloqueo de APIs por módulo e interruptor `Modules:EnforceCompanyModules`, que también condiciona el filtro del menú de esta spec), SPEC 45 (opciones de menú del agente y de personas pendientes), SPEC 48.
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-10-01)
+> **Ajuste por SPEC 43-post (implementación, 2026-10-12):** implementada en la rama `spec-43-post-company-modules-menu-and-english-routes`, desde cero (en `main` no hay implementación de SPEC 43). (1) **Filtro del menú siempre activo** (decisión del usuario, 2026-10-12): el interruptor `Modules:EnforceCompanyModules` de la sección D todavía no existe; lo crea SPEC 48-post, que envolverá este filtro. (2) **`Calendar`:** esta spec siembra los cuatro módulos existentes; el módulo `Calendar` (`IsBase = false`) lo agrega SPEC 44-post. (3) **Firma de `SystemOptionSeed`:** `(Name, Route, Icon, ModuleName, ParentName, ControllerName, …)`; se alinearon los ejemplos de SPEC 44-post y 45-post. (4) **Siembra de opciones:** reconoce cada fila por ruta nueva, ruta anterior, nombre nuevo y nombre anterior, en ese orden, y una fila solo la toma una semilla (`LegacySystemOptionRoutes` además de `LegacySystemOptionNames`). Corre en una transacción. (5) **Permisos por rol:** los flags no cambian; sí cambia `OrderMenu` de las opciones de seguridad (pasan a colgar del padre `Security`). (6) **Cache:** `CompanyPermissionCacheInvalidator` (Application, mismo patrón que `RolePermissionCacheInvalidator`) invalida menú y permisos de los usuarios de la empresa al crear, activar/desactivar, borrar o restaurar una asignación de módulo. (7) **`CompanyModules`:** las lecturas aceptan `SuperAdmin` (todas las empresas, `?companyId=` opcional) y `SuperAdminCompany` (el handler fuerza la empresa del token); las escrituras ya eran solo `SuperAdmin`. (8) **Frontend:** `PermissionView` compara por ruta y las rutas `/security/...` no cambian; FE-15 a FE-19 ya tenían el "Ajuste por BE-43" con las rutas `/tickets/...`. Sin cambios en `join_frontb`.
 > **Objective:** Dejar `CompanyModule` como la fuente de verdad de qué módulos tiene cada empresa y de qué se pinta en su menú: marcar qué módulos son **base**, conectar cada opción de menú (`SystemOption`) con su **módulo real** (hoy todas cuelgan de "Administracion"), filtrar el menú lateral por los módulos activos de la empresa, restringir al SuperAdmin la habilitación de módulos, y traducir al inglés los nombres de módulos, opciones y rutas, con guion como separador.
 
 ---
@@ -268,15 +269,17 @@ Unitarios e integración de la sección H. `dotnet build` sin warnings nuevos; a
 
 ## Acceptance criteria
 
-- [ ] `SystemModule` tiene `IsBase`; `Administration`, `Customers`, `Tickets` y `Security` son base; `Calendar` no.
-- [ ] La seed inicial asigna a las empresas solo módulos base, y no desactiva ni borra asignaciones existentes.
-- [ ] Cada `SystemOption` tiene el `ModuleId` de su módulo real; ninguna opción de Tickets, Clientes, Seguridad o Calendario queda bajo `Administration`.
-- [ ] Después de la seed, una base existente tiene los nombres y rutas en inglés con guion, sin filas duplicadas, con los mismos `Id` y con sus `RoleSystemOptions` intactos.
-- [ ] Ningún `ControllerName` cambió y los permisos vigentes siguen funcionando.
-- [ ] El menú de un usuario no SuperAdmin no muestra opciones de módulos inactivos o no asignados a su empresa, ni padres sin hijos visibles.
-- [ ] El menú del SuperAdmin muestra todas las opciones.
-- [ ] Solo el SuperAdmin puede crear, activar, desactivar o borrar asignaciones de módulos; `SuperAdminCompany` solo consulta las de su empresa.
-- [ ] Desactivar y reactivar un módulo no cambia datos ni permisos por rol, y el menú se actualiza sin esperar a que venza la cache.
+> **Ajuste por SPEC 43-post (2026-10-12, cierre):** verificados con build Release (sin warnings nuevos), 2555 unit tests con cobertura de líneas 92,63 %, integración `~PostgreSql` 174/174 (`SystemMenuSeedPostgreSqlTests`: base con el menú anterior → nombres nuevos, mismos `Id`, sin duplicados, permisos intactos, cada opción en su módulo, idempotente; `SidebarMenuPostgreSqlTests`: desactivar/reactivar `Tickets`, SuperAdmin sin filtro, `SuperAdminCompany` 403 al modificar y solo su empresa al leer) y verificación con Docker sobre una copia de una base existente con el menú anterior: migración `AddSystemModuleIsBase`, módulos renombrados con `IsBase`, 38 opciones con los mismos `Id` repartidas en sus cuatro módulos, permisos por rol idénticos (salvo `OrderMenu`), y el menú del Manager pierde `TicketManagement` al desactivar `Tickets` y lo recupera al reactivarlo, sin esperar a la cache.
+
+- [x] `SystemModule` tiene `IsBase`; `Administration`, `Customers`, `Tickets` y `Security` son base; `Calendar` no (el módulo lo crea SPEC 44-post con `IsBase = false`).
+- [x] La seed inicial asigna a las empresas solo módulos base, y no desactiva ni borra asignaciones existentes.
+- [x] Cada `SystemOption` tiene el `ModuleId` de su módulo real; ninguna opción de Tickets, Clientes, Seguridad o Calendario queda bajo `Administration`.
+- [x] Después de la seed, una base existente tiene los nombres y rutas en inglés con guion, sin filas duplicadas, con los mismos `Id` y con sus `RoleSystemOptions` intactos.
+- [x] Ningún `ControllerName` cambió y los permisos vigentes siguen funcionando.
+- [x] El menú de un usuario no SuperAdmin no muestra opciones de módulos inactivos o no asignados a su empresa, ni padres sin hijos visibles.
+- [x] El menú del SuperAdmin muestra todas las opciones.
+- [x] Solo el SuperAdmin puede crear, activar, desactivar o borrar asignaciones de módulos; `SuperAdminCompany` solo consulta las de su empresa.
+- [x] Desactivar y reactivar un módulo no cambia datos ni permisos por rol, y el menú se actualiza sin esperar a que venza la cache.
 
 ---
 

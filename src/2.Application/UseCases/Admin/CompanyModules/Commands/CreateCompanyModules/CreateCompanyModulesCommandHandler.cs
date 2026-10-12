@@ -15,7 +15,10 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
 /// <param name="currentUserService">Resolves the JWT-driven tenant and role context.</param>
-public sealed class CreateCompanyModulesCommandHandler(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
+public sealed class CreateCompanyModulesCommandHandler(
+    IUnitOfWork unitOfWork,
+    ICurrentUserService currentUserService,
+    CompanyPermissionCacheInvalidator cacheInvalidator)
     : IRequestHandler<CreateCompanyModulesCommand, Response<CompanyModuleDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
@@ -76,6 +79,9 @@ public sealed class CreateCompanyModulesCommandHandler(IUnitOfWork unitOfWork, I
             return Response<CompanyModuleDto>.Error("CREATE_FAILED", ["No records were affected while creating the company module assignment."]);
         }
 
+        // SPEC 43: the company's menu and permissions change right away, not when the cache expires.
+        await cacheInvalidator.InvalidateAsync(entity.CompanyId, cancellationToken);
+
         return new Response<CompanyModuleDto>
         {
             IsSuccess = true,
@@ -87,6 +93,7 @@ public sealed class CreateCompanyModulesCommandHandler(IUnitOfWork unitOfWork, I
                 CompanyName = company.Name,
                 ModuleId = entity.ModuleId,
                 ModuleName = module.Name,
+                IsBase = module.IsBase,
                 IsActive = entity.IsActive,
                 CreatedAt = entity.Created
             }

@@ -101,6 +101,7 @@ public static class ConfigureServices
         services.AddScoped<TicketCodeGenerator>();
         services.AddScoped<SoftDeleteRestorer>();
         services.AddScoped<RolePermissionCacheInvalidator>();
+        services.AddScoped<CompanyPermissionCacheInvalidator>();
         services.AddScoped<PersonCascadeCoordinator>();
         services.AddScoped<SystemOptionCascadeCoordinator>();
         services.AddScoped<TicketCascadeCoordinator>();

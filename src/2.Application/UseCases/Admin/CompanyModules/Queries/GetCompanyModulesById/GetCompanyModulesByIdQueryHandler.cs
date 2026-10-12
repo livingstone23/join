@@ -23,7 +23,11 @@ public sealed class GetCompanyModulesByIdQueryHandler(
     /// <returns>A standardized response containing the matching assignment when it exists.</returns>
     public async Task<Response<CompanyModuleDto>> Handle(GetCompanyModulesByIdQuery request, CancellationToken cancellationToken)
     {
-        if (request.CompanyId == Guid.Empty)
+        // SPEC 43: a SuperAdmin reads any company's assignment; anybody else only the ones of their own company.
+        var isSuperAdmin = currentUserService.IsInRole("SuperAdmin");
+        var companyId = isSuperAdmin ? request.CompanyId : currentUserService.CompanyId;
+
+        if (!isSuperAdmin && companyId == Guid.Empty)
         {
             return Response<CompanyModuleDto>.Error(
                 "INVALID_COMPANY_ID",
@@ -36,6 +40,8 @@ public sealed class GetCompanyModulesByIdQueryHandler(
             ? string.Empty
             : "AND cm.GcRecord = 0";
 
+        var companyOnly = companyId.HasValue ? "AND cm.CompanyId = @CompanyId" : string.Empty;
+
         var sql = $"""
             SELECT
                 cm.Id,
@@ -44,6 +50,7 @@ public sealed class GetCompanyModulesByIdQueryHandler(
                 c.Name AS CompanyName,
                 cm.ModuleId,
                 sm.Name AS ModuleName,
+                sm.IsBase,
                 cm.IsActive,
                 cm.Created AS CreatedAt
             FROM Admin.CompanyModules cm
@@ -54,12 +61,12 @@ public sealed class GetCompanyModulesByIdQueryHandler(
                 ON sm.Id = cm.ModuleId
                AND sm.GcRecord = 0
             WHERE cm.Id = @Id
-              AND cm.CompanyId = @CompanyId
+              {companyOnly}
               {activeOnly};
             """;
 
         var entity = await connection.QuerySingleOrDefaultAsync<CompanyModuleDto>(
-            new CommandDefinition(sql, new { request.Id, request.CompanyId }, cancellationToken: cancellationToken));
+            new CommandDefinition(sql, new { request.Id, CompanyId = companyId }, cancellationToken: cancellationToken));
 
         if (entity is null)
         {

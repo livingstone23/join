@@ -20,7 +20,23 @@ public sealed class GetSidebarMenuQueryHandler(
     IMemoryCache memoryCache)
     : IRequestHandler<GetSidebarMenuQuery, Response<IReadOnlyCollection<MenuOptionResponse>>>
 {
-    private const string DirectPermissionsSql = """
+    /// <summary>
+    /// SPEC 43: options of modules the company does not have active (or not assigned at all) are left out.
+    /// Applied to every user except the SuperAdmin, whose menu is never filtered (A8).
+    /// </summary>
+    private const string CompanyModuleFilterSql = """
+        INNER JOIN Admin.SystemModules sm
+            ON sm.Id = so.ModuleId
+           AND sm.IsActive = TRUE
+           AND sm.GcRecord = 0
+        INNER JOIN Admin.CompanyModules cm
+            ON cm.ModuleId = sm.Id
+           AND cm.CompanyId = @CompanyId
+           AND cm.IsActive = TRUE
+           AND cm.GcRecord = 0
+        """;
+
+    private const string DirectPermissionsSqlTemplate = """
         SELECT
             so.Id,
             so.Name,
@@ -41,6 +57,7 @@ public sealed class GetSidebarMenuQueryHandler(
            AND urc.UserId = @UserId
            AND urc.CompanyId = @CompanyId
            AND urc.GcRecord = 0
+        {0}
         WHERE so.GcRecord = 0
           AND so.IsVisibleMenu = TRUE
         GROUP BY
@@ -100,8 +117,12 @@ public sealed class GetSidebarMenuQueryHandler(
             parameters.Add("UserId", userId);
             parameters.Add("CompanyId", companyId);
 
+            // SPEC 43: the SuperAdmin menu is not filtered by company modules (A8).
+            var filterByCompanyModules = !currentUserService.IsInRole("SuperAdmin");
+            var directPermissionsSql = BuildDirectPermissionsSql(filterByCompanyModules);
+
             var rows = (await connection.QueryAsync<SidebarMenuSqlRow>(
-                new CommandDefinition(DirectPermissionsSql, parameters, cancellationToken: cancellationToken)))
+                new CommandDefinition(directPermissionsSql, parameters, cancellationToken: cancellationToken)))
                 .AsList();
 
             if (rows.Count == 0)
@@ -113,7 +134,7 @@ public sealed class GetSidebarMenuQueryHandler(
                 new CommandDefinition(AllSystemOptionsSql, cancellationToken: cancellationToken)))
                 .AsList();
 
-            return BuildTree(rows, allOptions);
+            return BuildTree(rows, allOptions, pruneEmptyParents: filterByCompanyModules);
         }) ?? [];
 
         return new Response<IReadOnlyCollection<MenuOptionResponse>>
@@ -124,9 +145,17 @@ public sealed class GetSidebarMenuQueryHandler(
         };
     }
 
+    /// <summary>
+    /// Direct-permission query; with <paramref name="filterByCompanyModules"/> it only keeps options of modules
+    /// that are active and assigned to the company (SPEC 43).
+    /// </summary>
+    private static string BuildDirectPermissionsSql(bool filterByCompanyModules) =>
+        DirectPermissionsSqlTemplate.Replace("{0}", filterByCompanyModules ? CompanyModuleFilterSql : string.Empty, StringComparison.Ordinal);
+
     private static IReadOnlyCollection<MenuOptionResponse> BuildTree(
         IReadOnlyCollection<SidebarMenuSqlRow> rows,
-        IReadOnlyCollection<SystemOptionHierarchyRow> allOptions)
+        IReadOnlyCollection<SystemOptionHierarchyRow> allOptions,
+        bool pruneEmptyParents)
     {
         var lookup = new Dictionary<Guid, MenuOptionResponse>(rows.Count);
         var optionIndex = allOptions.ToDictionary(option => option.Id);
@@ -170,8 +199,39 @@ public sealed class GetSidebarMenuQueryHandler(
             roots.Add(item);
         }
 
+        if (pruneEmptyParents)
+        {
+            // SPEC 43: a menu parent (an option that has children in the catalog) is shown only when at least
+            // one child survived the module filter — no empty parents.
+            var parentIds = allOptions
+                .Where(option => option.ParentId.HasValue)
+                .Select(option => option.ParentId!.Value)
+                .ToHashSet();
+            roots = PruneEmptyParents(roots, parentIds);
+        }
+
         SortTree(roots);
         return roots;
+    }
+
+    private static List<MenuOptionResponse> PruneEmptyParents(List<MenuOptionResponse> nodes, IReadOnlySet<Guid> parentIds)
+    {
+        var kept = new List<MenuOptionResponse>(nodes.Count);
+        foreach (var node in nodes)
+        {
+            var children = PruneEmptyParents(node.Children, parentIds);
+            node.Children.Clear();
+            node.Children.AddRange(children);
+
+            if (parentIds.Contains(node.Id) && node.Children.Count == 0)
+            {
+                continue;
+            }
+
+            kept.Add(node);
+        }
+
+        return kept;
     }
 
     /// <summary>

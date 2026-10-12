@@ -298,6 +298,106 @@ public sealed class GetSidebarMenuQueryHandlerTests : IDisposable
         result.Data.Should().ContainSingle().Which.Id.Should().Be(visibleRootId);
     }
 
+    // ── SPEC 43: company modules ─────────────────────────────────────────────
+
+    /// <summary>
+    /// SPEC 43: for a non-SuperAdmin the direct-permission query only keeps options of modules that are active
+    /// and assigned (active) to the company. With no rows the hierarchy query never runs, so the last command is
+    /// the direct-permission one.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenUserIsNotSuperAdmin_ShouldFilterByActiveCompanyModules()
+    {
+        SetupAuthenticatedUser();
+        _currentUserMock.Setup(x => x.IsInRole("SuperAdmin")).Returns(false);
+        _fakeConnection.SetResults(FakeResultSet.Empty("Id", "Name", "Icon", "ControllerName", "ParentId", "CanRead", "CanCreate", "CanUpdate", "CanDelete"));
+
+        await CreateHandler().Handle(new GetSidebarMenuQuery(), CancellationToken.None);
+
+        _fakeConnection.LastCommandText.Should().Contain("INNER JOIN Admin.SystemModules sm");
+        _fakeConnection.LastCommandText.Should().Contain("sm.IsActive = TRUE");
+        _fakeConnection.LastCommandText.Should().Contain("INNER JOIN Admin.CompanyModules cm");
+        _fakeConnection.LastCommandText.Should().Contain("cm.CompanyId = @CompanyId");
+        _fakeConnection.LastCommandText.Should().Contain("cm.IsActive = TRUE");
+        _fakeConnection.LastCommandText.Should().Contain("cm.GcRecord = 0");
+    }
+
+    /// <summary>
+    /// SPEC 43 (A8): the SuperAdmin menu is never filtered by company modules.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenUserIsSuperAdmin_ShouldNotFilterByCompanyModules()
+    {
+        SetupAuthenticatedUser();
+        _currentUserMock.Setup(x => x.IsInRole("SuperAdmin")).Returns(true);
+        _fakeConnection.SetResults(FakeResultSet.Empty("Id", "Name", "Icon", "ControllerName", "ParentId", "CanRead", "CanCreate", "CanUpdate", "CanDelete"));
+
+        await CreateHandler().Handle(new GetSidebarMenuQuery(), CancellationToken.None);
+
+        _fakeConnection.LastCommandText.Should().NotContain("Admin.CompanyModules");
+        _fakeConnection.LastCommandText.Should().Contain("Security.RoleSystemOptions");
+    }
+
+    /// <summary>
+    /// SPEC 43: a menu parent whose children are all left out is not shown to a non-SuperAdmin.
+    /// The child is hidden through IsVisibleMenu because the fake serves one result set to both queries.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenParentHasNoVisibleChildren_ShouldHideTheParentForNonSuperAdmin()
+    {
+        SetupAuthenticatedUser();
+        _currentUserMock.Setup(x => x.IsInRole("SuperAdmin")).Returns(false);
+        var parentId = Guid.NewGuid();
+        var rootId = Guid.NewGuid();
+        _fakeConnection.SetResults(FakeResultSet.FromRows(
+            WithVisibility(MakeSidebarRow(parentId, "Tickets parent"), true),
+            WithVisibility(MakeSidebarRow(Guid.NewGuid(), "Hidden child", parentId: parentId), false),
+            WithVisibility(MakeSidebarRow(rootId, "Standalone"), true)));
+
+        var result = await CreateHandler().Handle(new GetSidebarMenuQuery(), CancellationToken.None);
+
+        result.Data.Should().ContainSingle().Which.Id.Should().Be(rootId);
+    }
+
+    /// <summary>
+    /// SPEC 43: a parent with at least one visible child stays, nested children included.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenParentHasVisibleChildren_ShouldKeepTheParent()
+    {
+        SetupAuthenticatedUser();
+        _currentUserMock.Setup(x => x.IsInRole("SuperAdmin")).Returns(false);
+        var parentId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        _fakeConnection.SetResults(FakeResultSet.FromRows(
+            WithVisibility(MakeSidebarRow(parentId, "Tickets parent"), true),
+            WithVisibility(MakeSidebarRow(childId, "Tickets", parentId: parentId), true)));
+
+        var result = await CreateHandler().Handle(new GetSidebarMenuQuery(), CancellationToken.None);
+
+        var parent = result.Data.Should().ContainSingle().Subject;
+        parent.Id.Should().Be(parentId);
+        parent.Children.Should().ContainSingle().Which.Id.Should().Be(childId);
+    }
+
+    /// <summary>
+    /// SPEC 43 (A8): the SuperAdmin keeps every parent, even without visible children.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenSuperAdminParentHasNoVisibleChildren_ShouldKeepTheParent()
+    {
+        SetupAuthenticatedUser();
+        _currentUserMock.Setup(x => x.IsInRole("SuperAdmin")).Returns(true);
+        var parentId = Guid.NewGuid();
+        _fakeConnection.SetResults(FakeResultSet.FromRows(
+            WithVisibility(MakeSidebarRow(parentId, "Tickets parent"), true),
+            WithVisibility(MakeSidebarRow(Guid.NewGuid(), "Hidden child", parentId: parentId), false)));
+
+        var result = await CreateHandler().Handle(new GetSidebarMenuQuery(), CancellationToken.None);
+
+        result.Data.Should().ContainSingle().Which.Id.Should().Be(parentId);
+    }
+
     private static IDictionary<string, object?> WithVisibility(IDictionary<string, object?> row, bool isVisibleMenu)
     {
         row["IsVisibleMenu"] = isVisibleMenu;

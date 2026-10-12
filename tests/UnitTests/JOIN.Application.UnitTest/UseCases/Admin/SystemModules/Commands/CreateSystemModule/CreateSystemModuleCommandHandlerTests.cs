@@ -118,6 +118,7 @@ public sealed class CreateSystemModuleCommandHandlerTests
         response.Data.Description.Should().Be("Person management");
         response.Data.Icon.Should().Be("fa-users");
         response.Data.IsActive.Should().BeTrue();
+        response.Data.IsBase.Should().BeTrue("SPEC 43: the SuperAdmin can mark a module as base from the CRUD");
         response.Data.Order.Should().Be(10);
 
         context.RepositoryMock.Verify(x => x.InsertAsync(It.Is<SystemModule>(entity =>
@@ -125,6 +126,7 @@ public sealed class CreateSystemModuleCommandHandlerTests
             && entity.Description == "Person management"
             && entity.Icon == "fa-users"
             && entity.IsActive
+            && entity.IsBase
             && entity.Order == 10)), Times.Once);
     }
 
@@ -139,6 +141,7 @@ public sealed class CreateSystemModuleCommandHandlerTests
             Description = "  Person management  ",
             Icon = "  fa-users  ",
             IsActive = true,
+            IsBase = true,
             Order = 10
         };
     }

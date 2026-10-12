@@ -334,12 +334,12 @@ Al resolver o vincular:
 
 ```csharp
 // SPEC 45 — endpoints del agente de canales. No visible en menú.
-new("CalendarChannelIntake", "/calendar/channel-intake", "@Icons.Material.Filled.SmartToy", "Calendar", "CalendarChannelIntake", true, true, true, false, IsVisibleMenu: false),
+new("CalendarChannelIntake", "/calendar/channel-intake", "@Icons.Material.Filled.SmartToy", "Calendar", "Calendar", "CalendarChannelIntake", true, true, true, false, IsVisibleMenu: false),
 // SPEC 45 — bandeja de personas creadas por canal.
-new("PendingPersons", "/customers/pending-persons", "@Icons.Material.Filled.PersonSearch", "CustomersMenu", "PersonPendingConfirmations", true, false, true, false),
+new("PendingPersons", "/customers/pending-persons", "@Icons.Material.Filled.PersonSearch", "Customers", "CustomersMenu", "PersonPendingConfirmations", true, false, true, false),
 ```
 
-Nombres y rutas en inglés con guion (decisión del usuario, 2026-10-01; SPEC 43). `CalendarChannelIntake` declara `ModuleName = "Calendar"`; `PendingPersons` declara `ModuleName = "Customers"` y cuelga del padre `CustomersMenu` (ruta `/customers`), que SPEC 43 renombra desde `Persons`/`/Clientes`.
+Nombres y rutas en inglés con guion (decisión del usuario, 2026-10-01; SPEC 43). `CalendarChannelIntake` declara `ModuleName = "Calendar"`; `PendingPersons` declara `ModuleName = "Customers"` y cuelga del padre `CustomersMenu` (ruta `/customers`), que SPEC 43 renombra desde `Persons`/`/Clientes`. **Ajuste por SPEC 43-post (2026-10-12):** el ejemplo usa la firma implementada de `SystemOptionSeed`: `(Name, Route, Icon, ModuleName, ParentName, ControllerName, …)`.
 
 **`RoleSystemOptions`** (Read, Create, Update, Delete). Las filas referencian el nombre de la opción: `CalendarChannelIntake` y `PendingPersons`:
 
