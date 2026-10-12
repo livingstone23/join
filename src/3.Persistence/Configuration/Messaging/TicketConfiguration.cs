@@ -37,6 +37,18 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Property(t => t.Name).IsRequired().HasMaxLength(150);
         builder.Property(t => t.Description).HasMaxLength(2000);
 
+        // SPEC 47 — dedup key for tickets created by external channels (Twilio MessageSid,
+        // SendGrid Message-ID). Null for tickets created in JOIN; the filter ignores them so
+        // a ticket without an ExternalMessageId never blocks another ticket without one.
+        builder.Property(t => t.ExternalMessageId)
+            .HasMaxLength(200)
+            .IsRequired(false);
+
+        builder.HasIndex(t => new { t.CompanyId, t.ChannelId, t.ExternalMessageId })
+            .IsUnique()
+            .HasFilter("\"externalmessageid\" IS NOT NULL AND \"gcrecord\" = 0")
+            .HasDatabaseName("UX_Tickets_Company_Channel_ExternalMessageId_Active");
+
         builder.Property(t => t.EstimatedTime).HasPrecision(18, 2);
         builder.Property(t => t.ConsumedTime).HasPrecision(18, 2);
         builder.Property(t => t.EffortPoints).HasColumnType("decimal(5,1)").IsRequired(false);

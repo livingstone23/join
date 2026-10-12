@@ -42,6 +42,7 @@ public partial class TicketMapper : ITicketMapper
     [MapperIgnoreTarget(nameof(Ticket.Notifications))]
     [MapperIgnoreTarget(nameof(Ticket.ChildTickets))]
     [MapperIgnoreTarget(nameof(Ticket.TicketStatusId))]
+    [MapperIgnoreTarget(nameof(Ticket.ExternalMessageId))]
     [MapperIgnoreSource(nameof(CreateTicketCommand.TicketStatusId))]
     public partial Ticket ToEntity(CreateTicketCommand command);
 
@@ -71,6 +72,7 @@ public partial class TicketMapper : ITicketMapper
     [MapperIgnoreTarget(nameof(Ticket.PrecedentTicket))]
     [MapperIgnoreTarget(nameof(Ticket.Notifications))]
     [MapperIgnoreTarget(nameof(Ticket.ChildTickets))]
+    [MapperIgnoreTarget(nameof(Ticket.ExternalMessageId))]
     [MapperIgnoreSource(nameof(UpdateTicketCommand.Id))]
     public partial void ApplyUpdate(UpdateTicketCommand command, Ticket ticket);
 

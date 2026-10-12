@@ -1495,3 +1495,107 @@ curl -s -X POST "$BASE_URL/api/v1/CalendarUserNonWorkingPeriods/me" \
 | `CALENDAR_OTHERS_PERMISSION_REQUIRED` | 403 | Status change from the panel without CalendarOthers.CanUpdate |
 | `CALENDAR_INVALID_LINK` | 400 | A linked Person/Customer/Ticket/Project belongs to another company (or is missing) |
 | `MODULE_NOT_ENABLED` | 403 | Calendar module inactive for the company (SPEC 48) |
+
+## Canales de ingesta de tickets (SPEC 47)
+
+End-to-end de la ingesta automática de tickets desde canales externos (WhatsApp
+vía Twilio, correo vía SendGrid Inbound Parse). El operador de la empresa
+configura los `TicketInboundChannel` desde el CRUD autenticado; los proveedores
+externos disparan `POST /api/v1/inbound/{whatsapp|email}/{token}`, sin JWT, y
+el sistema crea el ticket sin intervención humana.
+
+El orden de configuración correcto es `TicketCompanyDefault` →
+`TicketUserCompany` (al menos un `IsSuperAdminTicket`) → `TicketAttachmentSettings`
+→ `TicketInboundChannel`. Sin el roster de tickets o los defaults completos,
+los webhooks devuelven `400` explícito (no se pierde el mensaje silenciosamente).
+
+### 1. Configuración de canal
+
+```bash
+# 1.1 Listar canales configurados (token siempre enmascarado).
+#     No hay paginación: a lo sumo una fila activa por (CompanyId, ChannelId)
+#     por el índice único filtrado. includeDeleted=true incluye soft-deleted.
+curl -s "$BASE_URL/api/v1/TicketInboundChannels" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+# 1.2 Crear un canal (devuelve el token y la URL del webhook — el token solo
+#     se devuelve una vez). El `code` del canal (WHATSAPP / SENDGRID) determina
+#     el segmento de URL. Devuelve 201 con { id, companyId, channelId,
+#     channelCode, channelName, description, webhookToken, webhookUrl, createdAt }.
+curl -s -X POST "$BASE_URL/api/v1/TicketInboundChannels" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{ "channelId": "'"$WHATSAPP_CHANNEL_ID"'", "description": "WhatsApp Business" }'
+# El webhookUrl devuelto tiene esta forma:
+#   https://api.join.local/api/v1/inbound/whatsapp/{token}
+# y es la URL que hay que registrar en Twilio (Messaging → Webhook → "A MESSAGE COMES IN").
+
+# 1.3 Eliminar (soft delete). Invalida el token de inmediato: el siguiente
+#     request del proveedor al webhook con ese token responde 404.
+curl -s -X DELETE "$BASE_URL/api/v1/TicketInboundChannels/$CHANNEL_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+# 404 TICKET_INBOUND_CHANNEL_NOT_FOUND si el id no existe, está soft-deleted
+# o pertenece a otra empresa.
+```
+
+### 2. Webhook de WhatsApp (Twilio)
+
+```bash
+# 2.1 Reenviar un mensaje entrante al endpoint del webhook.
+# NOTA: este endpoint es [AllowAnonymous]; no lleva token de JOIN.
+# El proveedor (Twilio) ya añade el sufijo `{token}` al URL registrado.
+# Devuelve 200 con { ticketId, ticketCode, isDuplicate } si el request es
+# válido y la empresa tiene `TicketUserCompany.IsSuperAdminTicket` configurado.
+# Devuelve 400 NO_TICKET_ADMIN_CONFIGURED si nadie es super admin de tickets.
+# Devuelve 400 TICKET_DEFAULTS_NOT_CONFIGURED si `TicketCompanyDefault` falta.
+# Devuelve 400 MISSING_MESSAGE_SID si Twilio no envió el MessageSid.
+# Devuelve 404 desnudo si el `WebhookToken` no existe, está soft-deleted,
+# o corresponde a un canal cuyo Code no es WHATSAPP.
+
+curl -s -X POST "$BASE_URL/api/v1/inbound/whatsapp/$TOKEN" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d 'From=whatsapp:+50588887777' \
+  -d 'Body=Quiero una cita para revisar mi contrato' \
+  -d 'MessageSid=wamid.HBgM...' \
+  -d 'NumMedia=0'
+# Si la misma MessageSid llega otra vez, devuelve el mismo ticketCode con
+# isDuplicate=true (sin crear un segundo ticket).
+```
+
+### 3. Webhook de correo (SendGrid Inbound Parse)
+
+```bash
+# 3.1 SendGrid envía el correo como multipart/form-data. La parte de texto se
+# mapea a `text` (o `html` si text está vacío); los adjuntos se enumeran como
+# `attachment1`, `attachment2`, ... El `Message-ID` del header se usa como
+# ExternalMessageId; si no aparece, se calcula un hash determinista de
+# (from + subject + body) para mantener la deduplicación.
+
+curl -s -X POST "$BASE_URL/api/v1/inbound/email/$TOKEN" \
+  -F "from=Ana López <ana@correo.com>" \
+  -F "subject=Necesito ayuda con mi factura" \
+  -F "text=Hola, mi factura de octubre..." \
+  -F "attachments=1" \
+  -F "attachment1=@./factura.pdf;type=application/pdf"
+# Devuelve 200 con { ticketId, ticketCode, isDuplicate }.
+# Devuelve 400 MISSING_BODY si SendGrid no envió ni text ni html.
+# Devuelve 404 desnudo si el WebhookToken no existe, está soft-deleted, o
+# corresponde a un canal cuyo Code no es SENDGRID.
+```
+
+### 4. Códigos de error
+
+| Code | HTTP | Cuándo |
+|------|------|--------|
+| `TICKET_INBOUND_UNSUPPORTED_CHANNEL` | 400 | El `code` del canal no es `WHATSAPP` ni `SENDGRID`. |
+| `INBOUND_CHANNEL_ALREADY_ACTIVE` | 409 | Ya existe un `TicketInboundChannel` activo para `(CompanyId, ChannelId)`. |
+| `TICKET_INBOUND_CHANNEL_NOT_FOUND` | 404 | El `id` de `TicketInboundChannel` no existe, está soft-deleted o pertenece a otra empresa. |
+| `TICKET_INBOUND_INVALID_TOKEN` | 404 | El token del webhook no existe, está soft-deleted, o el `Code` del canal no coincide con el segmento de la ruta (`whatsapp`/`email`). |
+| `TICKET_INBOUND_PAYLOAD_INVALID` | 400 | El body del proveedor es malformado (Twilio sin `MessageSid` o SendGrid sin `text`/`html`). |
+| `NO_TICKET_ADMIN_CONFIGURED` | 400 | La empresa no tiene ningún `TicketUserCompany.IsSuperAdminTicket`. |
+| `TICKET_DEFAULTS_NOT_CONFIGURED` | 400 | Faltan campos obligatorios en `TicketCompanyDefault`. |
+| `MODULE_NOT_ENABLED` | 403 | El módulo `Tickets` no está activo en la empresa. |
+| `COMPANY_REQUIRED` | 401 | El CRUD autenticado se llamó sin `CompanyId` (token sin claim, `X-Company-Id` ausente). |

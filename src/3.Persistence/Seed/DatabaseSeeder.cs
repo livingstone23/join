@@ -3276,7 +3276,11 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("CalendarPanel", "/calendar/panel", "@Icons.Material.Filled.ViewTimeline", "Calendar", "Calendar", "CalendarOthers", true, true, true, true),
         new("ActivityConfirmation", "/calendar/activity-confirmation", "@Icons.Material.Filled.EventAvailable", "Calendar", "Calendar", "CalendarActivityConfirmation", false, false, true, false, IsVisibleMenu: false),
         new("CalendarSettings", "/calendar/settings", "@Icons.Material.Filled.EditCalendar", "Calendar", "Calendar", "CalendarSettings", true, true, true, true, CanExecute: true),
-        new("CalendarCatalogs", "/calendar/catalogs", "@Icons.Material.Filled.Category", "Calendar", "Calendar", "CalendarCatalogs", true, true, true, true)
+        new("CalendarCatalogs", "/calendar/catalogs", "@Icons.Material.Filled.Category", "Calendar", "Calendar", "CalendarCatalogs", true, true, true, true),
+
+        // SPEC 47 — endpoint para gestionar canales de ingesta inbound de tickets (Twilio WhatsApp, SendGrid email).
+        // CanUpdate queda en false por diseño: rotar un token de webhook es soft-delete + create, no update in-place.
+        new("TicketInboundChannels", "/tickets/ticket-inbound-channels", "@Icons.Material.Filled.Webhook", "Tickets", "TicketManagement", "TicketInboundChannels", true, true, false, true)
 
     ];
 
@@ -3393,6 +3397,15 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("UsuarioSimple", "TicketUserCompanies", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         // SPEC 37 — UsuarioSimple solo lee, sin Download/Export/Execute.
         new("UsuarioSimple", "TicketStatusTransitions", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+
+        // SPEC 47 — canales de ingesta inbound (Twilio WhatsApp, SendGrid email). CanUpdate=false
+        // por diseño: rotar es delete + create. Admin y SuperAdminCompany reciben acceso total vía
+        // PrivilegedRoleNames; Agent y Person no tienen fila (denegado por defecto).
+        new("SuperAdmin", "TicketInboundChannels", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "TicketInboundChannels", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("Supervisor", "TicketInboundChannels", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("Coordinador", "TicketInboundChannels", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "TicketInboundChannels", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
 
         // SPEC 36 — adjuntos de tickets por rol. TicketAttachmentSettings es la config
         // singleton por empresa (no endpoint de descarga propio); TicketDocuments es

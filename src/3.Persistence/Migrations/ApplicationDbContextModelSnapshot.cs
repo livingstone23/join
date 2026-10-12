@@ -2862,6 +2862,11 @@ namespace JOIN.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("estimatedtime");
 
+                    b.Property<string>("ExternalMessageId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("externalmessageid");
+
                     b.Property<int>("GcRecord")
                         .HasColumnType("integer")
                         .HasColumnName("gcrecord");
@@ -2944,6 +2949,11 @@ namespace JOIN.Persistence.Migrations
                     b.HasIndex("CompanyId", "Code")
                         .IsUnique()
                         .HasDatabaseName("ix_tickets_companyid_code");
+
+                    b.HasIndex("CompanyId", "ChannelId", "ExternalMessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tickets_company_channel_externalmessageid_active")
+                        .HasFilter("\"externalmessageid\" IS NOT NULL AND \"gcrecord\" = 0");
 
                     b.ToTable("tickets", "messaging");
                 });
@@ -3178,6 +3188,71 @@ namespace JOIN.Persistence.Migrations
                         .HasFilter("\"gcrecord\" = 0");
 
                     b.ToTable("ticketcomplexities", "messaging");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Messaging.TicketInboundChannel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ChannelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("channelid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("WebhookToken")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("webhooktoken");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ticketinboundchannels");
+
+                    b.HasIndex("ChannelId")
+                        .HasDatabaseName("ix_ticketinboundchannels_channelid");
+
+                    b.HasIndex("WebhookToken")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ticketinboundchannels_token_active")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "ChannelId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ticketinboundchannels_company_channel_active")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("ticketinboundchannels", "messaging");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Messaging.TicketStatus", b =>
@@ -5917,6 +5992,27 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("TimeUnit");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Messaging.TicketInboundChannel", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.CommunicationChannel", "Channel")
+                        .WithMany()
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ticketinboundchannels_communicationchannels_channelid");
+
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ticketinboundchannels_companies_companyid");
+
+                    b.Navigation("Channel");
+
+                    b.Navigation("Company");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Messaging.TicketStatus", b =>

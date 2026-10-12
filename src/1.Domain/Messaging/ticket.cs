@@ -1,6 +1,3 @@
-
-
-
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
@@ -9,11 +6,7 @@ using JOIN.Domain.Exceptions;
 using JOIN.Domain.Security;
 using JOIN.Domain.Support;
 
-
-
 namespace JOIN.Domain.Messaging;
-
-
 
 /// <summary>
 /// Represents a service request with advanced tracking, SLAs, and multi-channel support.
@@ -45,17 +38,25 @@ public class Ticket : BaseTenantEntity
     public Guid? ProjectId { get; set; } // Opcional
     public Guid? AreaId { get; set; }    // Opcional
     public Guid ChannelId { get; set; } // Canal de creación (Bot, Web, etc.)
-    
+
     /// <summary> Link to the parent Ticket if this is a follow-up. </summary>
     public Guid? PrecedentTicketId { get; set; }
 
     /// <summary>
-    /// Indicates whether this Ticket is visible to external users (e.g., customers) 
+    /// Deduplication key for tickets created by external channels (Twilio MessageSid,
+    /// SendGrid Message-ID, SHA-256 fallback). Null for tickets created in JOIN.
+    /// Unique together with <see cref="ChannelId"/> per tenant via a filter index
+    /// (see SPEC 47 "Data model - Ticket.ExternalMessageId").
+    /// </summary>
+    public string? ExternalMessageId { get; set; }
+
+    /// <summary>
+    /// Indicates whether this Ticket is visible to external users (e.g., customers)
     /// through a self-service portal or external tracking system.
     /// </summary>
     public bool IsVisibleToExternals { get; set; } = false;
-    
-    
+
+
     // --- Ownership ---
     public Guid CreatedByUserId { get; set; } // Usuario creó
     public Guid? AssignedToUserId { get; set; } // Usuario gestiona
@@ -73,7 +74,7 @@ public class Ticket : BaseTenantEntity
     public virtual TicketStatus Status { get; set; } = null!;
     public virtual TicketComplexity Complexity { get; set; } = null!;
     public virtual TimeUnit TimeUnit { get; set; } = null!;
-    
+
     public virtual Ticket? PrecedentTicket { get; set; }
     public virtual ICollection<TicketNotification> Notifications { get; set; } = new List<TicketNotification>();
 

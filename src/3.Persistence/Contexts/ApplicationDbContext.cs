@@ -113,6 +113,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<TicketUserCompany> TicketUserCompanies => Set<TicketUserCompany>();
     public DbSet<TicketAttachmentSettings> TicketAttachmentSettings => Set<TicketAttachmentSettings>();
     public DbSet<TicketDocument> TicketDocuments => Set<TicketDocument>();
+    public DbSet<TicketInboundChannel> TicketInboundChannels => Set<TicketInboundChannel>();
 
 
 
@@ -263,6 +264,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<TicketAttachmentSettings>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<TicketDocument>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<TicketStatusTransition>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<TicketInboundChannel>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
         // Security / Tenant-scoped config
         // RoleCompany & CompanyModule carry CompanyId and are tenant-owned. SuperAdmin cross-tenant reads
