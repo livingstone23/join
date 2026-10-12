@@ -30,7 +30,7 @@ public sealed class PersonPendingConfirmationConfiguration : IEntityTypeConfigur
             .HasFilter("\"status\" = 1 AND \"gcrecord\" = 0")
             .HasDatabaseName("UX_PersonPendingConfirmations_Company_Person_Pending");
 
-        // Bandeira lookup of the paged tray.
+        // Inbox lookup (paged, most recent first).
         builder.HasIndex(x => new { x.CompanyId, x.Status, x.RequestedUtc })
             .HasFilter("\"gcrecord\" = 0")
             .HasDatabaseName("IX_PersonPendingConfirmations_Company_Status_RequestedUtc");

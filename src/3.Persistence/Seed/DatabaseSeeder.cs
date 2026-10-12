@@ -3110,7 +3110,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "Test", "supervisor@join.com", "ABCabc123*", "Supervisor", false),
         new("SimpleUser", "Test", "simpleuser@join.com", "ABCabc123*", "UsuarioSimple", false),
         // SPEC 45 — service user for the channel agent.
-        new("Agent", "Dev", "agent@join.local", "ABCabc123*", "Agent", false)
+        new("Agent", "Dev", "agent@join.com", "ABCabc123*", "Agent", false)
     ];
 
     private static List<RoleSystemOptionSeed> GetAdminFullSystemOptionPermissionSeeds()
@@ -3432,20 +3432,13 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("UsuarioSimple", "MyCalendar", true, true, true, true),
         new("UsuarioSimple", "ActivityConfirmation", false, false, true, false),
 
-        // SPEC 45 — channel agent (CalendarChannelIntake) and pending-persons inbox. Admin and
-        // SuperAdminCompany get full access through PrivilegedRoleNames; Agent now has the
-        // intake rows (no CanDelete, no PendingPersons — that's the supervisor's job).
+        // SPEC 45 — channel agent (CalendarChannelIntake, no CanDelete) and pending-persons inbox (read + update).
+        // Admin and SuperAdminCompany get full access through PrivilegedRoleNames; the agent gets nothing else.
         new("SuperAdmin", "CalendarChannelIntake", true, true, true, false),
         new("SuperAdmin", "PendingPersons", true, false, true, false),
         new("Agent", "CalendarChannelIntake", true, true, true, false),
-        new("Manager", "CalendarChannelIntake", false, false, false, false),
         new("Manager", "PendingPersons", true, false, true, false),
-        new("Supervisor", "CalendarChannelIntake", false, false, false, false),
-        new("Supervisor", "PendingPersons", true, false, true, false),
-        new("Coordinador", "CalendarChannelIntake", false, false, false, false),
-        new("Coordinador", "PendingPersons", true, false, true, false),
-        new("UsuarioSimple", "CalendarChannelIntake", false, false, false, false),
-        new("UsuarioSimple", "PendingPersons", false, false, false, false)
+        new("Supervisor", "PendingPersons", true, false, true, false)
 
     ];
 

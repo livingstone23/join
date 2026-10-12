@@ -1,19 +1,17 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Asp.Versioning;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Calendars;
-using JOIN.Application.Interface;
+using JOIN.Application.UseCases.Calendars.ChannelIntake.Commands.CancelIntakeEvent;
+using JOIN.Application.UseCases.Calendars.ChannelIntake.Commands.CreateIntakeEvent;
+using JOIN.Application.UseCases.Calendars.ChannelIntake.Commands.RegisterIntakePerson;
+using JOIN.Application.UseCases.Calendars.ChannelIntake.Commands.RescheduleIntakeEvent;
+using JOIN.Application.UseCases.Calendars.ChannelIntake.Queries.GetIntakeAvailability;
+using JOIN.Application.UseCases.Calendars.ChannelIntake.Queries.GetIntakeCompanies;
+using JOIN.Application.UseCases.Calendars.ChannelIntake.Queries.GetIntakeIdentificationTypes;
+using JOIN.Application.UseCases.Calendars.ChannelIntake.Queries.GetIntakePersonEvents;
+using JOIN.Application.UseCases.Calendars.ChannelIntake.Queries.LookupIntakePerson;
+using JOIN.Application.UseCases.Calendars.ChannelIntake.Queries.LookupIntakeUserByEmail;
 using JOIN.Domain.Security;
-using JOIN.Application.UseCases.Calendars.ChannelIntake;
-using JOIN.Application.UseCases.Calendars.ChannelIntake.GetIntakeAvailability;
-using JOIN.Application.UseCases.Calendars.ChannelIntake.GetIntakeCompanies;
-using JOIN.Application.UseCases.Calendars.ChannelIntake.GetIntakeIdentificationTypes;
-using JOIN.Application.UseCases.Calendars.ChannelIntake.GetIntakePersonEvents;
-using JOIN.Application.UseCases.Calendars.ChannelIntake.LookupIntakePerson;
-using JOIN.Application.UseCases.Calendars.ChannelIntake.LookupIntakeUserByEmail;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -22,169 +20,121 @@ using Microsoft.AspNetCore.Mvc;
 namespace JOIN.Services.WebApi.Controllers.Calendars;
 
 /// <summary>
-/// Endpoints for a channel agent (n8n over WhatsApp / e-mail / SMS) to identify the company, look up
-/// a person, register a new one, and create / reschedule / cancel calendar activities on their behalf
-/// (SPEC 45 F6). Resource <c>CalendarChannelIntake</c>; the <c>GET /companies</c> action is the only
-/// one that bypasses the dynamic authorization filter because the company context is not known yet
-/// and the handler enforces an <c>Agent</c> / <c>SuperAdmin</c> role check.
+/// Endpoints of the channel agent (n8n over WhatsApp, e-mail…) authenticated as a service user with the
+/// <c>Agent</c> role (SPEC 45). The company is the one of the token: the agent lists its companies with
+/// <c>GET /companies</c> and switches with <c>POST /workspaces/switch-company</c>. Resource
+/// <c>CalendarChannelIntake</c>, module <c>Calendar</c> (SPEC 48).
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [PermissionResource("CalendarChannelIntake")]
-public class CalendarChannelIntakeController(ISender sender, ICurrentUserService currentUserService) : ControllerBase
+public class CalendarChannelIntakeController(ISender sender) : ControllerBase
 {
-    /// <summary> Companies the agent can act in. Bypasses the controller filter; the handler enforces Agent / SuperAdmin. </summary>
+    /// <summary>
+    /// Companies of the agent with the calendar operational. Does not depend on the company of the token, so it skips
+    /// the resource check; the handler requires the <c>Agent</c> or <c>SuperAdmin</c> role (403 otherwise).
+    /// </summary>
     [Authorize]
     [SkipDynamicAuthorization]
     [HttpGet("companies")]
     [ProducesResponseType(typeof(Response<IReadOnlyList<IntakeCompanyDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetCompanies(
-        [FromQuery] string? search = null,
-        CancellationToken cancellationToken = default)
-    {
-        if (!currentUserService.IsInRole("Agent") && !currentUserService.IsInRole("SuperAdmin"))
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, Response<IReadOnlyList<IntakeCompanyDto>>.Error(
-                "CALENDAR_INTAKE_AGENT_ROLE_REQUIRED",
-                ["Only Agent or SuperAdmin users can list the intake companies."]));
-        }
+    public async Task<IActionResult> GetCompanies([FromQuery] string? search = null, CancellationToken cancellationToken = default) =>
+        this.ToResult(await sender.Send(new GetIntakeCompaniesQuery(search), cancellationToken));
 
-        var response = await sender.Send(new GetIntakeCompaniesQuery(search), cancellationToken);
-        return this.ToResult(response);
-    }
-
-    /// <summary> Active identification types. </summary>
+    /// <summary> Active identification types, to ask the person for their data. </summary>
     [HttpGet("identification-types")]
     [ProducesResponseType(typeof(Response<IReadOnlyList<IntakeIdentificationTypeDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetIdentificationTypes(
-        [FromHeader(Name = "X-Company-Id")] Guid companyId,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await sender.Send(new GetIntakeIdentificationTypesQuery(), cancellationToken);
-        return this.ToResult(response);
-    }
+    public async Task<IActionResult> GetIdentificationTypes(CancellationToken cancellationToken = default) =>
+        this.ToResult(await sender.Send(new GetIntakeIdentificationTypesQuery(), cancellationToken));
 
-    /// <summary> Look up a person by channel+identifier or by identification. </summary>
+    /// <summary> The person who writes, by channel identifier or by identification. Only id and name. </summary>
     [HttpGet("persons/lookup")]
     [ProducesResponseType(typeof(Response<IntakePersonLookupDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> LookupPerson(
-        [FromHeader(Name = "X-Company-Id")] Guid companyId,
         [FromQuery] string? channelCode = null,
         [FromQuery] string? identifier = null,
         [FromQuery] Guid? identificationTypeId = null,
         [FromQuery] string? identificationNumber = null,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await sender.Send(
-            new LookupIntakePersonQuery(channelCode, identifier, identificationTypeId, identificationNumber),
-            cancellationToken);
-        return this.ToResult(response);
-    }
+        CancellationToken cancellationToken = default) =>
+        this.ToResult(await sender.Send(new LookupIntakePersonQuery(channelCode, identifier, identificationTypeId, identificationNumber), cancellationToken));
 
-    /// <summary> Register a new person + primary contact + review activity (F4). </summary>
+    /// <summary>
+    /// Registers a new person (201). A person that already exists by identification is returned with 200 and
+    /// <c>created = false</c>.
+    /// </summary>
     [HttpPost("persons")]
     [ProducesResponseType(typeof(Response<RegisterIntakePersonDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(Response<RegisterIntakePersonDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> RegisterPerson(
-        [FromHeader(Name = "X-Company-Id")] Guid companyId,
-        [FromBody] RegisterIntakePersonCommand body,
-        CancellationToken cancellationToken = default)
+    public async Task<IActionResult> RegisterPerson([FromBody] RegisterIntakePersonCommand command, CancellationToken cancellationToken = default)
     {
-        var command = body with { CompanyId = companyId };
         var response = await sender.Send(command, cancellationToken);
-        return this.ToCreated(response);
+        return response is { IsSuccess: true, Data.Created: false } ? this.ToResult(response) : this.ToCreated(response);
     }
 
-    /// <summary> Exact email user lookup; no list, no name search. </summary>
+    /// <summary> Exact e-mail of the user who attends the requester. No listing, no search by name. </summary>
     [HttpGet("users/lookup")]
     [ProducesResponseType(typeof(Response<IntakeUserLookupDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> LookupUser(
-        [FromHeader(Name = "X-Company-Id")] Guid companyId,
-        [FromQuery] string email,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await sender.Send(new LookupIntakeUserByEmailQuery(email), cancellationToken);
-        return this.ToResult(response);
-    }
+    public async Task<IActionResult> LookupUser([FromQuery] string? email, CancellationToken cancellationToken = default) =>
+        this.ToResult(await sender.Send(new LookupIntakeUserByEmailQuery(email ?? string.Empty), cancellationToken));
 
-    /// <summary> Free slots of a user for an activity type, at most 14 days. </summary>
+    /// <summary> Free slots of a user (default user without <c>userId</c>) for an activity type, at most 14 days. </summary>
     [HttpGet("availability")]
     [ProducesResponseType(typeof(Response<IntakeAvailabilityDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetAvailability(
-        [FromHeader(Name = "X-Company-Id")] Guid companyId,
-        [FromQuery] Guid? userId,
         [FromQuery] DateTimeOffset from,
         [FromQuery] DateTimeOffset to,
         [FromQuery] string activityCode,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await sender.Send(new GetIntakeAvailabilityQuery(userId, from, to, activityCode), cancellationToken);
-        return this.ToResult(response);
-    }
+        [FromQuery] Guid? userId = null,
+        CancellationToken cancellationToken = default) =>
+        this.ToResult(await sender.Send(new GetIntakeAvailabilityQuery(userId, from, to, activityCode), cancellationToken));
 
-    /// <summary> Create the requested activity. </summary>
+    /// <summary>
+    /// Creates the requested activity (201). A retry with the same <c>originReference</c> returns the existing
+    /// activity with 200 and <c>isDuplicate = true</c>.
+    /// </summary>
     [HttpPost("events")]
     [ProducesResponseType(typeof(Response<CreateIntakeEventDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(Response<CreateIntakeEventDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status422UnprocessableEntity)]
-    public async Task<IActionResult> CreateEvent(
-        [FromHeader(Name = "X-Company-Id")] Guid companyId,
-        [FromBody] CreateIntakeEventCommand body,
-        CancellationToken cancellationToken = default)
+    public async Task<IActionResult> CreateEvent([FromBody] CreateIntakeEventCommand command, CancellationToken cancellationToken = default)
     {
-        var command = body with { CompanyId = companyId };
         var response = await sender.Send(command, cancellationToken);
-        return this.ToCreated(response);
+        return response is { IsSuccess: true, Data.IsDuplicate: true } ? this.ToResult(response) : this.ToCreated(response);
     }
 
-    /// <summary> Open activities of a person (not cancelled), up to 90 days. </summary>
+    /// <summary> Non-cancelled activities of the person from today (at most 90 days). </summary>
     [HttpGet("events")]
     [ProducesResponseType(typeof(Response<IReadOnlyList<IntakeEventDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPersonEvents(
-        [FromHeader(Name = "X-Company-Id")] Guid companyId,
         [FromQuery] Guid requesterPersonId,
         [FromQuery] DateTimeOffset? from = null,
         [FromQuery] DateTimeOffset? to = null,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await sender.Send(new GetIntakePersonEventsQuery(requesterPersonId, from, to), cancellationToken);
-        return this.ToResult(response);
-    }
+        CancellationToken cancellationToken = default) =>
+        this.ToResult(await sender.Send(new GetIntakePersonEventsQuery(requesterPersonId, from, to), cancellationToken));
 
-    /// <summary> Reschedule an activity owned by the requester. </summary>
+    /// <summary> Reschedules an activity of the requester. </summary>
     [HttpPut("events/{id:guid}/reschedule")]
-    [ProducesResponseType(typeof(Response<CreateIntakeEventDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<RescheduleIntakeEventDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> RescheduleEvent(
-        Guid id,
-        [FromHeader(Name = "X-Company-Id")] Guid companyId,
-        [FromBody] RescheduleIntakeEventCommand body,
-        CancellationToken cancellationToken = default)
-    {
-        var command = body with { CompanyId = companyId, EventId = id };
-        var response = await sender.Send(command, cancellationToken);
-        return this.ToResult(response);
-    }
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> RescheduleEvent(Guid id, [FromBody] RescheduleIntakeEventCommand command, CancellationToken cancellationToken = default) =>
+        this.ToResult(await sender.Send(command with { EventId = id }, cancellationToken));
 
-    /// <summary> Cancel an activity owned by the requester. </summary>
+    /// <summary> Cancels an activity of the requester (an update of its status). </summary>
     [HttpPost("events/{id:guid}/cancel")]
     [RequirePermission(PermissionFlags.CanUpdate)]
-    [ProducesResponseType(typeof(Response<CreateIntakeEventDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<CancelIntakeEventDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> CancelEvent(
-        Guid id,
-        [FromHeader(Name = "X-Company-Id")] Guid companyId,
-        [FromBody] CancelIntakeEventCommand body,
-        CancellationToken cancellationToken = default)
-    {
-        var command = body with { CompanyId = companyId, EventId = id };
-        var response = await sender.Send(command, cancellationToken);
-        return this.ToResult(response);
-    }
+    public async Task<IActionResult> CancelEvent(Guid id, [FromBody] CancelIntakeEventCommand command, CancellationToken cancellationToken = default) =>
+        this.ToResult(await sender.Send(command with { EventId = id }, cancellationToken));
 }

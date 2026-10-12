@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Asp.Versioning;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
@@ -8,7 +5,6 @@ using JOIN.Application.UseCases.Admin.PersonPendingConfirmations.Commands.LinkCu
 using JOIN.Application.UseCases.Admin.PersonPendingConfirmations.Commands.ResolvePersonPendingConfirmation;
 using JOIN.Application.UseCases.Admin.PersonPendingConfirmations.Queries.GetPersonPendingConfirmationById;
 using JOIN.Application.UseCases.Admin.PersonPendingConfirmations.Queries.GetPersonPendingConfirmations;
-using JOIN.Application.UseCases.Calendars.Common;
 using JOIN.Domain.Enums;
 using JOIN.Services.WebApi.Controllers.Calendars;
 using JOIN.Services.WebApi.Filters;
@@ -18,10 +14,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace JOIN.Services.WebApi.Controllers.Admin;
 
 /// <summary>
-/// Inbox of <c>PersonPendingConfirmation</c> rows (SPEC 45 F6). The controller is the
-/// <c>PersonPendingConfirmations</c> resource: it lives under the <c>Admin</c> folder, but the
-/// permission it asks for is the SPEC 43 "PendingPersons" option with controller name
-/// <c>PersonPendingConfirmations</c>.
+/// Inbox of the persons created by the channel agent (SPEC 45), menu option <c>PendingPersons</c>, resource
+/// <c>PersonPendingConfirmations</c>. Resolving or linking closes the review activity.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
@@ -30,11 +24,10 @@ namespace JOIN.Services.WebApi.Controllers.Admin;
 [PermissionResource("PersonPendingConfirmations")]
 public class PersonPendingConfirmationsController(ISender sender) : ControllerBase
 {
-    /// <summary> Paged inbox. Default <c>Status = Pending</c>; the supervisor screen calls it without arguments. </summary>
+    /// <summary> Paged inbox; <c>status</c> defaults to Pending (1), most recent first. </summary>
     [HttpGet]
     [ProducesResponseType(typeof(Response<PagedResult<PersonPendingConfirmationDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPaged(
-        [FromHeader(Name = "X-Company-Id")] Guid companyId,
         [FromQuery] int? status = null,
         [FromQuery] Guid? channelId = null,
         [FromQuery] DateTime? from = null,
@@ -42,68 +35,37 @@ public class PersonPendingConfirmationsController(ISender sender) : ControllerBa
         [FromQuery] string? search = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await sender.Send(
-            new GetPersonPendingConfirmationsQuery(companyId, status, channelId, from, to, search, page, pageSize),
-            cancellationToken);
-        return this.ToResult(response);
-    }
+        CancellationToken cancellationToken = default) =>
+        this.ToResult(await sender.Send(new GetPersonPendingConfirmationsQuery(status, channelId, from, to, search, page, pageSize), cancellationToken));
 
-    /// <summary> Detail with the person's contacts and the activities that target them. </summary>
+    /// <summary> Detail with the person's contacts and activities. </summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(Response<PersonPendingConfirmationDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(
-        Guid id,
-        [FromHeader(Name = "X-Company-Id")] Guid companyId,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await sender.Send(new GetPersonPendingConfirmationByIdQuery(companyId, id), cancellationToken);
-        return this.ToResult(response);
-    }
+    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default) =>
+        this.ToResult(await sender.Send(new GetPersonPendingConfirmationByIdQuery(id), cancellationToken));
 
-    /// <summary> Resolve as <c>Confirmed</c> or <c>Discarded</c> (notes required on Discarded). </summary>
+    /// <summary> Closes as <c>Confirmed</c> or <c>Discarded</c> (notes required). An update of the pending. </summary>
     [HttpPost("{id:guid}/resolve")]
+    [RequirePermission(Domain.Security.PermissionFlags.CanUpdate)]
     [ProducesResponseType(typeof(Response<ResolvePersonPendingConfirmationDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Resolve(
-        Guid id,
-        [FromHeader(Name = "X-Company-Id")] Guid companyId,
-        [FromBody] ResolvePersonPendingConfirmationBody body,
-        CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Resolve(Guid id, [FromBody] ResolvePersonPendingConfirmationBody body, CancellationToken cancellationToken = default)
     {
-        if (!Enum.TryParse<PersonPendingConfirmationStatus>(body.Status, ignoreCase: true, out var status))
-        {
-            return BadRequest(Response<ResolvePersonPendingConfirmationDto>.Error(
-                "INVALID_RESOLUTION_STATUS",
-                ["status must be one of: Confirmed, Discarded."]));
-        }
-
-        var response = await sender.Send(
-            new ResolvePersonPendingConfirmationCommand(companyId, id, status, body.Notes),
-            cancellationToken);
-        return this.ToResult(response);
+        var status = Enum.TryParse<PersonPendingConfirmationStatus>(body.Status, ignoreCase: true, out var parsed) ? parsed : default;
+        return this.ToResult(await sender.Send(new ResolvePersonPendingConfirmationCommand(id, status, body.Notes), cancellationToken));
     }
 
-    /// <summary> Link the pending to a customer of the same person; closes the pending. </summary>
+    /// <summary> Links to a customer of the same person and closes as <c>LinkedToCustomer</c>. An update of the pending. </summary>
     [HttpPost("{id:guid}/link-customer")]
+    [RequirePermission(Domain.Security.PermissionFlags.CanUpdate)]
     [ProducesResponseType(typeof(Response<LinkCustomerToPersonPendingConfirmationDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> LinkCustomer(
-        Guid id,
-        [FromHeader(Name = "X-Company-Id")] Guid companyId,
-        [FromBody] LinkCustomerBody body,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await sender.Send(
-            new LinkCustomerToPersonPendingConfirmationCommand(companyId, id, body.CustomerId),
-            cancellationToken);
-        return this.ToResult(response);
-    }
+    public async Task<IActionResult> LinkCustomer(Guid id, [FromBody] LinkCustomerBody body, CancellationToken cancellationToken = default) =>
+        this.ToResult(await sender.Send(new LinkCustomerToPersonPendingConfirmationCommand(id, body.CustomerId), cancellationToken));
 
-    /// <summary> Body of <c>POST /{id}/resolve</c>. </summary>
-    public sealed record ResolvePersonPendingConfirmationBody(string Status, string? Notes);
+    /// <summary> Body of <c>POST /{id}/resolve</c>: <c>status</c> is <c>Confirmed</c> or <c>Discarded</c>. </summary>
+    public sealed record ResolvePersonPendingConfirmationBody(string? Status, string? Notes);
 
     /// <summary> Body of <c>POST /{id}/link-customer</c>. </summary>
     public sealed record LinkCustomerBody(Guid CustomerId);

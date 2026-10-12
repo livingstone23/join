@@ -92,6 +92,8 @@ public static class ConfigureServices
         // Registramos el repositorio de clientes explícitamente para permitir lógica personalizada.
         services.AddScoped<IPersonsRepository, PersonsRepository>();
         services.AddScoped<ITenantDataInspector, TenantDataInspector>();
+        // SPEC 45-post — recognizes the 23505 of the OriginReference index (Application does not reference Npgsql).
+        services.AddSingleton<IDatabaseErrorClassifier, PostgresDatabaseErrorClassifier>();
         services.AddScoped<IPersonAddressRepository, PersonAddressRepository>();
         services.AddScoped<IPersonContactRepository, PersonContactRepository>();
         services.AddScoped<IPersonEmploymentRepository, PersonEmploymentRepository>();

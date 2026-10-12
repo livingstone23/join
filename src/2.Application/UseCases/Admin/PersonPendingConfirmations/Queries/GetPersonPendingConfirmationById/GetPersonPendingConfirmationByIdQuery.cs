@@ -1,4 +1,3 @@
-using System;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
 using MediatR;
@@ -6,8 +5,8 @@ using MediatR;
 namespace JOIN.Application.UseCases.Admin.PersonPendingConfirmations.Queries.GetPersonPendingConfirmationById;
 
 /// <summary>
-/// Detail of a single pending, with the person's active contacts and the activities that target them.
+/// <c>GET /PersonPendingConfirmations/{id}</c> (SPEC 45): the pending with the person's active contacts and the
+/// non-cancelled activities whose requester is the person.
 /// </summary>
-public sealed record GetPersonPendingConfirmationByIdQuery(
-    Guid CompanyId,
-    Guid PendingConfirmationId) : IRequest<Response<PersonPendingConfirmationDetailDto>>;
+public sealed record GetPersonPendingConfirmationByIdQuery(Guid PendingConfirmationId)
+    : IRequest<Response<PersonPendingConfirmationDetailDto>>;

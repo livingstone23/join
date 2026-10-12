@@ -39,11 +39,17 @@ public sealed class CalendarEventCommandProcessor(
 
     /// <summary>
     /// Creates an activity. <paramref name="panelOwnerUserId"/> is <c>null</c> for <c>CalendarEvents</c> (the owner
-    /// is the current user) and the target user for <c>CalendarPanel</c>.
+    /// is the current user) and the target user for <c>CalendarPanel</c> and the channel intake (SPEC 45).
+    /// <paramref name="origin"/> replaces the <c>WEB</c> channel of the actor when the activity is written on behalf
+    /// of an external requester.
     /// </summary>
-    public async Task<Response<CalendarEventDto>> CreateAsync(ICalendarEventInput input, Guid? panelOwnerUserId, CancellationToken cancellationToken)
+    public async Task<Response<CalendarEventDto>> CreateAsync(
+        ICalendarEventInput input,
+        Guid? panelOwnerUserId,
+        CancellationToken cancellationToken,
+        CalendarExternalOrigin? origin = null)
     {
-        var sessionResponse = await OpenSessionAsync(cancellationToken);
+        var sessionResponse = await OpenSessionAsync(cancellationToken, origin);
         if (!sessionResponse.IsSuccess)
         {
             return Response<CalendarEventDto>.Error(sessionResponse.Message, sessionResponse.Errors);
@@ -81,7 +87,9 @@ public sealed class CalendarEventCommandProcessor(
             OwnerUserId = ownerUserId,
             CalendarStatusCompanyId = initialStatus.Data!.Id,
             OriginChannelId = session.Actor.ChannelId,
-            OriginType = CalendarEventOriginType.User,
+            OriginType = origin?.OriginType ?? CalendarEventOriginType.User,
+            OriginIdentifier = origin?.Identifier,
+            OriginReference = origin?.Reference,
             OriginUserId = session.ActorUserId,
             StatusChangedUtc = DateTime.UtcNow,
             StatusChangedByUserId = session.ActorUserId
@@ -107,7 +115,8 @@ public sealed class CalendarEventCommandProcessor(
 
     /// <summary>
     /// Updates an activity. For a series, <paramref name="scope"/> and <paramref name="occurrenceStartUtc"/> are
-    /// required (R7).
+    /// required (R7). <paramref name="origin"/> and <paramref name="notes"/> come from the channel intake (SPEC 45):
+    /// the log rows are written with the requester's channel and identifier and carry the notes.
     /// </summary>
     public async Task<Response<CalendarEventDto>> UpdateAsync(
         Guid eventId,
@@ -115,9 +124,11 @@ public sealed class CalendarEventCommandProcessor(
         DateTime? occurrenceStartUtc,
         ICalendarEventInput input,
         bool panel,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CalendarExternalOrigin? origin = null,
+        string? notes = null)
     {
-        var context = await OpenTargetAsync(eventId, scope, occurrenceStartUtc, panel, cancellationToken);
+        var context = await OpenTargetAsync(eventId, scope, occurrenceStartUtc, panel, cancellationToken, origin);
         if (!context.IsSuccess)
         {
             return Response<CalendarEventDto>.Error(context.Message, context.Errors);
@@ -146,7 +157,7 @@ public sealed class CalendarEventCommandProcessor(
                 }
 
                 var changed = await ApplyUpdateAsync(session, calendarEvent, input, data, actorIsOwner, calendarEvent.StartUtc, calendarEvent.EndUtc,
-                    calendarEvent.SeriesMasterId.HasValue ? CalendarEventLogAction.OccurrenceModified : null);
+                    calendarEvent.SeriesMasterId.HasValue ? CalendarEventLogAction.OccurrenceModified : null, notes: notes);
                 if (!changed.IsSuccess)
                 {
                     return Response<CalendarEventDto>.Error(changed.Message, changed.Errors);
@@ -163,7 +174,7 @@ public sealed class CalendarEventCommandProcessor(
             case CalendarEditTarget.Occurrence:
             {
                 var exception = await GetOrCreateExceptionAsync(calendarEvent, target.OccurrenceStartUtc, target.OccurrenceEndUtc);
-                var changed = await ApplyUpdateAsync(session, exception, input, data, actorIsOwner, target.OccurrenceStartUtc, target.OccurrenceEndUtc, CalendarEventLogAction.OccurrenceModified);
+                var changed = await ApplyUpdateAsync(session, exception, input, data, actorIsOwner, target.OccurrenceStartUtc, target.OccurrenceEndUtc, CalendarEventLogAction.OccurrenceModified, notes: notes);
                 if (!changed.IsSuccess)
                 {
                     return Response<CalendarEventDto>.Error(changed.Message, changed.Errors);
@@ -180,7 +191,7 @@ public sealed class CalendarEventCommandProcessor(
                     return Response<CalendarEventDto>.Error(rule.Message, rule.Errors);
                 }
 
-                var split = await SplitSeriesAsync(session, calendarEvent, target.OccurrenceStartUtc, data.StartUtc - target.OccurrenceStartUtc, rule.Data);
+                var split = await SplitSeriesAsync(session, calendarEvent, target.OccurrenceStartUtc, data.StartUtc - target.OccurrenceStartUtc, rule.Data, notes);
                 if (!split.IsSuccess)
                 {
                     return Response<CalendarEventDto>.Error(split.Message, split.Errors);
@@ -214,7 +225,7 @@ public sealed class CalendarEventCommandProcessor(
                     EndUtc = calendarEvent.StartUtc + delta + (data.EndUtc - data.StartUtc)
                 };
 
-                var changed = await ApplyUpdateAsync(session, calendarEvent, input, shifted, actorIsOwner, previousStart, previousEnd, null);
+                var changed = await ApplyUpdateAsync(session, calendarEvent, input, shifted, actorIsOwner, previousStart, previousEnd, null, notes: notes);
                 if (!changed.IsSuccess)
                 {
                     return Response<CalendarEventDto>.Error(changed.Message, changed.Errors);
@@ -244,9 +255,10 @@ public sealed class CalendarEventCommandProcessor(
         Guid statusCompanyId,
         string? notes,
         bool panel,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CalendarExternalOrigin? origin = null)
     {
-        var context = await OpenTargetAsync(eventId, scope, occurrenceStartUtc, panel, cancellationToken);
+        var context = await OpenTargetAsync(eventId, scope, occurrenceStartUtc, panel, cancellationToken, origin);
         if (!context.IsSuccess)
         {
             return Response<CalendarEventDto>.Error(context.Message, context.Errors);
@@ -387,9 +399,10 @@ public sealed class CalendarEventCommandProcessor(
     // ------------------------------------------------------------------ session and target
 
     /// <summary>
-    /// Resolves the tenant, the actor, the calendar configuration (R1) and the <c>WEB</c> channel of the actor.
+    /// Resolves the tenant, the actor, the calendar configuration (R1) and the <c>WEB</c> channel of the actor, or
+    /// the requester's channel and identifier when <paramref name="origin"/> is given (SPEC 45).
     /// </summary>
-    public async Task<Response<CalendarSession>> OpenSessionAsync(CancellationToken cancellationToken)
+    public async Task<Response<CalendarSession>> OpenSessionAsync(CancellationToken cancellationToken, CalendarExternalOrigin? origin = null)
     {
         var companyId = currentUserService.CompanyId;
         if (companyId == Guid.Empty)
@@ -408,6 +421,11 @@ public sealed class CalendarEventCommandProcessor(
             return Response<CalendarSession>.Error(company.Message, company.Errors);
         }
 
+        if (origin is not null)
+        {
+            return Ok(new CalendarSession(companyId, actorUserId, company.Data!, new CalendarActor(origin.ChannelId, actorUserId, origin.Identifier)));
+        }
+
         var webChannel = (await unitOfWork.GetRepository<CommunicationChannel>()
                 .GetAllIncludingDeletedAsync(x => x.Code == CommunicationChannelCodes.Web && x.GcRecord == 0))
             .FirstOrDefault();
@@ -424,9 +442,10 @@ public sealed class CalendarEventCommandProcessor(
         CalendarRecurrenceEditScope? scope,
         DateTime? occurrenceStartUtc,
         bool panel,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CalendarExternalOrigin? origin = null)
     {
-        var sessionResponse = await OpenSessionAsync(cancellationToken);
+        var sessionResponse = await OpenSessionAsync(cancellationToken, origin);
         if (!sessionResponse.IsSuccess)
         {
             return Response<CalendarTargetContext>.Error(sessionResponse.Message, sessionResponse.Errors);
@@ -676,7 +695,8 @@ public sealed class CalendarEventCommandProcessor(
         DateTime previousStartUtc,
         DateTime previousEndUtc,
         CalendarEventLogAction? forcedAction,
-        bool logNew = true)
+        bool logNew = true,
+        string? notes = null)
     {
         var previousCalendarId = calendarEvent.CalendarId;
         var previousStatusId = calendarEvent.CalendarStatusCompanyId;
@@ -707,7 +727,7 @@ public sealed class CalendarEventCommandProcessor(
                 ? new CalendarEventLogChange(previousStartUtc, previousEndUtc, calendarEvent.StartUtc, calendarEvent.EndUtc,
                     previousStatusId, calendarEvent.CalendarStatusCompanyId)
                 : null;
-            await logWriter.WriteAsync(calendarEvent, action, session.Actor, change);
+            await logWriter.WriteAsync(calendarEvent, action, session.Actor, change, notes);
         }
 
         if (previousCalendarId != calendarEvent.CalendarId)
@@ -753,7 +773,8 @@ public sealed class CalendarEventCommandProcessor(
         CalendarEvent master,
         DateTime occurrenceStartUtc,
         TimeSpan delta,
-        CalendarRecurrenceRule? newRule)
+        CalendarRecurrenceRule? newRule,
+        string? notes = null)
     {
         var originalRule = CalendarRecurrenceRule.Parse(master.RecurrenceRule).Data!;
         var occurrenceEnd = occurrenceStartUtc + (master.EndUtc - master.StartUtc);
@@ -788,7 +809,7 @@ public sealed class CalendarEventCommandProcessor(
             await unitOfWork.CalendarEvents.UpdateAsync(exception);
         }
 
-        var note = $"Series split at {occurrenceStartUtc:O}.";
+        var note = notes is null ? $"Series split at {occurrenceStartUtc:O}." : $"{notes} Series split at {occurrenceStartUtc:O}.";
         await logWriter.WriteAsync(master, CalendarEventLogAction.SeriesSplit, session.Actor, null, note);
         await logWriter.WriteAsync(newMaster, CalendarEventLogAction.SeriesSplit, session.Actor,
             new CalendarEventLogChange(NewStartUtc: newMaster.StartUtc, NewEndUtc: newMaster.EndUtc, NewStatusCompanyId: newMaster.CalendarStatusCompanyId), note);
@@ -879,7 +900,11 @@ public sealed class CalendarEventCommandProcessor(
         return await scheduleGuard.ValidateAsync(check, cancellationToken);
     }
 
-    private async Task<Response<CalendarEventDto>> BuildResultAsync(CalendarEvent calendarEvent, CalendarCompanyContext company, string message)
+    /// <summary>
+    /// Builds the DTO of an activity as the commands return it (also used by the channel intake to answer a
+    /// duplicate or idempotent request with the current state).
+    /// </summary>
+    public async Task<Response<CalendarEventDto>> BuildResultAsync(CalendarEvent calendarEvent, CalendarCompanyContext company, string message)
     {
         var activityCompany = await unitOfWork.GetRepository<CalendarActivityCompany>().GetAsync(calendarEvent.CalendarActivityCompanyId);
         var activity = activityCompany is null ? null : await unitOfWork.GetRepository<CalendarActivity>().GetAsync(activityCompany.CalendarActivityId);
@@ -975,6 +1000,13 @@ public sealed class CalendarEventCommandProcessor(
     private static Response<T> Ok<T>(T data) => new() { IsSuccess = true, Data = data };
 
 }
+
+/// <summary>
+/// Origin of an activity written on behalf of an external requester (SPEC 45): the channel and identifier replace the
+/// <c>WEB</c> channel of the actor in the activity and its log, and <see cref="Reference"/> is the external message id
+/// used to deduplicate retries.
+/// </summary>
+public sealed record CalendarExternalOrigin(Guid ChannelId, CalendarEventOriginType OriginType, string Identifier, string? Reference);
 
 /// <summary>
 /// Tenant, actor and calendar configuration of a calendar command.

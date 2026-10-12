@@ -1,4 +1,3 @@
-using System;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
 using MediatR;
@@ -6,11 +5,10 @@ using MediatR;
 namespace JOIN.Application.UseCases.Admin.PersonPendingConfirmations.Queries.GetPersonPendingConfirmations;
 
 /// <summary>
-/// Paged inbox of pending confirmations. The default status filter is <c>Pending = 1</c>, so the call
-/// without a <c>Status</c> value is the "open tray" used by the supervisor screen (SPEC 45 F5).
+/// <c>GET /PersonPendingConfirmations</c> (SPEC 45): paged inbox, most recent first. <see cref="Status"/> defaults to
+/// <c>Pending</c>; <see cref="Search"/> matches the person's name, identification or active contacts.
 /// </summary>
 public sealed record GetPersonPendingConfirmationsQuery(
-    Guid CompanyId,
     int? Status = null,
     Guid? ChannelId = null,
     DateTime? From = null,
