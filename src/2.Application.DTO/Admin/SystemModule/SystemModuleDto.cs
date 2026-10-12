@@ -34,6 +34,11 @@ public sealed record SystemModuleDto : SoftDeletableDto
     public bool IsActive { get; init; }
 
     /// <summary>
+    /// Gets whether the module is a base module (SPEC 43).
+    /// </summary>
+    public bool IsBase { get; init; }
+
+    /// <summary>
     /// Gets the display sequence of the module in the CRM user interface.
     /// </summary>
     public int? Order { get; init; }

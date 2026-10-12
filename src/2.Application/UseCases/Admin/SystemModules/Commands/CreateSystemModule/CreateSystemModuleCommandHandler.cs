@@ -51,6 +51,7 @@ public sealed class CreateSystemModuleCommandHandler(IUnitOfWork unitOfWork)
             Description = normalizedDescription,
             Icon = normalizedIcon,
             IsActive = request.IsActive,
+            IsBase = request.IsBase,
             Order = request.Order
         };
 
@@ -74,6 +75,7 @@ public sealed class CreateSystemModuleCommandHandler(IUnitOfWork unitOfWork)
                 Description = entity.Description,
                 Icon = entity.Icon,
                 IsActive = entity.IsActive,
+                IsBase = entity.IsBase,
                 Order = entity.Order,
                 CreatedAt = entity.Created
             }

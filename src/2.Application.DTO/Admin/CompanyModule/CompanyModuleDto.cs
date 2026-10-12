@@ -39,6 +39,11 @@ public sealed record CompanyModuleDto : SoftDeletableDto
     public bool IsActive { get; init; }
 
     /// <summary>
+    /// Gets whether the module is a base module (SPEC 43), so the client can tell base and optional modules apart.
+    /// </summary>
+    public bool IsBase { get; init; }
+
+    /// <summary>
     /// Gets the UTC creation timestamp of the assignment record.
     /// </summary>
     public DateTime CreatedAt { get; init; }

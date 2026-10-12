@@ -71,6 +71,7 @@ public sealed class GetSystemModulesQueryHandler(
                 sm.Description,
                 sm.Icon,
                 sm.IsActive,
+                sm.IsBase,
                 sm."order" AS "Order",
                 sm.Created AS CreatedAt
             FROM Admin.SystemModules sm

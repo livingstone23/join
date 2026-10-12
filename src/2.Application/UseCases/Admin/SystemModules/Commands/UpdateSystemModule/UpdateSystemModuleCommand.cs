@@ -42,6 +42,11 @@ public sealed record UpdateSystemModuleCommand : ITransactionalCommand<Response<
     public bool IsActive { get; init; } = true;
 
     /// <summary>
+    /// Gets whether the module is a base module (SPEC 43): the seed assigns base modules to companies.
+    /// </summary>
+    public bool IsBase { get; init; }
+
+    /// <summary>
     /// Gets or sets the display sequence of the module in the CRM user interface.
     /// </summary>
     public int? Order { get; init; }

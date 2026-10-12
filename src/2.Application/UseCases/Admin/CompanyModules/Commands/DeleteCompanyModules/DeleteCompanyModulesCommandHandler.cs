@@ -13,7 +13,10 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
 /// <param name="currentUserService">Resolves the JWT-driven tenant and role context.</param>
-public sealed class DeleteCompanyModulesCommandHandler(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
+public sealed class DeleteCompanyModulesCommandHandler(
+    IUnitOfWork unitOfWork,
+    ICurrentUserService currentUserService,
+    CompanyPermissionCacheInvalidator cacheInvalidator)
     : IRequestHandler<DeleteCompanyModulesCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
@@ -41,6 +44,7 @@ public sealed class DeleteCompanyModulesCommandHandler(IUnitOfWork unitOfWork, I
             return Response<Guid>.Error("COMPANY_MODULE_NOT_FOUND", ["Company module not found."]);
         }
 
+        // SPEC 43 (A9): logical delete of the assignment only; role permissions and module data are kept.
         entity.MarkAsDeleted();
 
         await _unitOfWork.GetRepository<CompanyModule>().UpdateAsync(entity);
@@ -49,6 +53,9 @@ public sealed class DeleteCompanyModulesCommandHandler(IUnitOfWork unitOfWork, I
         {
             return Response<Guid>.Error("DELETE_FAILED", ["No records were affected while deleting the company module assignment."]);
         }
+
+        // SPEC 43: the company's menu and permissions change right away, not when the cache expires.
+        await cacheInvalidator.InvalidateAsync(entity.CompanyId, cancellationToken);
 
         return new Response<Guid>
         {

@@ -121,6 +121,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         await SeedRolesAsync();
         await SeedDefaultUsersAsync();
         await SeedUserAccessAsync(joinCompanyId);
+        // SPEC 43: modules first, so an existing database gets the renames and IsBase before the options
+        // are re-pointed at their real module.
+        await SeedSystemModulesAsync();
         await SeedSystemOptionsAsync();
         await SeedRoleSystemOptionsAsync(joinCompanyId);
 
@@ -145,6 +148,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         {
             Roles = SystemRoleNames,
             DefaultUsers = GetDefaultUserSeeds(),
+            // SPEC 43: modules (name, IsBase, order) and each option's ModuleName feed the checksum too.
+            SystemModules = GetSystemModuleSeeds(),
             AdministrativeSystemOptions = GetAdministrativeSystemOptionSeeds(),
             RoleSystemOptions = GetRoleSystemOptionSeeds(),
             AdminFullSystemOptionPermissions = GetAdminFullSystemOptionPermissionSeeds(),
@@ -2063,40 +2068,97 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         _logger.LogInformation("JOIN tickets seed finished. Inserted: {Inserted}, Existing: {Existing}, LogsAdded: {LogsAdded}", inserted, seeds.Count - inserted, logsAdded);
     }
 
+    /// <summary>
+    /// SPEC 43: modules renamed to English. The seed finds a module by its previous name and updates that
+    /// row in place (same Id), so <c>CompanyModules</c> and <c>SystemOptions</c> keep pointing at it.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> LegacySystemModuleNames = new Dictionary<string, string>
+    {
+        ["Administracion"] = "Administration",
+        ["Clientes"] = "Customers",
+        ["Seguridad"] = "Security"
+    };
+
+    /// <summary>
+    /// SPEC 43: module catalog (name, description, icon, base flag, order). Also read by
+    /// <see cref="ComputeMenuPermissionsSeedChecksum"/> — do not duplicate this list elsewhere.
+    /// The "Calendar" module (optional, Order 4) is added by SPEC 44.
+    /// </summary>
+    private static List<SystemModuleSeed> GetSystemModuleSeeds() =>
+    [
+        new("Administration", "Administrative management module", "fa-solid fa-building", IsBase: true, Order: 1),
+        new("Customers", "Customer management module", "fa-solid fa-users", IsBase: true, Order: 2),
+        new("Tickets", "Ticket management module", "fa-solid fa-ticket", IsBase: true, Order: 3),
+        new("Security", "Security module", "fa-solid fa-shield-halved", IsBase: true, Order: 99)
+    ];
+
     private async Task SeedSystemModulesAsync()
     {
         var now = DateTime.UtcNow;
-        var seeds = new List<SystemModule>
-        {
-            new() { Name = "Administracion", Description = "Modulo de gestion administrativa", Icon = "fa-solid fa-building", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0, Order = 1},
-            new() { Name = "Clientes", Description = "Modulo de gestion de clientes", Icon = "fa-solid fa-users", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 , Order = 2},
-            new() { Name = "Tickets", Description = "Modulo de gestion de tickets", Icon = "fa-solid fa-ticket", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 , Order = 3},
-            new() { Name = "Seguridad", Description = "Modulo de seguridad", Icon = "fa-solid fa-shield-halved", IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 , Order = 99}
-        };
-
+        var seeds = GetSystemModuleSeeds();
         var inserted = 0;
+        var updated = 0;
 
         foreach (var seed in seeds)
         {
-            var exists = await _context.SystemModules
-                .IgnoreQueryFilters()
-                .AnyAsync(m => m.Name == seed.Name);
+            var legacyNames = LegacySystemModuleNames
+                .Where(pair => pair.Value == seed.Name)
+                .Select(pair => pair.Key)
+                .ToList();
 
-            if (exists)
+            // The new name wins; the previous name is only used when the module was not renamed yet.
+            var module = await _context.SystemModules
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(m => m.Name == seed.Name)
+                ?? await _context.SystemModules
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(m => legacyNames.Contains(m.Name));
+
+            if (module is null)
+            {
+                _context.SystemModules.Add(new SystemModule
+                {
+                    Name = seed.Name,
+                    Description = seed.Description,
+                    Icon = seed.Icon,
+                    IsActive = true,
+                    IsBase = seed.IsBase,
+                    Order = seed.Order,
+                    Created = now,
+                    CreatedBy = "System_Seeder",
+                    GcRecord = 0
+                });
+                inserted++;
+                continue;
+            }
+
+            if (module.Name == seed.Name
+                && module.Description == seed.Description
+                && module.IsBase == seed.IsBase
+                && module.Order == seed.Order)
             {
                 continue;
             }
 
-            _context.SystemModules.Add(seed);
-            inserted++;
+            module.Name = seed.Name;
+            module.Description = seed.Description;
+            module.IsBase = seed.IsBase;
+            module.Order = seed.Order;
+            module.LastModified = now;
+            module.LastModifiedBy = "System_Seeder";
+            updated++;
         }
 
-        if (inserted > 0)
+        if (inserted > 0 || updated > 0)
         {
             await _context.SaveChangesAsync();
         }
 
-        _logger.LogInformation("System modules catalog seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
+        _logger.LogInformation(
+            "System modules catalog seed finished. Inserted: {Inserted}, Updated: {Updated}, Existing: {Existing}",
+            inserted,
+            updated,
+            seeds.Count - inserted - updated);
     }
 
     private async Task SeedCompanyModulesAsync()
@@ -2113,15 +2175,16 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             return;
         }
 
+        // SPEC 43: only BASE modules are assigned. Existing assignments are never deactivated or removed.
         var moduleIds = await _context.SystemModules
             .IgnoreQueryFilters()
-            .Where(m => m.IsActive)
+            .Where(m => m.IsActive && m.IsBase && m.GcRecord == 0)
             .Select(m => m.Id)
             .ToListAsync();
 
         if (moduleIds.Count == 0)
         {
-            _logger.LogWarning("Company modules seed skipped. No active system modules were found.");
+            _logger.LogWarning("Company modules seed skipped. No active base system modules were found.");
             return;
         }
 
@@ -2176,104 +2239,113 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
     private async Task SeedSystemOptionsAsync()
     {
-        var adminModule = await _context.SystemModules
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(m => m.Name == "Administracion");
+        // SPEC 43: renames run inside one transaction so a failure never leaves the menu half renamed.
+        var ownsTransaction = _context.Database.CurrentTransaction is null;
+        await using var transaction = ownsTransaction ? await _context.Database.BeginTransactionAsync() : null;
 
-        if (adminModule is null)
-        {
-            _logger.LogWarning("System options seed skipped. The 'Administracion' module was not found.");
-            return;
-        }
+        var modulesByName = await _context.SystemModules
+            .IgnoreQueryFilters()
+            .Where(m => m.GcRecord == 0)
+            .ToDictionaryAsync(m => m.Name, m => m.Id, StringComparer.OrdinalIgnoreCase);
 
         var seeds = GetAdministrativeSystemOptionSeeds();
-        var optionNames = seeds.Select(x => x.Name).ToList();
-        var optionRoutes = seeds
-            .Select(x => x.Route)
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
 
+        // SPEC 43: all options, not only the ones of one module (they all used to hang from "Administracion").
         var existingOptions = await _context.SystemOptions
             .IgnoreQueryFilters()
-            .Where(o => o.ModuleId == adminModule.Id
-                && (optionNames.Contains(o.Name)
-                    || (o.Route != null && optionRoutes.Contains(o.Route))))
             .ToListAsync();
 
-        var optionsByName = existingOptions.ToDictionary(o => o.Name, StringComparer.OrdinalIgnoreCase);
         var optionsByRoute = existingOptions
             .Where(o => !string.IsNullOrWhiteSpace(o.Route))
             .GroupBy(o => o.Route!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        var existingByName = existingOptions
+            .GroupBy(o => o.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        // Options already matched to a seed in this run: each existing row belongs to exactly one seed.
+        var claimed = new HashSet<Guid>();
+        var seededByName = new Dictionary<string, SystemOption>(StringComparer.OrdinalIgnoreCase);
 
         var now = DateTime.UtcNow;
         var inserted = 0;
         var updated = 0;
+        var skipped = 0;
         var menuOrder = 0;
 
         foreach (var seed in seeds.OrderBy(x => x.ParentName is null ? 0 : 1))
         {
-            Guid? parentId = null;
-            if (!string.IsNullOrWhiteSpace(seed.ParentName) && optionsByName.TryGetValue(seed.ParentName, out var parentOption))
+            menuOrder += 10;
+
+            if (!modulesByName.TryGetValue(seed.ModuleName, out var moduleId))
             {
-                parentId = parentOption.Id;
+                _logger.LogWarning(
+                    "System option {OptionName} skipped: module {ModuleName} was not found.",
+                    seed.Name,
+                    seed.ModuleName);
+                skipped++;
+                continue;
             }
 
-            menuOrder += 10;
+            Guid? parentId = null;
+            if (!string.IsNullOrWhiteSpace(seed.ParentName) && seededByName.TryGetValue(seed.ParentName, out var parentOption))
+            {
+                parentId = parentOption.Id;
+                if (parentOption.ModuleId != moduleId)
+                {
+                    _logger.LogWarning(
+                        "System option {OptionName} declares module {ModuleName} but its parent {ParentName} belongs to another module.",
+                        seed.Name,
+                        seed.ModuleName,
+                        seed.ParentName);
+                }
+            }
+
             var orderMenu = seed.OrderMenu ?? menuOrder;
             var canDownload = seed.CanDownload ?? seed.CanRead;
             var canExport = seed.CanExport ?? true;
             var canExecute = seed.CanExecute ?? true;
             var isVisibleMenu = seed.IsVisibleMenu ?? true;
 
-            if (!optionsByName.TryGetValue(seed.Name, out var option))
+            var option = FindExistingSystemOption(seed, optionsByRoute, existingByName, claimed);
+
+            if (option is null)
             {
-                if (!string.IsNullOrWhiteSpace(seed.Route)
-                    && optionsByRoute.TryGetValue(seed.Route, out var optionByRoute))
+                option = new SystemOption
                 {
-                    option = optionByRoute;
-                    optionsByName[seed.Name] = option;
-                }
-                else
-                {
-                    option = new SystemOption
-                    {
-                        ModuleId = adminModule.Id,
-                        Name = seed.Name,
-                        Route = seed.Route,
-                        Icon = seed.Icon,
-                        ParentId = parentId,
-                        ControllerName = seed.ControllerName,
-                        CanRead = seed.CanRead,
-                        CanCreate = seed.CanCreate,
-                        CanUpdate = seed.CanUpdate,
-                        CanDelete = seed.CanDelete,
-                        CanDownload = canDownload,
-                        CanExport = canExport,
-                        CanExecute = canExecute,
-                        IsVisibleMenu = isVisibleMenu,
-                        OrderMenu = orderMenu,
-                        Created = now,
-                        CreatedBy = "System_Seeder",
-                        GcRecord = 0
-                    };
+                    ModuleId = moduleId,
+                    Name = seed.Name,
+                    Route = seed.Route,
+                    Icon = seed.Icon,
+                    ParentId = parentId,
+                    ControllerName = seed.ControllerName,
+                    CanRead = seed.CanRead,
+                    CanCreate = seed.CanCreate,
+                    CanUpdate = seed.CanUpdate,
+                    CanDelete = seed.CanDelete,
+                    CanDownload = canDownload,
+                    CanExport = canExport,
+                    CanExecute = canExecute,
+                    IsVisibleMenu = isVisibleMenu,
+                    OrderMenu = orderMenu,
+                    Created = now,
+                    CreatedBy = "System_Seeder",
+                    GcRecord = 0
+                };
 
-                    _context.SystemOptions.Add(option);
-                    optionsByName[seed.Name] = option;
-                    if (!string.IsNullOrWhiteSpace(option.Route))
-                    {
-                        optionsByRoute[option.Route] = option;
-                    }
-
-                    inserted++;
-                    continue;
-                }
+                _context.SystemOptions.Add(option);
+                claimed.Add(option.Id);
+                seededByName[seed.Name] = option;
+                inserted++;
+                continue;
             }
 
-            var previousRoute = option.Route;
+            claimed.Add(option.Id);
+            seededByName[seed.Name] = option;
+
             var hasChanges = option.Route != seed.Route
                 || option.Name != seed.Name
+                || option.ModuleId != moduleId
                 || option.Icon != seed.Icon
                 || option.ParentId != parentId
                 || option.ControllerName != seed.ControllerName
@@ -2295,6 +2367,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
             option.Name = seed.Name;
             option.Route = seed.Route;
+            option.ModuleId = moduleId;
             option.Icon = seed.Icon;
             option.ParentId = parentId;
             option.ControllerName = seed.ControllerName;
@@ -2310,18 +2383,6 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             option.GcRecord = 0;
             option.LastModified = now;
             option.LastModifiedBy = "System_Seeder";
-
-            if (!string.IsNullOrWhiteSpace(previousRoute)
-                && !string.Equals(previousRoute, option.Route, StringComparison.OrdinalIgnoreCase))
-            {
-                optionsByRoute.Remove(previousRoute);
-            }
-
-            if (!string.IsNullOrWhiteSpace(option.Route))
-            {
-                optionsByRoute[option.Route] = option;
-            }
-
             updated++;
         }
 
@@ -2330,11 +2391,60 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await _context.SaveChangesAsync();
         }
 
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync();
+        }
+
         _logger.LogInformation(
-            "System options seed finished. Inserted: {Inserted}, Updated: {Updated}, Existing: {Existing}",
+            "System options seed finished. Inserted: {Inserted}, Updated: {Updated}, Skipped: {Skipped}, Existing: {Existing}",
             inserted,
             updated,
-            seeds.Count - inserted - updated);
+            skipped,
+            seeds.Count - inserted - updated - skipped);
+    }
+
+    /// <summary>
+    /// SPEC 43: finds the existing row of a seed, in this order: new route, previous route, new name, previous
+    /// name. Routes are unique, so they decide the Persons/Clientes swap; rows already claimed by another seed
+    /// in this run are skipped.
+    /// </summary>
+    private static SystemOption? FindExistingSystemOption(
+        SystemOptionSeed seed,
+        IReadOnlyDictionary<string, SystemOption> optionsByRoute,
+        IReadOnlyDictionary<string, SystemOption> optionsByName,
+        IReadOnlySet<Guid> claimed)
+    {
+        SystemOption? Unclaimed(SystemOption? candidate) =>
+            candidate is not null && !claimed.Contains(candidate.Id) ? candidate : null;
+
+        if (Unclaimed(optionsByRoute.GetValueOrDefault(seed.Route)) is { } byRoute)
+        {
+            return byRoute;
+        }
+
+        foreach (var legacyRoute in LegacySystemOptionRoutes.Where(pair => pair.Value == seed.Name).Select(pair => pair.Key))
+        {
+            if (Unclaimed(optionsByRoute.GetValueOrDefault(legacyRoute)) is { } byLegacyRoute)
+            {
+                return byLegacyRoute;
+            }
+        }
+
+        if (Unclaimed(optionsByName.GetValueOrDefault(seed.Name)) is { } byName)
+        {
+            return byName;
+        }
+
+        foreach (var legacyName in LegacySystemOptionNames.Where(pair => pair.Value == seed.Name).Select(pair => pair.Key))
+        {
+            if (Unclaimed(optionsByName.GetValueOrDefault(legacyName)) is { } byLegacyName)
+            {
+                return byLegacyName;
+            }
+        }
+
+        return null;
     }
 
     private async Task SeedRoleSystemOptionsAsync(Guid joinCompanyId)
@@ -2716,81 +2826,141 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             .ToList();
     }
 
+    /// <summary>
+    /// SPEC 43: options renamed to English. Previous name → new name. An existing option is recognized by its
+    /// new or previous route first (routes are unique), then by its new or previous name, and updated in place
+    /// (same Id, so its <c>RoleSystemOptions</c> are kept). Order matters for the Persons/Clientes swap: the
+    /// parent <c>Persons</c> (/Clientes) becomes <c>CustomersMenu</c> and the child <c>Clientes</c> becomes <c>Persons</c>.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> LegacySystemOptionNames = new Dictionary<string, string>
+    {
+        ["Administracion"] = "Administration",
+        ["Paises"] = "Countries",
+        ["Genero"] = "Genders",
+        ["Industria"] = "Industries",
+        ["Rango Ingreso"] = "IncomeRanges",
+        ["Regimen Tributario"] = "TaxRegimes",
+        ["Persons"] = "CustomersMenu",
+        ["Clientes"] = "Persons",
+        ["ManejoTickets"] = "TicketManagement",
+        ["Seguridad"] = "Security",
+        ["Usuarios"] = "Users",
+        ["Compañias"] = "Companies",
+        ["SystemOption"] = "SystemOptions",
+        ["RoleSystemOption"] = "RoleSystemOptions",
+        ["Bitacora"] = "AuditLog"
+    };
+
+    /// <summary>
+    /// SPEC 43: previous route → new option name. Used before any name lookup, so each existing row is claimed
+    /// by exactly one seed (see <see cref="LegacySystemOptionNames"/>).
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> LegacySystemOptionRoutes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["/administracion"] = "Administration",
+        ["/administracion/countries"] = "Countries",
+        ["/administracion/regions"] = "Regions",
+        ["/administracion/provinces"] = "Provinces",
+        ["/administracion/municipalities"] = "Municipalities",
+        ["/administracion/identification-types"] = "IdentificationTypes",
+        ["/administracion/Street-types"] = "StreetTypes",
+        ["/administracion/areas"] = "Areas",
+        ["/administracion/projects"] = "Projects",
+        ["/administracion/system-modules"] = "SystemModules",
+        ["/administracion/entity-statuses"] = "EntityStatuses",
+        ["/administracion/company-modules"] = "CompanyModules",
+        ["/administracion/communication-channels"] = "CommunicationChannels",
+        ["/administracion/gender"] = "Genders",
+        ["/administracion/industry"] = "Industries",
+        ["/administracion/incomerange"] = "IncomeRanges",
+        ["/administracion/taxregime"] = "TaxRegimes",
+        ["/Clientes"] = "CustomersMenu",
+        ["/Clientes/Cliente"] = "Persons",
+        ["/Clientes/customers"] = "Customers",
+        ["/ManejoTickets"] = "TicketManagement",
+        ["/ManejoTickets/tickets"] = "Tickets",
+        ["/ManejoTickets/time-units"] = "TimeUnits",
+        ["/ManejoTickets/ticket-complexities"] = "TicketComplexities",
+        ["/ManejoTickets/ticket-statuses"] = "TicketStatuses",
+        ["/ManejoTickets/ticket-company-defaults"] = "TicketCompanyDefaults",
+        ["/ManejoTickets/ticket-user-companies"] = "TicketUserCompanies",
+        ["/ManejoTickets/ticket-attachment-settings"] = "TicketAttachmentSettings",
+        ["/ManejoTickets/ticket-documents"] = "TicketDocuments",
+        ["/ManejoTickets/ticket-status-transitions"] = "TicketStatusTransitions"
+    };
+
+    // SPEC 43: every option declares its real module (ModuleName); names and routes in English with hyphens.
+    // ControllerName never changes: it is the permission resource ([PermissionResource], PermissionService).
     private static List<SystemOptionSeed> GetAdministrativeSystemOptionSeeds() =>
     [
-        new("Administracion", "/administracion", "@Icons.Material.Filled.AdminPanelSettings", null, null, false, false, false, false),
-        new("Paises", "/administracion/countries", "@Icons.Material.Filled.AddLocationAlt", "Administracion", "Countries", true, true, true, true),
-        new("Regions", "/administracion/regions", "@Icons.Material.Filled.AddLocationAlt", "Administracion", "Regions", true, true, true, true),
-        new("Provinces", "/administracion/provinces", "@Icons.Material.Filled.AddLocationAlt", "Administracion", "Provinces", true, true, true, true),
-        new("Municipalities", "/administracion/municipalities", "@Icons.Material.Filled.AddLocationAlt", "Administracion", "Municipalities", true, true, true, true),
-        new("IdentificationTypes", "/administracion/identification-types", "@Icons.Material.Filled.AddCard", "Administracion", "IdentificationTypes", true, true, true, true),
+        new("Administration", "/administration", "@Icons.Material.Filled.AdminPanelSettings", "Administration", null, null, false, false, false, false),
+        new("Countries", "/administration/countries", "@Icons.Material.Filled.AddLocationAlt", "Administration", "Administration", "Countries", true, true, true, true),
+        new("Regions", "/administration/regions", "@Icons.Material.Filled.AddLocationAlt", "Administration", "Administration", "Regions", true, true, true, true),
+        new("Provinces", "/administration/provinces", "@Icons.Material.Filled.AddLocationAlt", "Administration", "Administration", "Provinces", true, true, true, true),
+        new("Municipalities", "/administration/municipalities", "@Icons.Material.Filled.AddLocationAlt", "Administration", "Administration", "Municipalities", true, true, true, true),
+        new("IdentificationTypes", "/administration/identification-types", "@Icons.Material.Filled.AddCard", "Administration", "Administration", "IdentificationTypes", true, true, true, true),
 
-        new("StreetTypes", "/administracion/Street-types", "@Icons.Material.Filled.AddCard", "Administracion", "StreetTypes", true, true, true, true),
-        
-        new("Areas", "/administracion/areas", "@Icons.Material.Filled.Extension", "Administracion", "Areas", true, true, true, true),
-        new("Projects", "/administracion/projects", "@Icons.Material.Filled.Factory", "Administracion", "Projects", true, true, true, true),
-        new("SystemModules"  , "/administracion/system-modules"  , "@Icons.Material.Filled.FolderCopy", "Administracion", "SystemModules", true, true, true, true),
-        new("EntityStatuses" , "/administracion/entity-statuses" , "@Icons.Material.Filled.Highlight", "Administracion", "EntityStatuses", true, true, true, true),
-        new("CompanyModules", "/administracion/company-modules", "@Icons.Material.Filled.HolidayVillage", "Administracion", "CompanyModules", true, true, true, true),
-        new("CommunicationChannels", "/administracion/communication-channels", "@Icons.Material.Filled.KeyboardAlt", "Administracion", "CommunicationChannels", true, true, true, true),
+        new("StreetTypes", "/administration/street-types", "@Icons.Material.Filled.AddCard", "Administration", "Administration", "StreetTypes", true, true, true, true),
 
-
-        new("Genero", "/administracion/gender", "@Icons.Material.Filled.Factory", "Administracion", "Genders", true, true, true, true),
-        new("Industria", "/administracion/industry", "@Icons.Material.Filled.Factory", "Administracion", "Industries", true, true, true, true),
-        new("Rango Ingreso", "/administracion/incomerange", "@Icons.Material.Filled.Factory", "Administracion", "IncomeRanges", true, true, true, true),
-        new("Regimen Tributario", "/administracion/taxregime", "@Icons.Material.Filled.Factory", "Administracion", "TaxRegimes", true, true, true, true),
+        new("Areas", "/administration/areas", "@Icons.Material.Filled.Extension", "Administration", "Administration", "Areas", true, true, true, true),
+        new("Projects", "/administration/projects", "@Icons.Material.Filled.Factory", "Administration", "Administration", "Projects", true, true, true, true),
+        new("SystemModules", "/administration/system-modules", "@Icons.Material.Filled.FolderCopy", "Administration", "Administration", "SystemModules", true, true, true, true),
+        new("EntityStatuses", "/administration/entity-statuses", "@Icons.Material.Filled.Highlight", "Administration", "Administration", "EntityStatuses", true, true, true, true),
+        new("CompanyModules", "/administration/company-modules", "@Icons.Material.Filled.HolidayVillage", "Administration", "Administration", "CompanyModules", true, true, true, true),
+        new("CommunicationChannels", "/administration/communication-channels", "@Icons.Material.Filled.KeyboardAlt", "Administration", "Administration", "CommunicationChannels", true, true, true, true),
 
 
-        new("Persons", "/Clientes", "@Icons.Material.Filled.PermContactCalendar", null, null, false, false, false, false),
-        new("Clientes", "/Clientes/Cliente", "@Icons.Material.Filled.PeopleAlt", "Persons", "Persons", true, true, true, true),
-        new("Customers", "/Clientes/customers", "@Icons.Material.Filled.Badge", "Persons", "Customers", true, true, true, true, CanDownload: true, IsVisibleMenu: true, OrderMenu: 15),
+        new("Genders", "/administration/genders", "@Icons.Material.Filled.Factory", "Administration", "Administration", "Genders", true, true, true, true),
+        new("Industries", "/administration/industries", "@Icons.Material.Filled.Factory", "Administration", "Administration", "Industries", true, true, true, true),
+        new("IncomeRanges", "/administration/income-ranges", "@Icons.Material.Filled.Factory", "Administration", "Administration", "IncomeRanges", true, true, true, true),
+        new("TaxRegimes", "/administration/tax-regimes", "@Icons.Material.Filled.Factory", "Administration", "Administration", "TaxRegimes", true, true, true, true),
 
 
-        new("ManejoTickets", "/ManejoTickets", "@Icons.Material.Filled.Label", null, null, false, false, false, false),
-        new("Tickets", "/ManejoTickets/tickets", "@Icons.Material.Filled.LocalPlay", "ManejoTickets", "Tickets", false, false, false, false),
-        new("TimeUnits", "/ManejoTickets/time-units", "@Icons.Material.Filled.MoreTime", "ManejoTickets", "TimeUnits", true, true, true, true),
-        new("TicketComplexities", "/ManejoTickets/ticket-complexities", "@Icons.Material.Filled.Fluorescent", "ManejoTickets", "TicketComplexities", true, true, true, true),
-        new("TicketStatuses", "/ManejoTickets/ticket-statuses", "@Icons.Material.Filled.PendingActions", "ManejoTickets", "TicketStatuses", true, true, true, true),
-        new("TicketCompanyDefaults", "/ManejoTickets/ticket-company-defaults", "@Icons.Material.Filled.LocalPlay", "ManejoTickets", "TicketCompanyDefaults", true, true, true, true),
+        // SPEC 43: the parent was "Persons" (/Clientes); it is renamed CustomersMenu to free the name Persons
+        // for the persons screen, whose permission resource is "Persons".
+        new("CustomersMenu", "/customers", "@Icons.Material.Filled.PermContactCalendar", "Customers", null, null, false, false, false, false),
+        new("Persons", "/customers/persons", "@Icons.Material.Filled.PeopleAlt", "Customers", "CustomersMenu", "Persons", true, true, true, true),
+        new("Customers", "/customers/customers", "@Icons.Material.Filled.Badge", "Customers", "CustomersMenu", "Customers", true, true, true, true, CanDownload: true, IsVisibleMenu: true, OrderMenu: 15),
+
+
+        new("TicketManagement", "/tickets", "@Icons.Material.Filled.Label", "Tickets", null, null, false, false, false, false),
+        new("Tickets", "/tickets/tickets", "@Icons.Material.Filled.LocalPlay", "Tickets", "TicketManagement", "Tickets", false, false, false, false),
+        new("TimeUnits", "/tickets/time-units", "@Icons.Material.Filled.MoreTime", "Tickets", "TicketManagement", "TimeUnits", true, true, true, true),
+        new("TicketComplexities", "/tickets/ticket-complexities", "@Icons.Material.Filled.Fluorescent", "Tickets", "TicketManagement", "TicketComplexities", true, true, true, true),
+        new("TicketStatuses", "/tickets/ticket-statuses", "@Icons.Material.Filled.PendingActions", "Tickets", "TicketManagement", "TicketStatuses", true, true, true, true),
+        new("TicketCompanyDefaults", "/tickets/ticket-company-defaults", "@Icons.Material.Filled.LocalPlay", "Tickets", "TicketManagement", "TicketCompanyDefaults", true, true, true, true),
         // SPEC 34 — roster de agentes de tickets por empresa.
-        new("TicketUserCompanies", "/ManejoTickets/ticket-user-companies", "@Icons.Material.Filled.SupervisorAccount", "ManejoTickets", "TicketUserCompanies", true, true, true, true),
+        new("TicketUserCompanies", "/tickets/ticket-user-companies", "@Icons.Material.Filled.SupervisorAccount", "Tickets", "TicketManagement", "TicketUserCompanies", true, true, true, true),
 
         // SPEC 36 — attachments de tickets. TicketAttachmentSettings NO usa CanDownload
         // (no tiene endpoint de descarga propio); TicketDocuments sí, con CanDownload explícito
         // porque es el único recurso del sistema donde el flag se usa de verdad vía
         // [RequirePermission(PermissionFlags.CanDownload)] en el endpoint de descarga.
-        new("TicketAttachmentSettings", "/ManejoTickets/ticket-attachment-settings", "@Icons.Material.Filled.SettingsApplications", "ManejoTickets", "TicketAttachmentSettings", true, true, true, true),
-        new("TicketDocuments", "/ManejoTickets/ticket-documents", "@Icons.Material.Filled.AttachFile", "ManejoTickets", "TicketDocuments", true, true, true, true, CanDownload: true),
+        new("TicketAttachmentSettings", "/tickets/ticket-attachment-settings", "@Icons.Material.Filled.SettingsApplications", "Tickets", "TicketManagement", "TicketAttachmentSettings", true, true, true, true),
+        new("TicketDocuments", "/tickets/ticket-documents", "@Icons.Material.Filled.AttachFile", "Tickets", "TicketManagement", "TicketDocuments", true, true, true, true, CanDownload: true),
 
         // SPEC 37 — transiciones de status parametrizables (sub-recurso de configuración de Ticket).
         // CanUpdate queda en false por diseño: el par (FromStatusId, ToStatusId) es la identidad
         // de la regla, no un dato editable — el endpoint "Update" no existe (ver Scope).
-        new("TicketStatusTransitions", "/ManejoTickets/ticket-status-transitions", "@Icons.Material.Filled.SyncAlt", "ManejoTickets", "TicketStatusTransitions", true, true, false, true),
+        new("TicketStatusTransitions", "/tickets/ticket-status-transitions", "@Icons.Material.Filled.SyncAlt", "Tickets", "TicketManagement", "TicketStatusTransitions", true, true, false, true),
 
-        new("Seguridad", "/security", "@Icons.Material.Filled.Security", null, null, false, false, false, false),
-        new("Usuarios", "/security/users", "@Icons.Material.Filled.SupervisedUserCircle", null,"Users", false, false, false, false),
-        new("Roles", "/security/roles", "@Icons.Material.Filled.VerifiedUser", null,"Roles", false, false, false, false),
-        // Reubicado desde "Administracion" (/administracion/companies) a "Seguridad"
-        // (join_frontb specs/10-role-companies.md, paso 1 del plan de implementación) —
-        // mismo Name/ResourceCode "Compañias"/"Companies", solo cambia dónde aparece en
-        // el menú; no se duplica el SystemOption ni se mueve el CompaniesController.
-        new("Compañias", "/security/companies", "@Icons.Material.Filled.HomeWork", null, "Companies", true, true, true, true),
-        // "RoleCompanies" no tiene todavía una pantalla frontend confirmada (join_frontb
-        // specs 01-09) — ruta traducida por consistencia con el resto de /security/*,
-        // a revisar cuando esa pantalla se defina.
-        new("RoleCompanies", "/security/role-companies", "@Icons.Material.Filled.VerifiedUser", null, "RoleCompanies", false, false, false, false),
-        // Confirmado en join_frontb specs/09-roles-permisos.md ("Out of scope"): pantalla
-        // futura documentada como /security/system-options.
-        new("SystemOption", "/security/system-options", "@Icons.Material.Filled.SystemSecurityUpdateWarning", null,"SystemOptions", false, false, false, false),
-        // "RoleSystemOption" respalda la matriz de /security/roles (specs/09), no tiene
-        // pantalla propia — ruta traducida por consistencia, sin uso real desde el frontend hoy.
-        new("RoleSystemOption", "/security/role-system-options", "@Icons.Material.Filled.SystemSecurityUpdateGood", null,"RoleSystemOption", false, false, false, false),
+        // SPEC 43: the security options hang from the "Security" parent (they used to sit at the menu root).
+        new("Security", "/security", "@Icons.Material.Filled.Security", "Security", null, null, false, false, false, false),
+        new("Users", "/security/users", "@Icons.Material.Filled.SupervisedUserCircle", "Security", "Security", "Users", false, false, false, false),
+        new("Roles", "/security/roles", "@Icons.Material.Filled.VerifiedUser", "Security", "Security", "Roles", false, false, false, false),
+        // Reubicado desde Administration a Security (join_frontb specs/10-role-companies.md); el
+        // recurso de permiso sigue siendo "Companies" y el CompaniesController no se mueve.
+        new("Companies", "/security/companies", "@Icons.Material.Filled.HomeWork", "Security", "Security", "Companies", true, true, true, true),
+        // "RoleCompanies" no tiene todavía una pantalla frontend confirmada.
+        new("RoleCompanies", "/security/role-companies", "@Icons.Material.Filled.VerifiedUser", "Security", "Security", "RoleCompanies", false, false, false, false),
+        // Pantalla /security/system-options (join_frontb specs/11).
+        new("SystemOptions", "/security/system-options", "@Icons.Material.Filled.SystemSecurityUpdateWarning", "Security", "Security", "SystemOptions", false, false, false, false),
+        // Respalda la matriz de /security/roles (specs/09); el recurso de permiso sigue siendo "RoleSystemOption".
+        new("RoleSystemOptions", "/security/role-system-options", "@Icons.Material.Filled.SystemSecurityUpdateGood", "Security", "Security", "RoleSystemOption", false, false, false, false),
         // SPEC 29 — bitácora de seguridad. Read-only; other flags left at false so the
         // DynamicAuthorizationFilter denies anything other than GET. Without this row
         // the AuditController would 403 for everyone except SuperAdmin.
-        // Ruta de pantalla frontend aún no definida en ningún spec de join_frontb — best-effort,
-        // a confirmar cuando exista una pantalla real de auditoría.
-        new("Bitacora", "/security/audit-log", "@Icons.Material.Filled.HistoryEdu", null, "Audit", true, false, false, false)
+        new("AuditLog", "/security/audit-log", "@Icons.Material.Filled.HistoryEdu", "Security", "Security", "Audit", true, false, false, false)
 
     ];
 
@@ -2803,10 +2973,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("SuperAdmin", "TicketCompanyDefaults", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "TicketUserCompanies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Customers", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
-        new("SuperAdmin", "Compañias", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
 
-        new("Admin", "Administracion", false, false, false, false, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Admin", "Administration", false, false, false, false, CanDownload: true, CanExport: true, CanExecute: true),
         new("Admin", "TimeUnits", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Admin", "TicketComplexities", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Admin", "TicketStatuses", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -2814,8 +2984,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Admin", "TicketUserCompanies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Admin", "Customers", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
-        new("Manager", "Administracion", false, false, false, false, CanDownload: true, CanExport: true, CanExecute: true),
-        new("Manager", "Paises", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Administration", false, false, false, false, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Countries", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Regions", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Provinces", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Municipalities", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -2823,20 +2993,20 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "StreetTypes", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Areas", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Projects", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
-        new("Manager", "Genero", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
-        new("Manager", "Industria", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
-        new("Manager", "Rango Ingreso", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
-        new("Manager", "Regimen Tributario", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Genders", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Industries", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "IncomeRanges", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "TaxRegimes", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "EntityStatuses", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "CompanyModules", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "CommunicationChannels", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
+        new("Manager", "CustomersMenu", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Persons", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
-        new("Manager", "Clientes", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Customers", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
-        new("Manager", "Compañias", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
-        new("Manager", "ManejoTickets", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "TicketManagement", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Tickets", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "TimeUnits", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "TicketComplexities", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -2845,15 +3015,15 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "TicketUserCompanies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         // SPEC 37 — Manager gestiona transiciones (CanExecute para escenarios donde aplique).
         new("Manager", "TicketStatusTransitions", true, true, false, true, CanDownload: false, CanExport: false, CanExecute: true),
-        new("Manager", "Seguridad", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
-        new("Manager", "Usuarios", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Security", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "Users", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Roles", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
-        new("Manager", "SystemOption", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
-        new("Manager", "RoleSystemOption", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "SystemOptions", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "RoleSystemOptions", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
 
-        new("Supervisor", "Administracion", false, false, false, false),
-        new("Supervisor", "Paises", true, true, true, false),
+        new("Supervisor", "Administration", false, false, false, false),
+        new("Supervisor", "Countries", true, true, true, false),
         new("Supervisor", "Regions", true, true, true, false),
         new("Supervisor", "Provinces", true, true, true, false),
         new("Supervisor", "Municipalities", true, true, true, false),
@@ -2861,18 +3031,18 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "StreetTypes", true, true, true, true),
         new("Supervisor", "Areas", true, true, true, false),
         new("Supervisor", "Projects", true, true, true, false),
-        new("Supervisor", "Genero", true, true, true, false),
-        new("Supervisor", "Industria", true, true, true, false),
-        new("Supervisor", "Rango Ingreso", true, true, true, false),
-        new("Supervisor", "Regimen Tributario", true, true, true, false),
+        new("Supervisor", "Genders", true, true, true, false),
+        new("Supervisor", "Industries", true, true, true, false),
+        new("Supervisor", "IncomeRanges", true, true, true, false),
+        new("Supervisor", "TaxRegimes", true, true, true, false),
         new("Supervisor", "EntityStatuses", true, true, true, false),
         new("Supervisor", "CompanyModules", true, true, true, false),
+        new("Supervisor", "CustomersMenu", true, true, true, true),
         new("Supervisor", "Persons", true, true, true, true),
-        new("Supervisor", "Clientes", true, true, true, true),
         new("Supervisor", "Customers", true, true, true, false),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
-        new("Supervisor", "Compañias", true, true, true, false),
-        new("Supervisor", "ManejoTickets", true, true, true, true),
+        new("Supervisor", "Companies", true, true, true, false),
+        new("Supervisor", "TicketManagement", true, true, true, true),
         new("Supervisor", "Tickets", true, true, true, true),
         new("Supervisor", "TimeUnits", true, true, true, false),
         new("Supervisor", "TicketComplexities", true, true, true, false),
@@ -2882,8 +3052,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "TicketStatusTransitions", true, false, false, false),
 
         // `UsuarioSimple` receives read-only access to selected administrative options while the remaining entries stay restricted by default.
-        new("UsuarioSimple", "Administracion", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
-        new("UsuarioSimple", "Paises", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Administration", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Countries", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "Regions", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "Provinces", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "Municipalities", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
@@ -2891,15 +3061,15 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("UsuarioSimple", "StreetTypes", true, true, true, true, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "Areas", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "Projects", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
-        new("UsuarioSimple", "Genero", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
-        new("UsuarioSimple", "Industria", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
-        new("UsuarioSimple", "Rango Ingreso", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
-        new("UsuarioSimple", "Regimen Tributario", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Genders", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Industries", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "IncomeRanges", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "TaxRegimes", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "EntityStatuses", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "CompanyModules", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "CommunicationChannels", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
-        new("UsuarioSimple", "Compañias", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
-        new("UsuarioSimple", "ManejoTickets", true, true, true, true, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "Companies", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        new("UsuarioSimple", "TicketManagement", true, true, true, true, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "Tickets", true, true, true, true, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "TimeUnits", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
         new("UsuarioSimple", "TicketComplexities", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
@@ -2963,10 +3133,17 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         string RoleName,
         bool IsSuperAdmin,
         bool IsSuperAdminCompany = false);
+    private sealed record SystemModuleSeed(
+        string Name,
+        string Description,
+        string Icon,
+        bool IsBase,
+        int Order);
     private sealed record SystemOptionSeed(
         string Name,
         string Route,
         string? Icon,
+        string ModuleName,
         string? ParentName,
         string? ControllerName,
         bool CanRead,

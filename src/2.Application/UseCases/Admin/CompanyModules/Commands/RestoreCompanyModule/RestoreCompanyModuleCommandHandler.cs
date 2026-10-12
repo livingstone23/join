@@ -12,7 +12,8 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 /// </summary>
 public sealed class RestoreCompanyModuleCommandHandler(
     ICurrentUserService currentUserService,
-    SoftDeleteRestorer restorer)
+    SoftDeleteRestorer restorer,
+    CompanyPermissionCacheInvalidator cacheInvalidator)
     : IRequestHandler<RestoreCompanyModuleCommand, Response<Guid>>
 {
     /// <inheritdoc />
@@ -28,12 +29,20 @@ public sealed class RestoreCompanyModuleCommandHandler(
             return Response<Guid>.Error("SUPERADMIN_REQUIRED", ["Only a SuperAdmin can restore deleted records."]);
         }
 
-        return await restorer.RestoreAsync<CompanyModule>(
+        var response = await restorer.RestoreAsync<CompanyModule>(
             request.Id,
             request.CompanyId,
             isParentDeleted: async (entity, _) =>
                 await restorer.IsParentDeletedAsync<Company>(entity.CompanyId)
                 || await restorer.IsParentDeletedAsync<SystemModule>(entity.ModuleId),
             cancellationToken: cancellationToken);
+
+        if (response.IsSuccess)
+        {
+            // SPEC 43: the restored module shows up in the company's menu right away.
+            await cacheInvalidator.InvalidateAsync(TenantResolver.Resolve(currentUserService, request.CompanyId), cancellationToken);
+        }
+
+        return response;
     }
 }

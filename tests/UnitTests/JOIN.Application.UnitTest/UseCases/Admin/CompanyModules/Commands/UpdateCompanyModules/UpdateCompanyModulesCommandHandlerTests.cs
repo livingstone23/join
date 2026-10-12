@@ -6,6 +6,9 @@ using JOIN.Application.Interface.Persistence.Admin;
 using JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
+using JOIN.Application.UnitTest.Common.TestDoubles;
+using JOIN.Domain.Security;
+using JOIN.Application.Common;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Admin.CompanyModules.Commands.UpdateCompanyModules;
@@ -178,6 +181,43 @@ public sealed class UpdateCompanyModulesCommandHandlerTests
     }
 
     /// <summary>
+    /// SPEC 43: activating or deactivating a module drops the cached menu and permissions of every user of
+    /// the company (members and role assignments), and exposes IsBase of the module.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenUpdated_ShouldInvalidateTheCacheOfEveryCompanyUser()
+    {
+        var context = new UpdateCompanyModulesCommandTestContext();
+        var companyId = Guid.NewGuid();
+        var moduleId = Guid.NewGuid();
+        var member = Guid.NewGuid();
+        var roleUser = Guid.NewGuid();
+        var entity = new CompanyModule { CompanyId = companyId, ModuleId = moduleId, IsActive = true };
+        var request = CreateValidCommand(entity.Id, companyId);
+        context.SetActiveTenant(companyId);
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN" });
+        context.CompanyModuleNamedRepositoryMock
+            .Setup(x => x.GetByIdForUpdateAsync(request.Id, companyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(entity);
+        context.ModuleRepositoryMock.Setup(x => x.GetAsync(moduleId)).ReturnsAsync(new SystemModule { Name = "Tickets", IsBase = true });
+        context.UnitOfWorkMock.SetupRepositoryRows(new[]
+        {
+            new UserCompany { UserId = member, CompanyId = companyId },
+            new UserCompany { UserId = Guid.NewGuid(), CompanyId = Guid.NewGuid() }
+        });
+        context.UnitOfWorkMock.SetupRepositoryRows(new[] { new UserRoleCompany { UserId = roleUser, CompanyId = companyId } });
+
+        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        response.Data!.IsBase.Should().BeTrue();
+        entity.IsActive.Should().BeFalse();
+        context.PermissionServiceMock.Verify(x => x.InvalidateUserCacheAsync(companyId, member, It.IsAny<CancellationToken>()), Times.Once);
+        context.PermissionServiceMock.Verify(x => x.InvalidateUserCacheAsync(companyId, roleUser, It.IsAny<CancellationToken>()), Times.Once);
+        context.PermissionServiceMock.Verify(x => x.InvalidateUserCacheAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    /// <summary>
     /// Creates a valid update command.
     /// </summary>
     private static UpdateCompanyModulesCommand CreateValidCommand(Guid id, Guid companyId)
@@ -204,6 +244,8 @@ public sealed class UpdateCompanyModulesCommandHandlerTests
             UnitOfWorkMock.Setup(x => x.GetRepository<CompanyModule>()).Returns(CompanyModuleRepositoryMock.Object);
             UnitOfWorkMock.Setup(x => x.GetRepository<SystemModule>()).Returns(ModuleRepositoryMock.Object);
             UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+            UnitOfWorkMock.SetupRepositoryRows(Array.Empty<UserCompany>());
+            UnitOfWorkMock.SetupRepositoryRows(Array.Empty<UserRoleCompany>());
         }
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
@@ -212,6 +254,7 @@ public sealed class UpdateCompanyModulesCommandHandlerTests
         public Mock<IGenericRepository<SystemModule>> ModuleRepositoryMock { get; } = new();
         public Mock<ICompanyModuleRepository> CompanyModuleNamedRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
+        public Mock<IPermissionService> PermissionServiceMock { get; } = new();
 
         public UpdateCompanyModulesCommandHandler CreateHandler()
         {
@@ -219,7 +262,10 @@ public sealed class UpdateCompanyModulesCommandHandlerTests
             // with SetActiveTenant(companyId) to align it with the request's CompanyId.
             CurrentUserServiceMock.Setup(x => x.IsInRole(It.IsAny<string>())).Returns(false);
             UnitOfWorkMock.Setup(x => x.CompanyModules).Returns(CompanyModuleNamedRepositoryMock.Object);
-            return new UpdateCompanyModulesCommandHandler(UnitOfWorkMock.Object, CurrentUserServiceMock.Object);
+            return new UpdateCompanyModulesCommandHandler(
+                UnitOfWorkMock.Object,
+                CurrentUserServiceMock.Object,
+                new CompanyPermissionCacheInvalidator(UnitOfWorkMock.Object, PermissionServiceMock.Object));
         }
 
         /// <summary>

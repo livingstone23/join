@@ -41,7 +41,7 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
     /// <param name="cancellationToken">Token used to cancel the request while the query is being processed.</param>
     /// <returns>A standardized paged response containing the matching company module assignments.</returns>
     [HttpGet]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin,SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<PagedResult<CompanyModuleListItemDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
@@ -52,16 +52,17 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
         [FromQuery] string? moduleName = null,
         [FromQuery] DateTime? createdFrom = null,
         [FromQuery] DateTime? createdTo = null,
-        [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
+        [FromQuery] bool? includeDeleted = null,
+        [FromQuery] Guid? companyId = null, CancellationToken cancellationToken = default)
     {
-        var companyId = _currentUserService.CompanyId;
-        if (companyId == Guid.Empty)
+        if (_currentUserService.CompanyId == Guid.Empty)
         {
             return BadRequest(Response<PagedResult<CompanyModuleListItemDto>>.Error(
                 "INVALID_COMPANY_ID",
                 ["Authenticated token must contain a valid CompanyId claim."]));
         }
 
+        // SPEC 43: the handler ignores companyId for anybody but a SuperAdmin (SuperAdminCompany: own company only).
         var response = await _sender.Send(
             new GetCompanyModulesQuery(companyId, pageNumber, pageSize, companyName, moduleName, createdFrom, createdTo, includeDeleted),
             cancellationToken);
@@ -121,23 +122,24 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
     /// <param name="cancellationToken">Token used to cancel the request while the query is being processed.</param>
     /// <returns>A standardized response containing the requested assignment when it exists.</returns>
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = "SuperAdminCompany")]
+    [Authorize(Roles = "SuperAdmin,SuperAdminCompany")]
     [ProducesResponseType(typeof(Response<CompanyModuleDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(
         Guid id,
-        [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default)
+        [FromQuery] bool? includeDeleted = null,
+        [FromQuery] Guid? companyId = null, CancellationToken cancellationToken = default)
     {
-        var companyId = _currentUserService.CompanyId;
-        if (companyId == Guid.Empty)
+        if (_currentUserService.CompanyId == Guid.Empty)
         {
             return BadRequest(Response<CompanyModuleDto>.Error(
                 "INVALID_COMPANY_ID",
                 ["Authenticated token must contain a valid CompanyId claim."]));
         }
 
+        // SPEC 43: the handler ignores companyId for anybody but a SuperAdmin (SuperAdminCompany: own company only).
         var response = await _sender.Send(new GetCompanyModulesByIdQuery(id, companyId, includeDeleted), cancellationToken);
         if (!response.IsSuccess)
         {

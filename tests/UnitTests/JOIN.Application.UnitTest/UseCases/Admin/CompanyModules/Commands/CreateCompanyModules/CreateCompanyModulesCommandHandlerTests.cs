@@ -6,6 +6,9 @@ using JOIN.Application.Interface.Persistence.Admin;
 using JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
+using JOIN.Application.UnitTest.Common.TestDoubles;
+using JOIN.Domain.Security;
+using JOIN.Application.Common;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Admin.CompanyModules.Commands.CreateCompanyModules;
@@ -208,6 +211,27 @@ public sealed class CreateCompanyModulesCommandHandlerTests
     }
 
     /// <summary>
+    /// SPEC 43: enabling a module drops the cached menu and permissions of the company's users.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenCreated_ShouldInvalidateTheCompanyUsersCache()
+    {
+        var context = new CreateCompanyModulesCommandTestContext();
+        var request = CreateValidCommand();
+        var userId = Guid.NewGuid();
+        context.SetActiveTenant(request.CompanyId);
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(request.CompanyId)).ReturnsAsync(new Company { Name = "JOIN" });
+        context.ModuleRepositoryMock.Setup(x => x.GetAsync(request.ModuleId)).ReturnsAsync(new SystemModule { Name = "Tickets", IsBase = true });
+        context.UnitOfWorkMock.SetupRepositoryRows(new[] { new UserCompany { UserId = userId, CompanyId = request.CompanyId } });
+
+        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        response.Data!.IsBase.Should().BeTrue();
+        context.PermissionServiceMock.Verify(x => x.InvalidateUserCacheAsync(request.CompanyId, userId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
     /// Creates a valid command for reuse across test scenarios.
     /// </summary>
     private CreateCompanyModulesCommand CreateValidCommand()
@@ -234,6 +258,8 @@ public sealed class CreateCompanyModulesCommandHandlerTests
             UnitOfWorkMock.Setup(x => x.GetRepository<SystemModule>()).Returns(ModuleRepositoryMock.Object);
             UnitOfWorkMock.Setup(x => x.GetRepository<CompanyModule>()).Returns(CompanyModuleRepositoryMock.Object);
             UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+            UnitOfWorkMock.SetupRepositoryRows(Array.Empty<UserCompany>());
+            UnitOfWorkMock.SetupRepositoryRows(Array.Empty<UserRoleCompany>());
         }
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
@@ -242,6 +268,7 @@ public sealed class CreateCompanyModulesCommandHandlerTests
         public Mock<IGenericRepository<CompanyModule>> CompanyModuleRepositoryMock { get; } = new();
         public Mock<ICompanyModuleRepository> CompanyModuleNamedRepositoryMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
+        public Mock<IPermissionService> PermissionServiceMock { get; } = new();
 
         public CreateCompanyModulesCommandHandler CreateHandler()
         {
@@ -250,7 +277,10 @@ public sealed class CreateCompanyModulesCommandHandlerTests
             // per test to align the token tenant with the request's CompanyId.
             CurrentUserServiceMock.Setup(x => x.IsInRole(It.IsAny<string>())).Returns(false);
             UnitOfWorkMock.Setup(x => x.CompanyModules).Returns(CompanyModuleNamedRepositoryMock.Object);
-            return new CreateCompanyModulesCommandHandler(UnitOfWorkMock.Object, CurrentUserServiceMock.Object);
+            return new CreateCompanyModulesCommandHandler(
+                UnitOfWorkMock.Object,
+                CurrentUserServiceMock.Object,
+                new CompanyPermissionCacheInvalidator(UnitOfWorkMock.Object, PermissionServiceMock.Object));
         }
 
         /// <summary>

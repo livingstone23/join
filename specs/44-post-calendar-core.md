@@ -609,15 +609,15 @@ Nuevo módulo de menú **Calendario** (`SystemModule`). Recursos (`SystemOption.
 **Seed de menú** (`GetAdministrativeSystemOptionSeeds`):
 
 ```csharp
-new("Calendar", "/calendar", "@Icons.Material.Filled.CalendarMonth", null, null, false, false, false, false),
-new("MyCalendar", "/calendar/my-calendar", "@Icons.Material.Filled.Today", "Calendar", "Calendar", true, true, true, true),
-new("CalendarPanel", "/calendar/panel", "@Icons.Material.Filled.ViewTimeline", "Calendar", "CalendarOthers", true, true, true, true),
-new("ActivityConfirmation", "/calendar/activity-confirmation", "@Icons.Material.Filled.EventAvailable", "Calendar", "CalendarActivityConfirmation", false, false, true, false, IsVisibleMenu: false),
-new("CalendarSettings", "/calendar/settings", "@Icons.Material.Filled.EditCalendar", "Calendar", "CalendarSettings", true, true, true, true, CanExecute: true),
-new("CalendarCatalogs", "/calendar/catalogs", "@Icons.Material.Filled.Category", "Calendar", "CalendarCatalogs", true, true, true, true),
+new("Calendar", "/calendar", "@Icons.Material.Filled.CalendarMonth", "Calendar", null, null, false, false, false, false),
+new("MyCalendar", "/calendar/my-calendar", "@Icons.Material.Filled.Today", "Calendar", "Calendar", "Calendar", true, true, true, true),
+new("CalendarPanel", "/calendar/panel", "@Icons.Material.Filled.ViewTimeline", "Calendar", "Calendar", "CalendarOthers", true, true, true, true),
+new("ActivityConfirmation", "/calendar/activity-confirmation", "@Icons.Material.Filled.EventAvailable", "Calendar", "Calendar", "CalendarActivityConfirmation", false, false, true, false, IsVisibleMenu: false),
+new("CalendarSettings", "/calendar/settings", "@Icons.Material.Filled.EditCalendar", "Calendar", "Calendar", "CalendarSettings", true, true, true, true, CanExecute: true),
+new("CalendarCatalogs", "/calendar/catalogs", "@Icons.Material.Filled.Category", "Calendar", "Calendar", "CalendarCatalogs", true, true, true, true),
 ```
 
-Nombres de opción y rutas **en inglés**, en minúsculas y con **guion** para separar palabras, igual que todo el sistema (decisión del usuario, 2026-10-01; ver SPEC 43). Son definitivos para el frontend. Con SPEC 43, cada fila declara además `ModuleName = "Calendar"`.
+Nombres de opción y rutas **en inglés**, en minúsculas y con **guion** para separar palabras, igual que todo el sistema (decisión del usuario, 2026-10-01; ver SPEC 43). Son definitivos para el frontend. Con SPEC 43, cada fila declara además `ModuleName = "Calendar"`. **Ajuste por SPEC 43-post (2026-10-12):** el ejemplo usa la firma implementada de `SystemOptionSeed`: `(Name, Route, Icon, ModuleName, ParentName, ControllerName, CanRead, CanCreate, CanUpdate, CanDelete, …)`.
 
 **Seed de permisos por rol** (`GetRoleSystemOptionSeeds`, flags `Read, Create, Update, Delete`). Las filas de seed referencian el **nombre de la opción**, no el recurso: `Calendar` → opción `MyCalendar`; `CalendarOthers` → `CalendarPanel`; `CalendarActivityConfirmation` → `ActivityConfirmation`; `CalendarSettings` → `CalendarSettings`; `CalendarCatalogs` → `CalendarCatalogs`.
 

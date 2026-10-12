@@ -58,6 +58,8 @@ public sealed class UpdateSystemModuleCommandHandler(IUnitOfWork unitOfWork)
         entity.Description = normalizedDescription;
         entity.Icon = normalizedIcon;
         entity.IsActive = request.IsActive;
+        // SPEC 43: unmarking a base module never removes it from the companies that already have it.
+        entity.IsBase = request.IsBase;
         entity.Order = request.Order;
 
         await systemModuleRepository.UpdateAsync(entity);
@@ -80,6 +82,7 @@ public sealed class UpdateSystemModuleCommandHandler(IUnitOfWork unitOfWork)
                 Description = entity.Description,
                 Icon = entity.Icon,
                 IsActive = entity.IsActive,
+                IsBase = entity.IsBase,
                 Order = entity.Order,
                 CreatedAt = entity.Created
             }
