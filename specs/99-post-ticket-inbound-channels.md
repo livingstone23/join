@@ -7,6 +7,7 @@
 > **Depends on:** Ninguna. El mensaje de la siembra sobre un `WEB` borrado menciona `POST /CommunicationChannels/{id}/restore`, que existe con SPEC 41-post (Etapa 1).
 > **Related:** SPEC 44 (el calendario registra como origen `WEB` las actividades creadas desde la aplicación), SPEC 47 (ingesta de tickets por WhatsApp y correo, etapa posterior — contenido que antes estaba en esta spec).
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-10-01 (reescrita; la versión original del 2026-09-25 se movió a SPEC 47))
+> **Ajuste por SPEC 99-post (implementación, 2026-10-12):** implementada en la rama `spec-99-post-ticket-inbound-channels`. (1) **Origen del código:** constantes, siembra y test se tomaron del commit de `main` (`efc4128`) con `git apply --3way`, sin conflictos (mismo criterio que 41-post y 42-post); la migración **no** se copió: se generó contra Npgsql (`dotnet ef migrations add`, cuerpo vacío, sin cambios de modelo) y se completó con el SQL de PostgreSQL. (2) **`Down()`:** además de tickets y configuraciones, excluye los canales referenciados por `support.ticketnotifications` y `admin.usercommunicationchannels` (las cuatro FK hacia el canal), como en `main`; sin eso el `DELETE` fallaría por FK. Se actualizó el SQL de "Adaptación a PostgreSQL". (3) **Arreglo en la siembra de `TicketCompanyDefault`** (decisión del usuario, 2026-10-12): `SeedTicketCompanyDefaultsAsync` tomaba cualquier fila de la empresa, incluida una borrada, y la reactivaba (`GcRecord = 0`). Con una fila borrada junto a otra activa, la reactivación violaba `ux_ticketcompanydefaults_company_active` (índice filtrado de SPEC 41-post, Etapa 4) y la API no arrancaba; esta spec lo dejó a la vista porque su migración es la primera que dispara la siembra completa desde 41-post. Ahora la siembra actualiza solo la fila **activa**; si solo hay filas borradas, crea una nueva activa y registra un warning; nunca reactiva una borrada (misma regla que el canal `WEB`). Ver sección A y el test `Seed_WithDeletedTicketDefaults_ShouldNeverReviveThem`. (4) **Tests:** `CommunicationChannelSeedPostgreSqlTests` (3 casos) y `PostgreSqlSmokeTests` comprueba la migración.
 > **Objective:** Agregar al catálogo `Common.CommunicationChannels` los canales internos `Web` (`WEB`) y `App` (`APP`), para que un ticket o una actividad creados desde la propia aplicación queden registrados con su origen real, y usar `WEB` como canal por defecto de los tickets en la seed de desarrollo.
 
 > **Historia (2026-10-08):** al revisarla contra el código, el usuario decidió: (1) `WEB` y `APP` se agregan también con una **migración de datos** idempotente, porque la siembra completa solo corre cuando hay migraciones pendientes y una base existente (QA) nunca los recibiría; (2) los tickets demo que siembre `SeedJoinTicketsAsync` de aquí en adelante usan `WEB`; (3) si `WEB` existe pero está borrado (SPEC 41), la siembra registra un warning y el SuperAdmin lo restaura con `POST /CommunicationChannels/{id}/restore`. Lo relacionado con WhatsApp sigue en SPEC 47 (etapa posterior). Sigue en **Borrador** hasta que el usuario la apruebe.
@@ -37,11 +38,14 @@ INSERT INTO common.communicationchannels (id, name, provider, code, isactive, cr
 SELECT gen_random_uuid(), 'App', 'Internal', 'APP', TRUE, NOW(), 'Spec99_Migration', 0
 WHERE NOT EXISTS (SELECT 1 FROM common.communicationchannels c WHERE c.name = 'App' OR c.code = 'APP');
 
--- Down(): solo las filas insertadas por la migración y sin referencias
+-- Down(): solo las filas insertadas por la migración y sin referencias (las cuatro FK hacia el canal)
 DELETE FROM common.communicationchannels c
 WHERE c.createdby = 'Spec99_Migration'
+  AND c.code IN ('WEB', 'APP')
   AND NOT EXISTS (SELECT 1 FROM messaging.tickets t WHERE t.channelid = c.id)
-  AND NOT EXISTS (SELECT 1 FROM messaging.ticketcompanydefaults d WHERE d.channeldefaultid = c.id);
+  AND NOT EXISTS (SELECT 1 FROM messaging.ticketcompanydefaults d WHERE d.channeldefaultid = c.id)
+  AND NOT EXISTS (SELECT 1 FROM support.ticketnotifications n WHERE n.communicationchannelid = c.id)
+  AND NOT EXISTS (SELECT 1 FROM admin.usercommunicationchannels u WHERE u.communicationchannelid = c.id);
 ```
 
 Validación: `EXPLAIN` del `INSERT` y del `DELETE` contra la base migrada (convención 10 del README).
@@ -83,6 +87,7 @@ new() { Name = "App", Provider = "Internal", Code = "APP", IsActive = true, Crea
 
 - `Web` = la aplicación web de JOIN (la consola de gestión). `App` = una aplicación propia futura (móvil o portal con login); se siembra ya para que el catálogo esté completo, aunque hoy nada la use.
 - Seed de `TicketCompanyDefault` de desarrollo: `ChannelDefaultId` pasa a buscar primero `Code == "WEB"` y, solo si no existe, el comportamiento actual (`WHATSAPP` y luego el primero disponible). Como esa seed ya actualiza la fila existente (`existing.ChannelDefaultId = ...`), las bases de desarrollo quedan con `WEB`.
+- Seed de `TicketCompanyDefault` (Ajuste por SPEC 99-post, 2026-10-12): actualiza solo la configuración **activa** de la empresa; si solo existen filas borradas, crea una nueva activa y registra un warning. Nunca reactiva una fila borrada.
 - Seed de tickets demo (`SeedJoinTicketsAsync`): los tickets que siembre a partir de esta spec usan `WEB` (con el mismo fallback). Los tickets ya sembrados no cambian (decisión 2026-10-08).
 - Si existe un canal con `Code = "WEB"` (o `Name = "Web"`) borrado (`GcRecord > 0`), la siembra no lo inserta ni lo reactiva: registra un warning indicando que se restaure con `POST /CommunicationChannels/{id}/restore` (SPEC 41, solo SuperAdmin) y usa el fallback.
 - Las búsquedas son siempre por `Code`, nunca por `Name` (el comentario de `CommunicationChannel.Code` lo establece: *"Internal code to facilitate logic in the Application layer"*).
@@ -130,12 +135,15 @@ new() { Name = "App", Provider = "Internal", Code = "APP", IsActive = true, Crea
 
 ## Acceptance criteria
 
-- [ ] `Common.CommunicationChannels` tiene `Web` (`WEB`, `Internal`) y `App` (`APP`, `Internal`) activos, sin duplicar los existentes, en base limpia y en base ya sembrada.
-- [ ] El `TicketCompanyDefault` de desarrollo usa `WEB` como canal por defecto.
-- [ ] Ningún código nuevo compara canales por `Name`; se usan las constantes de `CommunicationChannelCodes`.
-- [ ] Ningún ticket existente cambia de canal; los tickets demo nuevos de la siembra usan `WEB`.
-- [ ] Una base existente sin otras migraciones pendientes recibe `WEB` y `APP` al aplicar `Spec99InternalCommunicationChannels`.
-- [ ] Un `WEB` borrado no se reactiva desde la siembra: queda un warning en el log.
+> **Ajuste por SPEC 99-post (2026-10-12, cierre):** verificados con build Release (sin warnings nuevos), 2537 unit tests con cobertura de líneas 92,45 %, integración `~PostgreSql` 171/171 (3 de siembra de canales y configuración, más la migración en `PostgreSqlSmokeTests`), `EXPLAIN` del `INSERT` y del `DELETE`, y verificación con Docker sobre una copia del `join_db` local (ya migrada sin esta migración, con una configuración de tickets borrada junto a la activa): primer arranque → se aplica `Spec99InternalCommunicationChannels` (`WEB`/`APP` con `Spec99_Migration`), seis canales, la configuración activa pasa a `WEB` y la borrada sigue borrada; segundo arranque → sin migraciones pendientes ni duplicados.
+
+- [x] `Common.CommunicationChannels` tiene `Web` (`WEB`, `Internal`) y `App` (`APP`, `Internal`) activos, sin duplicar los existentes, en base limpia y en base ya sembrada.
+- [x] El `TicketCompanyDefault` de desarrollo usa `WEB` como canal por defecto.
+- [x] Ningún código nuevo compara canales por `Name`; se usan las constantes de `CommunicationChannelCodes`.
+- [x] Ningún ticket existente cambia de canal; los tickets demo nuevos de la siembra usan `WEB`.
+- [x] Una base existente sin otras migraciones pendientes recibe `WEB` y `APP` al aplicar `Spec99InternalCommunicationChannels`.
+- [x] Un `WEB` borrado no se reactiva desde la siembra: queda un warning en el log.
+- [x] La siembra nunca reactiva una configuración de tickets (`TicketCompanyDefault`) borrada (Ajuste por SPEC 99-post, 2026-10-12).
 
 ---
 
@@ -145,7 +153,8 @@ new() { Name = "App", Provider = "Internal", Code = "APP", IsActive = true, Crea
 - `SeedCommunicationChannelsAsync` registra un warning cuando un canal sembrado existe con el mismo `Name` y otro `Code` (riesgo de la tabla de abajo); no lo corrige.
 - `SeedJoinTicketsAsync`: el log de creación que se agrega a un ticket demo ya existente sin log nombra el canal solo si es el del ticket (los tickets anteriores conservan su canal).
 - Migración `Spec99InternalCommunicationChannels`: sin cambios de modelo; `INSERT` condicionado por `Name` o `Code`, `CreatedBy = 'Spec99_Migration'`. El test de integración comprueba que en una base limpia las filas `WEB`/`APP` las inserta la migración (antes de la siembra).
-- Tests: `tests/IntegrationTests/Persistence/CommunicationChannelSeedPostgreSqlTests.cs` (base limpia + segunda siembra; `WEB` borrado → no se reactiva y el canal por defecto cae a `WHATSAPP`).
+- `SeedTicketCompanyDefaultsAsync` (Ajuste por SPEC 99-post, 2026-10-12): busca solo la fila activa (`GcRecord = 0`); ya no asigna `GcRecord = 0` al actualizar.
+- Tests: `tests/IntegrationTests/Persistence/CommunicationChannelSeedPostgreSqlTests.cs` (base limpia + segunda siembra; `WEB` borrado → no se reactiva y el canal por defecto cae a `WHATSAPP`; configuración de tickets borrada → no se reactiva).
 
 ## Decisions taken and discarded
 
