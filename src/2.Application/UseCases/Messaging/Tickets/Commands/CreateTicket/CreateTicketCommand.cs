@@ -40,9 +40,10 @@ public record CreateTicketCommand : ITransactionalCommand<Response<TicketDto>>
     public bool IsVisibleToExternals { get; init; }
 
     /// <summary>
-    /// Gets or sets the status identifier.
+    /// Gets or sets the optional initial status identifier. When omitted, the company's
+    /// <c>TicketCompanyDefaults.TicketStatusDefaultId</c> applies (SPEC 42).
     /// </summary>
-    public Guid TicketStatusId { get; init; }
+    public Guid? TicketStatusId { get; init; }
 
     /// <summary>
     /// Gets or sets the complexity identifier.

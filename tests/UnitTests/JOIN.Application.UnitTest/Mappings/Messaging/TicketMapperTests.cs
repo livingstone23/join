@@ -32,7 +32,7 @@ public sealed class TicketMapperTests
         entity.ConsumedTime.Should().Be(command.ConsumedTime);
         entity.EffortPoints.Should().Be(command.EffortPoints);
         entity.IsVisibleToExternals.Should().Be(command.IsVisibleToExternals);
-        entity.TicketStatusId.Should().Be(command.TicketStatusId);
+        entity.TicketStatusId.Should().BeEmpty("the initial status is resolved by the handler (SPEC 42), not mapped");
         entity.TicketComplexityId.Should().Be(command.TicketComplexityId);
         entity.TimeUnitId.Should().Be(command.TimeUnitId);
         entity.PersonId.Should().Be(command.PersonId);

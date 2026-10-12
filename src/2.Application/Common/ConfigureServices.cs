@@ -96,6 +96,7 @@ public static class ConfigureServices
         services.AddScoped<TicketUserCompanySuperAdminCoordinator>();
         services.AddScoped<TicketUserCompanyCapabilityResolver>();
         services.AddScoped<TicketStatusTransitionGuard>();
+        services.AddScoped<TicketInitialStatusResolver>();
         services.AddScoped<TicketDtoAssembler>();
         services.AddScoped<TicketCodeGenerator>();
         services.AddScoped<SoftDeleteRestorer>();
