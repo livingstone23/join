@@ -21,6 +21,10 @@ public static class GenericRepositoryMockExtensions
         repositoryMock
             .Setup(x => x.GetAllIncludingDeletedAsync(It.IsAny<Expression<Func<T, bool>>>()))
             .ReturnsAsync((Expression<Func<T, bool>> predicate) => table.Where(predicate.Compile()).ToList());
+        // Handlers re-read the row by id to get a tracked entity (GetAll* is untracked).
+        repositoryMock
+            .Setup(x => x.GetAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((Guid id) => table.FirstOrDefault(row => row is JOIN.Domain.Audit.BaseEntity entity && entity.Id == id));
     }
 
     /// <summary>

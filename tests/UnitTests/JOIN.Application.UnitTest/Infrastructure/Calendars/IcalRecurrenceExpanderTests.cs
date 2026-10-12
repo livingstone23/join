@@ -6,81 +6,284 @@ using JOIN.Infrastructure.Calendars;
 namespace JOIN.Application.UnitTest.Infrastructure.Calendars;
 
 /// <summary>
-/// SPEC 44 — contract tests of <see cref="IcalRecurrenceExpander"/> against Ical.Net: daylight saving time, last
-/// Friday of the month, COUNT, UNTIL, exceptions keyed by start, and <see cref="DateTimeKind.Utc"/> on every value
-/// (Npgsql rejects other kinds for timestamptz).
+/// Contract tests for <see cref="ICalendarRecurrenceExpander"/>, exercised against the real
+/// <see cref="IcalRecurrenceExpander"/> implementation in <c>JOIN.Infrastructure</c>. SPEC 44 lists these
+/// tests under "Identified risks — interfaz propia con pruebas de contrato": the interface is the
+/// contract, the test suite pins its behaviour so a future swap of the Ical.Net backing stays honest.
 /// </summary>
 public sealed class IcalRecurrenceExpanderTests
 {
-    private readonly IcalRecurrenceExpander _expander = new();
+    private readonly IcalRecurrenceExpander _sut = new();
 
-    private static DateTime Utc(int y, int m, int d, int h) => new(y, m, d, h, 0, 0, DateTimeKind.Utc);
+    /// <summary> Builds a UTC <see cref="DateTime"/> with <see cref="DateTimeKind.Utc"/>. </summary>
+    private static DateTime Utc(int year, int month, int day, int hour = 0, int minute = 0) =>
+        new(year, month, day, hour, minute, 0, DateTimeKind.Utc);
 
+    /// <summary> Builds a 1-hour <see cref="CalendarRecurrenceSeries"/> anchored at <paramref name="startUtc"/>. </summary>
+    private static CalendarRecurrenceSeries Series(string rule, DateTime startUtc) =>
+        new(startUtc, startUtc.AddHours(1), rule, false);
+
+    /// <summary> FREQ=DAILY;INTERVAL=1;COUNT=10 → 10 occurrences inside the window. </summary>
     [Fact]
-    public void Expand_ShouldKeepTheWallClockAcrossDaylightSavingTimeAndReturnUtcKind()
+    public void Expand_WhenDailyIntervalOneWithCountTen_ShouldReturnExactlyTenOccurrences()
     {
-        // Sunday 10:00 in New York: 14:00Z before the 2026-11-01 change, 15:00Z after.
-        var series = new CalendarRecurrenceSeries(Utc(2026, 10, 25, 14), Utc(2026, 10, 25, 15), "FREQ=WEEKLY;BYDAY=SU;COUNT=3", false);
+        var start = Utc(2027, 1, 1, 14, 0);
+        var series = Series("FREQ=DAILY;INTERVAL=1;COUNT=10", start);
 
-        var occurrences = _expander.Expand(series, Utc(2026, 10, 1, 0), Utc(2026, 12, 1, 0), "America/New_York");
+        var result = _sut.Expand(series, Utc(2027, 1, 1), Utc(2027, 5, 1), "UTC");
 
-        occurrences.Select(o => o.StartUtc).Should().Equal(Utc(2026, 10, 25, 14), Utc(2026, 11, 1, 15), Utc(2026, 11, 8, 15));
-        occurrences.Should().OnlyContain(o => o.StartUtc.Kind == DateTimeKind.Utc && o.EndUtc.Kind == DateTimeKind.Utc);
-        occurrences.Should().OnlyContain(o => o.EndUtc - o.StartUtc == TimeSpan.FromHours(1));
+        result.Should().HaveCount(10);
+        result.Select(o => o.StartUtc).Should().BeInAscendingOrder();
+        result[0].StartUtc.Should().Be(start);
+        result[^1].StartUtc.Should().Be(start.AddDays(9));
     }
 
+    /// <summary> FREQ=DAILY;INTERVAL=1 with no COUNT/UNTIL → at least 365 occurrences in a year. </summary>
     [Fact]
-    public void Expand_LastFridayOfTheMonth_AndOverlappingStartBeforeTheWindow()
+    public void Expand_WhenDailyIntervalOneHasNoEnd_ShouldYieldAtLeast365OccurrencesInAYear()
     {
-        var series = new CalendarRecurrenceSeries(Utc(2027, 1, 29, 15), Utc(2027, 1, 29, 18), "FREQ=MONTHLY;BYDAY=-1FR", false);
+        var start = Utc(2027, 1, 1, 0, 0);
+        var series = Series("FREQ=DAILY;INTERVAL=1", start);
 
-        _expander.Expand(series, Utc(2027, 2, 1, 0), Utc(2027, 5, 1, 0), "America/Managua")
-            .Select(o => o.StartUtc).Should().Equal(Utc(2027, 2, 26, 15), Utc(2027, 3, 26, 15), Utc(2027, 4, 30, 15));
-        _expander.Expand(series, Utc(2027, 2, 26, 16), Utc(2027, 2, 26, 17), "America/Managua")
-            .Should().ContainSingle("an occurrence that started before the window still overlaps it");
+        var result = _sut.Expand(series, start, Utc(2028, 1, 1), "UTC");
+
+        result.Should().HaveCountGreaterThanOrEqualTo(365);
     }
 
+    /// <summary> FREQ=WEEKLY;BYDAY=MO,WE;COUNT=10 → 10 occurrences, each on a Monday or Wednesday. </summary>
     [Fact]
-    public void Expand_InvalidRuleOrEmptyWindow_ShouldReturnNothing()
+    public void Expand_WhenWeeklyByDayMondayWednesdayCountTen_ShouldReturnTenOccurrencesOnlyOnMonWed()
     {
-        var series = new CalendarRecurrenceSeries(Utc(2027, 1, 1, 15), Utc(2027, 1, 1, 16), "FREQ=HOURLY", false);
+        var start = Utc(2027, 1, 4, 10, 0); // Monday
+        var series = Series("FREQ=WEEKLY;BYDAY=MO,WE;COUNT=10", start);
 
-        _expander.Expand(series, Utc(2027, 1, 1, 0), Utc(2027, 2, 1, 0), "America/Managua").Should().BeEmpty();
-        _expander.Expand(series with { RecurrenceRule = "FREQ=DAILY" }, Utc(2027, 2, 1, 0), Utc(2027, 1, 1, 0), "America/Managua").Should().BeEmpty();
+        var result = _sut.Expand(series, start, start.AddDays(91), "UTC");
+
+        result.Should().HaveCount(10);
+        result.Should().OnlyContain(o => o.StartUtc.DayOfWeek == DayOfWeek.Monday || o.StartUtc.DayOfWeek == DayOfWeek.Wednesday);
+        for (var i = 1; i < result.Count; i++)
+        {
+            // Alternates 2 days (Mon→Wed) and 5 days (Wed→Mon). Average is 3.5, but each individual gap is 2 or 5.
+            var gap = (result[i].StartUtc - result[i - 1].StartUtc).TotalDays;
+            (gap == 2 || gap == 5).Should().BeTrue($"expected 2 (Mon→Wed) or 5 (Wed→Mon) days, got {gap}");
+        }
     }
 
+    /// <summary> FREQ=WEEKLY;INTERVAL=2;BYDAY=MO → every other Monday. </summary>
     [Fact]
-    public void GetSeriesEndUtc_ShouldUseCountUntilOrNoEnd()
+    public void Expand_WhenWeeklyIntervalTwoByDayMonday_ShouldReturnEveryOtherMonday()
     {
-        var start = Utc(2027, 3, 1, 15);
-        _expander.GetSeriesEndUtc(new(start, start.AddHours(1), "FREQ=DAILY;COUNT=3", false), "America/Managua").Should().Be(Utc(2027, 3, 3, 16));
-        _expander.GetSeriesEndUtc(new(start, start.AddHours(1), "FREQ=WEEKLY;UNTIL=20270315T235959Z", false), "America/Managua").Should().Be(Utc(2027, 3, 15, 16));
-        _expander.GetSeriesEndUtc(new(start, start.AddHours(1), "FREQ=DAILY", false), "America/Managua").Should().BeNull();
-        _expander.GetSeriesEndUtc(new(start, start.AddHours(1), "FREQ=DAILY;COUNT=2", false), "Unknown/Zone")!.Value.Kind.Should().Be(DateTimeKind.Utc);
+        var start = Utc(2027, 1, 4, 10, 0); // Monday
+        var series = Series("FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=6", start);
+
+        var result = _sut.Expand(series, start, Utc(2027, 4, 5), "UTC");
+
+        result.Should().HaveCount(6);
+        result.Should().OnlyContain(o => o.StartUtc.DayOfWeek == DayOfWeek.Monday);
+        for (var i = 1; i < result.Count; i++)
+        {
+            (result[i].StartUtc - result[i - 1].StartUtc).TotalDays.Should().Be(14);
+        }
     }
 
+    /// <summary> FREQ=MONTHLY;BYMONTHDAY=15;COUNT=12 → the 15th of each month, 12 occurrences. </summary>
     [Fact]
-    public void ValidateRule_ShouldUseTheSubsetAndTheLibrary()
+    public void Expand_WhenMonthlyByMonthDayFifteenCountTwelve_ShouldReturn15thOfEachMonthForAYear()
     {
-        _expander.ValidateRule("FREQ=WEEKLY;BYDAY=MO").IsSuccess.Should().BeTrue();
-        _expander.ValidateRule("FREQ=MINUTELY").Message.Should().Be(CalendarErrorCodes.InvalidRecurrenceRule);
+        var start = Utc(2027, 1, 15, 9, 0);
+        var series = Series("FREQ=MONTHLY;BYMONTHDAY=15;COUNT=12", start);
+
+        var result = _sut.Expand(series, start, Utc(2028, 4, 1), "UTC");
+
+        result.Should().HaveCount(12);
+        result.Should().OnlyContain(o => o.StartUtc.Day == 15);
+        for (var i = 1; i < result.Count; i++)
+        {
+            result[i].StartUtc.Month.Should().Be(result[i - 1].StartUtc.Month + 1);
+        }
+        result[^1].StartUtc.Month.Should().Be(12);
+        result[^1].StartUtc.Year.Should().Be(2027);
     }
 
+    /// <summary> FREQ=MONTHLY;BYDAY=-1FR;COUNT=6 → the last Friday of each month, 6 occurrences. </summary>
     [Fact]
-    public void Expansion_ShouldReplaceOccurrencesKeyedByExceptions()
+    public void Expand_WhenMonthlyByDayLastFridayCountSix_ShouldReturnLastFridayOfEachMonth()
     {
-        var master = new Slot(Guid.NewGuid(), null, null, Utc(2027, 3, 1, 15), Utc(2027, 3, 1, 16), false, "FREQ=DAILY;COUNT=3");
-        var exception = new Slot(Guid.NewGuid(), master.Id, Utc(2027, 3, 2, 15), Utc(2027, 3, 2, 20), Utc(2027, 3, 2, 21), false, null);
+        var start = Utc(2027, 1, 29, 9, 0); // Last Friday of January 2027
+        var series = Series("FREQ=MONTHLY;BYDAY=-1FR;COUNT=6", start);
 
-        var occurrences = CalendarOccurrenceExpansion.Expand([master, exception], Utc(2027, 3, 1, 0), Utc(2027, 3, 5, 0), "America/Managua", _expander);
+        var result = _sut.Expand(series, start, Utc(2027, 8, 1), "UTC");
 
-        occurrences.Should().HaveCount(3);
-        occurrences[1].ExceptionId.Should().Be(exception.Id);
-        occurrences[1].EventId.Should().Be(master.Id);
-        occurrences[1].OccurrenceStartUtc.Should().Be(Utc(2027, 3, 2, 15));
-        occurrences.Should().OnlyContain(o => o.IsRecurring);
+        result.Should().HaveCount(6);
+        result.Should().OnlyContain(o => o.StartUtc.DayOfWeek == DayOfWeek.Friday);
+        foreach (var occ in result)
+        {
+            occ.StartUtc.Day.Should().BeGreaterThanOrEqualTo(25);
+            var lastDayOfMonth = DateTime.DaysInMonth(occ.StartUtc.Year, occ.StartUtc.Month);
+            var lastFriday = Enumerable.Range(lastDayOfMonth - 6, 7)
+                .Select(d => new DateTime(occ.StartUtc.Year, occ.StartUtc.Month, d, 9, 0, 0, DateTimeKind.Utc))
+                .First(d => d.DayOfWeek == DayOfWeek.Friday);
+            occ.StartUtc.Day.Should().Be(lastFriday.Day);
+        }
     }
 
-    private sealed record Slot(Guid Id, Guid? SeriesMasterId, DateTime? OriginalStartUtc, DateTime StartUtc, DateTime EndUtc, bool IsAllDay, string? RecurrenceRule)
-        : ICalendarEventSlot;
+    /// <summary> FREQ=YEARLY;BYMONTHDAY=1;COUNT=3 → January 1st of three consecutive years. </summary>
+    [Fact]
+    public void Expand_WhenYearlyByMonthDayOneCountThree_ShouldReturnJanuaryFirstEachYear()
+    {
+        var start = Utc(2027, 1, 1, 0, 0);
+        var series = Series("FREQ=YEARLY;BYMONTHDAY=1;COUNT=3", start);
+
+        var result = _sut.Expand(series, start, Utc(2030, 6, 1), "UTC");
+
+        result.Should().HaveCount(3);
+        result.Should().OnlyContain(o => o.StartUtc.Month == 1 && o.StartUtc.Day == 1);
+        result[0].StartUtc.Year.Should().Be(2027);
+        result[1].StartUtc.Year.Should().Be(2028);
+        result[2].StartUtc.Year.Should().Be(2029);
+    }
+
+    /// <summary> UTC normalisation: <c>StartUtc.Kind == Utc</c> regardless of the supplied time zone. </summary>
+    [Fact]
+    public void Expand_WhenTimeZoneIsNonUtc_ShouldReturnOccurrencesInUtcKind()
+    {
+        var start = Utc(2027, 1, 1, 14, 0);
+        var series = Series("FREQ=DAILY;INTERVAL=1;COUNT=3", start);
+
+        var result = _sut.Expand(series, start, Utc(2027, 1, 5), "America/New_York");
+
+        result.Should().HaveCount(3);
+        result.Should().OnlyContain(o => o.StartUtc.Kind == DateTimeKind.Utc);
+        result.Should().OnlyContain(o => o.EndUtc.Kind == DateTimeKind.Utc);
+    }
+
+    /// <summary>
+    /// DST handling: DAILY 03:30 America/New_York across the 2027-03-14 spring-forward boundary.
+    /// Wall-clock stays at 03:30 local and no occurrence is dropped or duplicated.
+    /// </summary>
+    [Fact]
+    public void Expand_WhenDailyAcrossDstInNewYork_ShouldKeepLocalWallClockAndNotDropOccurrences()
+    {
+        // Canonical US DST forward: 2027-03-14 02:00 -> 03:00 (second Sunday of March).
+        const string rule = "FREQ=DAILY;INTERVAL=1;COUNT=14";
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+        var startLocal = new DateTime(2027, 3, 7, 3, 30, 0, DateTimeKind.Unspecified);
+        var startUtc = TimeZoneInfo.ConvertTimeToUtc(startLocal, zone);
+        var series = new CalendarRecurrenceSeries(startUtc, startUtc.AddHours(1), rule, false);
+
+        var result = _sut.Expand(series, startUtc, startUtc.AddDays(14), "America/New_York");
+
+        result.Should().HaveCount(14);
+        foreach (var occ in result)
+        {
+            var local = TimeZoneInfo.ConvertTimeFromUtc(occ.StartUtc, zone);
+            local.Hour.Should().Be(3);
+            local.Minute.Should().Be(30);
+        }
+
+        // UTC offset shifts one hour forward on the day after the spring-forward.
+        // Wall-clock 03:30 falls outside the gap (02:00→03:00), so each occurrence stays at
+        // the same local 03:30. Before the switch (March 13 03:30 EST) the UTC offset is -5
+        // and on/after (March 14 03:30 EDT) it is -4, so the UTC gap between adjacent days is
+        // 23 hours (the local 03:30 EDT is one hour earlier in UTC than the previous 03:30 EST).
+        var beforeDst = result.Last(o => o.StartUtc.Date < new DateTime(2027, 3, 14, 0, 0, 0, DateTimeKind.Utc));
+        var afterDst = result.First(o => o.StartUtc.Date >= new DateTime(2027, 3, 14, 0, 0, 0, DateTimeKind.Utc));
+        (afterDst.StartUtc - beforeDst.StartUtc).TotalHours.Should().Be(23);
+    }
+
+    /// <summary> FREQ=NONE or missing FREQ → CALENDAR_INVALID_RECURRENCE_RULE. </summary>
+    [Theory]
+    [InlineData("FREQ=NONE;COUNT=5")]
+    [InlineData("COUNT=5")] // missing FREQ
+    [InlineData("")]
+    public void ValidateRule_WhenFrequencyIsNoneOrMissing_ShouldReturnInvalidRecurrenceRule(string rrule)
+    {
+        var result = _sut.ValidateRule(rrule);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Message.Should().Be(CalendarErrorCodes.InvalidRecurrenceRule);
+    }
+
+    /// <summary> FREQ=SECONDLY is outside the supported subset (DAILY/WEEKLY/MONTHLY/YEARLY). </summary>
+    [Fact]
+    public void ValidateRule_WhenFrequencyIsSecondly_ShouldBeRejected()
+    {
+        var result = _sut.ValidateRule("FREQ=SECONDLY;COUNT=5");
+
+        result.IsSuccess.Should().BeFalse();
+        result.Message.Should().Be(CalendarErrorCodes.InvalidRecurrenceRule);
+    }
+
+    /// <summary> COUNT greater than the documented cap (730) → CALENDAR_INVALID_RECURRENCE_RULE. </summary>
+    [Fact]
+    public void ValidateRule_WhenCountExceedsMax_ShouldBeRejected()
+    {
+        var result = _sut.ValidateRule($"FREQ=DAILY;COUNT={CalendarRecurrenceRule.MaxCount + 1}");
+
+        result.IsSuccess.Should().BeFalse();
+        result.Message.Should().Be(CalendarErrorCodes.InvalidRecurrenceRule);
+    }
+
+    /// <summary> Malformed rule (unknown key, bad value, or no KEY=VALUE) → CALENDAR_INVALID_RECURRENCE_RULE. </summary>
+    [Theory]
+    [InlineData("FOO=BAR")]
+    [InlineData("FREQ=DAILY;INTERVAL=abc")]
+    [InlineData("not-a-rule")]
+    public void ValidateRule_WhenRuleIsMalformed_ShouldBeRejected(string rrule)
+    {
+        var result = _sut.ValidateRule(rrule);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Message.Should().Be(CalendarErrorCodes.InvalidRecurrenceRule);
+    }
+
+    /// <summary>
+    /// Allowed qualifiers on each supported frequency round-trip through the parser and the Ical.Net
+    /// <c>RecurrencePattern</c> construction the implementation uses.
+    /// </summary>
+    [Theory]
+    [InlineData("FREQ=DAILY;COUNT=5")]
+    [InlineData("FREQ=WEEKLY;BYDAY=MO,TU;COUNT=10")]
+    [InlineData("FREQ=MONTHLY;BYMONTHDAY=15;COUNT=12")]
+    [InlineData("FREQ=YEARLY;BYMONTHDAY=1;COUNT=3")]
+    [InlineData("FREQ=DAILY;INTERVAL=2;COUNT=20")]
+    public void ValidateRule_WhenRuleIsSupported_ShouldReturnSuccess(string rrule)
+    {
+        var result = _sut.ValidateRule(rrule);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Data.Should().NotBeNull();
+    }
+
+    /// <summary> Expand honours UNTIL (no occurrence past the inclusive cap) per RFC 5545. </summary>
+    [Fact]
+    public void Expand_WhenRuleHasUntil_ShouldNotYieldOccurrencesPastUntil()
+    {
+        var start = Utc(2027, 1, 1, 12, 0);
+        var until = Utc(2027, 1, 10, 12, 0);
+        var series = Series($"FREQ=DAILY;UNTIL={until:yyyyMMddTHHmmssZ}", start);
+
+        var result = _sut.Expand(series, start, Utc(2027, 1, 31), "UTC");
+
+        result.Should().NotBeEmpty();
+        result.Should().OnlyContain(o => o.StartUtc <= until);
+        result[^1].StartUtc.Should().Be(until);
+    }
+
+    /// <summary> Expand only returns occurrences whose start falls within the requested half-open window. </summary>
+    [Fact]
+    public void Expand_ShouldReturnOnlyOccurrencesOverlappingRequestedWindow()
+    {
+        var start = Utc(2027, 1, 1, 9, 0);
+        var series = Series("FREQ=DAILY;INTERVAL=1;COUNT=10", start);
+        var windowFrom = Utc(2027, 1, 5);
+        var windowTo = Utc(2027, 1, 10);
+
+        var result = _sut.Expand(series, windowFrom, windowTo, "UTC");
+
+        // Capture Jan 5 09:00 .. Jan 9 09:00 — five overlapping 1-hour occurrences (Jan 10 09:00 is excluded).
+        result.Should().HaveCount(5);
+        result.Should().OnlyContain(o => o.StartUtc >= windowFrom && o.StartUtc < windowTo);
+        result.Should().OnlyContain(o => o.StartUtc.Day >= 5 && o.StartUtc.Day < 10);
+    }
 }

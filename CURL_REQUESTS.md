@@ -1230,12 +1230,17 @@ curl -s -X DELETE "$BASE_URL/api/v1/tickets/$TICKET_ID/documents/$DOCUMENT_ID" \
 # Returns 404 TICKET_DOCUMENT_NOT_FOUND for cross-ticket or cross-tenant ids.
 ```
 
----
+## Calendar module (SPEC 44)
 
-## Calendar — `/api/v1/Calendar*` (SPEC 44-post)
+All endpoints below require (once SPEC 48-post exists; until then only the menu is filtered) the Calendar module active in `CompanyModule` (otherwise `403 MODULE_NOT_ENABLED`), the bearer token + `X-Company-Id`, and the appropriate `Calendar*` permission. Five resources:
 
-All dates are UTC in the responses, with `timeZone` (the company's IANA zone) for the frontend to convert.
-Requests accept ISO 8601 with offset (`2027-03-01T10:00:00-06:00`); all-day activities use `startDate`/`endDate`.
+| Resource | What it controls |
+|---|---|
+| `Calendar` | own calendars, activities, preferences, absences |
+| `CalendarOthers` | panel — read/create/update/delete activities in other users' calendars |
+| `CalendarActivityConfirmation` | change status (confirm/cancel/complete) |
+| `CalendarSettings` | company-level configuration (activities, statuses, `CalendarCompany`, holidays, others' preferences/periods) |
+| `CalendarCatalogs` | global activity/status catalogs (SuperAdmin) |
 
 **Deployment per company (outside JOIN-001):**
 
@@ -1244,101 +1249,249 @@ Requests accept ISO 8601 with offset (`2027-03-01T10:00:00-06:00`); all-day acti
    JOIN-001 is seeded. The options are `MyCalendar` → `Calendar`, `CalendarPanel` → `CalendarOthers`,
    `ActivityConfirmation` → `CalendarActivityConfirmation`, `CalendarSettings` and `CalendarCatalogs`. Without
    these rows the endpoints answer `403`.
-3. The company's catalogs exist from its creation; for older companies, call `sync-catalogs`.
-4. Create the configuration with `POST /CalendarCompanies`. It provisions "Mi calendario" for every member.
+3. Older companies get the catalogs with `POST /CalendarCompanies/current/sync-catalogs`; new companies have them from creation.
+4. `POST /CalendarCompanies` creates the configuration and provisions "Mi calendario" for every member.
+
+
+### 1. Company configuration
 
 ```bash
-# Configuration (resource CalendarSettings)
-curl -s "$BASE_URL/api/v1/CalendarCompanies/current" -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID"
-# 200 always: { isConfigured, moduleEnabled, usersWithoutCalendar, timeZone, businessHoursStart, ... }
+# 1.1 Current configuration — never 404. `isConfigured: false` when the company has no CalendarCompany yet.
+# Returns: { isConfigured, moduleEnabled, usersWithoutCalendar, timeZone, businessHours*, ... }
+curl -s "$BASE_URL/api/v1/CalendarCompanies/current" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
 
-curl -s -X POST "$BASE_URL/api/v1/CalendarCompanies/current/sync-catalogs" -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID"
-# 200 { activitiesAdded, statusesAdded } — needs CalendarSettings.CanExecute
-
+# 1.2 Create. Provisions calendars for every user that has a UserCompany but no calendar yet.
+# `rescheduledByOthersStatusCompanyId` is optional — defaults to the company's RESCHEDULED status.
+# Returns 201 + Response<CalendarCompanyDto>. 409 CALENDAR_COMPANY_ALREADY_CONFIGURED on retry.
+# 400 CALENDAR_INVALID_TIME_ZONE for unknown IANA ids; 400 CALENDAR_INVALID_BUSINESS_HOURS when end ≤ start.
 curl -s -X POST "$BASE_URL/api/v1/CalendarCompanies" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID" -H "Content-Type: application/json" \
-  -d '{ "defaultActivityUserId": "'$USER_ID'", "timeZone": "America/Managua", "isOpen24Hours": false,
-        "businessHoursStart": "08:00:00", "businessHoursEnd": "17:00:00" }'
-# 201 — rescheduledByOthersStatusCompanyId defaults to the company's RESCHEDULED status.
-# 400 CALENDAR_INVALID_TIME_ZONE | CALENDAR_INVALID_BUSINESS_HOURS | CALENDAR_DEFAULT_USER_NOT_IN_COMPANY
-# 409 CALENDAR_COMPANY_ALREADY_CONFIGURED
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "defaultActivityUserId": "'"$ADMIN_USER_ID"'",
+    "timeZone": "America/Managua",
+    "isOpen24Hours": false,
+    "businessHoursStart": "08:00:00",
+    "businessHoursEnd": "17:00:00"
+  }'
 
-curl -s -X POST "$BASE_URL/api/v1/CalendarCompanies/current/provision-users" -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID"
-# 200 [ { userId, name, email } ] — users that got their default calendar now
+# 1.3 Update — narrowing company hours that puts existing users out of range returns
+# 409 CALENDAR_USER_HOURS_OUT_OF_COMPANY_RANGE with the affected user list.
+curl -s -X PUT "$BASE_URL/api/v1/CalendarCompanies/current" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{ "defaultActivityUserId": "'"$ADMIN_USER_ID"'", "timeZone": "America/Managua", "isOpen24Hours": false, "businessHoursStart": "09:00:00", "businessHoursEnd": "17:00:00" }'
+
+# 1.4 Sync catalogs — re-runs SeedCalendarCatalogsForCompanyAsync (idempotent).
+# 201 Permission: CanExecute. Response includes activitiesAdded / statusesAdded counts.
+curl -s -X POST "$BASE_URL/api/v1/CalendarCompanies/current/sync-catalogs" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+# 1.5 Provision pending users — creates default calendars for users added before CalendarCompany was set up.
+curl -s -X POST "$BASE_URL/api/v1/CalendarCompanies/current/provision-users" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
 ```
 
-```bash
-# Lookups for the activity form (resource Calendar)
-curl -s "$BASE_URL/api/v1/CalendarActivityCompanies/usable" -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID"
-curl -s "$BASE_URL/api/v1/CalendarStatusCompanies/usable" -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID"
-curl -s "$BASE_URL/api/v1/UserCalendars/mine" -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID"
-# { pendingProvisioning, calendars: [ { id, name, color, isDefault } ] }
-```
+### 2. Catalogs
 
 ```bash
-# Activities in my calendar (resource Calendar)
+# 2.1 Usable activity types (active in global AND company) — used by the activity form.
+# Resource: Calendar. Ordered by SortOrder.
+curl -s "$BASE_URL/api/v1/CalendarActivityCompanies/usable" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+# 2.2 Enable a global activity type in the company — copies Name/Color/DefaultDurationMinutes/AllowsOverlap/RequiresBusinessHours.
+# Returns 201 Response<CalendarActivityCompanyDto>. 409 CALENDAR_ACTIVITY_ALREADY_ENABLED if the type was already enabled.
+curl -s -X POST "$BASE_URL/api/v1/CalendarActivityCompanies" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{ "calendarActivityId": "'"$ACTIVITY_GLOBAL_ID"'" }'
+
+# 2.3 Usable statuses — same idea for CalendarStatusCompany.
+curl -s "$BASE_URL/api/v1/CalendarStatusCompanies/usable" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+```
+
+### 3. My calendars
+
+```bash
+# 3.1 List my calendars in the current company. `pendingProvisioning: true` when I have no UserCalendar.
+curl -s "$BASE_URL/api/v1/UserCalendars/mine" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+# 3.2 Create.
+curl -s -X POST "$BASE_URL/api/v1/UserCalendars" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "Ventas", "color": "#43A047" }'
+
+# 3.3 Set default — the new calendar becomes the one used when `calendarId` is omitted.
+# 409 CALENDAR_IS_DEFAULT is returned when trying to delete/deactivate the default.
+curl -s -X PUT "$BASE_URL/api/v1/UserCalendars/$CALENDAR_ID/set-default" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+```
+
+### 4. Activities
+
+```bash
+# 4.1 Range query (the main feed for day/week/month views). Max 62 days.
+# Returns: { timeZone, from, to, occurrences: [...], nonWorkingDays: [...] }
+curl -s "$BASE_URL/api/v1/CalendarEvents?from=2026-10-05T00:00:00Z&to=2026-10-11T23:59:59Z" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+# 4.2 Upcoming — for the app welcome banner ("tus actividades programadas"). days ∈ [1, 31], default 7.
+curl -s "$BASE_URL/api/v1/CalendarEvents/upcoming?days=7" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+# 4.3 Create. `calendarId` is optional — when omitted, the activity lands in the user's default calendar.
+# State is taken from CalendarActivityCompany.InitialCalendarStatusCompanyId (no state in the request).
+# Day-all-day activity: send `startDate` / `endDate` (date-only, inclusive) instead of `start` / `end`.
+# 409 CALENDAR_EVENT_OVERLAP when it conflicts with a non-overlapping activity of the same owner.
+# 422 CALENDAR_OUTSIDE_BUSINESS_HOURS / CALENDAR_OUTSIDE_WORK_DAYS / CALENDAR_USER_NOT_AVAILABLE / CALENDAR_COMPANY_HOLIDAY
+# when the activity requires business hours and the creator is not the owner.
 curl -s -X POST "$BASE_URL/api/v1/CalendarEvents" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID" -H "Content-Type: application/json" \
-  -d '{ "calendarActivityCompanyId": "'$MEETING_ID'", "title": "Revisión de contrato",
-        "start": "2027-03-01T10:00:00-06:00", "end": "2027-03-01T11:00:00-06:00",
-        "recurrenceRule": "FREQ=WEEKLY;BYDAY=MO;COUNT=10" }'
-# 201 status = initial status of the type (PENDING by default). calendarId optional → my default calendar.
-# 409 CALENDAR_EVENT_OVERLAP — errors[] lists up to 10 conflicts as JSON { eventId, exceptionId, title, startUtc, endUtc }
-# 400 CALENDAR_INVALID_RECURRENCE_RULE | CALENDAR_ACTIVITY_NOT_ENABLED | CALENDAR_INVALID_LINK | CALENDAR_INVALID_EVENT_TIMES
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "calendarActivityCompanyId": "'"$ACTIVITY_COMPANY_ID"'",
+    "title": "Revisión de contrato",
+    "isAllDay": false,
+    "start": "2026-10-05T10:00:00-06:00",
+    "end":   "2026-10-05T11:00:00-06:00"
+  }'
 
-# Views (day/week/month): expanded occurrences, holidays and my non-working periods. Max 62 days.
-curl -s "$BASE_URL/api/v1/CalendarEvents?from=2027-03-01T06:00:00Z&to=2027-03-08T06:00:00Z&includeCancelled=false" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID"
+# 4.4 Update. For recurring events, `scope` + `occurrenceStartUtc` are required:
+#   ThisOccurrence=1, ThisAndFollowing=2, Series=3.
+# When a non-owner reschedules (changes start/end), the activity is automatically moved to
+# CalendarCompany.RescheduledByOthersStatusCompanyId (default: "Rescheduled" / RESCHEDULED).
+curl -s -X PUT "$BASE_URL/api/v1/CalendarEvents/$EVENT_ID?scope=1&occurrenceStartUtc=2026-10-05T16:00:00Z" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{ "start": "2026-10-05T17:00:00-06:00", "end": "2026-10-05T18:00:00-06:00" }'
 
-curl -s "$BASE_URL/api/v1/CalendarEvents/upcoming?days=7" -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID"
-curl -s "$BASE_URL/api/v1/CalendarEvents/$EVENT_ID/logs" -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID"
-
-# Edit one occurrence of a series (scope: 1 ThisOccurrence, 2 ThisAndFollowing, 3 Series).
-# occurrenceStartUtc is the "occurrenceStartUtc" of the occurrence in the range response.
-curl -s -X PUT "$BASE_URL/api/v1/CalendarEvents/$EVENT_ID?scope=1&occurrenceStartUtc=2027-03-08T16:00:00Z" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID" -H "Content-Type: application/json" \
-  -d '{ "calendarActivityCompanyId": "'$MEETING_ID'", "title": "Movida", "start": "2027-03-08T11:00:00-06:00", "end": "2027-03-08T12:00:00-06:00" }'
-
-# Status change (resource CalendarActivityConfirmation). Cancelling requires notes.
+# 4.5 Change status — notes are mandatory when targeting CANCELLED (400 CALENDAR_CANCELLATION_REASON_REQUIRED).
+# Reactivating from CANCELLED revalidates overlap (R4).
 curl -s -X PATCH "$BASE_URL/api/v1/CalendarEvents/$EVENT_ID/status" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID" -H "Content-Type: application/json" \
-  -d '{ "calendarStatusCompanyId": "'$CANCELLED_ID'", "notes": "El cliente canceló" }'
-# 400 CALENDAR_CANCELLATION_REASON_REQUIRED; reactivating a cancelled activity may answer 409 CALENDAR_EVENT_OVERLAP.
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{ "calendarStatusCompanyId": "'"$CANCELLED_STATUS_ID"'", "notes": "Cliente canceló la cita" }'
 
-curl -s -X DELETE "$BASE_URL/api/v1/CalendarEvents/$EVENT_ID?scope=3&occurrenceStartUtc=2027-03-01T16:00:00Z" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID"
-# Logical delete (records created by mistake). Another user's activity answers 404 CALENDAR_EVENT_NOT_FOUND.
+# 4.6 Logs (history of every change).
+curl -s "$BASE_URL/api/v1/CalendarEvents/$EVENT_ID/logs" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
 ```
 
+### 5. Panel (operate on other users' calendars)
+
 ```bash
-# Panel: other users of the company (resource CalendarOthers)
-curl -s "$BASE_URL/api/v1/CalendarPanel/users?search=ana&onlyWithCalendar=true" -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID"
-curl -s "$BASE_URL/api/v1/CalendarPanel/events?userIds=$U1&userIds=$U2&from=2027-03-01T06:00:00Z&to=2027-03-08T06:00:00Z" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID"
-# Max 20 users and 62 days; others' non-working periods come as kind = "Unavailable" without reason.
+# 5.1 Users available in the panel filter.
+curl -s "$BASE_URL/api/v1/CalendarPanel/users?onlyWithCalendar=true&page=1&pageSize=20" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
 
-curl -s "$BASE_URL/api/v1/CalendarPanel/availability?userId=$U1&from=2027-03-08T06:00:00Z&to=2027-03-09T06:00:00Z&activityCompanyId=$MEETING_ID" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID"
-# Free slots in blocks of the type duration (max 14 days).
+# 5.2 Calendars of selected users (max 20 userIds per request).
+curl -s "$BASE_URL/api/v1/CalendarPanel/calendars?userIds=$USER1&userIds=$USER2" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
 
+# 5.3 Events across multiple users. Max 20 userIds, range ≤ 62 days.
+curl -s "$BASE_URL/api/v1/CalendarPanel/events?userIds=$USER1&from=2026-10-05T00:00:00Z&to=2026-10-11T23:59:59Z" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+# 5.4 Availability — free slots in blocks of the activity's DefaultDurationMinutes. Max 14 days.
+curl -s "$BASE_URL/api/v1/CalendarPanel/availability?userId=$USER1&from=2026-10-05T00:00:00Z&to=2026-10-11T23:59:59Z&activityCompanyId=$ACTIVITY_COMPANY_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+# 5.5 Create in another user's calendar. `ownerUserId` is required.
+# CalendarOthers.CanCreate is required; R5 (business-hours validation) is enforced.
 curl -s -X POST "$BASE_URL/api/v1/CalendarPanel/events" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID" -H "Content-Type: application/json" \
-  -d '{ "ownerUserId": "'$U1'", "calendarActivityCompanyId": "'$MEETING_ID'", "title": "Reunión",
-        "start": "2027-03-02T10:00:00-06:00", "end": "2027-03-02T11:00:00-06:00" }'
-# 422 CALENDAR_OUTSIDE_BUSINESS_HOURS | CALENDAR_OUTSIDE_WORK_DAYS | CALENDAR_USER_NOT_AVAILABLE | CALENDAR_COMPANY_HOLIDAY
-# 400 CALENDAR_USER_NOT_IN_COMPANY. Rescheduling another user's activity sets the company's reschedule status.
-# PATCH /CalendarPanel/events/{id}/status also needs CalendarOthers.CanUpdate (403 CALENDAR_OTHERS_PERMISSION_REQUIRED).
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ownerUserId": "'"$USER1"'",
+    "calendarActivityCompanyId": "'"$ACTIVITY_COMPANY_ID"'",
+    "title": "Reunión desde el panel",
+    "isAllDay": false,
+    "start": "2026-10-05T10:00:00-06:00",
+    "end":   "2026-10-05T11:00:00-06:00"
+  }'
+
+# 5.6 Status change from the panel — requires both CalendarOthers.CanUpdate AND
+# CalendarActivityConfirmation.CanUpdate. Returns 403 CALENDAR_OTHERS_PERMISSION_REQUIRED otherwise.
+curl -s -X PATCH "$BASE_URL/api/v1/CalendarPanel/events/$EVENT_ID/status" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{ "calendarStatusCompanyId": "'"$CONFIRMED_STATUS_ID"'" }'
 ```
 
+### 6. Configuration / absences
+
 ```bash
-# Settings: holidays, user hours and non-working periods (resource CalendarSettings; /me with Calendar)
-curl -s -X POST "$BASE_URL/api/v1/CalendarCompanyNonWorkingDays" -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID" \
-  -H "Content-Type: application/json" -d '{ "date": "2027-09-15", "name": "Independencia", "isRecurringYearly": true }'
-curl -s -X PUT "$BASE_URL/api/v1/CalendarUserConfigurations/$U1" -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID" \
-  -H "Content-Type: application/json" -d '{ "businessHoursStart": "08:00:00", "businessHoursEnd": "12:00:00", "workDays": 62, "defaultView": 2, "weekStartsOn": 1 }'
-# workDays flags: Sunday 1, Monday 2, Tuesday 4, Wednesday 8, Thursday 16, Friday 32, Saturday 64 (62 = Monday–Friday).
-# 409 CALENDAR_USER_HOURS_OUT_OF_COMPANY_RANGE
-curl -s -X POST "$BASE_URL/api/v1/CalendarUserNonWorkingPeriods/me" -H "Authorization: Bearer $TOKEN" -H "X-Company-Id: $TENANT_ID" \
-  -H "Content-Type: application/json" -d '{ "startDate": "2027-04-01", "endDate": "2027-04-10", "reason": 1 }'
-# 201 { period, affectedEvents } — existing activities are not touched. 409 CALENDAR_NON_WORKING_PERIOD_OVERLAP.
+# 6.1 My preferences.
+curl -s "$BASE_URL/api/v1/CalendarUserConfigurations/me" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+# 6.2 Company holidays in a year.
+curl -s "$BASE_URL/api/v1/CalendarCompanyNonWorkingDays?year=2026&page=1&pageSize=50" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+# 6.3 Register a non-working period for myself (vacation, leave, etc.).
+# Response includes `affectedEvents`: activities falling in the range so the user can decide.
+# 409 CALENDAR_NON_WORKING_PERIOD_OVERLAP if the new range collides with an existing one.
+curl -s -X POST "$BASE_URL/api/v1/CalendarUserNonWorkingPeriods/me" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "startDate": "2026-12-20",
+    "endDate":   "2026-12-31",
+    "reason": 1,
+    "notes": "Vacaciones de fin de año"
+  }'
 ```
+
+### 7. Error codes quick reference
+
+| Code | HTTP | When |
+|------|------|------|
+| `CALENDAR_COMPANY_NOT_CONFIGURED` | 400 | The company has no CalendarCompany yet (operations only) |
+| `CALENDAR_ACTIVITY_NOT_ENABLED` / `CALENDAR_STATUS_NOT_ENABLED` | 400 | Type/status not in the company's enabled set or inactive in the global catalog |
+| `CALENDAR_EVENT_OVERLAP` | 409 | Conflict with a non-overlapping activity of the same owner |
+| `CALENDAR_OUTSIDE_BUSINESS_HOURS` / `CALENDAR_OUTSIDE_WORK_DAYS` | 422 | Activity requires business hours, created by a non-owner outside the window |
+| `CALENDAR_USER_NOT_AVAILABLE` | 422 | Falls in a non-working period of the owner (vacation/leave/absence) |
+| `CALENDAR_COMPANY_HOLIDAY` | 422 | Date is a company holiday |
+| `CALENDAR_INVALID_RECURRENCE_RULE` | 400 | RRULE is malformed, uses an unsupported FREQ, or COUNT > 730 |
+| `CALENDAR_CANCELLATION_REASON_REQUIRED` | 400 | `ChangeStatus` to CANCELLED without notes |
+| `CALENDAR_IS_DEFAULT` | 409 | Trying to delete/deactivate the default calendar |
+| `CALENDAR_HAS_ACTIVE_EVENTS` | 409 | Deleting a calendar with future non-cancelled events |
+| `CALENDAR_USER_HOURS_OUT_OF_COMPANY_RANGE` | 409 | User hours outside the new company range |
+| `CALENDAR_OUT_OF_RANGE` | 400 | Range > 62 days (events) or 14 days (availability) |
+| `CALENDAR_PANEL_USER_LIMIT_EXCEEDED` | 400 | Panel query with more than 20 userIds |
+| `CALENDAR_USER_NOT_IN_COMPANY` | 400 | Panel target user has no UserCompany in the tenant |
+| `CALENDAR_OTHERS_PERMISSION_REQUIRED` | 403 | Status change from the panel without CalendarOthers.CanUpdate |
+| `CALENDAR_INVALID_LINK` | 400 | A linked Person/Customer/Ticket/Project belongs to another company (or is missing) |
+| `MODULE_NOT_ENABLED` | 403 | Calendar module inactive for the company (SPEC 48) |

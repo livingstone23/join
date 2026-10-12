@@ -38,6 +38,10 @@ internal sealed class FakeDbConnection : DbConnection
     // across commands.
     internal int ResultSetCursor;
 
+    // Highest grid on which a reader called Read(). A new command starts on the grid after it, so sequential
+    // Dapper calls consume one grid each even when Dapper drains the remaining results with NextResult().
+    internal int HighestReadGrid = -1;
+
     public string LastCommandText { get; private set; } = string.Empty;
 
     public Dictionary<string, object?> CapturedParameters { get; } =
@@ -48,6 +52,7 @@ internal sealed class FakeDbConnection : DbConnection
         _resultSets.Clear();
         _resultSets.AddRange(resultSets);
         ResultSetCursor = 0;
+        HighestReadGrid = -1;
     }
 
     public override string ConnectionString { get; set; } = string.Empty;
@@ -68,6 +73,7 @@ internal sealed class FakeDbConnection : DbConnection
         // Single-command mode: every command sees ALL configured result sets.
         // Dapper uses this for QueryMultipleAsync where one command produces
         // several grids that the reader iterates via NextResult().
+        ResultSetCursor = HighestReadGrid + 1;
         return new FakeDbCommand(this, _resultSets);
     }
 
@@ -100,6 +106,9 @@ internal sealed class FakeDbCommand : DbCommand
         => _connection.ResultSetCursor >= 0 && _connection.ResultSetCursor < _resultSets.Count
             ? _resultSets[_connection.ResultSetCursor]
             : null;
+
+    internal void MarkRead() =>
+        _connection.HighestReadGrid = Math.Max(_connection.HighestReadGrid, _connection.ResultSetCursor);
 
     internal bool AdvanceToNextResultSet()
     {
@@ -314,6 +323,7 @@ internal sealed class FakeDbDataReader : DbDataReader
 
     public override bool Read()
     {
+        _command.MarkRead();
         _rowIndex++;
         return _command.CurrentResultSet is { Rows: var rows } && _rowIndex < rows.Count;
     }
@@ -321,10 +331,16 @@ internal sealed class FakeDbDataReader : DbDataReader
     public override System.Threading.Tasks.Task<bool> ReadAsync(System.Threading.CancellationToken cancellationToken)
         => System.Threading.Tasks.Task.FromResult(Read());
 
-    public override bool NextResult() => _command.AdvanceToNextResultSet();
+    // The row cursor belongs to the reader: moving to the next grid must restart it, otherwise a grid that
+    // follows one with rows (QueryMultiple: items, then COUNT) looks empty.
+    public override bool NextResult()
+    {
+        _rowIndex = -1;
+        return _command.AdvanceToNextResultSet();
+    }
 
     public override System.Threading.Tasks.Task<bool> NextResultAsync(System.Threading.CancellationToken cancellationToken)
-        => System.Threading.Tasks.Task.FromResult(_command.AdvanceToNextResultSet());
+        => System.Threading.Tasks.Task.FromResult(NextResult());
 
     public override DataTable GetSchemaTable() => throw new NotSupportedException();
     public override bool GetBoolean(int ordinal) => Convert.ToBoolean(this[ordinal]);
