@@ -48,6 +48,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<PersonAddress> PersonAddresses => Set<PersonAddress>();
     public DbSet<PersonContact> PersonContacts => Set<PersonContact>();
+    // SPEC 45 — pending confirmations of people created by a channel agent.
+    public DbSet<PersonPendingConfirmation> PersonPendingConfirmations => Set<PersonPendingConfirmation>();
     public DbSet<EntityStatus> EntityStatuses => Set<EntityStatus>();
     public DbSet<IdentificationType> IdentificationTypes => Set<IdentificationType>();
     public DbSet<Project> Projects => Set<Project>();
@@ -129,6 +131,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<UserCalendar> UserCalendars => Set<UserCalendar>();
     public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
     public DbSet<CalendarEventLog> CalendarEventLogs => Set<CalendarEventLog>();
+
+    // --- 9. CALENDAR EXTERNAL SYNC (SPEC 46-post) ---
+    public DbSet<CalendarExternalConnection> CalendarExternalConnections => Set<CalendarExternalConnection>();
+    public DbSet<CalendarExternalEventLink> CalendarExternalEventLinks => Set<CalendarExternalEventLink>();
+    public DbSet<CalendarSyncOutboxItem> CalendarSyncOutboxItems => Set<CalendarSyncOutboxItem>();
 
 
 
@@ -237,6 +244,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<Person>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<PersonAddress>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<PersonContact>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        // SPEC 45 — pending confirmations are tenant-owned, soft-deleted like every BaseTenantEntity.
+        builder.Entity<PersonPendingConfirmation>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<Project>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<Area>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<UserCommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
@@ -283,6 +292,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<UserCalendar>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<CalendarEvent>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<CalendarEventLog>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+
+        // Calendar external sync (SPEC 46-post): tenant + soft delete, same convention as 44.
+        builder.Entity<CalendarExternalConnection>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CalendarExternalEventLink>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CalendarSyncOutboxItem>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
 
         // --- 2. SHARED CATALOGS (SOFT DELETE ONLY) ---

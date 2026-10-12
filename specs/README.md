@@ -100,10 +100,11 @@ Las filas 40–49 y 99 de la tabla anterior son las copias de `main` del 2026-10
 | 41-post | Visibilidad de registros borrados y restauración para SuperAdmin | Implementado | 38, 40-post |
 | 42-post | Valores iniciales del ticket desde `TicketCompanyDefaults` | Implementado | 41-post |
 | 43-post | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Implementado | 39 |
-| 44-post | Módulo Calendario: parametrización, calendarios y actividades | **Aprobado** | 99-post, 43-post, 48-post |
-| 45-post | Calendario: ingreso por canales (agente) y personas pendientes | **Pospuesto** | 43-post, 44-post, 48-post |
-| 46-post | Calendario: estructura para sincronizar con Google Calendar | Borrador | 44-post |
-| 47-post | Ingesta de tickets por WhatsApp y correo | **Pospuesto** | 34, 35, 36, 99-post, 42-post, 43-post |
+
+| 44-post | Módulo Calendario: parametrización, calendarios y actividades | Implementado | 99-post, 43-post, 48-post |
+| 45-post | Calendario: ingreso por canales (agente) y personas pendientes | Implementado | 43-post, 44-post, 48-post |
+| 46-post | Calendario: estructura para sincronizar con Google Calendar | Implementado | 44-post |
+| 47-post | Ingesta de tickets por WhatsApp y correo | **Aprobado** | 34, 35, 36, 99-post, 42-post, 43-post |
 | 48-post | Bloqueo de APIs y menú por módulo activo de la empresa | Borrador | 43-post |
 | 49-post | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Borrador | 36 |
 | 51-post | Invalidación de la caché de permisos con la clave `permissions:v2` | Borrador | 17, 25 |
@@ -174,7 +175,7 @@ Decisión del usuario (2026-10-09): las specs 40–49, 51 y 99 de `main` se copi
 
 1. **40-post** → **41-post** (etapas 1–4) → **99-post** → **42-post** → **43-post** → **48-post** → **44-post** → **46-post**. Es el mismo orden en que se implementaron o se implementarán en `main`; 41-post necesita 40-post, y 42-post usa el bloqueo de borrado de 41-post. **Ajuste (2026-10-09, decisión del usuario):** 42-post se implementó antes que 99-post; no dependen entre sí. **Ajuste (2026-10-12, decisión del usuario):** 44-post se implementa antes que 48-post; hasta que 48-post exista, el módulo Calendario queda sembrado pero el filtro global no bloquea sus APIs por módulo inactivo.
 2. **49-post** y **51-post**: sin dependencias con lo anterior, en cualquier momento.
-3. **45-post** y **47-post**: `Pospuesto`, igual que en `main`.
+3. **45-post**: `Implementado` (rama `spec-45-post-calendar-channel-intake`, mergeada en `main_postgresql`). **47-post**: `Aprobado`; en `main` sigue `Pospuesto`.
 4. **50**: pendientes para llevar QA a PostgreSQL (sin su antigua sección 0), cuando el usuario lo decida.
 
 ---
@@ -187,7 +188,7 @@ Decisiones o verificaciones que no tienen spec propia todavía:
 |---|---|
 | 43 (A3) | Método para poblar `RoleSystemOptions` de una empresa nueva. Hoy solo `JOIN-001` tiene permisos sembrados; las demás se configuran a mano. |
 | 43 (A6) | Asignación automática de módulos base a empresas nuevas y existentes. |
-| 45 | `DynamicAuthorizationFilter` usa el claim `CompanyId` del JWT, no `X-Company-Id`: definir cómo opera un agente en varias empresas. |
+| ~~45~~ | ~~`DynamicAuthorizationFilter` usa el claim `CompanyId` del JWT, no `X-Company-Id`: definir cómo opera un agente en varias empresas.~~ Resuelto en 45-post (2026-10-12): la empresa es siempre la del token; el agente lista sus empresas con `GET /CalendarChannelIntake/companies` y cambia con `POST /workspaces/switch-company`. |
 | 45 | Proceso de limpieza de personas con pendiente `Discarded`. |
 | 44 | Recordatorios y tareas automáticas (Hangfire): avisos, cierre de actividades vencidas, barridos de estados. |
 | 46 | Acciones de sincronización con Google (OAuth, envío, webhook, worker). |

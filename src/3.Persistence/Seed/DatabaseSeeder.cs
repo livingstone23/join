@@ -3108,7 +3108,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Livingstone23", "Admin", "livingstone23@gmail.com", "ABCabc123*", "Admin", false, true),
         new("Manager", "Test", "manager@join.com", "ABCabc123*", "Manager", false),
         new("Supervisor", "Test", "supervisor@join.com", "ABCabc123*", "Supervisor", false),
-        new("SimpleUser", "Test", "simpleuser@join.com", "ABCabc123*", "UsuarioSimple", false)
+        new("SimpleUser", "Test", "simpleuser@join.com", "ABCabc123*", "UsuarioSimple", false),
+        // SPEC 45 — service user for the channel agent.
+        new("Agent", "Dev", "agent@join.com", "ABCabc123*", "Agent", false)
     ];
 
     private static List<RoleSystemOptionSeed> GetAdminFullSystemOptionPermissionSeeds()
@@ -3280,7 +3282,11 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         // SPEC 47 — endpoint para gestionar canales de ingesta inbound de tickets (Twilio WhatsApp, SendGrid email).
         // CanUpdate queda en false por diseño: rotar un token de webhook es soft-delete + create, no update in-place.
-        new("TicketInboundChannels", "/tickets/ticket-inbound-channels", "@Icons.Material.Filled.Webhook", "Tickets", "TicketManagement", "TicketInboundChannels", true, true, false, true)
+        new("TicketInboundChannels", "/tickets/ticket-inbound-channels", "@Icons.Material.Filled.Webhook", "Tickets", "TicketManagement", "TicketInboundChannels", true, true, false, true),
+
+        // SPEC 45 — channel agent intake (no menu) and pending-persons inbox.
+        new("CalendarChannelIntake", "/calendar/channel-intake", "@Icons.Material.Filled.SmartToy", "Calendar", "Calendar", "CalendarChannelIntake", true, true, true, false, IsVisibleMenu: false),
+        new("PendingPersons", "/customers/pending-persons", "@Icons.Material.Filled.PersonSearch", "Customers", "CustomersMenu", "PersonPendingConfirmations", true, false, true, false)
 
     ];
 
@@ -3437,7 +3443,15 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Coordinador", "CalendarPanel", true, false, false, false),
         new("Coordinador", "ActivityConfirmation", false, false, true, false),
         new("UsuarioSimple", "MyCalendar", true, true, true, true),
-        new("UsuarioSimple", "ActivityConfirmation", false, false, true, false)
+        new("UsuarioSimple", "ActivityConfirmation", false, false, true, false),
+
+        // SPEC 45 — channel agent (CalendarChannelIntake, no CanDelete) and pending-persons inbox (read + update).
+        // Admin and SuperAdminCompany get full access through PrivilegedRoleNames; the agent gets nothing else.
+        new("SuperAdmin", "CalendarChannelIntake", true, true, true, false),
+        new("SuperAdmin", "PendingPersons", true, false, true, false),
+        new("Agent", "CalendarChannelIntake", true, true, true, false),
+        new("Manager", "PendingPersons", true, false, true, false),
+        new("Supervisor", "PendingPersons", true, false, true, false)
 
     ];
 

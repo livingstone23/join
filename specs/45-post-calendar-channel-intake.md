@@ -9,12 +9,14 @@
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-09-29)
 > **Objective:** Permitir que un agente automatizado (n8n) que atiende WhatsApp, correo u otro canal, autenticado vía API como usuario de servicio, identifique a la empresa y a la persona que escribe, registre a la persona si no existe (`Person` + `PersonContact` + `PersonPendingConfirmation`), consulte disponibilidad, y cree, reprograme o anule actividades en el calendario del usuario indicado o del usuario por defecto de la empresa, dejando trazado el canal y el solicitante, y generando una actividad de revisión para que un usuario interno complete los datos de la persona nueva.
 
+> **Ajuste en implementación (2026-10-12):** se cerró la verificación de F1 sin cambiar el alcance: la empresa es siempre la del token (el agente cambia de empresa con `POST /workspaces/switch-company`) y los endpoints no leen `X-Company-Id` (ver "Autenticación del agente", paso 3). Además: la actividad interna `PERSON_REVIEW` nunca se lista ni se puede reprogramar o anular desde el agente; la creación de `Person` + `PersonContact` + `PersonPendingConfirmation` vive en `UseCases/Admin/PersonPendingConfirmations` (`PersonIntakeRegistrar`), porque el módulo Calendario solo escribe entidades del calendario (aislamiento de SPEC 44); crear, reprogramar y anular reutilizan `CalendarEventCommandProcessor` con el canal del solicitante. Detalle en "Notas de implementación".
+
 > **Etapa (decisión del usuario, 2026-10-01):** WhatsApp y los demás canales con agente se configuran **después** de concluir los módulos de Tickets y Calendar. Esta spec no se implementa hasta entonces; antes de hacerlo se revisa contra el estado final de ambos módulos.
 ---
 
 ## Adaptación a PostgreSQL (fork `main_postgresql`)
 
-Sigue `Pospuesto`, igual que en `main`: al retomarla se revisa contra el estado final del fork. Las tablas del Data model ya usan tipos de PostgreSQL. Además:
+Retomada y aprobada para el fork (se revisó contra el estado final de 44-post). Las tablas del Data model ya usan tipos de PostgreSQL. Además:
 
 | Tema | En `main` (SQL Server) | En esta versión |
 |---|---|---|
@@ -22,7 +24,7 @@ Sigue `Pospuesto`, igual que en `main`: al retomarla se revisa contra el estado 
 | Índice de pendientes abiertos | `Status = 1 AND GcRecord = 0` | `HasFilter("\"status\" = 1 AND \"gcrecord\" = 0")`. |
 | Búsqueda por teléfono (`IntakeRequesterResolver`) | `REPLACE` anidado | `regexp_replace(pc.contactvalue, '[^0-9]', '', 'g')` (solo dígitos) contra el E.164 sin `+` y contra los últimos 8 dígitos (`RIGHT(..., 8)`). |
 | Búsqueda por correo | Igualdad (la colación de SQL Server no distingue mayúsculas) | `LOWER(TRIM(pc.contactvalue)) = LOWER(TRIM(@Email))`: PostgreSQL sí distingue mayúsculas. |
-| Deduplicación ante carrera | Captura de la violación del índice de SPEC 44 | La violación es `PostgresException` `23505` con `ConstraintName` = el índice de `(CompanyId, OriginChannelId, OriginReference)`; la reconoce un servicio de Persistence (Application no referencia Npgsql) y el handler responde `isDuplicate: true`. |
+| Deduplicación ante carrera | Captura de la violación del índice de SPEC 44 | La violación es `PostgresException` `23505` con `ConstraintName` = `ux_calendarevents_company_channel_originreference_active`; la reconoce `IDatabaseErrorClassifier` (implementado en Persistence por `PostgresDatabaseErrorClassifier`; Application no referencia Npgsql) y el handler responde `isDuplicate: true`, leyendo la actividad ganadora en otra conexión (la transacción propia queda abortada). |
 | Booleanos en SQL | `IsActive = 1` | `IsActive = TRUE`. |
 | Tests | MsSql | Integración con sufijo `PostgreSqlTests` sobre `PostgreSqlWebApplicationFactory`; incluye la carrera de deduplicación (dos requests con el mismo `originReference`). |
 
@@ -102,7 +104,7 @@ Clase de apoyo **`IntakeRequesterResolver`** (feature-local): normaliza el ident
 
 - `SystemOptions`: `CalendarChannelIntake` (no visible en menú) y `PersonPendingConfirmations` (menú en el módulo de Clientes).
 - `RoleSystemOptions`: el rol **`Agent`**, que ya existe en la seed de roles, recibe `CalendarChannelIntake` (ver Permisos).
-- Desarrollo: un usuario de servicio `agent@join.com` con rol `Agent` en `JOIN-001`, para probar el flujo.
+- Desarrollo: un usuario de servicio `agent@join.com` con rol `Agent` en `JOIN-001`, para probar el flujo. Se siembra con los demás usuarios de prueba de `GetDefaultUserSeeds` (contraseña de desarrollo).
 
 ### G. Tests
 
@@ -156,7 +158,7 @@ Ninguno. `Person.GenderId` ya es nullable en la entidad. La obligatoriedad del g
 
 1. El agente es un `ApplicationUser` de servicio con rol **`Agent`**, con `UserCompany` en **cada** empresa que atiende. Obtiene su JWT con el login normal y lo renueva con refresh token.
 2. `GET /CalendarChannelIntake/companies` no requiere empresa: lista las empresas del usuario de servicio que tienen el módulo Calendario activo y `CalendarCompany` configurada. Se marca `[SkipDynamicAuthorization]` y el handler exige rol `Agent` o `SuperAdmin` (`currentUserService.IsInRole`) → si no, `403`.
-3. Una vez identificada la empresa, todas las demás llamadas envían `X-Company-Id`. **Verificación en F1:** confirmar que `ICurrentUserService`/`DynamicAuthorizationFilter` rechazan un `X-Company-Id` de una empresa donde el usuario no tiene `UserCompany` activo. Si hoy no lo hacen, `CalendarCompanyGuard` agrega ese chequeo para los endpoints de intake (`CALENDAR_INTAKE_COMPANY_NOT_ALLOWED`). **Dato a revisar (2026-10-01):** `DynamicAuthorizationFilter` evalúa permisos y módulo (SPEC 48) con el claim `CompanyId` del JWT, no con el header `X-Company-Id`; para un agente que opera en varias empresas hay que confirmar que el claim refleja la empresa elegida (p.ej. cambiando de empresa con el flujo de workspaces y renovando el token) o ajustar el filtro.
+3. Una vez identificada la empresa, el agente cambia a ella con `POST /api/v1/workspaces/switch-company` (`{ companyId }`), que valida su `UserCompany` y devuelve un token nuevo con ese `CompanyId`; todas las demás llamadas usan ese token. **Resultado de F1 (2026-10-12):** `CurrentUserService` ignora `X-Company-Id` para un usuario autenticado y `DynamicAuthorizationFilter`, los permisos y los filtros globales de EF usan el claim `CompanyId`. Por eso los endpoints de intake no reciben `X-Company-Id` ni lo pasan a los comandos: la empresa sale solo del token, y un agente no puede operar en una empresa donde no tiene `UserCompany`. `CALENDAR_INTAKE_COMPANY_NOT_ALLOWED` (403) queda para `GET /companies` llamado sin rol `Agent`/`SuperAdmin`.
 4. `OriginUserId` de toda actividad o log creado por el agente = el usuario de servicio. `OriginIdentifier` / `ActorIdentifier` = teléfono o correo del solicitante.
 
 ---
@@ -168,7 +170,7 @@ Persona escribe por WhatsApp
         │
         ▼
 1. ¿A qué empresa?  ── GET /companies ── (número general: pregunta; número exclusivo: ya la sabe)
-        │  X-Company-Id
+        │  POST /workspaces/switch-company → token de esa empresa
         ▼
 2. ¿Quién eres?     ── GET /persons/lookup?channelCode=WHATSAPP&identifier=+50588887777
         │
@@ -214,7 +216,7 @@ Ruta base `api/v1/CalendarChannelIntake`. Todas las operaciones pasan por el fil
 | GET | `/users/lookup?email` | Read | Coincidencia **exacta** (sin distinguir mayúsculas) con el correo de un usuario con `UserCompany` activo y calendario en la empresa: `{ found, userId?, fullName? }`. No hay búsqueda por nombre ni listados: el agente solo puede confirmar un correo que la persona ya conoce. |
 | GET | `/availability?userId&from&to&activityCode` | Read | `userId` opcional → usuario por defecto. Rango máximo 14 días. Aplica R4 y R5 de SPEC 44 (el agente nunca es el dueño). Devuelve `[{ startUtc, endUtc }]` en bloques de la duración del tipo, más `timeZone`. |
 | POST | `/events` | Create | Crea la actividad (ver abajo). |
-| GET | `/events?requesterPersonId&from&to` | Read | Actividades **no anuladas** de esa persona desde hoy (rango máximo 90 días): `[{ eventId, occurrenceStartUtc, title, startUtc, endUtc, status, ownerFullName }]`. |
+| GET | `/events?requesterPersonId&from&to` | Read | Actividades **no anuladas** de esa persona desde hoy (rango máximo 90 días), sin la actividad interna `PERSON_REVIEW`: `[{ eventId, occurrenceStartUtc, title, startUtc, endUtc, status, ownerFullName }]`. En una serie, `eventId` es el maestro y `occurrenceStartUtc` identifica la ocurrencia. |
 | PUT | `/events/{id}/reschedule` | Update | `{ requesterPersonId, start, end?, scope?, occurrenceStartUtc?, originChannelCode, originIdentifier, originReference, notes? }`. |
 | POST | `/events/{id}/cancel` | Update (`[RequirePermission(CanUpdate)]`) | `{ requesterPersonId, reason, scope?, occurrenceStartUtc?, originChannelCode, originIdentifier }`. |
 
@@ -250,9 +252,9 @@ Handler (`ITransactionalCommand`, una sola transacción):
    - `RequesterPersonId` = la persona; origen = el del request.
    - Estado inicial del tipo. Pasa por `CalendarEventScheduleGuard` (el tipo permite superposición y no requiere horario hábil, así que en la práctica no choca).
 6. Crea `PersonPendingConfirmation` (`Pending`, `ReviewEventId` = la actividad del paso 5).
-7. Responde `201 { personId, created: true, pendingConfirmationId, reviewEventId }`.
+7. Responde `201 { personId, created: true, pendingConfirmationId, reviewEventId }`. La actividad de revisión no guarda `originReference` (el agente puede reutilizar el id del mensaje para la cita que crea después).
 
-Validador propio (`RegisterIntakePersonCommandValidator`): las mismas reglas de longitud y tipo que `CreatePersonCommandValidator`, **salvo** el género, que es opcional. `phone` en formato E.164 (`^\+[1-9]\d{7,14}$`). `reason` obligatorio, máximo 500. Al menos `phone` o `email`.
+Validador propio (`RegisterIntakePersonCommandValidator`): las mismas reglas de longitud y tipo que `CreatePersonCommandValidator`, **salvo** el género, que es opcional. `phone` en formato E.164 (`^\+[1-9]\d{7,14}$`), obligatorio si el canal es de teléfono (`WHATSAPP`, `TWILIO`, `TELEGRAM`); `email` obligatorio si el canal es `SENDGRID`. `reason` obligatorio, máximo 500. Al menos `phone` o `email`. Persona jurídica: `commercialName` obligatorio y sin género.
 
 ### `POST /events` — registrar actividad solicitada
 
@@ -271,7 +273,7 @@ Validador propio (`RegisterIntakePersonCommandValidator`): las mismas reglas de 
   "targetUserEmail": "maria@empresa.com", // opcional: correo de quien atiende al solicitante; sin valor o sin coincidencia → CalendarCompany.DefaultActivityUserId
   "requesterPersonId": "guid",            // obligatorio
   "originChannelCode": "WHATSAPP",
-  "originType": "Phone",                  // Phone | Email
+  "originType": "Phone",                  // opcional: Phone | Email; sin valor se deduce del canal
   "originIdentifier": "+50588887777",
   "originReference": "wamid.HBgM..."      // obligatorio
 }
@@ -294,9 +296,9 @@ Handler (`ITransactionalCommand`):
 
 ### `PUT /events/{id}/reschedule` y `POST /events/{id}/cancel`
 
-- La actividad debe existir en la empresa **y** tener `RequesterPersonId == requesterPersonId` del request → si no, `404 CALENDAR_EVENT_NOT_FOUND`. El agente solo puede tocar actividades de la persona que se identificó en la conversación, nunca actividades internas ni de otras personas.
+- La actividad debe existir en la empresa **y** tener `RequesterPersonId == requesterPersonId` del request, y no ser de tipo `PERSON_REVIEW` → si no, `404 CALENDAR_EVENT_NOT_FOUND`. El agente solo puede tocar actividades de la persona que se identificó en la conversación, nunca actividades internas ni de otras personas.
 - La actividad no debe estar en un estado `IsFinal` → si no, `CALENDAR_INTAKE_EVENT_ALREADY_CLOSED`. El agente no reabre actividades anuladas ni completadas; el usuario interno sí puede (SPEC 44 no tiene reglas de transición).
-- **Reprogramar:** valida R4 y R5 con creador ≠ dueño; el estado pasa al configurado en `CalendarCompany.RescheduledByOthersStatusCompanyId` (SPEC 44 R6; el agente nunca es el dueño); bitácora `Rescheduled`. Con `originReference` repetido en el log para esa actividad → respuesta idempotente sin volver a aplicar.
+- **Reprogramar:** valida R4 y R5 con creador ≠ dueño; el estado pasa al configurado en `CalendarCompany.RescheduledByOthersStatusCompanyId` (SPEC 44 R6; el agente nunca es el dueño); bitácora `Rescheduled`. Sin `end`, la actividad conserva su duración; una actividad de día completo conserva su número de días. Las notas de la bitácora empiezan con `[ref:<originReference>]`; con ese `originReference` ya registrado para el canal → respuesta idempotente con el estado actual, sin volver a aplicar.
 - **Anular:** estado `CANCELLED`, `reason` obligatorio → `notes` del log; bitácora `StatusChanged`.
 - Actividades periódicas: `scope` y `occurrenceStartUtc` con las mismas reglas de SPEC 44 R7. Si no se indica `scope`, se asume `ThisOccurrence`.
 
@@ -388,20 +390,30 @@ Los dos controllers, `SystemOptions`, `RoleSystemOptions` y el usuario `agent@jo
 ### F8 — Verificación final
 Build sin warnings nuevos, cobertura ≥ 90%, y en `CURL_REQUESTS.md` el flujo completo del agente con ejemplos (lookup → registrar persona → disponibilidad → crear → reprogramar → anular).
 
+### Notas de implementación (2026-10-12)
+
+- **Empresa:** solo la del token (paso 3 de "Autenticación del agente"); ningún comando de intake ni de la bandeja recibe `CompanyId`.
+- **Aislamiento del módulo:** `RegisterIntakePerson` (en `Calendars/ChannelIntake`) delega en `PersonIntakeRegistrar` (en `Admin/PersonPendingConfirmations`) la escritura de `Person`, `PersonContact` y `PersonPendingConfirmation`; resolver o vincular un pendiente cierra la actividad de revisión con `PersonPendingReviewCloser`, que usa `CalendarEventCommandProcessor.ChangeStatusAsync`. El test de arquitectura de SPEC 44 (`CalendarHandlerArchitectureTests`) sigue en verde.
+- **Reutilización:** `CalendarEventCommandProcessor` acepta un `CalendarExternalOrigin` (canal, tipo, identificador y referencia del solicitante) en crear, actualizar y cambiar estado, y notas para la bitácora al actualizar. Así el intake hereda R3–R9 (series, alcances, estado de reprogramación, bitácora) sin duplicar lógica.
+- **Clases de apoyo** (feature-local): `IntakeChannels`/`IntakeChannelReader` (canales por `Code`), `IntakeRequesterResolver`, `IntakeEventGuard` (pertenencia, `PERSON_REVIEW`, estado final, alcance por defecto) e `IntakeEventInput`.
+- **Códigos nuevos:** `CALENDAR_INTAKE_LOOKUP_CRITERIA_REQUIRED` (lookup sin criterios) y `PERSON_PENDING_INVALID_STATUS` (filtro de estado inválido en la bandeja). `CALENDAR_INTAKE_CONTACT_BELONGS_TO_OTHER_PERSON` → 409 y `CALENDAR_INTAKE_COMPANY_NOT_ALLOWED` → 403.
+- **Permisos sembrados (`JOIN-001`):** `SuperAdmin` (intake R/C/U; bandeja R/U), `Agent` (intake R/C/U), `Manager` y `Supervisor` (bandeja R/U); `Admin` y `SuperAdminCompany` por `PrivilegedRoleNames`. `resolve` y `link-customer` piden `CanUpdate`.
+- **Tests:** 69 unitarios nuevos (cobertura de las clases nuevas ≥ 95 %, total del proyecto 93,5 %) y `ChannelIntakePostgreSqlTests` (seed e índices, flujo completo del agente, carrera de 6 peticiones con el mismo `originReference` que produce `23505` reales, bandeja del supervisor y límites de permisos).
+
 ---
 
 ## Acceptance criteria
 
-- [ ] El agente, autenticado como usuario `Agent`, solo ve y opera en empresas donde tiene `UserCompany` activo y con el calendario operativo.
-- [ ] Una persona desconocida queda registrada como `Person` + `PersonContact` + `PersonPendingConfirmation` en la empresa indicada, con motivo, canal, identificador y fecha, y el usuario por defecto recibe una actividad "Revisar persona creada" con sus datos.
-- [ ] Una persona que ya existe (por contacto o identificación) no se duplica.
-- [ ] La actividad solicitada queda en el calendario por defecto del usuario indicado o, si no se identificó a nadie, en el del usuario por defecto de la empresa, con tema, resumen, canal, identificador del solicitante, persona solicitante y estado inicial configurado.
-- [ ] El agente no puede agendar fuera del horario hábil ni en días no hábiles, ausencias o feriados del destinatario cuando el tipo lo requiere, ni generar superposiciones.
-- [ ] Reenviar la misma solicitud (mismo `originReference`) no crea una segunda actividad.
-- [ ] El agente puede reprogramar (queda en el estado configurado para reprogramaciones, por defecto "Reprogramada") y anular (con motivo) solo actividades de la persona identificada, y cada cambio queda en la bitácora con canal y solicitante.
-- [ ] La bandeja de personas pendientes permite confirmar, descartar o vincular a un cliente, y cierra la actividad de revisión.
-- [ ] Ningún endpoint del agente devuelve datos de contacto de usuarios internos ni datos de otras personas, ni permite buscar usuarios por nombre.
-- [ ] Una solicitud con el correo de quien atiende al solicitante llega a ese usuario; sin correo o con un correo sin coincidencia llega al usuario por defecto, con una nota cuando el correo no coincidió.
+- [x] El agente, autenticado como usuario `Agent`, solo ve y opera en empresas donde tiene `UserCompany` activo y con el calendario operativo.
+- [x] Una persona desconocida queda registrada como `Person` + `PersonContact` + `PersonPendingConfirmation` en la empresa indicada, con motivo, canal, identificador y fecha, y el usuario por defecto recibe una actividad "Revisar persona creada" con sus datos.
+- [x] Una persona que ya existe (por contacto o identificación) no se duplica.
+- [x] La actividad solicitada queda en el calendario por defecto del usuario indicado o, si no se identificó a nadie, en el del usuario por defecto de la empresa, con tema, resumen, canal, identificador del solicitante, persona solicitante y estado inicial configurado.
+- [x] El agente no puede agendar fuera del horario hábil ni en días no hábiles, ausencias o feriados del destinatario cuando el tipo lo requiere, ni generar superposiciones.
+- [x] Reenviar la misma solicitud (mismo `originReference`) no crea una segunda actividad.
+- [x] El agente puede reprogramar (queda en el estado configurado para reprogramaciones, por defecto "Reprogramada") y anular (con motivo) solo actividades de la persona identificada, y cada cambio queda en la bitácora con canal y solicitante.
+- [x] La bandeja de personas pendientes permite confirmar, descartar o vincular a un cliente, y cierra la actividad de revisión.
+- [x] Ningún endpoint del agente devuelve datos de contacto de usuarios internos ni datos de otras personas, ni permite buscar usuarios por nombre.
+- [x] Una solicitud con el correo de quien atiende al solicitante llega a ese usuario; sin correo o con un correo sin coincidencia llega al usuario por defecto, con una nota cuando el correo no coincidió.
 
 ---
 

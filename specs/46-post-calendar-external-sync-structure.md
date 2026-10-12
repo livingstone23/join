@@ -6,6 +6,7 @@
 > **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 99) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
 > **Depends on:** SPEC 44-post (`CalendarEvent`, `UserCalendar`, estados `CONFIRMED`/`CANCELLED`).
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-09-29)
+> **Ajuste por SPEC 46-post (implementación, 2026-10-12):** implementada en la rama `spec-46-post-calendar-external-sync-structure` (commit `686c53a`), sin cambio de lógica. (1) **Carpetas:** las entidades están en `src/1.Domain/Calendars/External/` y las configuraciones EF en `src/3.Persistence/Configuration/Calendars/External/`, no directamente en `Calendars/` como dice el Scope. El namespace de las entidades sigue siendo `JOIN.Domain.Calendars`; los enums están en `Calendars/Enums/`, como pide la spec. (2) **Índice adicional:** además de los seis índices del Data model, `Calendar.ExternalConnections` tiene `IX_CalendarExternalConnections_Company_Status_ConnectedUtc` `(CompanyId, Status, ConnectedUtc)` where `"gcrecord" = 0`, no único, pensado para el panel de estado y el worker. (3) **FK a `Companies`:** es `Cascade`, igual que el resto de las tablas del calendario (convención de `BaseTenantEntity`); las FK hacia `Users`, `UserCalendars`, `Events` y entre estas tablas son `Restrict`, como pide la F2. (4) **Verificación:** build sin errores ni warnings nuevos; `CalendarExternalSyncStructurePostgreSqlTests` 2/2 en `postgres:17` (tablas e índices filtrados en `pg_indexes`, modelo EF); `dotnet ef migrations has-pending-model-changes` sin cambios; `Down` elimina las tres tablas. La comprobación manual con `\d calendar.syncoutbox` arrancando la API no se hizo, porque la prueba de integración cubre lo mismo.
 > **Objective:** Dejar creadas, en el esquema `Calendar`, las entidades, enums, configuraciones EF y la migración que necesita la sincronización de actividades de JOIN con el calendario de Google de cada usuario: la conexión de la cuenta externa, la relación entre una actividad de JOIN y su copia externa, y la cola de cambios pendientes de enviar. Esta spec **no** implementa acciones (OAuth, llamadas a la API de Google, webhook ni worker); documenta las reglas que esas acciones deberán cumplir para que la estructura quede correcta desde ahora.
 
 ---
@@ -184,11 +185,11 @@ Build sin warnings nuevos, migración reversible (`Down` elimina las tres tablas
 
 ## Acceptance criteria
 
-- [ ] Existen `Calendar.ExternalConnections`, `Calendar.ExternalEventLinks` y `Calendar.SyncOutbox` (físicas en minúsculas en el esquema `calendar`) con los campos e índices de esta spec.
-- [ ] Todas las entidades heredan de `BaseTenantEntity` y respetan tenant y soft delete.
-- [ ] No hay columnas específicas de Google en `Calendar.Events`: toda la información externa vive en las tablas de esta spec.
-- [ ] El modelo admite un segundo proveedor agregando solo un valor al enum `CalendarExternalProvider`.
-- [ ] Ningún campo que almacene tokens está pensado para exponerse en DTOs.
+- [x] Existen `Calendar.ExternalConnections`, `Calendar.ExternalEventLinks` y `Calendar.SyncOutbox` (físicas en minúsculas en el esquema `calendar`) con los campos e índices de esta spec.
+- [x] Todas las entidades heredan de `BaseTenantEntity` y respetan tenant y soft delete.
+- [x] No hay columnas específicas de Google en `Calendar.Events`: toda la información externa vive en las tablas de esta spec.
+- [x] El modelo admite un segundo proveedor agregando solo un valor al enum `CalendarExternalProvider`.
+- [x] Ningún campo que almacene tokens está pensado para exponerse en DTOs.
 
 ---
 

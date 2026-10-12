@@ -28,6 +28,29 @@ public sealed class CalendarCatalogReader(IUnitOfWork unitOfWork)
     }
 
     /// <summary>
+    /// Returns the usable activity type of the company whose global type has <paramref name="code"/> (compared
+    /// without case), or <c>null</c> (SPEC 45: the channel agent sends the code, not the id).
+    /// </summary>
+    public async Task<UsableActivity?> GetUsableActivityByCodeAsync(Guid companyId, string code)
+    {
+        var normalized = code.Trim().ToUpperInvariant();
+        var global = (await unitOfWork.GetRepository<CalendarActivity>()
+                .GetAllIncludingDeletedAsync(x => x.Code == normalized && x.GcRecord == 0))
+            .FirstOrDefault();
+        if (global is null)
+        {
+            return null;
+        }
+
+        var activityCompanyId = (await unitOfWork.GetRepository<CalendarActivityCompany>()
+                .GetAllIncludingDeletedAsync(x => x.CompanyId == companyId && x.CalendarActivityId == global.Id && x.GcRecord == 0))
+            .Select(x => x.Id)
+            .FirstOrDefault();
+
+        return activityCompanyId == Guid.Empty ? null : await GetUsableActivityAsync(companyId, activityCompanyId);
+    }
+
+    /// <summary>
     /// Returns the global status of <paramref name="status"/> when the company status is usable, otherwise <c>null</c>
     /// (<c>CALENDAR_STATUS_NOT_ENABLED</c>).
     /// </summary>

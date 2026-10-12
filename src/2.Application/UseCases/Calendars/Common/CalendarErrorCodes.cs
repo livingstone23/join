@@ -61,4 +61,16 @@ public static class CalendarErrorCodes
     public const string TooManyUsers = "CALENDAR_TOO_MANY_USERS";
     public const string OthersPermissionRequired = "CALENDAR_OTHERS_PERMISSION_REQUIRED";
     public const string WebChannelNotFound = "CALENDAR_WEB_CHANNEL_NOT_FOUND";
+
+    // SPEC 45 — channel agent intake and pending persons.
+    public const string IntakeInvalidChannel = "CALENDAR_INTAKE_INVALID_CHANNEL";
+    public const string IntakeCompanyNotAllowed = "CALENDAR_INTAKE_COMPANY_NOT_ALLOWED";
+    public const string IntakeLookupCriteriaRequired = "CALENDAR_INTAKE_LOOKUP_CRITERIA_REQUIRED";
+    public const string IntakeContactBelongsToOtherPerson = "CALENDAR_INTAKE_CONTACT_BELONGS_TO_OTHER_PERSON";
+    public const string IntakeTargetUserHasNoCalendar = "CALENDAR_INTAKE_TARGET_USER_HAS_NO_CALENDAR";
+    public const string IntakeEventAlreadyClosed = "CALENDAR_INTAKE_EVENT_ALREADY_CLOSED";
+    public const string PersonPendingNotFound = "PERSON_PENDING_NOT_FOUND";
+    public const string PersonPendingAlreadyResolved = "PERSON_PENDING_ALREADY_RESOLVED";
+    public const string PersonPendingInvalidCustomer = "PERSON_PENDING_INVALID_CUSTOMER";
+    public const string PersonPendingInvalidStatus = "PERSON_PENDING_INVALID_STATUS";
 }

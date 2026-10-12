@@ -46,6 +46,7 @@ internal sealed class CalendarTestContext : IDisposable
     public Mock<ICurrentUserService> CurrentUser { get; } = new();
     public Mock<IPermissionService> Permissions { get; } = new();
     public Mock<ICompanyCatalogSeeder> CatalogSeeder { get; } = new();
+    public Mock<IDatabaseErrorClassifier> ErrorClassifier { get; } = new();
     public SequencedFakeDbConnection Connection { get; } = new();
     public ApplicationDbContext Db { get; }
     public LockFreeUnitOfWork UnitOfWork { get; }
@@ -75,6 +76,7 @@ internal sealed class CalendarTestContext : IDisposable
         services.AddSingleton(CurrentUser.Object);
         services.AddSingleton(Permissions.Object);
         services.AddSingleton(CatalogSeeder.Object);
+        services.AddSingleton(ErrorClassifier.Object);
         services.AddSingleton(connectionFactory.Object);
         services.AddSingleton<ICalendarRecurrenceExpander, IcalRecurrenceExpander>();
         Services = services.BuildServiceProvider();
