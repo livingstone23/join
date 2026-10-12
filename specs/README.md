@@ -98,7 +98,7 @@ Las filas 40–49 y 99 de la tabla anterior son las copias de `main` del 2026-10
 |---|---|---|---|
 | 40-post | Índices únicos filtrados por soft-delete | Borrador | 39 |
 | 41-post | Visibilidad de registros borrados y restauración para SuperAdmin | Implementado | 38, 40-post |
-| 42-post | Valores iniciales del ticket desde `TicketCompanyDefaults` | Aprobado (implementada en la rama `spec-42-post-ticket-create-default-status`; falta pasar a Implementado) | 41-post |
+| 42-post | Valores iniciales del ticket desde `TicketCompanyDefaults` | Implementado | 41-post |
 | 43-post | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Borrador | 39 |
 | 44-post | Módulo Calendario: parametrización, calendarios y actividades | Borrador | 99-post, 43-post, 48-post |
 | 45-post | Calendario: ingreso por canales (agente) y personas pendientes | **Pospuesto** | 43-post, 44-post, 48-post |
