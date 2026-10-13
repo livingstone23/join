@@ -38,13 +38,9 @@ public interface IPermissionService
     /// and the sidebar menu cache (<c>sidebar:{companyId}:{userId}</c>) for the given
     /// user in the given tenant. Used after mutating <c>RoleSystemOption</c> rows so the
     /// next <see cref="HasPermissionAsync"/> call rebuilds the snapshot from scratch.
+    /// Also the canonical entry point used by <c>CleanCacheCommandHandler</c> (SPEC 51-post)
+    /// for the <c>permission</c>, <c>permissions</c> and <c>all</c> cache keys.
     /// </summary>
-    /// <remarks>
-    /// Introduced by SPEC 25 because the legacy <c>InvalidateSidebarCacheCommand</c> writes
-    /// the wrong key for the permissions snapshot (it removes <c>permissions:{companyId}:{userId}</c>,
-    /// not the real <c>permissions:v2:{companyId}:{userId}</c>). A future spec will fix that command;
-    /// in the meantime, callers that need a guaranteed snapshot refresh should invoke this method.
-    /// </remarks>
     Task InvalidateUserCacheAsync(Guid companyId, Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
