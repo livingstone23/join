@@ -64,8 +64,8 @@ public sealed class GetSystemWideTicketsQueryHandlerTests
         item.Name.Should().Be("Urgent production issue");
 
         context.Connection.LastCommandText.Should().Contain("WHERE 1 = 1");
-        context.Connection.LastCommandText.Should().Contain("co.Name LIKE @CompanyName");
-        context.Connection.LastCommandText.Should().Contain("t.Code LIKE @Search OR t.Name LIKE @Search OR t.Description LIKE @Search");
+        context.Connection.LastCommandText.Should().Contain("co.Name ILIKE @CompanyName");
+        context.Connection.LastCommandText.Should().Contain("t.Code ILIKE @Search OR t.Name ILIKE @Search OR t.Description ILIKE @Search");
         context.Connection.LastCommandText.Should().Contain("t.TicketStatusId = @TicketStatusId");
         context.Connection.LastCommandText.Should().Contain("t.ProjectId = @ProjectId");
         context.Connection.LastCommandText.Should().Contain("t.Created >= @FromDate");

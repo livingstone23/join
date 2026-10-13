@@ -47,7 +47,7 @@ public sealed class GetMunicipalitiesQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND m.Name LIKE @Name");
+            whereBuilder.Append(" AND m.Name ILIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 

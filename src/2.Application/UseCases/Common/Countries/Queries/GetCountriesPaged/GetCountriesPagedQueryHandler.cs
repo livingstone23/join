@@ -47,7 +47,7 @@ public class GetCountriesPagedQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
-            whereBuilder.Append(" AND c.Name LIKE @SearchTerm");
+            whereBuilder.Append(" AND c.Name ILIKE @SearchTerm");
             parameters.Add("SearchTerm", $"%{request.SearchTerm.Trim()}%");
         }
 

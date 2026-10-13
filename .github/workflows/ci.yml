@@ -91,10 +91,9 @@ jobs:
     - name: 🔨 Build
       run: dotnet build --no-restore --configuration Release
 
-    - name: 🐘 Run PostgreSQL Smoke Tests (Testcontainers)
-      # Solo PostgreSqlSmokeTests: la suite existente usa Testcontainers.MsSql y no
-      # aplica a esta rama (paridad completa = spec de seguimiento).
+    - name: 🐘 Run Integration Tests (PostgreSQL)
+      # SPEC 50 (F5): la suite completa corre contra Testcontainers.PostgreSql
+      # dentro de la factory unificada — ya no hace falta filtro.
       run: >
         dotnet test tests/IntegrationTests/JOIN.IntegrationTests.csproj
         --no-build --configuration Release --verbosity normal
-        --filter "FullyQualifiedName~PostgreSql"

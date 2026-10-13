@@ -65,13 +65,13 @@ public sealed class GetCompanyModulesQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.CompanyName))
         {
-            whereBuilder.Append(" AND c.Name LIKE @CompanyName");
+            whereBuilder.Append(" AND c.Name ILIKE @CompanyName");
             parameters.Add("CompanyName", $"%{request.CompanyName.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(request.ModuleName))
         {
-            whereBuilder.Append(" AND sm.Name LIKE @ModuleName");
+            whereBuilder.Append(" AND sm.Name ILIKE @ModuleName");
             parameters.Add("ModuleName", $"%{request.ModuleName.Trim()}%");
         }
 

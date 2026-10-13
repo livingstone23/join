@@ -58,7 +58,7 @@ public sealed class GetProjectsQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND p.Name LIKE @Name");
+            whereBuilder.Append(" AND p.Name ILIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 

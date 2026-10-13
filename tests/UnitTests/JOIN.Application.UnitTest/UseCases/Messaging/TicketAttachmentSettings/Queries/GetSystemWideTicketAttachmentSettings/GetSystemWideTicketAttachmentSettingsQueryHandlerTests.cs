@@ -81,7 +81,7 @@ public sealed class GetSystemWideTicketAttachmentSettingsQueryHandlerTests
     }
 
     /// <summary>
-    /// Verifies that the SQL contains the LIKE filter when <c>CompanyName</c>
+    /// Verifies that the SQL contains the ILIKE filter when <c>CompanyName</c>
     /// is supplied — important because the cross-tenant query is the entry
     /// point SuperAdmin uses to find any company's settings.
     /// </summary>
@@ -99,7 +99,7 @@ public sealed class GetSystemWideTicketAttachmentSettingsQueryHandlerTests
             new GetSystemWideTicketAttachmentSettingsQuery(PageNumber: 1, PageSize: 20, CompanyName: "JOIN"),
             CancellationToken.None);
 
-        context.Connection.LastCommandText.Should().Contain("c.Name LIKE @CompanyName");
+        context.Connection.LastCommandText.Should().Contain("c.Name ILIKE @CompanyName");
     }
 
     /// <summary>

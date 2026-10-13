@@ -83,19 +83,19 @@ internal static class RoleSystemOptionQuerySql
 
         if (!string.IsNullOrWhiteSpace(filters.RoleName))
         {
-            whereBuilder.Append(" AND ar.Name LIKE @RoleNamePattern");
+            whereBuilder.Append(" AND ar.Name ILIKE @RoleNamePattern");
             parameters.Add("RoleNamePattern", $"%{filters.RoleName.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(filters.SystemOptionName))
         {
-            whereBuilder.Append(" AND so.Name LIKE @SystemOptionNamePattern");
+            whereBuilder.Append(" AND so.Name ILIKE @SystemOptionNamePattern");
             parameters.Add("SystemOptionNamePattern", $"%{filters.SystemOptionName.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(filters.CompanyName))
         {
-            whereBuilder.Append(" AND c.Name LIKE @CompanyNamePattern");
+            whereBuilder.Append(" AND c.Name ILIKE @CompanyNamePattern");
             parameters.Add("CompanyNamePattern", $"%{filters.CompanyName.Trim()}%");
         }
 

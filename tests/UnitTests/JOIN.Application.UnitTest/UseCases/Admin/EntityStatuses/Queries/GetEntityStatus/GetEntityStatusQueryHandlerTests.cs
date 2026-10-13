@@ -126,8 +126,8 @@ public sealed class GetEntityStatusQueryHandlerTests
         item.CreatedAt.Should().Be(createdAt);
 
         context.Connection.LastCommandText.Should().Contain("AND es.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("es.Name LIKE @Name");
-        context.Connection.LastCommandText.Should().Contain("COALESCE(es.Description, '') LIKE @ModuleName");
+        context.Connection.LastCommandText.Should().Contain("es.Name ILIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("COALESCE(es.Description, '') ILIKE @ModuleName");
         context.Connection.LastCommandText.Should().Contain("es.Created >= @CreatedFrom");
         context.Connection.LastCommandText.Should().Contain("es.Created < @CreatedToExclusive");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");

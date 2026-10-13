@@ -66,7 +66,7 @@ public class GetCompaniesPagedQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
-            whereBuilder.Append(" AND (c.Name LIKE @SearchTerm OR c.TaxId LIKE @SearchTerm)");
+            whereBuilder.Append(" AND (c.Name ILIKE @SearchTerm OR c.TaxId ILIKE @SearchTerm)");
             parameters.Add("SearchTerm", $"%{request.SearchTerm.Trim()}%");
         }
 

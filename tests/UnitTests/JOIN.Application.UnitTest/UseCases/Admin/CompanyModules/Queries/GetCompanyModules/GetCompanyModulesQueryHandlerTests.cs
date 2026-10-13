@@ -103,8 +103,8 @@ public sealed class GetCompanyModulesQueryHandlerTests
 
         context.Connection.LastCommandText.Should().Contain("cm.CompanyId = @CompanyId");
         context.Connection.LastCommandText.Should().Contain("cm.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("c.Name LIKE @CompanyName");
-        context.Connection.LastCommandText.Should().Contain("sm.Name LIKE @ModuleName");
+        context.Connection.LastCommandText.Should().Contain("c.Name ILIKE @CompanyName");
+        context.Connection.LastCommandText.Should().Contain("sm.Name ILIKE @ModuleName");
         context.Connection.LastCommandText.Should().Contain("cm.Created >= @CreatedFrom");
         context.Connection.LastCommandText.Should().Contain("cm.Created < @CreatedToExclusive");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");

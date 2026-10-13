@@ -7,16 +7,16 @@ using Npgsql;
 namespace JOIN.IntegrationTests.Calendars;
 
 /// <summary>
-/// SPEC 46-post (PostgreSQL, <see cref="PostgreSqlWebApplicationFactory"/>) — verifies the structure of
+/// SPEC 46-post (PostgreSQL, <see cref="CustomWebApplicationFactory"/>) — verifies the structure of
 /// the three new tables (<c>Calendar.ExternalConnections</c>, <c>Calendar.ExternalEventLinks</c>,
 /// <c>Calendar.SyncOutbox</c>): they exist, their filtered unique indexes match the spec, and the
 /// EF model compiles (the host built successfully, so the model is valid by construction).
 /// </summary>
-public sealed class CalendarExternalSyncStructurePostgreSqlTests : IClassFixture<PostgreSqlWebApplicationFactory>
+public sealed class CalendarExternalSyncStructurePostgreSqlTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly PostgreSqlWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public CalendarExternalSyncStructurePostgreSqlTests(PostgreSqlWebApplicationFactory factory)
+    public CalendarExternalSyncStructurePostgreSqlTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

@@ -115,7 +115,7 @@ public sealed class GetAreasQueryHandlerTests
         item.Created.Should().Be(createdAt);
 
         context.Connection.LastCommandText.Should().Contain("WHERE a.CompanyId = @CompanyId AND a.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("a.Name LIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("a.Name ILIKE @Name");
         context.Connection.LastCommandText.Should().Contain("a.Created >= @CreatedFrom");
         context.Connection.LastCommandText.Should().Contain("a.Created < @CreatedToExclusive");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");

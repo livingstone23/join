@@ -53,7 +53,7 @@ public sealed class GetIndustriesQueryHandlerTests
         response.Data.TotalCount.Should().Be(21);
         response.Data.TotalPages.Should().Be(3);
         context.Connection.LastCommandText.Should()
-            .Contain("i.Code LIKE @Code").And.Contain("i.Name LIKE @Name").And.Contain("i.IsActive = @IsActive")
+            .Contain("i.Code ILIKE @Code").And.Contain("i.Name ILIKE @Name").And.Contain("i.IsActive = @IsActive")
             .And.Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.CapturedParameters["Code"].Should().Be("%M%");
         context.Connection.CapturedParameters["Name"].Should().Be("%Mas%");

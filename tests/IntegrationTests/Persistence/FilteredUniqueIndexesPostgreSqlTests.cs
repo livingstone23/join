@@ -9,18 +9,18 @@ namespace JOIN.IntegrationTests.Persistence;
 
 /// <summary>
 /// SPEC 40-post (D) — runtime behavior of the filtered unique indexes on a real PostgreSQL
-/// (<see cref="PostgreSqlWebApplicationFactory"/>, <c>postgres:17</c>). Soft delete is reproduced with the
+/// (<see cref="CustomWebApplicationFactory"/>, <c>postgres:17</c>). Soft delete is reproduced with the
 /// same stamp <c>MarkAsDeleted</c> writes (<c>yyyyMMdd</c> of today), so two deletions happen "the same day".
 /// Every case runs in a transaction that is rolled back.
 /// </summary>
-public sealed class FilteredUniqueIndexesPostgreSqlTests : IClassFixture<PostgreSqlWebApplicationFactory>
+public sealed class FilteredUniqueIndexesPostgreSqlTests : IClassFixture<CustomWebApplicationFactory>
 {
     private static readonly int TodayStamp =
         int.Parse(DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
 
-    private readonly PostgreSqlWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public FilteredUniqueIndexesPostgreSqlTests(PostgreSqlWebApplicationFactory factory)
+    public FilteredUniqueIndexesPostgreSqlTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

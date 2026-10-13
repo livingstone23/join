@@ -46,7 +46,7 @@ public sealed class GetSystemOptionsPagedQueryHandler(
         }
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND o.Name LIKE @Name");
+            whereBuilder.Append(" AND o.Name ILIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 

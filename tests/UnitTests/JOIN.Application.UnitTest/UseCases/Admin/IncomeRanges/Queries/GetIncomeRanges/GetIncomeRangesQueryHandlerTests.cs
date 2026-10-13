@@ -53,7 +53,7 @@ public sealed class GetIncomeRangesQueryHandlerTests
         response.Data!.Items.Should().ContainSingle();
         response.Data.TotalPages.Should().Be(2);
         context.Connection.LastCommandText.Should()
-            .Contain("ir.DisplayName LIKE @DisplayName").And.Contain("ir.CurrencyCode = @CurrencyCode")
+            .Contain("ir.DisplayName ILIKE @DisplayName").And.Contain("ir.CurrencyCode = @CurrencyCode")
             .And.Contain("ir.IsActive = @IsActive").And.Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.CapturedParameters["CurrencyCode"].Should().Be("USD");
         context.Connection.CapturedParameters["DisplayName"].Should().Be("%Lo%");

@@ -60,9 +60,9 @@ public sealed class GetSystemWideTimeUnitsQueryHandlerTests
         response.Data.TotalPages.Should().Be(2);
 
         context.Connection.LastCommandText.Should().Contain("WHERE 1 = 1");
-        context.Connection.LastCommandText.Should().Contain("tu.Name LIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("tu.Name ILIKE @Name");
         context.Connection.LastCommandText.Should().Contain("tu.IsActive = @IsActive");
-        context.Connection.LastCommandText.Should().Contain("c.Name LIKE @CompanyName");
+        context.Connection.LastCommandText.Should().Contain("c.Name ILIKE @CompanyName");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.LastCommandText.Should().NotContain("tu.CompanyId = @TenantId");
 

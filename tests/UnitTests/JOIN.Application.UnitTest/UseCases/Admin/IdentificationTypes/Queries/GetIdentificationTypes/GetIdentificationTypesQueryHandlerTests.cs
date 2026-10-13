@@ -86,7 +86,7 @@ public sealed class GetIdentificationTypesQueryHandlerTests
         item.CreatedAt.Should().Be(createdAt);
 
         context.Connection.LastCommandText.Should().Contain("AND it.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("it.Name LIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("it.Name ILIKE @Name");
         context.Connection.LastCommandText.Should().Contain("it.Created >= @CreatedDayStart AND it.Created < @CreatedDayEnd");
         context.Connection.LastCommandText.Should().Contain("it.Created >= @CreatedFrom");
         context.Connection.LastCommandText.Should().Contain("it.Created < @CreatedToExclusive");

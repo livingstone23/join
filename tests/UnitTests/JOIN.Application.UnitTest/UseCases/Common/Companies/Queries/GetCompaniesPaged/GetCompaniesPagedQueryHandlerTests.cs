@@ -55,7 +55,7 @@ public sealed class GetCompaniesPagedQueryHandlerTests
         response.Data.Items.Single().Id.Should().Be(companyId);
 
         context.Connection.LastCommandText.Should().Contain("AND c.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("c.Name LIKE @SearchTerm OR c.TaxId LIKE @SearchTerm");
+        context.Connection.LastCommandText.Should().Contain("c.Name ILIKE @SearchTerm OR c.TaxId ILIKE @SearchTerm");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.CapturedParameters["SearchTerm"].Should().Be("%join%");
         context.Connection.CapturedParameters["PageSize"].Should().Be(50);

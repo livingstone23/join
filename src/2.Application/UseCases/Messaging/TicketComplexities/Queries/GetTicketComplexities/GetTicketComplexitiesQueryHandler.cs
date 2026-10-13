@@ -51,7 +51,7 @@ public sealed class GetTicketComplexitiesQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND tc.Name LIKE @Name");
+            whereBuilder.Append(" AND tc.Name ILIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 

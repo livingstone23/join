@@ -37,8 +37,8 @@ public sealed class GetTaxRegimesQueryHandler(
         {
             where.Append(" AND tr.GcRecord = 0");
         }
-        if (!string.IsNullOrWhiteSpace(request.Code)) { where.Append(" AND tr.Code LIKE @Code"); parameters.Add("Code", $"%{request.Code.Trim()}%"); }
-        if (!string.IsNullOrWhiteSpace(request.Name)) { where.Append(" AND tr.Name LIKE @Name"); parameters.Add("Name", $"%{request.Name.Trim()}%"); }
+        if (!string.IsNullOrWhiteSpace(request.Code)) { where.Append(" AND tr.Code ILIKE @Code"); parameters.Add("Code", $"%{request.Code.Trim()}%"); }
+        if (!string.IsNullOrWhiteSpace(request.Name)) { where.Append(" AND tr.Name ILIKE @Name"); parameters.Add("Name", $"%{request.Name.Trim()}%"); }
         if (request.IsActive.HasValue) { where.Append(" AND tr.IsActive = @IsActive"); parameters.Add("IsActive", request.IsActive.Value); }
 
         var whereClause = where.ToString();

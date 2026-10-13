@@ -66,7 +66,7 @@ public sealed class GetRegionsQueryHandlerTests
         item.CreatedAt.Should().Be(createdAt);
 
         context.Connection.LastCommandText.Should().Contain("AND r.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("r.Name LIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("r.Name ILIKE @Name");
         context.Connection.LastCommandText.Should().Contain("r.Code = @Code");
         context.Connection.LastCommandText.Should().Contain("r.CountryId = @CountryId");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");

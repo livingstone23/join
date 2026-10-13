@@ -141,7 +141,7 @@ public sealed class GlobalQueryFiltersGuardTests
 
     /// <summary>
     /// A minimal DbContext that calls the production OnModelCreating so the guard test
-    /// inspects the same model the application uses at runtime. The SQL Server provider is
+    /// inspects the same model the application uses at runtime. The Npgsql provider is
     /// configured but no connection is opened — OnModelCreating does not need a live DB.
     /// </summary>
     private sealed class TestApplicationDbContext : ApplicationDbContext
@@ -149,8 +149,8 @@ public sealed class GlobalQueryFiltersGuardTests
         public TestApplicationDbContext()
             : base(
                 new DbContextOptionsBuilder<ApplicationDbContext>()
-                    .UseSqlServer(
-                        "Server=(localdb)\\mssqllocaldb;Database=GuardTest;Trusted_Connection=True;",
+                    .UseNpgsql(
+                        "Host=localhost;Database=GuardTest;Username=postgres;Password=postgres",
                         builder => builder.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName))
                     .Options,
                 null!,

@@ -25,19 +25,19 @@ namespace JOIN.IntegrationTests.Persistence;
 
 /// <summary>
 /// SPEC 39 (F6) — smoke suite for the main_postgresql fork, against a real PostgreSQL
-/// (Testcontainers in <see cref="PostgreSqlWebApplicationFactory"/>). Not full parity with the
+/// (Testcontainers in <see cref="CustomWebApplicationFactory"/>). Not full parity with the
 /// SQL Server suite: it covers the highest-risk points of the port — the InitialPostgres
 /// migration, the seed, the 11 filtered unique indexes, one paged CRUD flow and the session
 /// flow whose <c>TOP (n)</c> queries were rewritten to <c>LIMIT</c>.
 /// CI runs it with <c>--filter "FullyQualifiedName~PostgreSql"</c>.
 /// </summary>
-public sealed class PostgreSqlSmokeTests : IClassFixture<PostgreSqlWebApplicationFactory>
+public sealed class PostgreSqlSmokeTests : IClassFixture<CustomWebApplicationFactory>
 {
     private const string Password = "Smoke!Pass2026";
 
-    private readonly PostgreSqlWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public PostgreSqlSmokeTests(PostgreSqlWebApplicationFactory factory)
+    public PostgreSqlSmokeTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

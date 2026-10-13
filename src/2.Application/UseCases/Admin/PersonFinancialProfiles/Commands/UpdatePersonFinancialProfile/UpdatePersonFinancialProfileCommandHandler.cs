@@ -26,6 +26,11 @@ public sealed class UpdatePersonFinancialProfileCommandHandler(
         }
 
         var companyId = currentUserService.CompanyId;
+
+        // Normalize DeclaredDate to Unspecified so Npgsql stores it as `timestamp without time zone`
+        // without timezone conversion (PostgreSQL rejects Utc-kind values for `timestamp` columns).
+        var declaredDate = DateTime.SpecifyKind(request.DeclaredDate, DateTimeKind.Unspecified);
+
         var profileRepository = unitOfWork.PersonFinancialProfiles;
         var entity = await profileRepository.GetActiveByIdAsync(request.Id, companyId, cancellationToken);
 
@@ -55,7 +60,7 @@ public sealed class UpdatePersonFinancialProfileCommandHandler(
 
         try
         {
-            entity.Update(request.IncomeRangeId, request.SourceOfFunds, request.DeclaredDate);
+            entity.Update(request.IncomeRangeId, request.SourceOfFunds, declaredDate);
 
             if (request.IsActive == true)
             {

@@ -164,11 +164,11 @@ public sealed class ModuleEnforcementPostgreSqlTests : IClassFixture<ModuleEnfor
 /// SPEC 48-post — with the switch off (deployment default), <c>CompanyModules</c> is ignored for menu and APIs (B4/B5):
 /// a disabled module still answers and still shows in the menu.
 /// </summary>
-public sealed class ModuleEnforcementSwitchOffPostgreSqlTests : IClassFixture<PostgreSqlWebApplicationFactory>
+public sealed class ModuleEnforcementSwitchOffPostgreSqlTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly PostgreSqlWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public ModuleEnforcementSwitchOffPostgreSqlTests(PostgreSqlWebApplicationFactory factory)
+    public ModuleEnforcementSwitchOffPostgreSqlTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }
@@ -201,7 +201,7 @@ internal static class ModuleTestHelpers
 {
     private const string Password = "ABCabc123*";
 
-    public static async Task<HttpClient> LoginAsync(PostgreSqlWebApplicationFactory factory, string email)
+    public static async Task<HttpClient> LoginAsync(CustomWebApplicationFactory factory, string email)
     {
         var client = factory.CreateClient();
         var login = await client.PostAsJsonAsync("/api/v1/users/login", new LoginCommand { Email = email, Password = Password });
@@ -239,21 +239,21 @@ internal static class ModuleTestHelpers
         }
     }
 
-    public static async Task<Guid> JoinCompanyIdAsync(PostgreSqlWebApplicationFactory factory)
+    public static async Task<Guid> JoinCompanyIdAsync(CustomWebApplicationFactory factory)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         return await db.Companies.IgnoreQueryFilters().Where(c => c.TaxId == "JOIN-001").Select(c => c.Id).SingleAsync();
     }
 
-    public static async Task<Domain.Admin.SystemModule> SystemModuleAsync(PostgreSqlWebApplicationFactory factory, string moduleName)
+    public static async Task<Domain.Admin.SystemModule> SystemModuleAsync(CustomWebApplicationFactory factory, string moduleName)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         return await db.SystemModules.IgnoreQueryFilters().AsNoTracking().SingleAsync(m => m.Name == moduleName && m.GcRecord == 0);
     }
 
-    public static async Task<Guid> JoinCompanyModuleIdAsync(PostgreSqlWebApplicationFactory factory, string moduleName)
+    public static async Task<Guid> JoinCompanyModuleIdAsync(CustomWebApplicationFactory factory, string moduleName)
     {
         var companyId = await JoinCompanyIdAsync(factory);
         await using var scope = factory.Services.CreateAsyncScope();

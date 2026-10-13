@@ -156,7 +156,7 @@ Decisión del usuario (2026-10-09): las specs 40–49, 51 y 99 de `main` se copi
 8. **Bloqueos:** `pg_advisory_xact_lock(...)` en lugar de `sp_getapplock`; `SELECT ... FOR UPDATE` en lugar de `WITH (UPDLOCK, HOLDLOCK)`.
 9. **Violación de índice único:** `PostgresException` con `SqlState = 23505` (y `ConstraintName`); `GlobalExceptionHandler` ya la responde como 409 `DUPLICATE_KEY` (SPEC 39). Si un handler necesita reconocer la violación de un índice concreto, lo hace un servicio de Persistence/Infrastructure (Application no referencia Npgsql).
 10. **Validación del SQL:** `EXPLAIN` de cada sentencia nueva contra la base migrada (técnica de SPEC 39).
-11. **Tests:** los unitarios que afirman texto SQL afirman el SQL de PostgreSQL. Los de integración usan `PostgreSqlWebApplicationFactory` (`postgres:17`) y su clase termina en `PostgreSqlTests`, para entrar al filtro `FullyQualifiedName~PostgreSql` del job `integration-tests-postgres` (hasta que SPEC 50 E unifique las factories). Comando: `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 dotnet test tests/IntegrationTests/JOIN.IntegrationTests.csproj --filter "FullyQualifiedName~PostgreSql"`.
+11. **Tests:** los unitarios que afirman texto SQL afirman el SQL de PostgreSQL. Los de integración usan `CustomWebApplicationFactory` (`postgres:17`, SPEC 50 E); los previos al SPEC 50 E mantienen su sufijo `PostgreSqlTests` y siguen usando esa misma factory. Job de CI: `dotnet test tests/IntegrationTests/JOIN.IntegrationTests.csproj` (sin filtro). Comando: `dotnet test tests/IntegrationTests/JOIN.IntegrationTests.csproj`.
 12. **Verificación con Docker** (smoke manual de cada `-post`, decisión del usuario 2026-10-09; `docker-compose.yml` no cambia):
 
     ```bash

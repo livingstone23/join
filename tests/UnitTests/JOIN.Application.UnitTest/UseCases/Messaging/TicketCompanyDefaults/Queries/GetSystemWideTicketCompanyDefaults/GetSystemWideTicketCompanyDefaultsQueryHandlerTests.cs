@@ -72,14 +72,14 @@ public sealed class GetSystemWideTicketCompanyDefaultsQueryHandlerTests
         item.ProjectName.Should().Be("CRM Rollout");
         item.ChannelName.Should().Be("Email");
 
-        context.Connection.LastCommandText.Should().Contain("c.Name LIKE @CompanyName");
-        context.Connection.LastCommandText.Should().Contain("tcd.StartCode LIKE @StartCode");
-        context.Connection.LastCommandText.Should().Contain("ts.Name LIKE @TicketStatusDefaultName");
-        context.Connection.LastCommandText.Should().Contain("tc.Name LIKE @TicketComplexityDefaultName");
-        context.Connection.LastCommandText.Should().Contain("tu.Name LIKE @TimeUnitDefaultName");
-        context.Connection.LastCommandText.Should().Contain("a.Name LIKE @AreaName");
-        context.Connection.LastCommandText.Should().Contain("p.Name LIKE @ProjectName");
-        context.Connection.LastCommandText.Should().Contain("ch.Name LIKE @ChannelName");
+        context.Connection.LastCommandText.Should().Contain("c.Name ILIKE @CompanyName");
+        context.Connection.LastCommandText.Should().Contain("tcd.StartCode ILIKE @StartCode");
+        context.Connection.LastCommandText.Should().Contain("ts.Name ILIKE @TicketStatusDefaultName");
+        context.Connection.LastCommandText.Should().Contain("tc.Name ILIKE @TicketComplexityDefaultName");
+        context.Connection.LastCommandText.Should().Contain("tu.Name ILIKE @TimeUnitDefaultName");
+        context.Connection.LastCommandText.Should().Contain("a.Name ILIKE @AreaName");
+        context.Connection.LastCommandText.Should().Contain("p.Name ILIKE @ProjectName");
+        context.Connection.LastCommandText.Should().Contain("ch.Name ILIKE @ChannelName");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
 
         context.Connection.CapturedParameters["CompanyName"].Should().Be("%JOIN%");

@@ -41,7 +41,7 @@ public record GetSystemWideTicketUserCompaniesQuery : IRequest<Response<PagedRes
     public bool? CanResolveTicket { get; init; }
 
     /// <summary>
-    /// Gets or sets an optional filter on the company name (LIKE match).
+    /// Gets or sets an optional filter on the company name (ILIKE match).
     /// </summary>
     public string? CompanyName { get; init; }
 }

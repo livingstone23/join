@@ -39,7 +39,7 @@ public sealed class GetSystemWideTicketAttachmentSettingsQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.CompanyName))
         {
-            whereBuilder.Append(" AND c.Name LIKE @CompanyName");
+            whereBuilder.Append(" AND c.Name ILIKE @CompanyName");
             parameters.Add("CompanyName", $"%{request.CompanyName.Trim()}%");
         }
 

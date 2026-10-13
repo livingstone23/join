@@ -93,7 +93,7 @@ public sealed class GetTicketsQueryHandlerTests
         item.Code.Should().Be("TICK-202604-0001");
 
         context.Connection.LastCommandText.Should().Contain("WHERE t.CompanyId = @TenantId AND t.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("t.Code LIKE @Search OR t.Name LIKE @Search OR t.Description LIKE @Search");
+        context.Connection.LastCommandText.Should().Contain("t.Code ILIKE @Search OR t.Name ILIKE @Search OR t.Description ILIKE @Search");
         context.Connection.LastCommandText.Should().Contain("t.TicketStatusId = @TicketStatusId");
         context.Connection.LastCommandText.Should().Contain("t.ProjectId = @ProjectId");
         context.Connection.LastCommandText.Should().Contain("t.IsVisibleToExternals = @IsVisibleToExternals");

@@ -80,7 +80,7 @@ public sealed class GetTimeUnitsQueryHandlerTests
         response.Data.TotalPages.Should().Be(1);
 
         context.Connection.LastCommandText.Should().Contain("WHERE tu.CompanyId = @TenantId AND tu.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("tu.Name LIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("tu.Name ILIKE @Name");
         context.Connection.LastCommandText.Should().Contain("tu.IsActive = @IsActive");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.CapturedParameters["TenantId"].Should().Be(companyId);

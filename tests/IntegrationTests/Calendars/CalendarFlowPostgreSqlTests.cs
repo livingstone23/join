@@ -24,19 +24,19 @@ using Microsoft.Extensions.DependencyInjection;
 namespace JOIN.IntegrationTests.Calendars;
 
 /// <summary>
-/// SPEC 44-post (PostgreSQL, <see cref="PostgreSqlWebApplicationFactory"/>) — calendar flow through the API:
+/// SPEC 44-post (PostgreSQL, <see cref="CustomWebApplicationFactory"/>) — calendar flow through the API:
 /// configure the company → create an activity → overlap 409 → confirm → week query, plus recurring series with the
 /// three scopes, the panel (business hours 422, reschedule status), availability, non-working periods and the seed.
 /// Dates are in March 2027 (America/Managua, UTC-6, no daylight saving time).
 /// </summary>
-public sealed class CalendarFlowPostgreSqlTests : IClassFixture<PostgreSqlWebApplicationFactory>
+public sealed class CalendarFlowPostgreSqlTests : IClassFixture<CustomWebApplicationFactory>
 {
     private const string Creator = "spec44-tests";
     private const string Password = "Integration!Pass123";
 
-    private readonly PostgreSqlWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public CalendarFlowPostgreSqlTests(PostgreSqlWebApplicationFactory factory)
+    public CalendarFlowPostgreSqlTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

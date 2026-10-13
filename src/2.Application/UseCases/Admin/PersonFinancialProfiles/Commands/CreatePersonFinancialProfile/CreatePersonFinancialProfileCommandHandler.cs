@@ -23,6 +23,11 @@ public sealed class CreatePersonFinancialProfileCommandHandler(
         }
 
         var companyId = currentUserService.CompanyId;
+
+        // Normalize DeclaredDate to Unspecified so Npgsql stores it as `timestamp without time zone`
+        // without timezone conversion (PostgreSQL rejects Utc-kind values for `timestamp` columns).
+        var declaredDate = DateTime.SpecifyKind(request.DeclaredDate, DateTimeKind.Unspecified);
+
         var person = await unitOfWork.GetRepository<Person>().GetAsync(request.PersonId);
 
         if (person is null || person.CompanyId != companyId || person.GcRecord != 0)
@@ -46,7 +51,7 @@ public sealed class CreatePersonFinancialProfileCommandHandler(
                 request.PersonId,
                 request.IncomeRangeId,
                 request.SourceOfFunds,
-                request.DeclaredDate);
+                declaredDate);
 
             if (request.IsCurrent == false)
             {

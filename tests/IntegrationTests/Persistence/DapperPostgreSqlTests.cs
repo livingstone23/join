@@ -13,15 +13,15 @@ using Npgsql;
 namespace JOIN.IntegrationTests.Persistence;
 
 /// <summary>
-/// Dapper on PostgreSQL (<see cref="PostgreSqlWebApplicationFactory"/>, <c>postgres:17</c>):
+/// Dapper on PostgreSQL (<see cref="CustomWebApplicationFactory"/>, <c>postgres:17</c>):
 /// <see cref="DapperContext"/> opens Npgsql connections (it used to always create a SqlConnection),
 /// and <c>date</c> columns, which Npgsql returns as <see cref="DateOnly"/>, map into <see cref="DateTime"/>.
 /// </summary>
-public sealed class DapperPostgreSqlTests : IClassFixture<PostgreSqlWebApplicationFactory>
+public sealed class DapperPostgreSqlTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly PostgreSqlWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public DapperPostgreSqlTests(PostgreSqlWebApplicationFactory factory)
+    public DapperPostgreSqlTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

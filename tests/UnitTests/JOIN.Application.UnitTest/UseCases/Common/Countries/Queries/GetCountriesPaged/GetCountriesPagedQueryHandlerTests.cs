@@ -59,8 +59,8 @@ public sealed class GetCountriesPagedQueryHandlerTests
         response.Data.TotalPages.Should().Be(1);
 
         context.Connection.LastCommandText.Should().Contain("AND c.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("c.Name LIKE @SearchTerm");
-        context.Connection.LastCommandText.Should().NotContain("c.IsoCode LIKE @SearchTerm");
+        context.Connection.LastCommandText.Should().Contain("c.Name ILIKE @SearchTerm");
+        context.Connection.LastCommandText.Should().NotContain("c.IsoCode ILIKE @SearchTerm");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
 
         context.Connection.CapturedParameters["SearchTerm"].Should().Be("%pan%");

@@ -62,7 +62,7 @@ public sealed class GetSystemModulesQueryHandlerTests
         item.CreatedAt.Should().Be(createdAt);
 
         context.Connection.LastCommandText.Should().Contain("AND sm.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("sm.Name LIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("sm.Name ILIKE @Name");
         context.Connection.LastCommandText.Should().Contain("sm.IsActive = @IsActive");
         context.Connection.LastCommandText.Should().Contain("ORDER BY sm.\"order\" ASC NULLS LAST, sm.Name ASC");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");

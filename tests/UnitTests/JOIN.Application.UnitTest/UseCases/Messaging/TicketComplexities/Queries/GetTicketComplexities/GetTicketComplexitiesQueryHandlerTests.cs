@@ -84,7 +84,7 @@ public sealed class GetTicketComplexitiesQueryHandlerTests
         response.Data.TotalPages.Should().Be(1);
 
         context.Connection.LastCommandText.Should().Contain("WHERE tc.CompanyId = @TenantId AND tc.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("tc.Name LIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("tc.Name ILIKE @Name");
         context.Connection.LastCommandText.Should().Contain("tc.IsActive = @IsActive");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
 

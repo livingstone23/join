@@ -105,7 +105,7 @@ public sealed class GetMyCompanyUserReportQueryHandlerTests
             FakeResultSet.FromScalar(0));
 
         // The SQL round-trip is exercised in integration tests. Here we only care
-        // that Search is propagated as a LIKE wildcard before the query runs.
+        // that Search is propagated as a ILIKE wildcard before the query runs.
         try { await ctx.Handler.Handle(new GetMyCompanyUserReportQuery(Search: "juan"), CancellationToken.None); }
         catch { /* fake-only: round-trip is integration territory */ }
 

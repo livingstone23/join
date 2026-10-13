@@ -90,12 +90,12 @@ public sealed class GetPersonsPagedQueryHandlerTests
         item.IdentificationTypeName.Should().Be("Passport");
 
         context.Connection.LastCommandText.Should().Contain("WHERE c.CompanyId = @TenantId AND c.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("c.PersonType LIKE @PersonType");
-        context.Connection.LastCommandText.Should().Contain("c.FirstName LIKE @FirstName");
-        context.Connection.LastCommandText.Should().Contain("c.LastName LIKE @LastName");
-        context.Connection.LastCommandText.Should().Contain("c.CommercialName LIKE @CommercialName");
+        context.Connection.LastCommandText.Should().Contain("c.PersonType ILIKE @PersonType");
+        context.Connection.LastCommandText.Should().Contain("c.FirstName ILIKE @FirstName");
+        context.Connection.LastCommandText.Should().Contain("c.LastName ILIKE @LastName");
+        context.Connection.LastCommandText.Should().Contain("c.CommercialName ILIKE @CommercialName");
         context.Connection.LastCommandText.Should().Contain("c.IdentificationTypeId = @IdentificationTypeId");
-        context.Connection.LastCommandText.Should().Contain("c.IdentificationNumber LIKE @IdentificationNumber");
+        context.Connection.LastCommandText.Should().Contain("c.IdentificationNumber ILIKE @IdentificationNumber");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
 
         context.Connection.CapturedParameters["TenantId"].Should().Be(companyId);

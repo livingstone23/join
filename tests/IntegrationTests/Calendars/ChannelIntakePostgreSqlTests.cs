@@ -20,20 +20,20 @@ using Npgsql;
 namespace JOIN.IntegrationTests.Calendars;
 
 /// <summary>
-/// SPEC 45-post (PostgreSQL, <see cref="PostgreSqlWebApplicationFactory"/>) — the channel agent through the API with
+/// SPEC 45-post (PostgreSQL, <see cref="CustomWebApplicationFactory"/>) — the channel agent through the API with
 /// the seeded <c>agent@join.com</c> in <c>JOIN-001</c>: companies, identification types, person lookup (digits, last
 /// 8 digits, e-mail without case), registration with the review activity, booking on a free slot, deduplication
 /// (sequential and concurrent), reschedule and cancel; the pending-persons inbox with the seeded supervisor; and the
 /// permission boundaries between both resources. Dates in April 2027 (America/Managua, UTC-6).
 /// </summary>
-public sealed class ChannelIntakePostgreSqlTests : IClassFixture<PostgreSqlWebApplicationFactory>
+public sealed class ChannelIntakePostgreSqlTests : IClassFixture<CustomWebApplicationFactory>
 {
     private const string Base = "/api/v1/CalendarChannelIntake";
     private const string SeedPassword = "ABCabc123*";
 
-    private readonly PostgreSqlWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public ChannelIntakePostgreSqlTests(PostgreSqlWebApplicationFactory factory)
+    public ChannelIntakePostgreSqlTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

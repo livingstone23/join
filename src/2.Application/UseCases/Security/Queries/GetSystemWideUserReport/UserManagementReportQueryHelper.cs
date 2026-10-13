@@ -118,8 +118,8 @@ internal static class UserManagementReportQueryHelper
               AND (@IsActive IS NULL OR u.IsActive = @IsActive)
               AND (
                     @Search IS NULL
-                    OR u.Email LIKE @Search
-                    OR CONCAT(u.FirstName, ' ', u.LastName) LIKE @Search
+                    OR u.Email ILIKE @Search
+                    OR CONCAT(u.FirstName, ' ', u.LastName) ILIKE @Search
               )
         ),
         page AS (
@@ -191,8 +191,8 @@ internal static class UserManagementReportQueryHelper
               AND (@IsActive IS NULL OR u.IsActive = @IsActive)
               AND (
                     @Search IS NULL
-                    OR u.Email LIKE @Search
-                    OR CONCAT(u.FirstName, ' ', u.LastName) LIKE @Search
+                    OR u.Email ILIKE @Search
+                    OR CONCAT(u.FirstName, ' ', u.LastName) ILIKE @Search
               )
         ) AS pairs;
         """;

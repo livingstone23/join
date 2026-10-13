@@ -82,7 +82,7 @@ public sealed class GetTicketStatusesQueryHandlerTests
         item.IsActive.Should().BeTrue();
 
         context.Connection.LastCommandText.Should().Contain("WHERE ts.CompanyId = @TenantId AND ts.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("ts.Name LIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("ts.Name ILIKE @Name");
         context.Connection.LastCommandText.Should().Contain("ts.IsActive = @IsActive");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
 

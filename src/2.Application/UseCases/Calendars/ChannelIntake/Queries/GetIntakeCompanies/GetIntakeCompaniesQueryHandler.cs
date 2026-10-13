@@ -36,7 +36,7 @@ public sealed class GetIntakeCompaniesQueryHandler(
             ON cc.CompanyId = co.Id
            AND cc.GcRecord = 0
          WHERE co.GcRecord = 0
-           AND (LOWER(co.Name) LIKE @Search OR LOWER(co.TaxId) LIKE @Search)
+           AND (LOWER(co.Name) ILIKE @Search OR LOWER(co.TaxId) ILIKE @Search)
          ORDER BY co.Name;
         """;
 

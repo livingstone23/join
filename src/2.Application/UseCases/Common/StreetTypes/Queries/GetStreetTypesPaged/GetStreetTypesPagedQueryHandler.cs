@@ -44,7 +44,7 @@ public class GetStreetTypesPagedQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
-            whereBuilder.Append(" AND (st.Name LIKE @SearchTerm OR st.Abbreviation LIKE @SearchTerm)");
+            whereBuilder.Append(" AND (st.Name ILIKE @SearchTerm OR st.Abbreviation ILIKE @SearchTerm)");
             parameters.Add("SearchTerm", $"%{request.SearchTerm.Trim()}%");
         }
 

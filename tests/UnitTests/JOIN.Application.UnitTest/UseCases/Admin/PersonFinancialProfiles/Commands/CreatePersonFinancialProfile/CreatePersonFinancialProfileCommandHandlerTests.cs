@@ -120,6 +120,29 @@ public sealed class CreatePersonFinancialProfileCommandHandlerTests
             x => x.GetActiveCurrentAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Theory]
+    [InlineData(DateTimeKind.Utc)]
+    [InlineData(DateTimeKind.Local)]
+    [InlineData(DateTimeKind.Unspecified)]
+    public async Task Handle_WhenDeclaredDateHasAnyKind_ShouldPersistUnspecifiedKind(DateTimeKind kind)
+    {
+        var context = new Ctx(Ctx.CompanyId);
+        context.SetupPerson();
+        context.SetupIncomeRange();
+        context.UnitOfWorkMock.Setup(x => x.SaveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var raw = kind == DateTimeKind.Local
+            ? Ctx.DeclaredDate.ToLocalTime()
+            : DateTime.SpecifyKind(Ctx.DeclaredDate, kind);
+
+        var response = await CreateHandler(context).Handle(Command(context) with { DeclaredDate = raw }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        context.ProfileRepositoryMock.Verify(
+            x => x.InsertAsync(It.Is<PersonFinancialProfile>(p => p.DeclaredDate.Kind == DateTimeKind.Unspecified)),
+            Times.Once);
+    }
+
     private static CreatePersonFinancialProfileCommand Command(Ctx context) => new()
     {
         PersonId = Ctx.PersonId,

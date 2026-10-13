@@ -52,7 +52,7 @@ public sealed class GetTaxRegimesQueryHandlerTests
         response.Data.TotalCount.Should().Be(21);
         response.Data.TotalPages.Should().Be(3);
         context.Connection.LastCommandText.Should()
-            .Contain("tr.Code LIKE @Code").And.Contain("tr.Name LIKE @Name").And.Contain("tr.IsActive = @IsActive")
+            .Contain("tr.Code ILIKE @Code").And.Contain("tr.Name ILIKE @Name").And.Contain("tr.IsActive = @IsActive")
             .And.Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.CapturedParameters["Code"].Should().Be("%M%");
         context.Connection.CapturedParameters["Name"].Should().Be("%Mas%");

@@ -38,7 +38,7 @@ public sealed class GetIncomeRangesQueryHandler(
         }
         if (!string.IsNullOrWhiteSpace(request.DisplayName))
         {
-            where.Append(" AND ir.DisplayName LIKE @DisplayName");
+            where.Append(" AND ir.DisplayName ILIKE @DisplayName");
             parameters.Add("DisplayName", $"%{request.DisplayName.Trim()}%");
         }
 

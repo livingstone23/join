@@ -23,19 +23,19 @@ using Microsoft.Extensions.DependencyInjection;
 namespace JOIN.IntegrationTests.Messaging;
 
 /// <summary>
-/// SPEC 42-post (PostgreSQL, <see cref="PostgreSqlWebApplicationFactory"/>) — initial status of a new ticket through <c>POST /Tickets</c>: optional in the request,
+/// SPEC 42-post (PostgreSQL, <see cref="CustomWebApplicationFactory"/>) — initial status of a new ticket through <c>POST /Tickets</c>: optional in the request,
 /// falling back to <c>TicketCompanyDefaults.TicketStatusDefaultId</c>; a status sent by the client must
 /// be active, not final and of the same company. Also covers the matching rule on
 /// <c>POST /TicketCompanyDefaults</c> (<c>TICKET_STATUS_DEFAULT_INVALID</c>).
 /// </summary>
-public sealed class CreateTicketInitialStatusPostgreSqlTests : IClassFixture<PostgreSqlWebApplicationFactory>
+public sealed class CreateTicketInitialStatusPostgreSqlTests : IClassFixture<CustomWebApplicationFactory>
 {
     private const string Creator = "spec42-tests";
     private const string Password = "Integration!Pass123";
 
-    private readonly PostgreSqlWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public CreateTicketInitialStatusPostgreSqlTests(PostgreSqlWebApplicationFactory factory)
+    public CreateTicketInitialStatusPostgreSqlTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

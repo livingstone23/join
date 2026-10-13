@@ -86,11 +86,35 @@ Sin cambios de dominio.
 
 ### Runbook de la base de QA (borrador, se completa en F4)
 
-1. Crear el rol de aplicación y la base: `CREATE ROLE join_app LOGIN PASSWORD '<secreto>'; CREATE DATABASE join_db_qa OWNER join_app;`
-2. Configurar el despliegue de QA: `DatabaseProvider=PostgreSQL`, `ConnectionStrings__DefaultConnection=Host=<host-qa>;Port=5432;Database=join_db_qa;Username=join_app;Password=<secreto>`.
-3. Arrancar la API: migra (`InitialPostgres` + incrementales del fork) y siembra.
-4. Verificar: `/health/ready` → 200; login con un usuario sembrado; `GET /api/v1/tickets` paginado.
-5. Retirar del despliegue de QA la configuración de SQL Server.
+> **Aplicado:** Decisión 2A — base nueva sembrada por `DatabaseSeeder`; no se migran los datos actuales de QA sobre SQL Server.
+
+#### Valores base (no secretos)
+
+| Concepto | Valor |
+|---|---|
+| Motor | PostgreSQL 17 (mismo que dev y CI, SPEC 39) |
+| Base | `join_db_qa` |
+| Rol de aplicación | `join_app` (owner de los esquemas `admin`, `common`, `messaging`, `security`, `support` y `public` para `__EFMigrationsHistory`) |
+| Cadena de conexión | `Host=<host-qa>;Port=5432;Database=join_db_qa;Username=join_app;Password=<secreto>;Timeout=60;` (vía variable de entorno `ConnectionStrings__DefaultConnection`) |
+| Proveedor EF | `DatabaseProvider=PostgreSQL` |
+
+#### Pasos (ejecutar contra el servidor de QA)
+
+1. Crear el rol y la base:
+
+   ```sql
+   CREATE ROLE join_app LOGIN PASSWORD '<secreto>';
+   CREATE DATABASE join_db_qa OWNER join_app;
+   ```
+
+2. Configurar el despliegue de QA con las variables de entorno anteriores (nunca commitear el secreto).
+3. Arrancar la API contra `join_db_qa`. Aplica `InitialPostgres` + las incrementales del fork y corre `DatabaseSeeder` (programado en `Program.cs`).
+4. Verificar:
+   - `GET /health/ready` → `200`.
+   - Login con un usuario sembrado (la identidad sembrada por `DatabaseSeeder`).
+   - `GET /api/v1/tickets?searchTerm=juan` devuelve tickets cuyo nombre contiene `Juan` (búsqueda insensible a mayúsculas por F1).
+   - Crear perfil financiero vía HTTP con `DeclaredDate` ISO terminado en `Z` → `201` (verificación de F2).
+5. Retirar la configuración de SQL Server del despliegue de QA.
 
 ---
 

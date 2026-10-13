@@ -3,25 +3,26 @@ using JOIN.Application.Interface;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Serilog;
-using Testcontainers.MsSql;
+using Testcontainers.PostgreSql;
 
 namespace JOIN.IntegrationTests;
 
 /// <summary>
-/// WebApplicationFactory base for integration tests. Spins up an ephemeral SQL Server
-/// via Testcontainers before the host boots, points the host at it via the
-/// <c>ConnectionStrings:DefaultConnection</c> override, and replaces the real
-/// <see cref="IEmailService"/> with a mock so no test depends on an external
-/// network or sends real emails. EF Core migrations run automatically at startup
-/// — see <c>Program.cs</c>, no extra migration logic lives here on purpose.
+/// WebApplicationFactory base for all integration tests in the <c>main_postgresql</c> fork
+/// (SPEC 50, F5). Spins up an ephemeral PostgreSQL via Testcontainers before the host boots,
+/// points the host at it via <c>ConnectionStrings:DefaultConnection</c>, sets
+/// <c>DatabaseProvider=PostgreSQL</c>, and replaces the real <see cref="IEmailService"/> with a
+/// mock so no test depends on an external network or sends real emails. EF Core migrations run
+/// automatically at startup — see <c>Program.cs</c>, no extra migration logic lives here on
+/// purpose. The <c>postgres:17</c> image's readiness probe is reliable; no extra stability wait
+/// is needed (Testcontainers' own check is enough, unlike the mssql image).
 /// </summary>
-public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     // Must be set BEFORE any host in this process builds — see the static constructor below.
     // RateLimitingServiceCollectionExtensions.AddJoinRateLimiting reads
@@ -45,11 +46,15 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("RateLimiting__Strict__PermitLimit", "1000000");
     }
 
-    private readonly MsSqlContainer _dbContainer = new MsSqlBuilder()
-        .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
+    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder()
+        .WithImage("postgres:17")
         .Build();
 
-    private string _connectionString = string.Empty;
+    /// <summary>
+    /// Connection string of the ephemeral database, for tests that need to verify raw SQL
+    /// behavior (filtered indexes, savepoints) outside the EF Core model.
+    /// </summary>
+    public string ConnectionString { get; private set; } = string.Empty;
 
     // Process-wide lock around host build. Serilog's <c>Log.Logger</c> is a static singleton;
     // <see cref="WebApplicationFactory{TEntryPoint}"/> instances created concurrently by xUnit
@@ -59,9 +64,14 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     // assignment before factory A's <c>ILoggerFactory</c> resolution freezes it — A's freeze
     // then collides with B's later freeze of the same instance:
     // <c>InvalidOperationException: The logger is already frozen.</c>
-    // Internal (not private) so PostgreSqlWebApplicationFactory (SPEC 39) serializes on the SAME
-    // lock — both factories race on the one process-wide Log.Logger.
-    internal static readonly object _hostBuildLock = new();
+    protected static readonly object _hostBuildLock = new();
+
+    /// <summary>
+    /// Extra configuration values layered over the defaults, for derived factories that need a
+    /// different host setup (e.g. module-enforcement variants).
+    /// </summary>
+    protected virtual IReadOnlyDictionary<string, string?> AdditionalConfiguration { get; } =
+        new Dictionary<string, string?>();
 
     /// <summary>
     /// Resets <see cref="Log.Logger"/> to a fresh empty instance before each host build so
@@ -91,10 +101,18 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureAppConfiguration((_, config) =>
         {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
+            var settings = new Dictionary<string, string?>
             {
-                ["ConnectionStrings:DefaultConnection"] = _connectionString
-            });
+                ["DatabaseProvider"] = "PostgreSQL",
+                ["ConnectionStrings:DefaultConnection"] = ConnectionString
+            };
+
+            foreach (var (key, value) in AdditionalConfiguration)
+            {
+                settings[key] = value;
+            }
+
+            config.AddInMemoryCollection(settings);
         });
 
         builder.ConfigureTestServices(services =>
@@ -125,73 +143,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     public async Task InitializeAsync()
     {
         await _dbContainer.StartAsync();
-
-        var mappedPort = _dbContainer.GetMappedPublicPort(1433);
-        Console.WriteLine($"[DIAG] Testcontainers hostname={_dbContainer.Hostname} mappedPort={mappedPort}");
-
-        var builder = new SqlConnectionStringBuilder(_dbContainer.GetConnectionString())
-        {
-            ConnectTimeout = 30,
-            IPAddressPreference = SqlConnectionIPAddressPreference.IPv4First
-        };
-        _connectionString = builder.ConnectionString;
-
-        await WaitUntilStablyQueryableAsync();
-    }
-
-    // The official mssql-server image can briefly accept connections right after
-    // Testcontainers' own "docker exec sqlcmd" readiness check succeeds, then go
-    // dark for minutes while the engine finishes first-boot setup (service master
-    // key / certificate generation, possible internal restart). CI evidence: our
-    // own probe succeeded on the very first attempt, then every connection attempt
-    // from the app's own startup retry loop — using a fresh DbContext/connection
-    // each time — failed for the next ~2.5 minutes straight. A single successful
-    // SELECT 1 is therefore not a reliable readiness signal for this image; require
-    // several CONSECUTIVE successes, spaced apart, before declaring the container
-    // ready, so the host is never started against a server that's about to
-    // disappear.
-    private async Task WaitUntilStablyQueryableAsync()
-    {
-        const int requiredConsecutiveSuccesses = 3;
-        const int maxAttempts = 60;
-        var delay = TimeSpan.FromSeconds(5);
-
-        var consecutiveSuccesses = 0;
-
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            try
-            {
-                await using var connection = new SqlConnection(_connectionString);
-                await connection.OpenAsync();
-                await using var command = connection.CreateCommand();
-                command.CommandText = "SELECT 1;";
-                await command.ExecuteScalarAsync();
-
-                consecutiveSuccesses++;
-                Console.WriteLine($"[DIAG] stability check succeeded ({consecutiveSuccesses}/{requiredConsecutiveSuccesses}) on attempt {attempt}/{maxAttempts}");
-
-                if (consecutiveSuccesses >= requiredConsecutiveSuccesses)
-                {
-                    return;
-                }
-            }
-            catch (SqlException ex)
-            {
-                Console.WriteLine(consecutiveSuccesses > 0
-                    ? $"[DIAG] stability check regressed after {consecutiveSuccesses} consecutive successes on attempt {attempt}/{maxAttempts}: {ex.Message}"
-                    : $"[DIAG] attempt {attempt}/{maxAttempts} failed: {ex.Message}");
-
-                consecutiveSuccesses = 0;
-
-                if (attempt == maxAttempts)
-                {
-                    throw;
-                }
-            }
-
-            await Task.Delay(delay);
-        }
+        ConnectionString = _dbContainer.GetConnectionString();
     }
 
     public new Task DisposeAsync() => _dbContainer.DisposeAsync().AsTask();

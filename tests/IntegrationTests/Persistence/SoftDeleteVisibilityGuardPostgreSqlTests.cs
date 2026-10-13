@@ -24,7 +24,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace JOIN.IntegrationTests.Persistence;
 
 /// <summary>
-/// SPEC 41-post — visibility guard (PostgreSQL, <see cref="PostgreSqlWebApplicationFactory"/>) over every listing endpoint of the implemented stages (Etapa 1: the
+/// SPEC 41-post — visibility guard (PostgreSQL, <see cref="CustomWebApplicationFactory"/>) over every listing endpoint of the implemented stages (Etapa 1: the
 /// 19 catalogs; Etapas 2–4: persons, security and tickets — the ticket cases live in the <c>.Tickets.cs</c> part). For each endpoint it seeds an active and a deleted row in company A and an active row
 /// in company B (global catalogs: an active and a deleted row), then checks the visibility invariants:
 /// <list type="bullet">
@@ -37,14 +37,14 @@ namespace JOIN.IntegrationTests.Persistence;
 /// normal listing. A new Dapper listing that forgets its tenant predicate fails here (the gap SPEC 38 left).
 /// The <c>system-wide</c> endpoints are excluded on purpose (SPEC 41, Etapa 1 decision 2026-10-07).
 /// </summary>
-public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFixture<PostgreSqlWebApplicationFactory>
+public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFixture<CustomWebApplicationFactory>
 {
     private const int DeletedStamp = 20260101;
     private const string Password = "Integration!Pass123";
 
-    private readonly PostgreSqlWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public SoftDeleteVisibilityGuardPostgreSqlTests(PostgreSqlWebApplicationFactory factory)
+    public SoftDeleteVisibilityGuardPostgreSqlTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

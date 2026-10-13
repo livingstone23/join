@@ -51,7 +51,7 @@ public sealed class GetSystemModulesQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND sm.Name LIKE @Name");
+            whereBuilder.Append(" AND sm.Name ILIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 

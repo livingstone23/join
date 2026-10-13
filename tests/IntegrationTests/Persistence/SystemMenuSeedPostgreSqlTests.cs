@@ -13,9 +13,9 @@ namespace JOIN.IntegrationTests.Persistence;
 /// SPEC 43-post — a database with the PREVIOUS menu (Spanish names, mixed routes, every option under
 /// "Administracion", no IsBase) goes through the seed and ends with the English names and hyphenated routes,
 /// with the same Ids, no duplicates, the role permissions untouched and each option under its real module.
-/// Runs on <see cref="PostgreSqlWebApplicationFactory"/> (<c>postgres:17</c>).
+/// Runs on <see cref="CustomWebApplicationFactory"/> (<c>postgres:17</c>).
 /// </summary>
-public sealed class SystemMenuSeedPostgreSqlTests : IClassFixture<PostgreSqlWebApplicationFactory>
+public sealed class SystemMenuSeedPostgreSqlTests : IClassFixture<CustomWebApplicationFactory>
 {
     // New option name → (previous name, previous route). Options not listed kept their name; their previous
     // route is derived from the module prefix below.
@@ -55,9 +55,9 @@ public sealed class SystemMenuSeedPostgreSqlTests : IClassFixture<PostgreSqlWebA
         ["/security"] = "Security"
     };
 
-    private readonly PostgreSqlWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public SystemMenuSeedPostgreSqlTests(PostgreSqlWebApplicationFactory factory)
+    public SystemMenuSeedPostgreSqlTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

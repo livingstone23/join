@@ -51,7 +51,7 @@ public sealed class GetTicketStatusesQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND ts.Name LIKE @Name");
+            whereBuilder.Append(" AND ts.Name ILIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 

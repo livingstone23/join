@@ -147,7 +147,7 @@ public class GetPersonsPagedQueryHandler(
                 return;
             }
 
-            whereBuilder.Append($" AND c.{columnName} LIKE @{columnName}");
+            whereBuilder.Append($" AND c.{columnName} ILIKE @{columnName}");
             parameters.Add(columnName, $"%{value.Trim()}%");
         }
     }

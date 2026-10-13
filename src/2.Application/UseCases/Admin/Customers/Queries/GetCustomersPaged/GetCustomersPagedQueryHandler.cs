@@ -49,7 +49,7 @@ public sealed class GetCustomersPagedQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.CustomerCode))
         {
-            whereBuilder.Append(" AND cust.CustomerCode LIKE @CustomerCode");
+            whereBuilder.Append(" AND cust.CustomerCode ILIKE @CustomerCode");
             parameters.Add("CustomerCode", $"%{request.CustomerCode.Trim()}%");
         }
 
@@ -77,14 +77,14 @@ public sealed class GetCustomersPagedQueryHandler(
                             COALESCE(p.SecondLastName, ''))))
                         ELSE COALESCE(NULLIF(p.CommercialName, ''), p.FirstName, '')
                     END
-                ) LIKE @PersonName
+                ) ILIKE @PersonName
                 """);
             parameters.Add("PersonName", $"%{request.PersonName.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(request.UserEmail))
         {
-            whereBuilder.Append(" AND u.Email LIKE @UserEmail");
+            whereBuilder.Append(" AND u.Email ILIKE @UserEmail");
             parameters.Add("UserEmail", $"%{request.UserEmail.Trim()}%");
         }
 

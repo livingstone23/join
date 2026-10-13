@@ -52,7 +52,7 @@ public sealed class GetTicketsQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            whereBuilder.Append(" AND (t.Code LIKE @Search OR t.Name LIKE @Search OR t.Description LIKE @Search)");
+            whereBuilder.Append(" AND (t.Code ILIKE @Search OR t.Name ILIKE @Search OR t.Description ILIKE @Search)");
             parameters.Add("Search", $"%{request.Search.Trim()}%");
         }
 

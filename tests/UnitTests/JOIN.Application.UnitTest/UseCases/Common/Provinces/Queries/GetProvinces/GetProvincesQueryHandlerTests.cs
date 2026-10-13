@@ -70,7 +70,7 @@ public sealed class GetProvincesQueryHandlerTests
         item.CreatedAt.Should().Be(createdAt);
 
         context.Connection.LastCommandText.Should().Contain("AND p.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("p.Name LIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("p.Name ILIKE @Name");
         context.Connection.LastCommandText.Should().Contain("p.Code = @Code");
         context.Connection.LastCommandText.Should().Contain("p.CountryId = @CountryId");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");

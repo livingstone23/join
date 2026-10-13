@@ -11,7 +11,7 @@ namespace JOIN.Application.UnitTest.UseCases.Messaging.TicketUserCompanies.Queri
 
 /// <summary>
 /// Unit tests for <see cref="GetSystemWideTicketUserCompaniesQueryHandler"/>:
-/// cross-tenant browsing and CompanyName LIKE filter.
+/// cross-tenant browsing and CompanyName ILIKE filter.
 /// </summary>
 public sealed class GetSystemWideTicketUserCompaniesQueryHandlerTests
 {
@@ -77,7 +77,7 @@ public sealed class GetSystemWideTicketUserCompaniesQueryHandlerTests
             CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
-        context.Connection.LastCommandText.Should().Contain("AND co.Name LIKE @CompanyName");
+        context.Connection.LastCommandText.Should().Contain("AND co.Name ILIKE @CompanyName");
         context.Connection.CapturedParameters["CompanyName"].Should().Be("%JOIN%");
     }
 

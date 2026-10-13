@@ -64,9 +64,9 @@ public sealed class GetCommunicationChannelsPagedQueryHandlerTests
         item.IsActive.Should().BeTrue();
 
         context.Connection.LastCommandText.Should().Contain("AND cc.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("cc.Name LIKE @SearchTerm");
-        context.Connection.LastCommandText.Should().Contain("cc.Provider LIKE @SearchTerm");
-        context.Connection.LastCommandText.Should().Contain("cc.Code LIKE @SearchTerm");
+        context.Connection.LastCommandText.Should().Contain("cc.Name ILIKE @SearchTerm");
+        context.Connection.LastCommandText.Should().Contain("cc.Provider ILIKE @SearchTerm");
+        context.Connection.LastCommandText.Should().Contain("cc.Code ILIKE @SearchTerm");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
 
         context.Connection.CapturedParameters["SearchTerm"].Should().Be("%What%");

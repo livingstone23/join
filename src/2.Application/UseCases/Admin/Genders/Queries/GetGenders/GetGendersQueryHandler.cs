@@ -49,13 +49,13 @@ public sealed class GetGendersQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Code))
         {
-            whereBuilder.Append(" AND g.Code LIKE @Code");
+            whereBuilder.Append(" AND g.Code ILIKE @Code");
             parameters.Add("Code", $"%{request.Code.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND g.Name LIKE @Name");
+            whereBuilder.Append(" AND g.Name ILIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 

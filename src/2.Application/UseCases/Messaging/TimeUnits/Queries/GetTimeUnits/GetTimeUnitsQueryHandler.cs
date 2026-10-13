@@ -51,7 +51,7 @@ public sealed class GetTimeUnitsQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND tu.Name LIKE @Name");
+            whereBuilder.Append(" AND tu.Name ILIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 

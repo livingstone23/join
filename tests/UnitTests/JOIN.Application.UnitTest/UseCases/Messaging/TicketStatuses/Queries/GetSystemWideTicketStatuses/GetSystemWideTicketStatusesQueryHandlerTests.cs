@@ -69,12 +69,12 @@ public sealed class GetSystemWideTicketStatusesQueryHandlerTests
         item.IsFinal.Should().BeTrue();
 
         context.Connection.LastCommandText.Should().Contain("WHERE ts.GcRecord = 0 AND c.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("ts.Name LIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("ts.Name ILIKE @Name");
         context.Connection.LastCommandText.Should().Contain("ts.IsActive = @IsActive");
         context.Connection.LastCommandText.Should().Contain("ts.IsInitial = @IsInitial");
         context.Connection.LastCommandText.Should().Contain("ts.IsPaused = @IsPaused");
         context.Connection.LastCommandText.Should().Contain("ts.IsFinal = @IsFinal");
-        context.Connection.LastCommandText.Should().Contain("c.Name LIKE @CompanyName");
+        context.Connection.LastCommandText.Should().Contain("c.Name ILIKE @CompanyName");
         context.Connection.LastCommandText.Should().Contain("ts.Code = @Code");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.LastCommandText.Should().NotContain("TenantId");

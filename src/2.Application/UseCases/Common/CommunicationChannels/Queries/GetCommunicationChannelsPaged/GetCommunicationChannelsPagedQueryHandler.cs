@@ -44,7 +44,7 @@ public class GetCommunicationChannelsPagedQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
-            whereBuilder.Append(" AND (cc.Name LIKE @SearchTerm OR cc.Provider LIKE @SearchTerm OR cc.Code LIKE @SearchTerm)");
+            whereBuilder.Append(" AND (cc.Name ILIKE @SearchTerm OR cc.Provider ILIKE @SearchTerm OR cc.Code ILIKE @SearchTerm)");
             parameters.Add("SearchTerm", $"%{request.SearchTerm.Trim()}%");
         }
 

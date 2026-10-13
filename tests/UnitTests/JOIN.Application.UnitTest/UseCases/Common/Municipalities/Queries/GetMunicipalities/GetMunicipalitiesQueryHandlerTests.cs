@@ -67,7 +67,7 @@ public sealed class GetMunicipalitiesQueryHandlerTests
 
         context.Connection.LastCommandText.Should().Contain("AND m.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("INNER JOIN Common.Provinces p");
-        context.Connection.LastCommandText.Should().Contain("m.Name LIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("m.Name ILIKE @Name");
         context.Connection.LastCommandText.Should().Contain("m.Code = @Code");
         context.Connection.LastCommandText.Should().Contain("m.ProvinceId = @ProvinceId");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");

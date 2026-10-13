@@ -13,11 +13,11 @@ using Microsoft.Extensions.DependencyInjection;
 namespace JOIN.IntegrationTests.Persistence;
 
 /// <summary>
-/// SPEC 99-post (PostgreSQL, <see cref="PostgreSqlWebApplicationFactory"/>) — internal channels <c>WEB</c>/<c>APP</c>: the data migration and the seed leave the six seeded
+/// SPEC 99-post (PostgreSQL, <see cref="CustomWebApplicationFactory"/>) — internal channels <c>WEB</c>/<c>APP</c>: the data migration and the seed leave the six seeded
 /// channels active without duplicates (clean and already-seeded database), the JOIN-001 ticket defaults use
 /// <c>WEB</c>, and a deleted <c>WEB</c> is never revived by the seed (only a SuperAdmin restores it, SPEC 41).
 /// </summary>
-public sealed class CommunicationChannelSeedPostgreSqlTests : IClassFixture<PostgreSqlWebApplicationFactory>
+public sealed class CommunicationChannelSeedPostgreSqlTests : IClassFixture<CustomWebApplicationFactory>
 {
     private static readonly string[] SeededCodes =
     [
@@ -29,9 +29,9 @@ public sealed class CommunicationChannelSeedPostgreSqlTests : IClassFixture<Post
         CommunicationChannelCodes.App
     ];
 
-    private readonly PostgreSqlWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public CommunicationChannelSeedPostgreSqlTests(PostgreSqlWebApplicationFactory factory)
+    public CommunicationChannelSeedPostgreSqlTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

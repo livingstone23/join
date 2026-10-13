@@ -60,8 +60,8 @@ public sealed class GetStreetTypesPagedQueryHandlerTests
         response.Data.TotalPages.Should().Be(1);
 
         context.Connection.LastCommandText.Should().Contain("AND st.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("st.Name LIKE @SearchTerm");
-        context.Connection.LastCommandText.Should().Contain("st.Abbreviation LIKE @SearchTerm");
+        context.Connection.LastCommandText.Should().Contain("st.Name ILIKE @SearchTerm");
+        context.Connection.LastCommandText.Should().Contain("st.Abbreviation ILIKE @SearchTerm");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
 
         context.Connection.CapturedParameters["SearchTerm"].Should().Be("%Ave%");

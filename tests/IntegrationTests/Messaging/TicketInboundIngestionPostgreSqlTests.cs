@@ -19,19 +19,19 @@ using Npgsql;
 namespace JOIN.IntegrationTests.Messaging;
 
 /// <summary>
-/// SPEC 47-post (PostgreSQL, <see cref="PostgreSqlWebApplicationFactory"/>) — inbound ticket ingestion through the
+/// SPEC 47-post (PostgreSQL, <see cref="CustomWebApplicationFactory"/>) — inbound ticket ingestion through the
 /// API on the seeded <c>JOIN-001</c>: migration indexes and permission seed, the <c>TicketInboundChannels</c> CRUD
 /// with the seeded roles, the anonymous WhatsApp and e-mail webhooks (bare 404s, idempotency also under concurrent
 /// retries, attachments) and the immediate invalidation of a rotated token.
 /// </summary>
-public sealed class TicketInboundIngestionPostgreSqlTests : IClassFixture<PostgreSqlWebApplicationFactory>
+public sealed class TicketInboundIngestionPostgreSqlTests : IClassFixture<CustomWebApplicationFactory>
 {
     private const string Base = "/api/v1/TicketInboundChannels";
     private const string SeedPassword = "ABCabc123*";
 
-    private readonly PostgreSqlWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public TicketInboundIngestionPostgreSqlTests(PostgreSqlWebApplicationFactory factory)
+    public TicketInboundIngestionPostgreSqlTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

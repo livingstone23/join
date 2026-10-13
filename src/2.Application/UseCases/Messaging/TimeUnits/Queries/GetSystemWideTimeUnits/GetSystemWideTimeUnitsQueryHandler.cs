@@ -40,7 +40,7 @@ public sealed class GetSystemWideTimeUnitsQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND tu.Name LIKE @Name");
+            whereBuilder.Append(" AND tu.Name ILIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 
@@ -52,7 +52,7 @@ public sealed class GetSystemWideTimeUnitsQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.CompanyName))
         {
-            whereBuilder.Append(" AND c.Name LIKE @CompanyName");
+            whereBuilder.Append(" AND c.Name ILIKE @CompanyName");
             parameters.Add("CompanyName", $"%{request.CompanyName.Trim()}%");
         }
 

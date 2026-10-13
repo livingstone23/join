@@ -65,7 +65,7 @@ public sealed class GetAreasQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND a.Name LIKE @Name");
+            whereBuilder.Append(" AND a.Name ILIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 

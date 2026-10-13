@@ -61,9 +61,9 @@ public sealed class GetSystemWideTicketComplexitiesQueryHandlerTests
         item.Code.Should().Be(90);
 
         context.Connection.LastCommandText.Should().Contain("WHERE 1 = 1");
-        context.Connection.LastCommandText.Should().Contain("tc.Name LIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("tc.Name ILIKE @Name");
         context.Connection.LastCommandText.Should().Contain("tc.IsActive = @IsActive");
-        context.Connection.LastCommandText.Should().Contain("c.Name LIKE @CompanyName");
+        context.Connection.LastCommandText.Should().Contain("c.Name ILIKE @CompanyName");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.LastCommandText.Should().NotContain("tc.CompanyId = @TenantId");
 

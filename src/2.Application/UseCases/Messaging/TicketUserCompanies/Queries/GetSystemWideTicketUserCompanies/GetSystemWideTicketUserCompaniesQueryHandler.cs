@@ -12,7 +12,7 @@ namespace JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetSys
 /// <summary>
 /// Handles <see cref="GetSystemWideTicketUserCompaniesQuery"/>: same projection as the
 /// tenant-scoped variant but without a tenant filter; the optional <c>CompanyName</c>
-/// is matched with LIKE for cross-tenant browsing.
+/// is matched with ILIKE for cross-tenant browsing.
 /// </summary>
 public sealed class GetSystemWideTicketUserCompaniesQueryHandler(
     ISqlConnectionFactory connectionFactory,
@@ -62,7 +62,7 @@ public sealed class GetSystemWideTicketUserCompaniesQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.CompanyName))
         {
-            whereBuilder.Append(" AND co.Name LIKE @CompanyName");
+            whereBuilder.Append(" AND co.Name ILIKE @CompanyName");
             parameters.Add("CompanyName", $"%{request.CompanyName.Trim()}%");
         }
 

@@ -39,49 +39,49 @@ public sealed class GetSystemWideTicketCompanyDefaultsQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.CompanyName))
         {
-            whereBuilder.Append(" AND c.Name LIKE @CompanyName");
+            whereBuilder.Append(" AND c.Name ILIKE @CompanyName");
             parameters.Add("CompanyName", $"%{request.CompanyName.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(request.StartCode))
         {
-            whereBuilder.Append(" AND tcd.StartCode LIKE @StartCode");
+            whereBuilder.Append(" AND tcd.StartCode ILIKE @StartCode");
             parameters.Add("StartCode", $"%{request.StartCode.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(request.TicketStatusDefaultName))
         {
-            whereBuilder.Append(" AND ts.Name LIKE @TicketStatusDefaultName");
+            whereBuilder.Append(" AND ts.Name ILIKE @TicketStatusDefaultName");
             parameters.Add("TicketStatusDefaultName", $"%{request.TicketStatusDefaultName.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(request.TicketComplexityDefaultName))
         {
-            whereBuilder.Append(" AND tc.Name LIKE @TicketComplexityDefaultName");
+            whereBuilder.Append(" AND tc.Name ILIKE @TicketComplexityDefaultName");
             parameters.Add("TicketComplexityDefaultName", $"%{request.TicketComplexityDefaultName.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(request.TimeUnitDefaultName))
         {
-            whereBuilder.Append(" AND tu.Name LIKE @TimeUnitDefaultName");
+            whereBuilder.Append(" AND tu.Name ILIKE @TimeUnitDefaultName");
             parameters.Add("TimeUnitDefaultName", $"%{request.TimeUnitDefaultName.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(request.AreaName))
         {
-            whereBuilder.Append(" AND a.Name LIKE @AreaName");
+            whereBuilder.Append(" AND a.Name ILIKE @AreaName");
             parameters.Add("AreaName", $"%{request.AreaName.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(request.ProjectName))
         {
-            whereBuilder.Append(" AND p.Name LIKE @ProjectName");
+            whereBuilder.Append(" AND p.Name ILIKE @ProjectName");
             parameters.Add("ProjectName", $"%{request.ProjectName.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(request.ChannelName))
         {
-            whereBuilder.Append(" AND ch.Name LIKE @ChannelName");
+            whereBuilder.Append(" AND ch.Name ILIKE @ChannelName");
             parameters.Add("ChannelName", $"%{request.ChannelName.Trim()}%");
         }
 

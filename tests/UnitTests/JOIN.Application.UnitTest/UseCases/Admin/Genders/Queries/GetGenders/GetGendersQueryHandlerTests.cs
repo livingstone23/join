@@ -52,7 +52,7 @@ public sealed class GetGendersQueryHandlerTests
         response.Data.TotalCount.Should().Be(21);
         response.Data.TotalPages.Should().Be(3);
         context.Connection.LastCommandText.Should()
-            .Contain("g.Code LIKE @Code").And.Contain("g.Name LIKE @Name").And.Contain("g.IsActive = @IsActive")
+            .Contain("g.Code ILIKE @Code").And.Contain("g.Name ILIKE @Name").And.Contain("g.IsActive = @IsActive")
             .And.Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.CapturedParameters["Code"].Should().Be("%M%");
         context.Connection.CapturedParameters["Name"].Should().Be("%Mas%");

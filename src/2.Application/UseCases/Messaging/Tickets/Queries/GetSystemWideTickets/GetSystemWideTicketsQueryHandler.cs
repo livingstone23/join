@@ -41,7 +41,7 @@ public sealed class GetSystemWideTicketsQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            whereBuilder.Append(" AND (t.Code LIKE @Search OR t.Name LIKE @Search OR t.Description LIKE @Search)");
+            whereBuilder.Append(" AND (t.Code ILIKE @Search OR t.Name ILIKE @Search OR t.Description ILIKE @Search)");
             parameters.Add("Search", $"%{request.Search.Trim()}%");
         }
 
@@ -95,7 +95,7 @@ public sealed class GetSystemWideTicketsQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.CompanyName))
         {
-            whereBuilder.Append(" AND co.Name LIKE @CompanyName");
+            whereBuilder.Append(" AND co.Name ILIKE @CompanyName");
             parameters.Add("CompanyName", $"%{request.CompanyName.Trim()}%");
         }
 

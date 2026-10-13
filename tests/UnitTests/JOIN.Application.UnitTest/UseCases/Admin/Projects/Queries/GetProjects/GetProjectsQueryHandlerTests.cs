@@ -86,7 +86,7 @@ public sealed class GetProjectsQueryHandlerTests
         item.CreatedAt.Should().Be(createdAt);
 
         context.Connection.LastCommandText.Should().Contain("WHERE p.CompanyId = @CompanyId AND p.GcRecord = 0");
-        context.Connection.LastCommandText.Should().Contain("p.Name LIKE @Name");
+        context.Connection.LastCommandText.Should().Contain("p.Name ILIKE @Name");
         context.Connection.LastCommandText.Should().Contain("p.EntityStatusId = @EntityStatusId");
         context.Connection.LastCommandText.Should().Contain("LIMIT @PageSize OFFSET @Offset");
 

@@ -49,13 +49,13 @@ public sealed class GetIndustriesQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Code))
         {
-            whereBuilder.Append(" AND i.Code LIKE @Code");
+            whereBuilder.Append(" AND i.Code ILIKE @Code");
             parameters.Add("Code", $"%{request.Code.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND i.Name LIKE @Name");
+            whereBuilder.Append(" AND i.Name ILIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 

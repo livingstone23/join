@@ -79,13 +79,13 @@ public sealed class GetEntityStatusQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND es.Name LIKE @Name");
+            whereBuilder.Append(" AND es.Name ILIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 
         if (!string.IsNullOrWhiteSpace(request.ModuleName))
         {
-            whereBuilder.Append(" AND COALESCE(es.Description, '') LIKE @ModuleName");
+            whereBuilder.Append(" AND COALESCE(es.Description, '') ILIKE @ModuleName");
             parameters.Add("ModuleName", $"%{request.ModuleName.Trim()}%");
         }
 

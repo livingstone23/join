@@ -59,7 +59,7 @@ public sealed class GetRegionsQueryHandler(
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            whereBuilder.Append(" AND r.Name LIKE @Name");
+            whereBuilder.Append(" AND r.Name ILIKE @Name");
             parameters.Add("Name", $"%{request.Name.Trim()}%");
         }
 

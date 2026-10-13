@@ -51,11 +51,11 @@ public sealed class GetCustomersPagedQueryHandlerTests
         response.Data!.Items.Should().ContainSingle();
         response.Data.TotalPages.Should().Be(1);
         context.Connection.LastCommandText.Should()
-            .Contain("cust.CustomerCode LIKE @CustomerCode")
+            .Contain("cust.CustomerCode ILIKE @CustomerCode")
             .And.Contain("cust.PersonLifecycleStage = @PersonLifecycleStage")
             .And.Contain("cust.IsActive = @IsActive")
-            .And.Contain("LIKE @PersonName")
-            .And.Contain("u.Email LIKE @UserEmail")
+            .And.Contain("ILIKE @PersonName")
+            .And.Contain("u.Email ILIKE @UserEmail")
             .And.Contain("LIMIT @PageSize OFFSET @Offset");
         context.Connection.CapturedParameters["CustomerCode"].Should().Be("%C0%");
         context.Connection.CapturedParameters["PersonLifecycleStage"].Should().Be(3);

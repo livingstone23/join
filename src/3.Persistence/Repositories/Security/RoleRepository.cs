@@ -68,7 +68,7 @@ public sealed class RoleRepository(
         // or false exposed deleted roles to any caller with read permission.
         var activeOnly = includeDeleted ? string.Empty : "AND GcRecord = 0";
         var whereClause = $"""
-            WHERE (@nameFilter IS NULL OR Name LIKE CONCAT('%', @nameFilter, '%'))
+            WHERE (@nameFilter IS NULL OR Name ILIKE CONCAT('%', @nameFilter, '%'))
               {activeOnly}
               AND (@isActive IS NULL
                    OR ((@isActive = TRUE AND GcRecord = 0)

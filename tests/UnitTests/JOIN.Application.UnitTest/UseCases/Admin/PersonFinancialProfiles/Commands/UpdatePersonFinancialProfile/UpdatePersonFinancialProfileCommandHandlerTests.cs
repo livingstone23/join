@@ -139,6 +139,27 @@ public sealed class UpdatePersonFinancialProfileCommandHandlerTests
         entity.IsActive.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData(DateTimeKind.Utc)]
+    [InlineData(DateTimeKind.Local)]
+    [InlineData(DateTimeKind.Unspecified)]
+    public async Task Handle_WhenDeclaredDateHasAnyKind_ShouldUpdateEntityWithUnspecifiedKind(DateTimeKind kind)
+    {
+        var context = new Ctx(Ctx.CompanyId);
+        context.SetupIncomeRange();
+        var entity = context.SetupExisting(isCurrent: true);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var raw = kind == DateTimeKind.Local
+            ? Ctx.DeclaredDate.ToLocalTime()
+            : DateTime.SpecifyKind(Ctx.DeclaredDate, kind);
+
+        var response = await CreateHandler(context).Handle(Command(context, entity.Id) with { DeclaredDate = raw }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        entity.DeclaredDate.Kind.Should().Be(DateTimeKind.Unspecified);
+    }
+
     private static UpdatePersonFinancialProfileCommand Command(Ctx context, Guid id) => new()
     {
         Id = id,
