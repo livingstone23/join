@@ -48,6 +48,7 @@ public class TicketsController(ISender sender) : ControllerBase
         [FromQuery] DateTime? toDate = null,
         [FromQuery] bool? includeDeleted = null,
         [FromQuery] Guid? companyId = null,
+        [FromQuery] bool? unassigned = null,
         CancellationToken cancellationToken = default)
     {
         var query = new GetTicketsQuery(
@@ -63,7 +64,8 @@ public class TicketsController(ISender sender) : ControllerBase
             fromDate,
             toDate,
             includeDeleted,
-            companyId);
+            companyId,
+            unassigned);
 
         var response = await _sender.Send(query, cancellationToken);
 
@@ -115,6 +117,30 @@ public class TicketsController(ISender sender) : ControllerBase
             companyName);
 
         var response = await _sender.Send(query, cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            return MapResponseError(response);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Returns the inbox summary (open / SLA breached / inactive / unassigned
+    /// counts) for the active tenant — SPEC 52. Counts the company active
+    /// in the token, never the global view; SuperAdmin sees the company
+    /// indicated by the request.
+    /// </summary>
+    [HttpGet("summary")]
+    [ProducesResponseType(typeof(Response<TicketSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetSummary(
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new GetTicketSummaryQuery(companyId), cancellationToken);
 
         if (!response.IsSuccess)
         {

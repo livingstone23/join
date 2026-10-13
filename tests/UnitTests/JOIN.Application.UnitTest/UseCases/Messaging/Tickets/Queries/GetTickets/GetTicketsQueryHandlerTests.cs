@@ -328,4 +328,56 @@ public sealed class GetTicketsQueryHandlerTests
                 ["FinishedAt"] = finishedAt
             });
     }
+
+    /// <summary>
+    /// SPEC 52: <c>?unassigned=true</c> adds the <c>AssignedToUserId IS NULL</c>
+    /// predicate to the shared <c>WHERE</c> clause (the same one the COUNT
+    /// consumes), so the page and the <c>TotalCount</c> agree.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenUnassignedTrue_ShouldAddIsNullPredicateToSharedWhereClause()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var context = new GetTicketsQueryHandlerTestContext(companyId, useNpgsqlConnection: true);
+        context.Connection.SetResults(
+            CreateTicketItemsResultSet(companyId),
+            FakeResultSet.FromScalar(7));
+
+        var query = new GetTicketsQuery(Unassigned: true);
+        var handler = context.CreateHandler();
+
+        var response = await handler.Handle(query, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        response.Data!.TotalCount.Should().Be(7);
+        context.Connection.LastCommandText.Should().Contain("t.AssignedToUserId IS NULL");
+        context.Connection.LastCommandText.Should().NotContain("t.AssignedToUserId = @AssignedToUserId");
+        // The WHERE is shared by the SELECT and the COUNT, so the filter appears twice.
+        var occurrences = System.Text.RegularExpressions.Regex.Matches(
+            context.Connection.LastCommandText,
+            "t\\.AssignedToUserId IS NULL").Count;
+        occurrences.Should().Be(2);
+    }
+
+    /// <summary>
+    /// SPEC 52: combining <c>unassigned=true</c> with <c>assignedToUserId</c> is
+    /// ambiguous and the handler must reject it before touching the DB.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenUnassignedAndAssignedToUserId_ShouldReturnInvalidAssigneeFilter()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var context = new GetTicketsQueryHandlerTestContext(companyId, useNpgsqlConnection: false);
+
+        var query = new GetTicketsQuery(
+            AssignedToUserId: Guid.NewGuid(),
+            Unassigned: true);
+        var handler = context.CreateHandler();
+
+        var response = await handler.Handle(query, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("INVALID_ASSIGNEE_FILTER");
+        context.ConnectionFactoryMock.Verify(x => x.CreateConnection(), Times.Never);
+    }
 }

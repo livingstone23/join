@@ -781,10 +781,12 @@ filtered unique index `(UserId, CompanyId) WHERE GcRecord = 0` enforces
 "one active row per user-company pair" at the database level even if a
 concurrent request slips past the in-memory check.
 
-## Tickets — `/api/v1/Tickets` (SPEC 35)
+## Tickets — `/api/v1/Tickets` (SPEC 35, SPEC 52)
 
 CRUD over support tickets, plus three lifecycle actions introduced by SPEC 35
-(`reassign`, `finish`, `notes`). All endpoints are tenant-scoped and share the
+(`reassign`, `finish`, `notes`), the inbox summary (`GET /Tickets/summary`) and
+the `?unassigned=true` filter introduced by SPEC 52. All endpoints are
+tenant-scoped and share the
 `Tickets` permission resource (HTTP-verb default flags: GET → CanRead, POST →
 CanCreate, PUT → CanUpdate, DELETE → CanDelete). Exception: `POST /{id}/notes`
 requires **CanUpdate**, because adding a note modifies an existing ticket. A token without `CompanyId`
@@ -799,7 +801,7 @@ Error codes returned by the ticket endpoints map to HTTP status as follows:
 | `COMPANY_REQUIRED` / `USER_REQUIRED` | 401 |
 | `TICKET_NOT_FOUND` | 404 |
 | `TICKET_REASSIGN_FORBIDDEN` / `TICKET_FINISH_FORBIDDEN` | 403 |
-| `TARGET_NOT_ELIGIBLE_RESOLVER` / `INVALID_ASSIGNED_USER` / `INVALID_ASSIGNED_USER_TENANT` / `INVALID_ASSIGNED_USER_NOT_RESOLVER` / `INVALID_TICKET_STATUS` / `TICKET_STATUS_NOT_FINAL` / `INVALID_LOG_TYPE` | 400 |
+| `TARGET_NOT_ELIGIBLE_RESOLVER` / `INVALID_ASSIGNED_USER` / `INVALID_ASSIGNED_USER_TENANT` / `INVALID_ASSIGNED_USER_NOT_RESOLVER` / `INVALID_TICKET_STATUS` / `TICKET_STATUS_NOT_FINAL` / `INVALID_LOG_TYPE` / `INVALID_ASSIGNEE_FILTER` (SPEC 52, `unassigned=true` + `assignedToUserId`) | 400 |
 | `USE_FINISH_TICKET_FOR_FINAL_STATUS` / `TICKET_STATUS_TRANSITION_NOT_ALLOWED` (SPEC 37) | 400 |
 | `TICKET_DEFAULT_STATUS_NOT_CONFIGURED` / `TICKET_DEFAULT_STATUS_INVALID` (create without `ticketStatusId`, SPEC 42) | 400 |
 | `TICKET_STATUS_DEFAULT_INVALID` (`POST`/`PUT /TicketCompanyDefaults` with a status that is missing, inactive, final or of another company, SPEC 42) | 400 |
@@ -835,6 +837,28 @@ curl -s "$BASE_URL/api/v1/Tickets?pageNumber=1&pageSize=10" \
 curl -s "$BASE_URL/api/v1/Tickets?assignedToUserId=$USER_ID&isVisibleToExternals=true" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Company-Id: $TENANT_ID"
+
+# SPEC 52: server-side "unassigned" filter (replaces the page-side filter the
+# front used to apply). Combine with the regular filters; sending it together
+# with assignedToUserId returns 400 INVALID_ASSIGNEE_FILTER.
+curl -s "$BASE_URL/api/v1/Tickets?unassigned=true" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+```
+
+```bash
+# 1b. Inbox summary — SPEC 52. Returns the four counts the FE-16 summary
+#     cards and the SLA-breached sidenav badge need:
+#     openCount, slaBreachedCount, inactiveCount, unassignedCount, generatedAt.
+#     Always counts the active tenant; soft-deleted and final-status tickets
+#     are excluded. The math is delegated to TicketSlaCalculator so the
+#     counts and the grid markers cannot drift apart.
+curl -s "$BASE_URL/api/v1/Tickets/summary" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+# Returns 200 with Response<TicketSummaryDto>.
+# Returns 401 COMPANY_REQUIRED without a token CompanyId.
+# Returns 403 without CanRead on Tickets (the same gate as the listing).
 ```
 
 ```bash

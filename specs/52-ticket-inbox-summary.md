@@ -1,6 +1,6 @@
 # SPEC 52 — Tickets: resumen de la bandeja (`GET /Tickets/summary`) y filtro "sin asignar"
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 37 (SLA e inactividad, `TicketSlaCalculator`), SPEC 38 (aislamiento por empresa), SPEC 41-post (borrado lógico), SPEC 43-post (rutas y permisos de tickets). Rama de trabajo: `spec-52-ticket-inbox-summary`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`.
 > **Date:** 2026-10-13
 > **Objective:** Dar a la bandeja de tickets (FE-16) los totales de la empresa activa —abiertos, SLA vencido, sin actividad y sin asignar— y un filtro de servidor para "sin asignar", para que el front no calcule números sobre la página visible.

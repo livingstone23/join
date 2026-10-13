@@ -35,6 +35,18 @@ public sealed class GetTicketsQueryHandler(
                 ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
+        // SPEC 52: combining "unassigned only" with a specific assignee is
+        // ambiguous — the two filters contradict each other, so refuse the
+        // request up front rather than silently picking one.
+        if (request.Unassigned == true
+            && request.AssignedToUserId.HasValue
+            && request.AssignedToUserId.Value != Guid.Empty)
+        {
+            return Response<PagedResult<TicketListItemDto>>.Error(
+                "INVALID_ASSIGNEE_FILTER",
+                ["unassigned=true cannot be combined with assignedToUserId."]);
+        }
+
         var (sanitizedPageNumber, sanitizedPageSize) = _paginationSettings.Sanitize(request.PageNumber, request.PageSize);
         var offset = (sanitizedPageNumber - 1) * sanitizedPageSize;
 
@@ -72,6 +84,13 @@ public sealed class GetTicketsQueryHandler(
         {
             whereBuilder.Append(" AND t.AssignedToUserId = @AssignedToUserId");
             parameters.Add("AssignedToUserId", request.AssignedToUserId.Value);
+        }
+        else if (request.Unassigned == true)
+        {
+            // SPEC 52: server-side filter for tickets without an assignee.
+            // Mutually exclusive with AssignedToUserId above (cross-validated
+            // at the top of Handle) — only one branch can fire.
+            whereBuilder.Append(" AND t.AssignedToUserId IS NULL");
         }
 
         if (request.PersonId.HasValue && request.PersonId.Value != Guid.Empty)
