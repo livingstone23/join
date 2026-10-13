@@ -1208,11 +1208,12 @@ curl -s -o downloaded.pdf \
 #    active log of the ticket (the typical "evidence after creation" flow). When
 #    provided, it must belong to the same TicketId (otherwise 400 INVALID_TICKET_LOG).
 #    DocumentType is inferred server-side from the file extension — the client never
-#    sends it. Accepted extensions (SPEC 49-post): .pdf .doc/.docx .xls/.xlsx
-#    .png/.jpg/.jpeg .zip — and any of the above mapped to Text (.txt/.csv) when
-#    AllowedDocumentTypes has the Text bit set (the bitmask controls what each tenant
-#    accepts, but the default seed is Pdf | Word | Excel | Image without Text). .gif
-#    returns 400 UNSUPPORTED_DOCUMENT_TYPE for all tenants.
+#    sends it. Recognized extensions (SPEC 49-post): .pdf .doc/.docx .xls/.xlsx
+#    .txt/.csv .png/.jpg/.jpeg .zip; anything else (including .gif) → 400
+#    UNSUPPORTED_DOCUMENT_TYPE for all tenants. Each tenant's AllowedDocumentTypes
+#    bitmask then decides which of those types it accepts (400 DOCUMENT_TYPE_NOT_ALLOWED
+#    otherwise); the default seed is Pdf | Word | Excel | Image, so .txt/.csv/.zip
+#    are rejected unless the tenant enables Text/Other.
 curl -s -X POST "$BASE_URL/api/v1/tickets/$TICKET_ID/documents" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Company-Id: $TENANT_ID" \

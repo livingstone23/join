@@ -10,17 +10,17 @@ namespace JOIN.Domain.Enums;
 public enum StorageProviderKind
 {
     /// <summary>
-    /// Disco local del servidor (<see cref="JOIN.Infrastructure.Storage.Local.LocalDiskFileStorageAdapter"/>).
+    /// Disco local del servidor (<c>LocalDiskFileStorageAdapter</c>).
     /// </summary>
     Local = 0,
 
     /// <summary>
-    /// Azure Blob Storage (<see cref="JOIN.Infrastructure.Storage.AzureBlob.AzureBlobFileStorageAdapter"/>).
+    /// Azure Blob Storage (<c>AzureBlobFileStorageAdapter</c>).
     /// </summary>
     AzureBlob = 1,
 
     /// <summary>
-    /// Amazon S3 (<see cref="JOIN.Infrastructure.Storage.S3.S3CompatibleFileStorageAdapter"/>).
+    /// Amazon S3 (<c>S3CompatibleFileStorageAdapter</c>).
     /// </summary>
     S3 = 2,
 

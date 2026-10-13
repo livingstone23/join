@@ -1,4 +1,6 @@
 using Azure;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using FluentAssertions;
 using JOIN.Domain.Enums;
 using JOIN.Infrastructure.Storage;
@@ -86,7 +88,7 @@ public sealed class AzureBlobFileStorageAdapterTests
     }
 
     [Fact]
-    public void Constructor_WithContainerFactory_ShouldUseItForOperations()
+    public async Task Constructor_WithContainerFactory_ShouldUseItForOperations()
     {
         // Verifica que el constructor de testing recibe el factory y
         // lo invoca. Una exception del factory se propaga al primer
@@ -110,10 +112,108 @@ public sealed class AzureBlobFileStorageAdapterTests
             "application/octet-stream",
             CancellationToken.None);
 
-        act.Should().ThrowAsync<InvalidOperationException>().Result
-            .And.Message.Should().Be("factory invoked");
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("factory invoked");
         factoryInvoked.Should().BeTrue();
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SaveAsync_ShouldUploadWithKeyAndContentType_AndCreateContainerOnlyWhenEnabled(bool createContainer)
+    {
+        var options = BuildOptions();
+        options.AzureBlob.CreateContainerIfNotExists = createContainer;
+        var (container, blob) = BuildContainer("companyA/ticketX/report.pdf");
+        blob.Setup(b => b.UploadAsync(It.IsAny<Stream>(), It.IsAny<BlobUploadOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Mock.Of<Response<BlobContentInfo>>());
+        var adapter = BuildAdapter(options, container);
+        var payload = new byte[] { 0x01, 0x02, 0x03 };
+
+        var result = await adapter.SaveAsync(new MemoryStream(payload), "companyA/ticketX/report.pdf", "application/pdf", CancellationToken.None);
+
+        result.StorageKey.Should().Be("companyA/ticketX/report.pdf");
+        result.SizeBytes.Should().Be(payload.Length);
+        blob.Verify(b => b.UploadAsync(
+            It.IsAny<Stream>(),
+            It.Is<BlobUploadOptions>(o => o.HttpHeaders.ContentType == "application/pdf"),
+            It.IsAny<CancellationToken>()), Times.Once);
+        container.Verify(c => c.CreateIfNotExistsAsync(
+            It.IsAny<PublicAccessType>(),
+            It.IsAny<IDictionary<string, string>>(),
+            It.IsAny<BlobContainerEncryptionScopeOptions>(),
+            It.IsAny<CancellationToken>()), createContainer ? Times.Once() : Times.Never());
+    }
+
+    [Fact]
+    public async Task OpenReadAsync_WhenBlobExists_ShouldReturnItsContent()
+    {
+        var (container, blob) = BuildContainer("companyA/x.bin");
+        var content = new MemoryStream([0x01]);
+        blob.Setup(b => b.DownloadStreamingAsync(It.IsAny<BlobDownloadOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response.FromValue(
+                BlobsModelFactory.BlobDownloadStreamingResult(content: content),
+                Mock.Of<Response>()));
+        var adapter = BuildAdapter(BuildOptions(), container);
+
+        var opened = await adapter.OpenReadAsync("companyA/x.bin", CancellationToken.None);
+
+        opened.Should().BeSameAs(content);
+    }
+
+    [Fact]
+    public async Task OpenReadAsync_WhenBlobDoesNotExist_ShouldReturnNull()
+    {
+        var (container, blob) = BuildContainer("companyA/missing.bin");
+        blob.Setup(b => b.DownloadStreamingAsync(It.IsAny<BlobDownloadOptions>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new RequestFailedException(404, "BlobNotFound"));
+        var adapter = BuildAdapter(BuildOptions(), container);
+
+        var opened = await adapter.OpenReadAsync("companyA/missing.bin", CancellationToken.None);
+
+        opened.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task OpenReadAsync_WhenServiceFailsWithOtherError_ShouldPropagate()
+    {
+        var (container, blob) = BuildContainer("companyA/x.bin");
+        blob.Setup(b => b.DownloadStreamingAsync(It.IsAny<BlobDownloadOptions>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new RequestFailedException(403, "AuthorizationFailure"));
+        var adapter = BuildAdapter(BuildOptions(), container);
+
+        var act = async () => await adapter.OpenReadAsync("companyA/x.bin", CancellationToken.None);
+
+        (await act.Should().ThrowAsync<RequestFailedException>()).Which.Status.Should().Be(403);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task DeleteAsync_ShouldReportWhetherTheBlobExisted(bool existed)
+    {
+        var (container, blob) = BuildContainer("companyA/x.bin");
+        blob.Setup(b => b.DeleteIfExistsAsync(
+                It.IsAny<DeleteSnapshotsOption>(),
+                It.IsAny<BlobRequestConditions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response.FromValue(existed, Mock.Of<Response>()));
+        var adapter = BuildAdapter(BuildOptions(), container);
+
+        var deleted = await adapter.DeleteAsync("companyA/x.bin", CancellationToken.None);
+
+        deleted.Should().Be(existed);
+    }
+
+    private static (Mock<BlobContainerClient> Container, Mock<BlobClient> Blob) BuildContainer(string blobName)
+    {
+        var container = new Mock<BlobContainerClient>();
+        var blob = new Mock<BlobClient>();
+        container.Setup(c => c.GetBlobClient(blobName)).Returns(blob.Object);
+        return (container, blob);
+    }
+
+    private static AzureBlobFileStorageAdapter BuildAdapter(FileStorageOptions options, Mock<BlobContainerClient> container) =>
+        new(Options.Create(options), NullLogger<AzureBlobFileStorageAdapter>.Instance, () => container.Object);
 
     private static FileStorageOptions BuildOptions() => new()
     {

@@ -5,7 +5,6 @@ using Amazon.S3.Model;
 using JOIN.Application.Interface;
 using JOIN.Domain.Enums;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace JOIN.Infrastructure.Storage.S3;
 
@@ -18,8 +17,9 @@ namespace JOIN.Infrastructure.Storage.S3;
 /// <see cref="FileStorageOptions.CloudflareR2"/>) y en el
 /// <see cref="StorageProviderKind"/> que este adapter reporta. La fila
 /// guarda ese <c>Kind</c> y <see cref="JOIN.Application.Interface.IFileStorageResolver"/>
-/// lo usa para devolver este mismo adapter con el <c>Kind</c> que
-/// corresponda a la sección de la fila.
+/// devuelve la instancia registrada para esa sección. El DI registra
+/// una instancia por sección (singleton con clave): los clientes del
+/// SDK son thread-safe y están pensados para reutilizarse.
 /// </summary>
 public sealed class S3CompatibleFileStorageAdapter : IFileStorageService
 {
@@ -29,26 +29,9 @@ public sealed class S3CompatibleFileStorageAdapter : IFileStorageService
     private readonly ILogger _logger;
 
     /// <summary>
-    /// Constructor de producción. Se le pasa el <see cref="IAmazonS3"/>
-    /// ya configurado por el DI según la sección de
-    /// <see cref="FileStorageOptions"/> que corresponda.
-    /// </summary>
-    public S3CompatibleFileStorageAdapter(
-        IOptions<FileStorageOptions> options,
-        ILogger<S3CompatibleFileStorageAdapter> s3Logger,
-        StorageProviderKind kind)
-    {
-        _kind = kind;
-        _logger = s3Logger;
-        _bucketName = kind == StorageProviderKind.CloudflareR2
-            ? options.Value.CloudflareR2.BucketName
-            : options.Value.S3.BucketName;
-        _client = BuildClient(options.Value, kind);
-    }
-
-    /// <summary>
-    /// Constructor para tests unitarios: acepta un cliente
-    /// <see cref="IAmazonS3"/> simulado.
+    /// Construye el adapter con su propio <see cref="IAmazonS3"/>. En
+    /// producción el DI lo crea vía <see cref="Create"/>; los tests
+    /// unitarios pasan un cliente simulado.
     /// </summary>
     public S3CompatibleFileStorageAdapter(
         IAmazonS3 client,
@@ -62,8 +45,34 @@ public sealed class S3CompatibleFileStorageAdapter : IFileStorageService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Fábrica de producción: arma el cliente S3 con las credenciales,
+    /// el endpoint y el bucket de la sección que corresponde a
+    /// <paramref name="kind"/> (<c>S3</c> o <c>CloudflareR2</c>).
+    /// </summary>
+    public static S3CompatibleFileStorageAdapter Create(
+        FileStorageOptions options,
+        StorageProviderKind kind,
+        ILogger logger)
+    {
+        var isR2 = kind == StorageProviderKind.CloudflareR2;
+        var credentials = isR2
+            ? new BasicAWSCredentials(options.CloudflareR2.AccessKeyId, options.CloudflareR2.SecretAccessKey)
+            : new BasicAWSCredentials(options.S3.AccessKeyId, options.S3.SecretAccessKey);
+        var bucketName = isR2 ? options.CloudflareR2.BucketName : options.S3.BucketName;
+
+        return new S3CompatibleFileStorageAdapter(
+            new AmazonS3Client(credentials, BuildClientConfig(options, kind)),
+            bucketName,
+            kind,
+            logger);
+    }
+
     /// <inheritdoc />
     public StorageProviderKind Kind => _kind;
+
+    /// <summary>Bucket de la sección con la que se construyó el adapter.</summary>
+    internal string BucketName => _bucketName;
 
     /// <inheritdoc />
     public async Task<FileStorageSaveResult> SaveAsync(
@@ -79,28 +88,27 @@ public sealed class S3CompatibleFileStorageAdapter : IFileStorageService
         // stream de origen no es seekable, lo copiamos a un MemoryStream
         // para poder reportar el tamaño observado en FileStorageSaveResult
         // (mismo criterio que LocalDisk y AzureBlob).
-        long size;
-        Stream uploadStream;
-        if (content.CanSeek)
+        // El buffer temporal vive hasta que termina PutObjectAsync.
+        await using var buffer = content.CanSeek ? null : new MemoryStream();
+        var uploadStream = content;
+        if (buffer is not null)
         {
-            size = content.Length - content.Position;
-            uploadStream = content;
-        }
-        else
-        {
-            using var buffer = new MemoryStream();
             await content.CopyToAsync(buffer, cancellationToken);
-            size = buffer.Length;
             buffer.Position = 0;
             uploadStream = buffer;
         }
+
+        var size = uploadStream.Length - uploadStream.Position;
 
         var request = new PutObjectRequest
         {
             BucketName = _bucketName,
             Key = key,
             InputStream = uploadStream,
-            ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType
+            ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
+            // R2 no soporta la firma de payload por chunks (aws-chunked)
+            // que el SDK usa por defecto para PutObject.
+            DisablePayloadSigning = _kind == StorageProviderKind.CloudflareR2
         };
 
         await _client.PutObjectAsync(request, cancellationToken);
@@ -143,40 +151,41 @@ public sealed class S3CompatibleFileStorageAdapter : IFileStorageService
         return true;
     }
 
-    private static IAmazonS3 BuildClient(FileStorageOptions options, StorageProviderKind kind)
+    /// <summary>
+    /// Configuración del cliente según el proveedor. R2 usa el endpoint
+    /// <c>https://{AccountId}.r2.cloudflarestorage.com</c>, región de
+    /// firma <c>auto</c> y checksums solo cuando la operación los exige
+    /// (R2 rechaza los encabezados de checksum que el SDK v4 envía por
+    /// defecto). S3 usa la región configurada y, si hay
+    /// <c>ServiceUrl</c> (MinIO u otro compatible), ese endpoint firmado
+    /// con la misma región.
+    /// </summary>
+    internal static AmazonS3Config BuildClientConfig(FileStorageOptions options, StorageProviderKind kind)
     {
-        var credentials = kind == StorageProviderKind.CloudflareR2
-            ? new BasicAWSCredentials(
-                options.CloudflareR2.AccessKeyId,
-                options.CloudflareR2.SecretAccessKey)
-            : new BasicAWSCredentials(
-                options.S3.AccessKeyId,
-                options.S3.SecretAccessKey);
-
-        var region = kind == StorageProviderKind.CloudflareR2
-            ? RegionEndpoint.USEast1 // R2 acepta cualquier region; "auto" no es un endpoint válido del SDK
-            : RegionEndpoint.GetBySystemName(options.S3.Region);
-
-        var clientConfig = new AmazonS3Config
-        {
-            // AWSSDK.S3 v4 expone la región vía RegionEndpoint (no
-            // existe `Region = string` en esta versión).
-            RegionEndpoint = region,
-            ForcePathStyle = kind == StorageProviderKind.S3 && options.S3.ForcePathStyle
-        };
-
         if (kind == StorageProviderKind.CloudflareR2)
         {
-            // R2 siempre usa su propio ServiceUrl.
-            var accountId = options.CloudflareR2.AccountId;
-            clientConfig.ServiceURL = $"https://{accountId}.r2.cloudflarestorage.com";
-        }
-        else if (!string.IsNullOrWhiteSpace(options.S3.ServiceUrl))
-        {
-            // MinIO u otro servicio compatible con S3.
-            clientConfig.ServiceURL = options.S3.ServiceUrl;
+            return new AmazonS3Config
+            {
+                ServiceURL = $"https://{options.CloudflareR2.AccountId}.r2.cloudflarestorage.com",
+                AuthenticationRegion = "auto",
+                RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+                ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED
+            };
         }
 
-        return new AmazonS3Client(credentials, clientConfig);
+        var config = new AmazonS3Config { ForcePathStyle = options.S3.ForcePathStyle };
+        if (string.IsNullOrWhiteSpace(options.S3.ServiceUrl))
+        {
+            config.RegionEndpoint = RegionEndpoint.GetBySystemName(options.S3.Region);
+        }
+        else
+        {
+            // ServiceURL y RegionEndpoint son excluyentes en el SDK: con
+            // endpoint propio, la región solo se usa para firmar.
+            config.ServiceURL = options.S3.ServiceUrl;
+            config.AuthenticationRegion = options.S3.Region;
+        }
+
+        return config;
     }
 }

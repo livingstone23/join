@@ -22,7 +22,7 @@ public sealed class AzureBlobFileStorageAdapter : IFileStorageService
 {
     private readonly AzureBlobStorageOptions _options;
     private readonly ILogger<AzureBlobFileStorageAdapter> _logger;
-    private readonly Func<BlobContainerClient> _containerFactory;
+    private readonly Lazy<BlobContainerClient> _container;
 
     /// <summary>
     /// Constructor de producción. El <see cref="BlobContainerClient"/>
@@ -48,7 +48,9 @@ public sealed class AzureBlobFileStorageAdapter : IFileStorageService
     {
         _options = options.Value.AzureBlob;
         _logger = logger;
-        _containerFactory = containerFactory;
+        // Se crea una vez y se reutiliza: los clientes del SDK son
+        // thread-safe y el adapter se registra como singleton con clave.
+        _container = new Lazy<BlobContainerClient>(containerFactory);
     }
 
     private static Func<BlobContainerClient> BuildContainerFromOptions(AzureBlobStorageOptions options)
@@ -72,7 +74,7 @@ public sealed class AzureBlobFileStorageAdapter : IFileStorageService
     {
         var segments = StorageKeyGuard.EnsureSafeKey(storageKey);
         var blobName = string.Join('/', segments);
-        var container = _containerFactory();
+        var container = _container.Value;
 
         if (_options.CreateContainerIfNotExists)
         {
@@ -106,7 +108,7 @@ public sealed class AzureBlobFileStorageAdapter : IFileStorageService
     {
         var segments = StorageKeyGuard.EnsureSafeKey(storageKey);
         var blobName = string.Join('/', segments);
-        var container = _containerFactory();
+        var container = _container.Value;
         var blob = container.GetBlobClient(blobName);
 
         try
@@ -128,7 +130,7 @@ public sealed class AzureBlobFileStorageAdapter : IFileStorageService
     {
         var segments = StorageKeyGuard.EnsureSafeKey(storageKey);
         var blobName = string.Join('/', segments);
-        var container = _containerFactory();
+        var container = _container.Value;
         var blob = container.GetBlobClient(blobName);
 
         var response = await blob.DeleteIfExistsAsync(cancellationToken: cancellationToken);

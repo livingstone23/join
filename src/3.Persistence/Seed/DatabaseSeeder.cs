@@ -83,6 +83,28 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     }
 
     /// <summary>
+    /// SPEC 49-post: aplica en una base ya migrada el valor por defecto de
+    /// <see cref="TicketAttachmentSettings"/> para las empresas sembradas (JOIN-001 y
+    /// PRIV-001). <see cref="SeedAsync"/> solo corre cuando hay migraciones pendientes,
+    /// y esta spec no trae migración: sin este paso las bases existentes nunca
+    /// recibirían el cambio. Idempotente; solo escribe si la fila falta o conserva
+    /// exactamente el valor del seed anterior.
+    /// </summary>
+    public async Task SeedTicketAttachmentSettingsDefaultsAsync(CancellationToken cancellationToken = default)
+    {
+        var companyIds = await _context.Companies
+            .IgnoreQueryFilters()
+            .Where(c => c.TaxId == "JOIN-001" || c.TaxId == "PRIV-001")
+            .Select(c => c.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var companyId in companyIds)
+        {
+            await SeedTicketAttachmentSettingsAsync(companyId);
+        }
+    }
+
+    /// <summary>
     /// Re-runs system option and role permission seeds idempotently for the master tenant.
     /// Skipped when <paramref name="forceReseed"/> is <c>false</c> and the checksum of the
     /// in-code seed definitions still matches the one stored in <c>Security.SeedState</c>.
@@ -1893,19 +1915,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         if (existing.AllowedDocumentTypes != previousSeedValue)
         {
-            // Alguien (humano o API) ya configuró esta fila; respetar.
+            // Ya está en el nuevo valor (corrida previa) o alguien la configuró; respetar.
             _logger.LogDebug(
                 "Ticket attachment settings for company {CompanyId} do not match the previous seed value ({Actual}); leaving as configured.",
                 companyId, existing.AllowedDocumentTypes);
-            return;
-        }
-
-        if (existing.AllowedDocumentTypes == currentSeedValue)
-        {
-            // Idempotente: ya quedó en el nuevo valor en una corrida previa.
-            _logger.LogDebug(
-                "Ticket attachment settings for company {CompanyId} already on the current seed value; no change.",
-                companyId);
             return;
         }
 

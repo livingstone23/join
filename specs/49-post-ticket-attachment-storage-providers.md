@@ -8,6 +8,8 @@
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-10-06)
 > **Objective:** Que los adjuntos de tickets se guarden en el proveedor que indique la configuración —carpeta local (para desarrollo y pruebas), Azure Blob Storage, Amazon S3 o Cloudflare R2— sin tocar el resto del módulo; que cada adjunto se siga descargando desde el proveedor donde se guardó aunque la configuración cambie después; que la carpeta local sobreviva a un contenedor recreado; y que las empresas sembradas acepten por defecto PDF, Word, Excel, PNG y JPG.
 
+> **Notas de implementación (2026-10-13):** (1) Los adapters de nube se registran como **singleton** con clave (`AddKeyedSingleton`) en lugar de `AddKeyedScoped`: los clientes de `AWSSDK.S3` y `Azure.Storage.Blobs` son thread-safe y están pensados para reutilizarse; `Local` sigue `Scoped`. (2) `SeedAsync` solo corre con migraciones pendientes y esta spec no trae migración, así que la regla de "bases existentes" (G) se ejecuta además en cada arranque sin migraciones pendientes, en todos los entornos, vía `DatabaseSeeder.SeedTicketAttachmentSettingsDefaultsAsync` (idempotente; solo escribe si la fila falta o conserva el valor anterior). (3) El cliente de R2 firma con región `auto`, calcula y valida checksums solo cuando se requieren (`WHEN_REQUIRED`) y sube con `DisablePayloadSigning`. Con `S3.ServiceUrl`, la región se usa como `AuthenticationRegion`. (4) Smokes F7.2, F7.3, F7.4 y F7.6 hechos contra un contenedor PostgreSQL desechable; **F7.5 (nube real) queda pendiente** hasta que el usuario dé las credenciales.
+
 ---
 
 ## Adaptación a PostgreSQL (fork `main_postgresql`)
@@ -228,39 +230,39 @@ La clave de cada adjunto sigue siendo la de SPEC 36: `{companyId}/{ticketId}/{yy
 
 ### Proveedores
 
-- [ ] `StorageProviderKind` tiene `Local`, `AzureBlob`, `S3` y `CloudflareR2`, sin migración.
-- [ ] `FileStorage:Provider` admite `Local`, `AzureBlob`, `S3` y `CloudflareR2`; el valor por defecto es `Local`.
-- [ ] Un único adapter (`S3CompatibleFileStorageAdapter`) sirve a AWS S3 y a Cloudflare R2, con `Kind` distinto según la sección.
-- [ ] `Local` está registrado siempre; cada proveedor de nube solo si su sección está completa.
-- [ ] Con `Provider` apuntando a una sección incompleta, la API no arranca y el error nombra la configuración faltante.
-- [ ] Application no referencia ningún paquete de Azure ni de AWS.
-- [ ] Ningún secreto queda en `appsettings.json` versionado.
+- [x] `StorageProviderKind` tiene `Local`, `AzureBlob`, `S3` y `CloudflareR2`, sin migración.
+- [x] `FileStorage:Provider` admite `Local`, `AzureBlob`, `S3` y `CloudflareR2`; el valor por defecto es `Local`.
+- [x] Un único adapter (`S3CompatibleFileStorageAdapter`) sirve a AWS S3 y a Cloudflare R2, con `Kind` distinto según la sección.
+- [x] `Local` está registrado siempre; cada proveedor de nube solo si su sección está completa.
+- [x] Con `Provider` apuntando a una sección incompleta, la API no arranca y el error nombra la configuración faltante.
+- [x] Application no referencia ningún paquete de Azure ni de AWS.
+- [x] Ningún secreto queda en `appsettings.json` versionado.
 
 ### Resolución por adjunto
 
-- [ ] Una subida graba en `StorageProvider` el proveedor que la guardó (ya no el literal `Local`).
-- [ ] Una descarga usa el proveedor de la fila, no el configurado actualmente.
-- [ ] Un adjunto cuyo proveedor no está configurado devuelve 503 `STORAGE_PROVIDER_NOT_CONFIGURED`, no 404 ni 500.
-- [ ] Los cuatro adapters rechazan claves vacías, absolutas o con `..` antes de tocar el almacenamiento.
+- [x] Una subida graba en `StorageProvider` el proveedor que la guardó (ya no el literal `Local`).
+- [x] Una descarga usa el proveedor de la fila, no el configurado actualmente.
+- [x] Un adjunto cuyo proveedor no está configurado devuelve 503 `STORAGE_PROVIDER_NOT_CONFIGURED`, no 404 ni 500.
+- [x] Los cuatro adapters rechazan claves vacías, absolutas o con `..` antes de tocar el almacenamiento.
 
 ### Tipos de documento y seed
 
-- [ ] `.gif` devuelve 400 `UNSUPPORTED_DOCUMENT_TYPE`; `.png`, `.jpg` y `.jpeg` siguen siendo `Image`; los `.gif` ya subidos se siguen descargando.
-- [ ] Una base nueva siembra Join (y la empresa privada) con `Pdf | Word | Excel | Image`.
-- [ ] En una base existente, una fila con el valor anterior del seed pasa al nuevo; una fila con cualquier otro valor no se toca.
-- [ ] Correr el seeder dos veces no cambia nada la segunda vez.
+- [x] `.gif` devuelve 400 `UNSUPPORTED_DOCUMENT_TYPE`; `.png`, `.jpg` y `.jpeg` siguen siendo `Image`; los `.gif` ya subidos se siguen descargando.
+- [x] Una base nueva siembra Join (y la empresa privada) con `Pdf | Word | Excel | Image`.
+- [x] En una base existente, una fila con el valor anterior del seed pasa al nuevo; una fila con cualquier otro valor no se toca.
+- [x] Correr el seeder dos veces no cambia nada la segunda vez.
 
 ### Carpeta local
 
-- [ ] `App_Data/` está en `.gitignore`.
-- [ ] En Docker, los adjuntos viven en el volumen `join-attachments` y sobreviven a recrear el contenedor.
+- [x] `App_Data/` está en `.gitignore`.
+- [x] En Docker, los adjuntos viven en el volumen `join-attachments` y sobreviven a recrear el contenedor.
 
 ### General
 
-- [ ] `dotnet build -c Release` → 0 errores, 0 warnings nuevos.
-- [ ] `dotnet test` → 0 fallidos; `JOIN.Application` ≥ 90 % de líneas.
-- [ ] `CURL_REQUESTS.md` y `.env.example` documentan la configuración y el código 503.
-- [ ] SPEC 36 (copia del fork) tiene la nota "Ajuste por SPEC 49-post" en su encabezado.
+- [x] `dotnet build -c Release` → 0 errores, 0 warnings nuevos.
+- [x] `dotnet test` → 0 fallidos; `JOIN.Application` ≥ 90 % de líneas.
+- [x] `CURL_REQUESTS.md` y `.env.example` documentan la configuración y el código 503.
+- [x] SPEC 36 (copia del fork) tiene la nota "Ajuste por SPEC 49-post" en su encabezado.
 
 ---
 

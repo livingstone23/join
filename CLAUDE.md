@@ -33,7 +33,7 @@ dotnet ef database update --project ../3.Persistence --startup-project .
 docker-compose up -d --build
 ```
 
-Migrations apply automatically at startup (`Program.cs` calls `context.Database.MigrateAsync()`), and the `DatabaseSeeder` runs after any pending migration or, in Development with no pending migrations, re-runs the idempotent menu/permissions seed.
+Migrations apply automatically at startup (`Program.cs` calls `context.Database.MigrateAsync()`), and the `DatabaseSeeder` runs after any pending migration. With no pending migrations it applies the idempotent ticket-attachment defaults (`SeedTicketAttachmentSettingsDefaultsAsync`, SPEC 49-post) and, in Development only, re-runs the idempotent menu/permissions seed.
 
 CI (`.github/workflows/ci.yml`) builds in Release and runs `dotnet test` scoped explicitly to `tests/UnitTests/JOIN.Application.UnitTest/JOIN.Application.UnitTest.csproj` with Coverlet, **failing the build if line coverage drops below 90%**. This scoping is deliberate: running the whole solution would pull in `IntegrationTests` and inflate the metric with coverage of Controllers/Behaviors/EF Core that the gate isn't meant to measure. Integration tests run as a separate, uncovered CI step. Keep new Application-layer code covered by unit tests under `tests/UnitTests/JOIN.Application.UnitTest`, mirroring the `UseCases/<Area>/<Feature>/Commands|Queries/<Name>` folder structure of the source.
 

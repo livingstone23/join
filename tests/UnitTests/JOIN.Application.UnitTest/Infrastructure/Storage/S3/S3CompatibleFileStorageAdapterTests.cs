@@ -1,9 +1,12 @@
 using System.Net;
 using System.Text;
+using Amazon;
+using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using FluentAssertions;
 using JOIN.Domain.Enums;
+using JOIN.Infrastructure.Storage;
 using JOIN.Infrastructure.Storage.S3;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -76,7 +79,17 @@ public sealed class S3CompatibleFileStorageAdapterTests
         // seekable, así puede reportar el tamaño observado. El SDK
         // puede envolver el stream en su propia pipeline; aquí solo
         // nos interesa el contrato: SizeBytes == payload.Length.
-        var adapter = BuildAdapter(out _, StorageProviderKind.S3, bucket: "join-bucket");
+        var adapter = BuildAdapter(out var client, StorageProviderKind.S3, bucket: "join-bucket");
+        byte[]? uploaded = null;
+        client.Setup(x => x.PutObjectAsync(It.IsAny<PutObjectRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<PutObjectRequest, CancellationToken>((r, _) =>
+            {
+                // El buffer temporal debe seguir abierto mientras dura la subida.
+                using var copy = new MemoryStream();
+                r.InputStream.CopyTo(copy);
+                uploaded = copy.ToArray();
+            })
+            .ReturnsAsync(new PutObjectResponse());
 
         var payload = Encoding.UTF8.GetBytes("hello");
         var nonSeekable = new NonSeekableReadStream(new MemoryStream(payload));
@@ -89,6 +102,85 @@ public sealed class S3CompatibleFileStorageAdapterTests
 
         result.SizeBytes.Should().Be(payload.Length);
         result.StorageKey.Should().Be("companyA/x.bin");
+        uploaded.Should().Equal(payload);
+    }
+
+    [Theory]
+    [InlineData(StorageProviderKind.S3, false)]
+    [InlineData(StorageProviderKind.CloudflareR2, true)]
+    public async Task SaveAsync_ShouldDisablePayloadSigningOnlyForR2(StorageProviderKind kind, bool expected)
+    {
+        var adapter = BuildAdapter(out var client, kind, bucket: "join-bucket");
+
+        await adapter.SaveAsync(new MemoryStream([0x01]), "companyA/x.bin", "application/pdf", CancellationToken.None);
+
+        client.Verify(x => x.PutObjectAsync(
+            It.Is<PutObjectRequest>(r => r.DisablePayloadSigning == expected),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public void BuildClientConfig_ForCloudflareR2_ShouldBuildEndpointFromAccountId()
+    {
+        var options = new FileStorageOptions
+        {
+            CloudflareR2 = new CloudflareR2StorageOptions { AccountId = "abc123" }
+        };
+
+        var config = S3CompatibleFileStorageAdapter.BuildClientConfig(options, StorageProviderKind.CloudflareR2);
+
+        config.ServiceURL.Should().Be("https://abc123.r2.cloudflarestorage.com/");
+        config.AuthenticationRegion.Should().Be("auto");
+        config.RequestChecksumCalculation.Should().Be(RequestChecksumCalculation.WHEN_REQUIRED);
+        config.ResponseChecksumValidation.Should().Be(ResponseChecksumValidation.WHEN_REQUIRED);
+    }
+
+    [Fact]
+    public void BuildClientConfig_ForS3WithoutServiceUrl_ShouldUseTheConfiguredRegion()
+    {
+        var options = new FileStorageOptions { S3 = new S3StorageOptions { Region = "eu-west-1" } };
+
+        var config = S3CompatibleFileStorageAdapter.BuildClientConfig(options, StorageProviderKind.S3);
+
+        config.RegionEndpoint.Should().Be(RegionEndpoint.EUWest1);
+        config.ForcePathStyle.Should().BeFalse();
+    }
+
+    [Fact]
+    public void BuildClientConfig_ForS3WithServiceUrl_ShouldUseItAndSignWithTheRegion()
+    {
+        var options = new FileStorageOptions
+        {
+            S3 = new S3StorageOptions
+            {
+                Region = "us-east-1",
+                ServiceUrl = "http://localhost:9000",
+                ForcePathStyle = true
+            }
+        };
+
+        var config = S3CompatibleFileStorageAdapter.BuildClientConfig(options, StorageProviderKind.S3);
+
+        config.ServiceURL.Should().Be("http://localhost:9000/");
+        config.AuthenticationRegion.Should().Be("us-east-1");
+        config.ForcePathStyle.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(StorageProviderKind.S3, "join-s3")]
+    [InlineData(StorageProviderKind.CloudflareR2, "join-r2")]
+    public void Create_ShouldPickTheBucketAndKindOfItsSection(StorageProviderKind kind, string expectedBucket)
+    {
+        var options = new FileStorageOptions
+        {
+            S3 = new S3StorageOptions { BucketName = "join-s3", Region = "us-east-1", AccessKeyId = "ak", SecretAccessKey = "sk" },
+            CloudflareR2 = new CloudflareR2StorageOptions { AccountId = "acc", BucketName = "join-r2", AccessKeyId = "ak", SecretAccessKey = "sk" }
+        };
+
+        var adapter = S3CompatibleFileStorageAdapter.Create(options, kind, NullLogger.Instance);
+
+        adapter.Kind.Should().Be(kind);
+        adapter.BucketName.Should().Be(expectedBucket);
     }
 
     [Fact]

@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Net.Http;
 using Dapper;
@@ -22,6 +21,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
 
@@ -121,36 +121,40 @@ public static class DependencyInjection
                 }
             })
             // Falla al arranque si FileStorage:Provider apunta a una
-            // sección incompleta. Un error de despliegue se ve al
-            // levantar la API, no en la primera subida de un usuario.
-            .Validate(options => FileStorageOptionsValidator.IsValid(options, configuration),
-                "FileStorage configuration is invalid. Check that the section for FileStorage:Provider has all required values.")
+            // sección incompleta; el mensaje nombra las claves que faltan.
             .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<FileStorageOptions>, FileStorageOptionsValidator>();
 
         // Local: siempre registrado. Es el provider por defecto, el de
         // pruebas, y el que permite seguir leyendo adjuntos locales
         // después de pasar a la nube.
         services.AddKeyedScoped<IFileStorageService, LocalDiskFileStorageAdapter>(StorageProviderKind.Local);
 
-        if (configuration.GetSection("FileStorage:AzureBlob").Exists()
-            && configuration.GetSection("FileStorage:AzureBlob").Get<AzureBlobStorageOptions>() is { } azureOptions
-            && azureOptions.IsConfigured)
+        // Nube: cada adapter solo si su sección está completa, para que un
+        // entorno que cambió de proveedor siga leyendo los adjuntos del
+        // anterior mientras conserve su sección. Singleton con clave: los
+        // clientes del SDK son thread-safe y caros de construir.
+        if (configuration.GetSection("FileStorage:AzureBlob").Get<AzureBlobStorageOptions>() is { IsConfigured: true })
         {
-            services.AddKeyedScoped<IFileStorageService, AzureBlobFileStorageAdapter>(StorageProviderKind.AzureBlob);
+            services.AddKeyedSingleton<IFileStorageService, AzureBlobFileStorageAdapter>(StorageProviderKind.AzureBlob);
         }
 
-        if (configuration.GetSection("FileStorage:S3").Exists()
-            && configuration.GetSection("FileStorage:S3").Get<S3StorageOptions>() is { } s3Options
-            && s3Options.IsConfigured)
+        if (configuration.GetSection("FileStorage:S3").Get<S3StorageOptions>() is { IsConfigured: true })
         {
-            services.AddKeyedScoped<IFileStorageService, S3CompatibleFileStorageAdapter>(StorageProviderKind.S3);
+            services.AddKeyedSingleton<IFileStorageService>(StorageProviderKind.S3, (sp, _) =>
+                S3CompatibleFileStorageAdapter.Create(
+                    sp.GetRequiredService<IOptions<FileStorageOptions>>().Value,
+                    StorageProviderKind.S3,
+                    sp.GetRequiredService<ILogger<S3CompatibleFileStorageAdapter>>()));
         }
 
-        if (configuration.GetSection("FileStorage:CloudflareR2").Exists()
-            && configuration.GetSection("FileStorage:CloudflareR2").Get<CloudflareR2StorageOptions>() is { } r2Options
-            && r2Options.IsConfigured)
+        if (configuration.GetSection("FileStorage:CloudflareR2").Get<CloudflareR2StorageOptions>() is { IsConfigured: true })
         {
-            services.AddKeyedScoped<IFileStorageService, S3CompatibleFileStorageAdapter>(StorageProviderKind.CloudflareR2);
+            services.AddKeyedSingleton<IFileStorageService>(StorageProviderKind.CloudflareR2, (sp, _) =>
+                S3CompatibleFileStorageAdapter.Create(
+                    sp.GetRequiredService<IOptions<FileStorageOptions>>().Value,
+                    StorageProviderKind.CloudflareR2,
+                    sp.GetRequiredService<ILogger<S3CompatibleFileStorageAdapter>>()));
         }
 
         services.AddScoped<IFileStorageResolver, FileStorageResolver>();
