@@ -24,6 +24,14 @@ namespace JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Commands.UploadTi
 /// the gate sequence defined in the spec section "UploadTicketDocumentCommandHandler
 /// — flujo completo" (12 branches).
 /// </summary>
+/// <remarks>
+/// SPEC 49-post: the handler resolves the active storage provider through
+/// <see cref="IFileStorageResolver"/> (instead of taking a single
+/// <c>IFileStorageService</c>) and records the provider's
+/// <c>Kind</c> on the row. <c>.gif</c> was removed from the
+/// <c>Image</c> mapping — uploads now return
+/// <c>UNSUPPORTED_DOCUMENT_TYPE</c> (400) for that extension.
+/// </remarks>
 public sealed class UploadTicketDocumentCommandHandlerTests
 {
     private readonly Fixture _fixture = new();
@@ -175,6 +183,32 @@ public sealed class UploadTicketDocumentCommandHandlerTests
 
         response.IsSuccess.Should().BeFalse();
         response.Message.Should().Be("UNSUPPORTED_DOCUMENT_TYPE");
+    }
+
+    /// <summary>
+    /// SPEC 49-post: <c>.gif</c> ya no es <c>Image</c>. La subida
+    /// devuelve <c>UNSUPPORTED_DOCUMENT_TYPE</c> aunque la empresa
+    /// acepte <c>Image</c>; los <c>.gif</c> ya subidos se siguen
+    /// descargando (la descarga no vuelve a inferir el tipo).
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenExtensionIsGif_ShouldReturnUnsupportedDocumentTypeError()
+    {
+        var context = SetupHappyPathWithSettings(allowedTypes: DocumentType.Image, maxBytes: 1024, maxPerTicket: 10, maxPerDay: null);
+
+        var handler = context.CreateHandler();
+        var request = new UploadTicketDocumentCommand
+        {
+            TicketId = context.TicketId,
+            TicketLogsId = null,
+            File = CreateAttachment("anim.gif", 512)
+        };
+
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be("UNSUPPORTED_DOCUMENT_TYPE");
+        context.FileStorageServiceMock.Verify(x => x.SaveAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -420,6 +454,10 @@ public sealed class UploadTicketDocumentCommandHandlerTests
     /// Each row corresponds to one switch arm in the handler; the resulting
     /// DocumentType must round-trip to the expected enum value.
     /// </summary>
+    /// <remarks>
+    /// SPEC 49-post: <c>anim.gif</c> sale del mapping y devuelve
+    /// <c>UNSUPPORTED_DOCUMENT_TYPE</c> — se excluye del round-trip.
+    /// </remarks>
     [Theory]
     [InlineData("report.pdf", DocumentType.Pdf)]
     [InlineData("memo.doc", DocumentType.Word)]
@@ -431,7 +469,6 @@ public sealed class UploadTicketDocumentCommandHandlerTests
     [InlineData("photo.png", DocumentType.Image)]
     [InlineData("photo.jpg", DocumentType.Image)]
     [InlineData("photo.jpeg", DocumentType.Image)]
-    [InlineData("anim.gif", DocumentType.Image)]
     [InlineData("bundle.zip", DocumentType.Other)]
     public async Task Handle_WhenFileExtensionMatchesSpecTable_ShouldResolveCorrectDocumentType(
         string fileName, DocumentType expectedType)
@@ -504,9 +541,48 @@ public sealed class UploadTicketDocumentCommandHandlerTests
 
         capturedDoc.TicketId.Should().Be(context.TicketId);
         capturedDoc.DocumentType.Should().Be(DocumentType.Pdf);
+        // SPEC 49-post: la fila guarda el Kind del adapter activo, no un literal.
         capturedDoc.StorageProvider.Should().Be(StorageProviderKind.Local);
         capturedDoc.Path.Should().Be(capturedKey);
         capturedDoc.NewName.Should().EndWith(".pdf");
+    }
+
+    /// <summary>
+    /// SPEC 49-post: cuando el provider activo no es <c>Local</c>
+    /// (por ejemplo, la API corre contra Azure Blob), la fila
+    /// registra el Kind del adapter activo. Es la garantía de que
+    /// la descarga posterior se haga desde el mismo servicio, no
+    /// desde el disco local por defecto.
+    /// </summary>
+    [Theory]
+    [InlineData(StorageProviderKind.AzureBlob)]
+    [InlineData(StorageProviderKind.S3)]
+    [InlineData(StorageProviderKind.CloudflareR2)]
+    public async Task Handle_WhenActiveProviderIsNotLocal_ShouldRecordItsKindInTheRow(StorageProviderKind providerKind)
+    {
+        var context = SetupHappyPathWithSettings(allowedTypes: DocumentType.Pdf, maxBytes: 1024, maxPerTicket: 10, maxPerDay: null);
+        context.SetActiveProvider(providerKind);
+
+        var capturedDoc = new TicketDocument();
+        context.DocumentRepositoryMock.Setup(x => x.InsertAsync(It.IsAny<TicketDocument>()))
+            .Callback<TicketDocument>(d => capturedDoc = d)
+            .ReturnsAsync(true);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        context.UserRepositoryMock.Setup(x => x.GetAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(new ApplicationUser { Id = Guid.NewGuid(), FirstName = "A", LastName = "B" });
+
+        var handler = context.CreateHandler();
+        var request = new UploadTicketDocumentCommand
+        {
+            TicketId = context.TicketId,
+            TicketLogsId = null,
+            File = CreateAttachment("report.pdf", 1024)
+        };
+
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        capturedDoc.StorageProvider.Should().Be(providerKind);
     }
 
     private static UploadTicketDocumentCommand CreateValidCommand(Guid ticketId) => new()
@@ -627,12 +703,23 @@ public sealed class UploadTicketDocumentCommandHandlerTests
     /// </summary>
     private sealed class UploadTestContext
     {
+        private StorageProviderKind _activeKind = StorageProviderKind.Local;
+
         public UploadTestContext(Guid companyId, Guid currentUserId)
         {
             CompanyId = companyId;
             CurrentUserServiceMock.SetupGet(x => x.CompanyId).Returns(companyId);
             CurrentUserServiceMock.SetupGet(x => x.UserId).Returns(currentUserId.ToString());
             CurrentUserServiceMock.SetupGet(x => x.IsAuthenticated).Returns(true);
+
+            FileStorageServiceMock.SetupGet(x => x.Kind).Returns(() => _activeKind);
+
+            // Resolver.Current devuelve el mismo mock que el resto del
+            // context; los tests que quieren otro provider usan
+            // SetActiveProvider para mover el Kind.
+            FileStorageResolverMock.Setup(x => x.Current).Returns(() => FileStorageServiceMock.Object);
+            FileStorageResolverMock.Setup(x => x.Resolve(It.IsAny<StorageProviderKind>()))
+                .Returns(() => FileStorageServiceMock.Object);
 
             UnitOfWorkMock.Setup(x => x.GetRepository<TicketEntity>()).Returns(TicketRepositoryMock.Object);
             UnitOfWorkMock.Setup(x => x.GetRepository<TicketLog>()).Returns(TicketLogRepositoryMock.Object);
@@ -647,13 +734,19 @@ public sealed class UploadTicketDocumentCommandHandlerTests
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IFileStorageService> FileStorageServiceMock { get; } = new();
+        public Mock<IFileStorageResolver> FileStorageResolverMock { get; } = new();
         public Mock<IGenericRepository<TicketEntity>> TicketRepositoryMock { get; } = new();
         public Mock<IGenericRepository<TicketLog>> TicketLogRepositoryMock { get; } = new();
         public Mock<IGenericRepository<TicketAttachmentSettingsEntity>> SettingsRepositoryMock { get; } = new();
         public Mock<IGenericRepository<TicketDocument>> DocumentRepositoryMock { get; } = new();
         public Mock<IGenericRepository<ApplicationUser>> UserRepositoryMock { get; } = new();
 
+        public void SetActiveProvider(StorageProviderKind kind)
+        {
+            _activeKind = kind;
+        }
+
         public IRequestHandler<UploadTicketDocumentCommand, Response<TicketDocumentDto>> CreateHandler()
-            => new UploadTicketDocumentCommandHandler(UnitOfWorkMock.Object, CurrentUserServiceMock.Object, FileStorageServiceMock.Object);
+            => new UploadTicketDocumentCommandHandler(UnitOfWorkMock.Object, CurrentUserServiceMock.Object, FileStorageResolverMock.Object);
     }
 }

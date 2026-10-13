@@ -399,6 +399,15 @@ public sealed class RegisterInboundTicketCommandHandlerTests
                 .Setup(x => x.SaveAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((Stream content, string key, string _, CancellationToken _) => new FileStorageSaveResult(key, content.Length));
 
+            FileStorage.SetupGet(x => x.Kind).Returns(StorageProviderKind.Local);
+
+            FileStorageResolver
+                .Setup(x => x.Current)
+                .Returns(FileStorage.Object);
+            FileStorageResolver
+                .Setup(x => x.Resolve(It.IsAny<StorageProviderKind>()))
+                .Returns(FileStorage.Object);
+
             _sql.SetResults(FakeResultSet.Empty("Id", "FullName", "HasPending"));
         }
 
@@ -420,6 +429,7 @@ public sealed class RegisterInboundTicketCommandHandlerTests
         public Mock<IUnitOfWork> UnitOfWork { get; } = new();
         public Mock<IGenericRepository<Ticket>> TicketRepository { get; }
         public Mock<IFileStorageService> FileStorage { get; } = new();
+        public Mock<IFileStorageResolver> FileStorageResolver { get; } = new();
         public Mock<IDatabaseErrorClassifier> ErrorClassifier { get; } = new();
 
         public void SetPersonMatch(Guid personId) =>
@@ -472,7 +482,7 @@ public sealed class RegisterInboundTicketCommandHandlerTests
         public Task<JOIN.Application.Common.Response<JOIN.Application.DTO.Messaging.TicketDto>> HandleAsync(RegisterInboundTicketCommand command) =>
             new RegisterInboundTicketCommandHandler(
                     UnitOfWork.Object,
-                    FileStorage.Object,
+                    FileStorageResolver.Object,
                     new TicketDtoAssembler(UnitOfWork.Object),
                     new TicketCodeGenerator(UnitOfWork.Object),
                     new TicketInitialStatusResolver(UnitOfWork.Object),

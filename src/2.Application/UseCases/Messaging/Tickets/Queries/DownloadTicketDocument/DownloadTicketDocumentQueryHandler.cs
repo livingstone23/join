@@ -1,6 +1,7 @@
 using Dapper;
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
+using JOIN.Domain.Enums;
 using MediatR;
 
 namespace JOIN.Application.UseCases.Messaging.Tickets.Queries.DownloadTicketDocument;
@@ -8,18 +9,20 @@ namespace JOIN.Application.UseCases.Messaging.Tickets.Queries.DownloadTicketDocu
 /// <summary>
 /// Maneja la descarga de un documento adjunto:
 ///   1. Carga la fila de metadata validando <c>TicketId</c> + <c>CompanyId</c>.
-///   2. Si la fila existe, abre el stream vía <see cref="IFileStorageService"/>.
-///   3. Devuelve <see cref="TicketDocumentDownloadResult"/> para que el
+///   2. Lee la columna <c>StorageProvider</c> de la fila y resuelve el
+///      adapter que guardó el archivo (no el que está activo en el entorno:
+///      un adjunto de Local debe seguir saliendo de Local aunque la API
+///      ya esté en Azure; ver SPEC 49-post).
+///   3. Si el adapter no está configurado en este entorno, devuelve
+///      <c>STORAGE_PROVIDER_NOT_CONFIGURED</c> (503). Si el adapter existe
+///      pero el objeto no, <c>FILE_NOT_FOUND_IN_STORAGE</c> (404).
+///   4. Devuelve <see cref="TicketDocumentDownloadResult"/> para que el
 ///      controller la traduzca a <c>File(stream, contentType, fileName)</c>.
-///
-/// Inconsistencias (fila en base sin archivo en disco) se traducen a
-/// <c>FILE_NOT_FOUND_IN_STORAGE</c> (404), no a 500 — son recuperables por
-/// ops si deciden rehidratar el binario desde un backup.
 /// </summary>
 public sealed class DownloadTicketDocumentQueryHandler(
     ISqlConnectionFactory connectionFactory,
     ICurrentUserService currentUserService,
-    IFileStorageService fileStorageService)
+    IFileStorageResolver fileStorageResolver)
     : IRequestHandler<DownloadTicketDocumentQuery, Response<TicketDocumentDownloadResult>>
 {
     public async Task<Response<TicketDocumentDownloadResult>> Handle(DownloadTicketDocumentQuery request, CancellationToken cancellationToken)
@@ -33,12 +36,15 @@ public sealed class DownloadTicketDocumentQueryHandler(
         using var connection = connectionFactory.CreateConnection();
 
         // Only metadata — the binary is streamed by IFileStorageService below.
+        // SPEC 49-post: td.StorageProvider travels with the row so the download
+        // opens the file from the same provider that uploaded it.
         const string sql = """
             SELECT
                 td.Id,
                 td.TicketId,
                 td.CompanyId,
                 td.Path,
+                td.StorageProvider,
                 td.ContentType,
                 td.OriginalName
             FROM Support.TicketDocuments td
@@ -59,7 +65,18 @@ public sealed class DownloadTicketDocumentQueryHandler(
             return Response<TicketDocumentDownloadResult>.Error("TICKET_DOCUMENT_NOT_FOUND", ["Ticket document not found for the current ticket and tenant."]);
         }
 
-        var stream = await fileStorageService.OpenReadAsync(row.Path, cancellationToken);
+        var provider = fileStorageResolver.Resolve(row.StorageProvider);
+        if (provider is null)
+        {
+            // Section removed from config (or the row was written by a
+            // provider that was never deployed here) — recoverable from
+            // ops by restoring the section, not a generic 500.
+            return Response<TicketDocumentDownloadResult>.Error(
+                "STORAGE_PROVIDER_NOT_CONFIGURED",
+                [$"The storage provider '{row.StorageProvider}' required by this document is not configured in the current environment."]);
+        }
+
+        var stream = await provider.OpenReadAsync(row.Path, cancellationToken);
         if (stream is null)
         {
             return Response<TicketDocumentDownloadResult>.Error("FILE_NOT_FOUND_IN_STORAGE", ["The underlying file is missing from storage."]);
@@ -82,6 +99,7 @@ public sealed class DownloadTicketDocumentQueryHandler(
         public Guid TicketId { get; init; }
         public Guid CompanyId { get; init; }
         public string Path { get; init; } = string.Empty;
+        public StorageProviderKind StorageProvider { get; init; }
         public string ContentType { get; init; } = string.Empty;
         public string OriginalName { get; init; } = string.Empty;
     }

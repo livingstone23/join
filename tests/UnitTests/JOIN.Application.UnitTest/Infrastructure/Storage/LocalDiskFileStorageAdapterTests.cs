@@ -1,5 +1,6 @@
 using System.Text;
 using FluentAssertions;
+using JOIN.Infrastructure.Storage;
 using JOIN.Infrastructure.Storage.Local;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -12,6 +13,12 @@ namespace JOIN.Application.UnitTest.Infrastructure.Storage;
 /// because the value of testing a filesystem adapter is precisely to
 /// verify the bytes-on-disk behavior, not the call contract.
 /// </summary>
+/// <remarks>
+/// SPEC 49-post: <see cref="FileStorageOptions"/> ahora tiene la sección
+/// <see cref="FileStorageOptions.Local"/> anidada; los tests que
+/// construyen el adapter directamente instancian esa sección y dejan
+/// el resto en sus defaults.
+/// </remarks>
 public sealed class LocalDiskFileStorageAdapterTests : IDisposable
 {
     private readonly string _rootPath;
@@ -20,7 +27,7 @@ public sealed class LocalDiskFileStorageAdapterTests : IDisposable
     public LocalDiskFileStorageAdapterTests()
     {
         _rootPath = Path.Combine(Path.GetTempPath(), "join-fs-tests", Guid.NewGuid().ToString("N"));
-        var options = Options.Create(new FileStorageOptions { RootPath = _rootPath });
+        var options = Options.Create(new FileStorageOptions { Local = new LocalStorageOptions { RootPath = _rootPath } });
         _adapter = new LocalDiskFileStorageAdapter(options, NullLogger<LocalDiskFileStorageAdapter>.Instance);
     }
 

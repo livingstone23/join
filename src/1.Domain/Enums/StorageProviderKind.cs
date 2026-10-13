@@ -10,18 +10,25 @@ namespace JOIN.Domain.Enums;
 public enum StorageProviderKind
 {
     /// <summary>
-    /// Disco local del servidor (único adapter implementado en esta spec;
-    /// ver <c>LocalDiskFileStorageAdapter</c>).
+    /// Disco local del servidor (<c>LocalDiskFileStorageAdapter</c>).
     /// </summary>
     Local = 0,
 
     /// <summary>
-    /// Azure Blob Storage — seam listo, adapter NO implementado en esta spec.
+    /// Azure Blob Storage (<c>AzureBlobFileStorageAdapter</c>).
     /// </summary>
     AzureBlob = 1,
 
     /// <summary>
-    /// Amazon S3 — seam listo, adapter NO implementado en esta spec.
+    /// Amazon S3 (<c>S3CompatibleFileStorageAdapter</c>).
     /// </summary>
-    S3 = 2
+    S3 = 2,
+
+    /// <summary>
+    /// Cloudflare R2, también servido por <c>S3CompatibleFileStorageAdapter</c>
+    /// con un <c>Kind</c> distinto: R2 implementa la API de S3, pero
+    /// un adjunto guardado en R2 vive en otro servicio y con otras
+    /// credenciales que uno en AWS, así que la fila debe recordar cuál.
+    /// </summary>
+    CloudflareR2 = 3
 }

@@ -70,6 +70,7 @@ public class TicketDocumentsController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> Download(Guid ticketId, Guid id, CancellationToken cancellationToken = default)
     {
         var response = await _sender.Send(new DownloadTicketDocumentQuery(ticketId, id), cancellationToken);
@@ -187,6 +188,11 @@ public class TicketDocumentsController(ISender sender) : ControllerBase
                 => Unauthorized(response),
             "TICKET_NOT_FOUND" or "TICKET_DOCUMENT_NOT_FOUND" or "FILE_NOT_FOUND_IN_STORAGE"
                 => NotFound(response),
+            // SPEC 49-post: la fila pide un provider que el entorno ya no tiene
+            // configurado. 503 (no 500 ni 404) refleja que es recuperable
+            // restaurando la sección correspondiente.
+            "STORAGE_PROVIDER_NOT_CONFIGURED"
+                => StatusCode(StatusCodes.Status503ServiceUnavailable, response),
             "MAX_FILES_PER_TICKET_REACHED"
                 => Conflict(response),
             "DAILY_ATTACHMENT_QUOTA_REACHED"

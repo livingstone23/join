@@ -20,10 +20,28 @@
     <PackageReference Include="SendGrid" Version="9.29.3" />
     <PackageReference Include="Otp.NET" Version="1.4.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.9.0" />
+    <!--
+      SPEC 49-post: storage providers. The cost of these two packages is
+      paid even when only Local is in use, in exchange for being able to
+      switch providers by configuration instead of recompiling. R2 reuses
+      the S3 client (Cloudflare R2 implements the S3 API), so it doesn't
+      need its own package.
+    -->
+    <PackageReference Include="AWSSDK.S3" Version="4.0.100" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.24.0" />
   </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <ItemGroup>
+    <!--
+      SPEC 49-post: las pruebas unitarias de la capa Application (que es
+      el scope del coverage gate) instancian FileStorageResolver y los
+      adapters de storage para validar el contrato. Se exponen vía
+      InternalsVisibleTo en lugar de subir el visibility a public.
+    -->
+    <InternalsVisibleTo Include="JOIN.Application.UnitTest" />
+  </ItemGroup>
 </Project>

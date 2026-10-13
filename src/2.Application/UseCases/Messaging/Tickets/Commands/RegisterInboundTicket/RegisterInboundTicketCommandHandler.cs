@@ -28,7 +28,7 @@ namespace JOIN.Application.UseCases.Messaging.Tickets.Commands.RegisterInboundTi
 /// </summary>
 public sealed class RegisterInboundTicketCommandHandler(
     IUnitOfWork unitOfWork,
-    IFileStorageService fileStorageService,
+    IFileStorageResolver fileStorageResolver,
     TicketDtoAssembler ticketDtoAssembler,
     TicketCodeGenerator ticketCodeGenerator,
     TicketInitialStatusResolver initialStatusResolver,
@@ -273,7 +273,10 @@ public sealed class RegisterInboundTicketCommandHandler(
 
             try
             {
-                var saveResult = await fileStorageService.SaveAsync(attachment.Content, storageKey, attachment.ContentType, cancellationToken);
+                // SPEC 49-post: subimos con el provider activo y grabamos
+                // su Kind; mismo criterio que UploadTicketDocumentCommandHandler.
+                var activeProvider = fileStorageResolver.Current;
+                var saveResult = await activeProvider.SaveAsync(attachment.Content, storageKey, attachment.ContentType, cancellationToken);
 
                 await documentRepository.InsertAsync(new TicketDocument
                 {
@@ -284,7 +287,7 @@ public sealed class RegisterInboundTicketCommandHandler(
                     OriginalName = attachment.FileName,
                     NewName = newName,
                     Path = storageKey,
-                    StorageProvider = StorageProviderKind.Local,
+                    StorageProvider = activeProvider.Kind,
                     ContentType = attachment.ContentType,
                     SizeBytes = saveResult.SizeBytes
                 });

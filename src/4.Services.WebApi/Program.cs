@@ -228,11 +228,18 @@ using (var scope = app.Services.CreateScope())
         {
             await seeder.SeedAsync();
         }
-        else if (app.Environment.IsDevelopment())
+        else
         {
-            logger.LogInformation("Running idempotent menu and permissions seed (Development).");
-            var forceReseed = builder.Configuration.GetValue<bool>("Seeding:ForceMenuPermissionsReseed");
-            await seeder.SeedMenuAndPermissionsAsync(forceReseed);
+            // SPEC 49-post: existing databases also get the new attachment defaults
+            // (only rows still holding the previous seed value are changed).
+            await seeder.SeedTicketAttachmentSettingsDefaultsAsync();
+
+            if (app.Environment.IsDevelopment())
+            {
+                logger.LogInformation("Running idempotent menu and permissions seed (Development).");
+                var forceReseed = builder.Configuration.GetValue<bool>("Seeding:ForceMenuPermissionsReseed");
+                await seeder.SeedMenuAndPermissionsAsync(forceReseed);
+            }
         }
 
     }

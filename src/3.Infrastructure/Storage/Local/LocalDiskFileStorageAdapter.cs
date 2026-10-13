@@ -1,4 +1,5 @@
 using JOIN.Application.Interface;
+using JOIN.Domain.Enums;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -6,14 +7,16 @@ namespace JOIN.Infrastructure.Storage.Local;
 
 /// <summary>
 /// Implementación de <see cref="IFileStorageService"/> sobre el filesystem
-/// del servidor. Único adapter de storage implementado en esta spec —
-/// el contrato queda listo para un futuro <c>AzureBlobFileStorageAdapter</c>
-/// o <c>S3FileStorageAdapter</c> cuando negocio decida a qué nube migrar.
+/// del servidor. Único adapter de storage original (SPEC 36); SPEC 49-post
+/// lo conserva con <c>Kind = Local</c> y agrega los adapters de nube
+/// (Azure Blob, S3, Cloudflare R2) detrás del mismo
+/// <see cref="JOIN.Application.Interface.IFileStorageResolver"/>.
 ///
-/// Toda <c>storageKey</c> se valida con <see cref="ResolveSafePath"/> antes
-/// de tocar el filesystem: si la ruta resuelta escapa del <c>RootPath</c>
-/// configurado (por ejemplo por un segmento <c>..</c>), el adapter lanza
-/// <see cref="InvalidOperationException"/> sin escribir nada.
+/// Toda <c>storageKey</c> se valida con
+/// <see cref="StorageKeyGuard.EnsureSafeKey"/> antes de tocar el
+/// filesystem y, además, el adapter verifica que la ruta resuelta siga
+/// dentro del <c>RootPath</c> configurado (un escape de tipo
+/// "<c>&lt;root&gt;-evil</c>" no se atrapa con la guarda de segmentos).
 /// </summary>
 public sealed class LocalDiskFileStorageAdapter(
     IOptions<FileStorageOptions> options,
@@ -22,6 +25,9 @@ public sealed class LocalDiskFileStorageAdapter(
 {
     private readonly FileStorageOptions _options = options.Value;
     private readonly ILogger<LocalDiskFileStorageAdapter> _logger = logger;
+
+    /// <inheritdoc />
+    public StorageProviderKind Kind => StorageProviderKind.Local;
 
     /// <inheritdoc />
     public async Task<FileStorageSaveResult> SaveAsync(
@@ -77,30 +83,19 @@ public sealed class LocalDiskFileStorageAdapter(
     }
 
     /// <summary>
-    /// Combina <paramref name="storageKey"/> con <c>RootPath</c> y valida
-    /// que el resultado siga dentro de la raíz. Lanza
-    /// <see cref="InvalidOperationException"/> ante cualquier intento de
-    /// path traversal (<c>..</c>, segmentos absolutos, etc.).
-    /// Ambos separadores (<c>/</c> y <c>\</c>) se tratan como separador en
-    /// cualquier plataforma: en Linux/macOS <c>\</c> no lo es para el
-    /// filesystem, y sin normalizar una clave como <c>..\x</c> se aceptaría
-    /// aquí y escaparía de la raíz al migrar el almacenamiento a Windows.
+    /// Combina los segmentos ya validados de <paramref name="storageKey"/>
+    /// con <c>RootPath</c> y comprueba que el resultado siga dentro de la
+    /// raíz. La validación de segmentos la hace
+    /// <see cref="StorageKeyGuard.EnsureSafeKey"/>; este método añade el
+    /// segundo check (prefijo-similar) que es específico del filesystem
+    /// local — la nube no lo necesita porque el bucket o contenedor
+    /// hace de sandbox.
     /// </summary>
     private string ResolveSafePath(string storageKey)
     {
-        if (string.IsNullOrWhiteSpace(storageKey))
-        {
-            throw new InvalidOperationException("Storage key must not be empty.");
-        }
+        var segments = StorageKeyGuard.EnsureSafeKey(storageKey);
 
-        var segments = storageKey.Split('/', '\\');
-        if (Path.IsPathRooted(storageKey) || segments.Any(segment => segment == ".."))
-        {
-            throw new InvalidOperationException(
-                $"Storage key '{storageKey}' resolves outside the configured root.");
-        }
-
-        var root = Path.GetFullPath(_options.RootPath);
+        var root = Path.GetFullPath(_options.Local.RootPath);
         var combined = Path.GetFullPath(Path.Combine([root, .. segments]));
 
         // Compare against "root + separator": a bare StartsWith(root) would also
