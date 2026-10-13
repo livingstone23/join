@@ -11,17 +11,21 @@ namespace JOIN.Application.UnitTest.UseCases.Security.Users.Commands.InvalidateS
 /// Each <c>cacheKey</c> branches through <see cref="IPermissionService.InvalidateUserCacheAsync"/>
 /// (and a direct <see cref="IMemoryCache.Remove"/> for the sidebar-only branch) so the
 /// permission-snapshot key the handler touches always matches the one
-/// <see cref="PermissionService"/> actually stores (<c>permissions:v2:{companyId}:{userId}</c>).
+/// <c>PermissionService</c> actually stores (<c>permissions:v2:{companyId}:{userId}</c>).
 /// </summary>
 public sealed class CleanCacheCommandHandlerTests
 {
     private static readonly Guid CompanyId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
+    private static readonly string SidebarKey = $"sidebar:{CompanyId}:{UserId}";
+    private static readonly string PermissionKey = $"permissions:v2:{CompanyId}:{UserId}";
 
     [Fact]
     public async Task Handle_WhenCacheKeyIsSidebar_ShouldRemoveOnlySidebarEntry()
     {
         var cache = new MemoryCache(new MemoryCacheOptions());
+        cache.Set(SidebarKey, "menu");
+        cache.Set(PermissionKey, "snapshot");
         var permissions = new Mock<IPermissionService>(MockBehavior.Strict);
 
         var handler = new CleanCacheCommandHandler(cache, permissions.Object);
@@ -34,6 +38,8 @@ public sealed class CleanCacheCommandHandlerTests
 
         response.IsSuccess.Should().BeTrue();
         response.Message.Should().Be("Cache 'sidebar' cleaned successfully.");
+        cache.TryGetValue(SidebarKey, out _).Should().BeFalse();
+        cache.TryGetValue(PermissionKey, out _).Should().BeTrue("'sidebar' only clears the menu cache");
         permissions.VerifyNoOtherCalls();
     }
 
@@ -85,6 +91,7 @@ public sealed class CleanCacheCommandHandlerTests
     public async Task Handle_WhenCacheKeyIsAll_ShouldInvalidateUserCache()
     {
         var cache = new MemoryCache(new MemoryCacheOptions());
+        cache.Set(SidebarKey, "menu");
         var permissions = new Mock<IPermissionService>();
         permissions
             .Setup(p => p.InvalidateUserCacheAsync(CompanyId, UserId, It.IsAny<CancellationToken>()))
@@ -99,6 +106,8 @@ public sealed class CleanCacheCommandHandlerTests
         }, CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
+        response.Message.Should().Be("Cache 'all' cleaned successfully.");
+        cache.TryGetValue(SidebarKey, out _).Should().BeFalse();
         permissions.Verify(p => p.InvalidateUserCacheAsync(CompanyId, UserId, It.IsAny<CancellationToken>()), Times.Once);
     }
 

@@ -1,6 +1,6 @@
 # SPEC 51-post — Invalidación de la caché de permisos con la clave `permissions:v2`
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Origen:** copia de SPEC 51 de `main` (estado allí al copiarla: Borrador), adaptada a PostgreSQL para el fork `main_postgresql`. Se implementa **desde cero** en el fork, sin traer commits de `main` (decisión del usuario, 2026-10-09).
 > **Rama de trabajo:** `spec-51-post-permission-cache-invalidation-key`, creada desde `main_postgresql`; PR hacia `main_postgresql`, nunca hacia `main`.
 > **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 99) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
@@ -54,10 +54,10 @@ Detectado al revisar los pendientes de SPEC 41 (2026-10-08).
 
 ## Acceptance criteria
 
-- [ ] Después de `POST /Users/sidebar/cache/invalidate` con `cacheKey = "permission"` (o `"all"`), el siguiente request del usuario reconstruye el snapshot de permisos desde la base.
-- [ ] `cacheKey = "sidebar"` sigue borrando solo la caché del menú.
-- [ ] Una clave no soportada sigue devolviendo `INVALID_CACHE_KEY`.
-- [ ] Ningún archivo arma a mano la clave `permissions:{companyId}:{userId}`.
+- [x] Después de `POST /Users/sidebar/cache/invalidate` con `cacheKey = "permission"` (o `"all"`), el siguiente request del usuario reconstruye el snapshot de permisos desde la base. *(integración `CleanCachePostgreSqlTests`, también por el alias `/Users/cleancache`)*
+- [x] `cacheKey = "sidebar"` sigue borrando solo la caché del menú.
+- [x] Una clave no soportada sigue devolviendo `INVALID_CACHE_KEY` (desde el handler). *Ajuste (2026-10-13): por HTTP la rechaza antes `CleanCacheCommandValidator` con 400 ("CacheKey must be one of…"), igual que antes de esta spec; `INVALID_CACHE_KEY` queda como respaldo defensivo del handler, cubierto por unit tests.*
+- [x] Ningún archivo arma a mano la clave `permissions:{companyId}:{userId}` (la única construcción es `PermissionService.CacheKeyPrefix`).
 
 ---
 
@@ -66,3 +66,17 @@ Detectado al revisar los pendientes de SPEC 41 (2026-10-08).
 > **Decisión del usuario (2026-10-08):** las preguntas abiertas se responden cuando se trabaje esta spec; hasta entonces queda en `Borrador` y no bloquea las siguientes.
 
 - Con `cacheKey = "permission"`, `InvalidateUserCacheAsync` también borra la caché del menú (el menú depende de los permisos). ¿Se acepta, o se agrega un método que borre solo el snapshot?
+  - **Decisión del usuario (2026-10-13): opción A, se acepta.** Es lo que ya dice el Scope, el menú se arma a partir de los permisos (un menú cacheado con permisos viejos sería incoherente) y reconstruirlo cuesta una consulta. No se agrega un método nuevo a `IPermissionService`.
+
+---
+
+## Registro de implementación (2026-10-13)
+
+Rama `spec-51-post-permission-cache-invalidation-key`.
+
+- `InvalidateSidebarCacheCommandHandler.cs` (`CleanCacheCommandHandler`): recibe `IPermissionService` por constructor primario; `permission`/`permissions` llaman a `InvalidateUserCacheAsync`; `all` llama a `InvalidateUserCacheAsync` y además borra `sidebar:` explícitamente; `sidebar` sin cambios. Mensajes y contrato sin cambios (el texto de `Errors` para `INVALID_CACHE_KEY` se mantuvo idéntico).
+- `IPermissionService.InvalidateUserCacheAsync`: quitada la nota del bug del `<remarks>`; el `<summary>` indica que es el punto de entrada que usa `CleanCacheCommandHandler`.
+- Unit tests: `tests/UnitTests/.../Security/Users/Commands/InvalidateSidebarCache/CleanCacheCommandHandlerTests.cs` (6 casos: `sidebar` borra solo el menú, `permission`, `permissions`, `all` borra snapshot + menú, clave desconocida → `INVALID_CACHE_KEY`, normalización de mayúsculas/espacios).
+- Integración: `tests/IntegrationTests/Security/CleanCachePostgreSqlTests.cs` (5 casos sobre la `IMemoryCache` real: la clave `permissions:v2` desaparece y el siguiente request la reconstruye, `sidebar` conserva el snapshot, clave no soportada → 400).
+- Verificación: build Release sin errores; unit tests 3190 OK (2 skipped), cobertura de líneas 94,48 % (gate 90 %); integración `~PostgreSql` 209/209 OK.
+- Frontend: sin cambios de ruta, contrato ni permisos, así que no hay que actualizar specs FE (FE-07, FE-11).

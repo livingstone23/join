@@ -49,7 +49,7 @@ public sealed class CleanCacheCommandHandler(IMemoryCache memoryCache, IPermissi
                 {
                     IsSuccess = false,
                     Message = "INVALID_CACHE_KEY",
-                    Errors = ["CacheKey must be one of: 'sidebar', 'permission', 'all'."]
+                    Errors = ["CacheKey must be one of: 'sidebar', 'permission', or 'all'."]
                 };
         }
 
