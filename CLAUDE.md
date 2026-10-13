@@ -22,7 +22,7 @@ dotnet test --filter "FullyQualifiedName~CreatePersonCommandHandlerTests"
 dotnet test tests/UnitTests/JOIN.Application.UnitTest/JOIN.Application.UnitTest.csproj \
   /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:Threshold=90 /p:ThresholdType=line
 
-# Integration tests (needs Docker — spins up a real SQL Server via Testcontainers)
+# Integration tests (needs Docker — spins up a real PostgreSQL 17 via Testcontainers)
 dotnet test tests/IntegrationTests/JOIN.IntegrationTests.csproj
 
 # EF Core migrations (run from src/4.Services.WebApi so the Design package + DbContext resolve)
@@ -47,7 +47,7 @@ src/3.Infrastructure    JOIN.Infrastructure    ISqlConnectionFactory impl, JWT, 
 src/3.Persistence       JOIN.Persistence       DbContext, EF configurations, migrations, repositories, UnitOfWork, seeder.
 src/4.Services.WebApi   JOIN.Services.WebApi   Controllers, Program.cs, middlewares, filters.
 tests/UnitTests          JOIN.Application.UnitTest   Handler/mapper/validator tests for Application, 90% coverage gate.
-tests/IntegrationTests    JOIN.IntegrationTests       Testcontainers.MsSql + WebApplicationFactory<Program>, full API flows, not gated on coverage.
+tests/IntegrationTests    JOIN.IntegrationTests       Testcontainers.PostgreSql + WebApplicationFactory<Program>, full API flows, not gated on coverage.
 ```
 
 Dependency direction is strict: Domain has no project references; Application depends only on Domain + DTO; Persistence/Infrastructure depend on Application+Domain; WebApi depends on Application+Infrastructure+Persistence. Each layer is registered via its own `AddXServices`/`AddInfrastructure`-style extension method (`2.Application/Common/ConfigureServices.cs`, `3.Persistence/Configuration/ConfigureServices.cs`, `3.Infrastructure/DependencyInjection.cs`), all called from `Program.cs`.
@@ -93,7 +93,7 @@ ASP.NET Core Identity (`ApplicationUser`/`ApplicationRole`, GUID keys) + JWT bea
 
 ## Testing gotchas
 
-- `CustomWebApplicationFactory` (`tests/IntegrationTests/CustomWebApplicationFactory.cs`) spins up an ephemeral SQL Server via Testcontainers per fixture and mocks `IEmailService` so nothing hits a real network. Building the host is guarded by a static `_hostBuildLock`: Serilog's `Log.Logger` is a static singleton, and `Program.Main` (re-invoked by every `WebApplicationFactory<Program>` instance) reassigns and freezes it — concurrent factory construction across xUnit test classes throws `InvalidOperationException: The logger is already frozen` without that lock. Keep the lock if you touch this file.
+- `CustomWebApplicationFactory` (`tests/IntegrationTests/CustomWebApplicationFactory.cs`) spins up an ephemeral PostgreSQL (`postgres:17`) via Testcontainers per fixture and mocks `IEmailService` so nothing hits a real network. Building the host is guarded by a static `_hostBuildLock`: Serilog's `Log.Logger` is a static singleton, and `Program.Main` (re-invoked by every `WebApplicationFactory<Program>` instance) reassigns and freezes it — concurrent factory construction across xUnit test classes throws `InvalidOperationException: The logger is already frozen` without that lock. Keep the lock if you touch this file.
 
 ## API surface
 

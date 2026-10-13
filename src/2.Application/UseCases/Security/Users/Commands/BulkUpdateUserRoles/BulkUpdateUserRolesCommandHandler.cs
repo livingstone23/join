@@ -42,7 +42,7 @@ public sealed class BulkUpdateUserRolesCommandHandler(
                urc.GcRecord AS GcRecord
         FROM Security.UserRoleCompanies urc
         WHERE urc.CompanyId = @CompanyId
-          AND urc.UserId IN @UserIds;
+          AND urc.UserId = ANY(@UserIds);
         """;
 
     public async Task<Response<BulkUpdateUserRolesResultDto>> Handle(
@@ -96,7 +96,7 @@ public sealed class BulkUpdateUserRolesCommandHandler(
             ? new List<AssignmentRow>()
             : (await connection.QueryAsync<AssignmentRow>(
                 new CommandDefinition(AssignmentsForUsersSql,
-                    new { UserIds = memberIds, CompanyId = companyId },
+                    new { UserIds = memberIds.ToArray(), CompanyId = companyId },
                     cancellationToken: cancellationToken))).AsList();
 
         // Index once: per-user (RoleId → RowId, GcRecord). O(assignments) total.

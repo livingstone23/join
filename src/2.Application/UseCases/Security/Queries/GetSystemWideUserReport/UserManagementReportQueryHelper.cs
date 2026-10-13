@@ -22,13 +22,17 @@ internal static class UserManagementReportQueryHelper
     // Filters shared between ReadAsync and ReadPagedAsync. Built once in C# and
     // interpolated into both query strings so a future change cannot land in only
     // one place (the spec's documented risk about WHERE duplication).
+    // SPEC 50: optional parameters are CAST in their IS NULL check — Dapper sends a
+    // null DynamicParameters value untyped and PostgreSQL cannot infer "$n IS NULL"
+    // (42P08). Role names are an array (= ANY): Dapper passes lists to Npgsql as
+    // arrays instead of expanding IN @RoleNames.
     private const string SharedFilters = """
             u.GcRecord = 0
-          AND (@ScopedCompanyId IS NULL OR uc.CompanyId = @ScopedCompanyId)
-          AND (@TargetCompanyId IS NULL OR uc.CompanyId = @TargetCompanyId)
-          AND (uc.UserId IS NOT NULL OR (@ScopedCompanyId IS NULL AND @TargetCompanyId IS NULL))
-          AND (@FromDate IS NULL OR COALESCE(lastLogin.LastLoginDate, u.Created) >= @FromDate)
-          AND (@ToDateExclusive IS NULL OR COALESCE(lastLogin.LastLoginDate, u.Created) < @ToDateExclusive)
+          AND (CAST(@ScopedCompanyId AS uuid) IS NULL OR uc.CompanyId = @ScopedCompanyId)
+          AND (CAST(@TargetCompanyId AS uuid) IS NULL OR uc.CompanyId = @TargetCompanyId)
+          AND (uc.UserId IS NOT NULL OR (CAST(@ScopedCompanyId AS uuid) IS NULL AND CAST(@TargetCompanyId AS uuid) IS NULL))
+          AND (CAST(@FromDate AS timestamptz) IS NULL OR COALESCE(lastLogin.LastLoginDate, u.Created) >= @FromDate)
+          AND (CAST(@ToDateExclusive AS timestamptz) IS NULL OR COALESCE(lastLogin.LastLoginDate, u.Created) < @ToDateExclusive)
           AND (
                 @ApplyRoleFilter = 0
                 OR EXISTS (
@@ -39,7 +43,7 @@ internal static class UserManagementReportQueryHelper
                       AND rf.GcRecord = 0
                       AND urcf.UserId = uc.UserId
                       AND urcf.CompanyId = uc.CompanyId
-                      AND UPPER(rf.Name) IN @RoleNames
+                      AND UPPER(rf.Name) = ANY(@RoleNames)
                 )
           )
         """;
@@ -115,9 +119,9 @@ internal static class UserManagementReportQueryHelper
             ) lastLogin ON lastLogin.UserId = u.Id
             WHERE
         """ + SharedFilters + """
-              AND (@IsActive IS NULL OR u.IsActive = @IsActive)
+              AND (CAST(@IsActive AS boolean) IS NULL OR u.IsActive = @IsActive)
               AND (
-                    @Search IS NULL
+                    CAST(@Search AS text) IS NULL
                     OR u.Email ILIKE @Search
                     OR CONCAT(u.FirstName, ' ', u.LastName) ILIKE @Search
               )
@@ -188,9 +192,9 @@ internal static class UserManagementReportQueryHelper
             ) lastLogin ON lastLogin.UserId = u.Id
             WHERE
         """ + SharedFilters + """
-              AND (@IsActive IS NULL OR u.IsActive = @IsActive)
+              AND (CAST(@IsActive AS boolean) IS NULL OR u.IsActive = @IsActive)
               AND (
-                    @Search IS NULL
+                    CAST(@Search AS text) IS NULL
                     OR u.Email ILIKE @Search
                     OR CONCAT(u.FirstName, ' ', u.LastName) ILIKE @Search
               )

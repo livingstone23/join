@@ -87,7 +87,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 47 | Ingesta de tickets por WhatsApp y correo | **Pospuesto** | 34, 35, 36, 99, 42, 43 |
 | 48 | Bloqueo de APIs y menú por módulo activo de la empresa | Borrador | 43 |
 | 49 | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Borrador | 36 |
-| 50 | `main_postgresql`: pendientes para llevar QA a PostgreSQL (el port de 40–49 pasó a la serie `-post`) | Borrador | 39 |
+| 50 | `main_postgresql`: pendientes para llevar QA a PostgreSQL (el port de 40–49 pasó a la serie `-post`) | Aprobado | 39 |
 | 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
 
 ### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)
@@ -96,7 +96,7 @@ Las filas 40–49 y 99 de la tabla anterior son las copias de `main` del 2026-10
 
 | Nº | Título | Estado | Depende de (según su encabezado) |
 |---|---|---|---|
-| 40-post | Índices únicos filtrados por soft-delete | Borrador | 39 |
+| 40-post | Índices únicos filtrados por soft-delete | Aprobado | 39 |
 | 41-post | Visibilidad de registros borrados y restauración para SuperAdmin | Implementado | 38, 40-post |
 | 42-post | Valores iniciales del ticket desde `TicketCompanyDefaults` | Implementado | 41-post |
 | 43-post | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Implementado | 39 |
@@ -104,7 +104,7 @@ Las filas 40–49 y 99 de la tabla anterior son las copias de `main` del 2026-10
 | 45-post | Calendario: ingreso por canales (agente) y personas pendientes | Implementado | 43-post, 44-post, 48-post |
 | 46-post | Calendario: estructura para sincronizar con Google Calendar | Implementado | 44-post |
 | 47-post | Ingesta de tickets por WhatsApp y correo | Implementado | 34, 35, 36, 99-post, 42-post, 43-post |
-| 48-post | Bloqueo de APIs y menú por módulo activo de la empresa | Aprobado | 43-post |
+| 48-post | Bloqueo de APIs y menú por módulo activo de la empresa | Implementado | 43-post |
 | 49-post | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Aprobado | 36 |
 | 51-post | Invalidación de la caché de permisos con la clave `permissions:v2` | Borrador | 17, 25 |
 | 99-post | Canales internos `WEB` y `APP` en el catálogo de canales | Implementado | — |
@@ -151,7 +151,7 @@ Decisión del usuario (2026-10-09): las specs 40–49, 51 y 99 de `main` se copi
 3. **`NULL` en índices únicos:** PostgreSQL trata dos `NULL` como distintos; SQL Server, como iguales. Cuando el comportamiento de `main` depende de que choquen, el índice usa `.AreNullsDistinct(false)` (`NULLS NOT DISTINCT`, PostgreSQL 15+).
 4. **Tipos:** `nvarchar(n)` → `varchar(n)`; `nvarchar(max)` → `text`; `bit` → `boolean`; `uniqueidentifier` → `uuid`; `datetime2` → `timestamp with time zone` (lo que Npgsql usa para `DateTime`); `date` → `date` (`DateOnly`); `time` → `time` (`TimeOnly`).
 5. **`DateTime` en UTC:** Npgsql rechaza escribir en `timestamp with time zone` un `DateTime` que no sea `Kind=Utc` (columnas y parámetros Dapper). Todo valor que venga de un request o de una librería se normaliza con `ToUniversalTime()` / `DateTime.SpecifyKind(..., DateTimeKind.Utc)` antes de guardarlo o de usarlo como parámetro.
-6. **SQL Dapper:** sin corchetes; `COALESCE`; booleanos `= TRUE`/`= FALSE`; `CAST(... AS boolean)` o una expresión booleana directa (no `CASE ... THEN 1 ELSE 0`); `CONCAT(...)` o `||`; `NOW()`; paginación literal `LIMIT @PageSize OFFSET @Offset` (sin branch por proveedor); listas con `= ANY(@Ids)` (arreglo) o la expansión `IN @Ids` de Dapper; **búsquedas de texto con `ILIKE`** (conserva la búsqueda sin distinción de mayúsculas que da la colación de SQL Server; las búsquedas existentes las convierte SPEC 50 A).
+6. **SQL Dapper:** sin corchetes; `COALESCE`; booleanos `= TRUE`/`= FALSE`; `CAST(... AS boolean)` o una expresión booleana directa (no `CASE ... THEN 1 ELSE 0`); `CONCAT(...)` o `||`; `NOW()`; paginación literal `LIMIT @PageSize OFFSET @Offset` (sin branch por proveedor); listas **solo** con `= ANY(@Ids)` y un arreglo (`ids.ToArray()`): con `NpgsqlConnection`, Dapper pasa la lista como arreglo y **no** expande `IN @Ids`, que da error de sintaxis (Ajuste por SPEC 50); filtros opcionales `(@p IS NULL OR col = @p)`: si el valor puede llegar nulo sin tipo (`DynamicParameters.Add(name, null)` o un `DateTime?` nulo), el `IS NULL` lleva `CAST(@p AS <tipo>)` (si no, PostgreSQL responde 42P08); **búsquedas de texto con `ILIKE`** (conserva la búsqueda sin distinción de mayúsculas que da la colación de SQL Server; las búsquedas existentes las convierte SPEC 50 A).
 7. **Migraciones:** cada `-post` genera su propia migración incremental contra Npgsql desde `src/4.Services.WebApi` (`dotnet ef migrations add <Nombre> --project ../3.Persistence --startup-project .`) e inspecciona el `Up()` (sin `nvarchar`/`datetime2`/`bit`/corchetes; filtros en minúsculas). Nunca se copian migraciones de `main`. Las migraciones de datos (`migrationBuilder.Sql`) se escriben en SQL de PostgreSQL (`gen_random_uuid()`, `NOW()`, nombres en minúsculas).
 8. **Bloqueos:** `pg_advisory_xact_lock(...)` en lugar de `sp_getapplock`; `SELECT ... FOR UPDATE` en lugar de `WITH (UPDLOCK, HOLDLOCK)`.
 9. **Violación de índice único:** `PostgresException` con `SqlState = 23505` (y `ConstraintName`); `GlobalExceptionHandler` ya la responde como 409 `DUPLICATE_KEY` (SPEC 39). Si un handler necesita reconocer la violación de un índice concreto, lo hace un servicio de Persistence/Infrastructure (Application no referencia Npgsql).

@@ -2,6 +2,8 @@
 
 > **Status:** Aprobado
 > **Historia (2026-10-09):** vuelve a Borrador por cambio de alcance. El usuario decidió traer las specs de `main` al fork como **serie `-post`** (copias adaptadas a PostgreSQL de 40–49, 51 y 99, implementadas desde cero en el fork; ver `specs/README.md` → "Serie `-post`"). Se elimina la sección 0 (único `git merge main` + migración `Port_Specs_40_49`) con su fase F0 y sus criterios; la sección F pasa a verificar la convención de la serie. El resto (A–E) no cambia.
+> **Ajuste por SPEC 50 (implementación, 2026-10-13):** se aplicó la Decisión 1A (`SpecifyKind(..., Unspecified)` en crear y actualizar; sin migración) y la 2A. La revisión de F1 encontró dos defectos del fork que ningún test cubría y que se corrigen aquí: (1) `IN @lista` no funciona con `NpgsqlConnection` (Dapper pasa la lista como arreglo y no la expande → error de sintaxis). Se cambiaron los 7 usos a `= ANY(@lista)`, incluido el `UPPER(r.Name) IN @RoleNames` que la sección A daba por correcto: `UserManagementReportQueryHelper`, `UserAdminRepository` (×3), `ReplaceUserRolesCommandHandler` y `BulkUpdateUserRolesCommandHandler`. Afectaba a los reportes de usuarios, a reemplazar roles y a los roles en lote. (2) Los filtros opcionales `@p IS NULL` con un valor nulo sin tipo daban 42P08: el reporte de usuarios y `GET /Audit/security` respondían 500 siempre. Ahora llevan `CAST(@p AS <tipo>)`. Ambos quedan cubiertos por `UserAdministrationPostgreSqlTests`, y la convención 6 del README se corrigió.
+
 > **Depends on:** SPEC 39 (fork `main_postgresql`, `Implementado`). No depende de las `-post`; si alguna ya está implementada al arrancar, sus tests `*PostgreSqlTests` entran en la paridad de E. Rama de trabajo: `spec-50-postgresql-qa-readiness`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql` — nunca hacia `main`.
 > **Date:** 2026-10-07
 > **Objective:** Cerrar los pendientes que SPEC 39 dejó documentados, para que `main_postgresql` pueda reemplazar a SQL Server en el entorno de QA: búsquedas sin distinción de mayúsculas, el tipo de `DeclaredDate`, la configuración y el aprovisionamiento de la base de QA, y la paridad de la suite de integración contra PostgreSQL. Al terminar esta spec, QA pasa a PostgreSQL.
@@ -84,9 +86,16 @@ Sin cambios de dominio.
 - **Con la recomendación de la Decisión pendiente 1:** sin migración; `DeclaredDate` sigue como `timestamp`.
 - **Si se elige `timestamp with time zone`:** migración incremental `DeclaredDateTimestampTz` en el fork (`ALTER COLUMN ... TYPE timestamp with time zone USING declareddate AT TIME ZONE 'UTC'`).
 
-### Runbook de la base de QA (borrador, se completa en F4)
+### Runbook de la base de QA
 
 > **Aplicado:** Decisión 2A — base nueva sembrada por `DatabaseSeeder`; no se migran los datos actuales de QA sobre SQL Server.
+>
+> **Ensayo (2026-10-13):** se ejecutó paso a paso contra un PostgreSQL 17.11 desechable, con `join_app` sin privilegios de superusuario y la API en `ASPNETCORE_ENVIRONMENT=Staging`, sin `appsettings.Development.json` y con la conexión solo por variables de entorno:
+> - Aplicó las 9 migraciones y sembró, y `join_app` quedó dueño de todos los esquemas.
+> - `/health/ready` → 200, login → 200, `search=portal` → 1 ticket y el perfil financiero con `...Z` → 201.
+> - Barrido de los 81 `GET` sin parámetros de ruta: ningún 500 tras las correcciones.
+>
+> Falta ejecutarlo en el servidor real de QA (F4.1); lo hace quien tenga acceso.
 
 #### Valores base (no secretos)
 
@@ -94,7 +103,7 @@ Sin cambios de dominio.
 |---|---|
 | Motor | PostgreSQL 17 (mismo que dev y CI, SPEC 39) |
 | Base | `join_db_qa` |
-| Rol de aplicación | `join_app` (owner de los esquemas `admin`, `common`, `messaging`, `security`, `support` y `public` para `__EFMigrationsHistory`) |
+| Rol de aplicación | `join_app`, sin superusuario. Como dueño de la base crea los esquemas `admin`, `calendar`, `common`, `messaging`, `security` y `support`, que quedan suyos. `public` (con `__EFMigrationsHistory`) es de `pg_database_owner`, es decir del dueño de la base |
 | Cadena de conexión | `Host=<host-qa>;Port=5432;Database=join_db_qa;Username=join_app;Password=<secreto>;Timeout=60;` (vía variable de entorno `ConnectionStrings__DefaultConnection`) |
 | Proveedor EF | `DatabaseProvider=PostgreSQL` |
 
@@ -108,12 +117,13 @@ Sin cambios de dominio.
    ```
 
 2. Configurar el despliegue de QA con las variables de entorno anteriores (nunca commitear el secreto).
-3. Arrancar la API contra `join_db_qa`. Aplica `InitialPostgres` + las incrementales del fork y corre `DatabaseSeeder` (programado en `Program.cs`).
+3. Arrancar la API contra `join_db_qa` (`ASPNETCORE_ENVIRONMENT` distinto de `Development`). Aplica `InitialPostgres` + las incrementales del fork (9 migraciones al 2026-10-13) y corre `DatabaseSeeder` (programado en `Program.cs`). Usuario sembrado para el login: `lcano@join.com` (SuperAdmin; cambiar su contraseña tras el primer ingreso).
 4. Verificar:
    - `GET /health/ready` → `200`.
    - Login con un usuario sembrado (la identidad sembrada por `DatabaseSeeder`).
-   - `GET /api/v1/tickets?searchTerm=juan` devuelve tickets cuyo nombre contiene `Juan` (búsqueda insensible a mayúsculas por F1).
-   - Crear perfil financiero vía HTTP con `DeclaredDate` ISO terminado en `Z` → `201` (verificación de F2).
+   - `GET /api/v1/tickets?search=portal` (header `X-Company-Id` de JOIN-001) devuelve el ticket sembrado "Portal login intermittent failure" (búsqueda sin distinción de mayúsculas, F1).
+   - `POST /api/v1/personFinancialProfile` con `DeclaredDate` ISO terminado en `Z` → `201` (F2).
+   - `GET /api/v1/Users/reports/system` y `GET /api/v1/Audit/security` → `200` (defectos corregidos por esta spec).
 5. Retirar la configuración de SQL Server del despliegue de QA.
 
 ---
@@ -171,34 +181,35 @@ Sin cambios de dominio.
 ## Acceptance criteria
 
 ### F1 — Búsquedas
-- [ ] Ningún archivo bajo `src/2.Application/UseCases` ni `src/3.Persistence/Repositories` contiene `LIKE` (solo `ILIKE`).
-- [ ] Un listado filtrado por un texto en minúsculas devuelve registros cuyo nombre tiene mayúsculas (test de integración).
+- [x] Ningún archivo bajo `src/2.Application/UseCases` ni `src/3.Persistence/Repositories` contiene `LIKE` (solo `ILIKE`).
+- [x] Un listado filtrado por un texto en minúsculas devuelve registros cuyo nombre tiene mayúsculas (test de integración).
 
 ### F2 — `DeclaredDate`
-- [ ] Crear y actualizar un perfil financiero con `DeclaredDate` en `Kind=Utc`, `Local` y `Unspecified` no lanza excepción.
-- [ ] El test de integración con fecha ISO `...Z` responde 201.
+- [x] Crear y actualizar un perfil financiero con `DeclaredDate` en `Kind=Utc`, `Local` y `Unspecified` no lanza excepción.
+- [x] El test de integración con fecha ISO `...Z` responde 201.
 
 ### F3 — Configuración
-- [ ] `appsettings.json` no contiene credenciales de ningún entorno.
-- [ ] `.env.example` usa el formato de conexión de Npgsql e incluye `DatabaseProvider=PostgreSQL`.
+- [x] `appsettings.json` no contiene credenciales de ningún entorno.
+- [x] `.env.example` usa el formato de conexión de Npgsql e incluye `DatabaseProvider=PostgreSQL`.
 
 ### F4 — QA
 - [ ] La API de QA arranca contra `join_db_qa` en PostgreSQL, migra y siembra (o restaura datos, según la Decisión 2).
 - [ ] El runbook de esta spec refleja los pasos realmente ejecutados.
 
 ### F5 — Integración
-- [ ] La suite de integración completa (26 + 27 + los nuevos de esta spec) pasa contra PostgreSQL, sin `Testcontainers.MsSql` en el proyecto.
-- [ ] El job de CI corre la suite completa sin filtro.
+- [x] La suite de integración completa (26 + 27 + los nuevos de esta spec) pasa contra PostgreSQL, sin `Testcontainers.MsSql` en el proyecto.
+- [x] El job de CI corre la suite completa sin filtro.
 
 ### F6 — Port
-- [ ] `specs/README.md` del fork mantiene la sección "Serie `-post`" y el índice refleja el estado de cada `-post`.
+- [x] `specs/README.md` del fork mantiene la sección "Serie `-post`" y el índice refleja el estado de cada `-post`.
 
 ### General
-- [ ] `dotnet build -c Release` → 0 errores, 0 warnings nuevos; gate de cobertura ≥ 90 %; CI verde en `main_postgresql`.
+- [x] `dotnet build -c Release` → 0 errores, 0 warnings nuevos; gate de cobertura ≥ 90 %.
+- [ ] CI verde en `main_postgresql` (se confirma al hacer push/PR).
 
 ---
 
-## Decisiones pendientes (las resuelve el usuario antes de `Aprobado`)
+## Decisiones (resueltas: 1A y 2A)
 
 1. **`DeclaredDate`:**
    - **A (recomendada).** Normalizar en los handlers de crear/actualizar: `DateTime.SpecifyKind(request.DeclaredDate, DateTimeKind.Unspecified)`. Sin migración; conserva la semántica de `datetime2` de SQL Server (fecha y hora sin zona).

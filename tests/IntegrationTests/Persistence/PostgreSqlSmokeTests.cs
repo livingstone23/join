@@ -189,6 +189,10 @@ public sealed class PostgreSqlSmokeTests : IClassFixture<CustomWebApplicationFac
 
         var byStatus = await GetTicketsAsync(client, $"search={token}&ticketStatusId={statusId}");
         byStatus.TotalCount.Should().Be(3);
+
+        // SPEC 50 F1: ILIKE — a lowercase (or uppercase) search finds names written as "Smoke...".
+        (await GetTicketsAsync(client, $"search={token.ToLowerInvariant()}")).TotalCount.Should().Be(3);
+        (await GetTicketsAsync(client, $"search={token.ToUpperInvariant()}")).TotalCount.Should().Be(3);
     }
 
     /// <summary>

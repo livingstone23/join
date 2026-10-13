@@ -203,14 +203,14 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
                 ON rc.RoleId = r.Id
                AND rc.CompanyId = @CompanyId
                AND rc.GcRecord = 0
-            WHERE r.Id IN @RoleIds
+            WHERE r.Id = ANY(@RoleIds)
               AND r.GcRecord = 0;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
         connection.Open();
         var rows = await connection.QueryAsync<Guid>(
-            new CommandDefinition(sql, new { RoleIds = roleIds, CompanyId = companyId }, cancellationToken: ct));
+            new CommandDefinition(sql, new { RoleIds = roleIds.ToArray(), CompanyId = companyId }, cancellationToken: ct));
         return rows.AsList();
     }
 
@@ -267,14 +267,14 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
                 ON rc.RoleId = r.Id
                AND rc.CompanyId = @CompanyId
                AND rc.GcRecord = 0
-            WHERE UPPER(r.Name) IN @RoleNames
+            WHERE UPPER(r.Name) = ANY(@RoleNames)
               AND r.GcRecord = 0;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
         connection.Open();
         var rows = await connection.QueryAsync<Guid>(
-            new CommandDefinition(sql, new { RoleNames = roleNames, CompanyId = companyId }, cancellationToken: ct));
+            new CommandDefinition(sql, new { RoleNames = roleNames.ToArray(), CompanyId = companyId }, cancellationToken: ct));
         return rows.AsList();
     }
 
@@ -346,7 +346,7 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
         const string sql = """
             SELECT DISTINCT UserId
             FROM Security.UserCompanies
-            WHERE UserId IN @UserIds
+            WHERE UserId = ANY(@UserIds)
               AND CompanyId = @CompanyId
               AND GcRecord = 0;
             """;
@@ -354,7 +354,7 @@ public sealed class UserAdminRepository(ISqlConnectionFactory connectionFactory)
         using var connection = _connectionFactory.CreateConnection();
         connection.Open();
         var rows = await connection.QueryAsync<Guid>(
-            new CommandDefinition(sql, new { UserIds = userIds, CompanyId = companyId }, cancellationToken: ct));
+            new CommandDefinition(sql, new { UserIds = userIds.ToArray(), CompanyId = companyId }, cancellationToken: ct));
         return rows.AsList();
     }
 

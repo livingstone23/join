@@ -84,14 +84,16 @@ public sealed class AuditLogRepository(
 
         // Each optional filter uses the (@Param IS NULL OR Column = @Param) idiom so the
         // same SQL handles both "filter present" and "no filter" with one execution plan.
+        // SPEC 50: the IS NULL check carries an explicit CAST — Dapper sends a null
+        // DateTime? untyped and PostgreSQL cannot infer the type of "$n IS NULL" (42P08).
         var whereClause = """
-            WHERE (@companyId IS NULL OR a.CompanyId = @companyId)
-              AND (@entityName IS NULL OR a.EntityName = @entityName)
-              AND (@entityId IS NULL OR a.EntityId = @entityId)
-              AND (@changedBy IS NULL OR a.ChangedBy = @changedBy)
-              AND (@action IS NULL OR a.Action = @action)
-              AND (@fromUtc IS NULL OR a.ChangedAtUtc >= @fromUtc)
-              AND (@toUtcExclusive IS NULL OR a.ChangedAtUtc < @toUtcExclusive)
+            WHERE (CAST(@companyId AS uuid) IS NULL OR a.CompanyId = @companyId)
+              AND (CAST(@entityName AS text) IS NULL OR a.EntityName = @entityName)
+              AND (CAST(@entityId AS uuid) IS NULL OR a.EntityId = @entityId)
+              AND (CAST(@changedBy AS text) IS NULL OR a.ChangedBy = @changedBy)
+              AND (CAST(@action AS text) IS NULL OR a.Action = @action)
+              AND (CAST(@fromUtc AS timestamptz) IS NULL OR a.ChangedAtUtc >= @fromUtc)
+              AND (CAST(@toUtcExclusive AS timestamptz) IS NULL OR a.ChangedAtUtc < @toUtcExclusive)
             """;
 
         var pageSql = $"""
@@ -127,13 +129,13 @@ public sealed class AuditLogRepository(
             LEFT JOIN Security.Users u
                 ON CAST(u.Id AS text) = LOWER(a.ChangedBy)
             WHERE a.ChangedBy <> 'System'
-              AND (@companyId IS NULL OR a.CompanyId = @companyId)
-              AND (@entityName IS NULL OR a.EntityName = @entityName)
-              AND (@entityId IS NULL OR a.EntityId = @entityId)
-              AND (@changedBy IS NULL OR a.ChangedBy = @changedBy)
-              AND (@action IS NULL OR a.Action = @action)
-              AND (@fromUtc IS NULL OR a.ChangedAtUtc >= @fromUtc)
-              AND (@toUtcExclusive IS NULL OR a.ChangedAtUtc < @toUtcExclusive)
+              AND (CAST(@companyId AS uuid) IS NULL OR a.CompanyId = @companyId)
+              AND (CAST(@entityName AS text) IS NULL OR a.EntityName = @entityName)
+              AND (CAST(@entityId AS uuid) IS NULL OR a.EntityId = @entityId)
+              AND (CAST(@changedBy AS text) IS NULL OR a.ChangedBy = @changedBy)
+              AND (CAST(@action AS text) IS NULL OR a.Action = @action)
+              AND (CAST(@fromUtc AS timestamptz) IS NULL OR a.ChangedAtUtc >= @fromUtc)
+              AND (CAST(@toUtcExclusive AS timestamptz) IS NULL OR a.ChangedAtUtc < @toUtcExclusive)
               AND u.Id IS NOT NULL
             GROUP BY a.ChangedBy, u.FirstName, u.LastName;
             """;

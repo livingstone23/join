@@ -66,7 +66,7 @@ public sealed class ReplaceUserRolesCommandHandler(
         SELECT Id   AS Id,
                Name AS Name
         FROM Security.Roles
-        WHERE Id IN @Ids
+        WHERE Id = ANY(@Ids)
           AND GcRecord = 0;
         """;
 
@@ -135,7 +135,7 @@ public sealed class ReplaceUserRolesCommandHandler(
         var roleNamesById = resolvedIds.Length == 0
             ? new Dictionary<Guid, string>()
             : (await connection.QueryAsync<RoleNameRow>(
-                new CommandDefinition(RoleNamesByIdSql, new { Ids = resolvedIds }, cancellationToken: cancellationToken)))
+                new CommandDefinition(RoleNamesByIdSql, new { Ids = resolvedIds.ToArray() }, cancellationToken: cancellationToken)))
                 .Where(row => !string.IsNullOrWhiteSpace(row.Name))
                 .ToDictionary(row => row.Id, row => row.Name!);
 
