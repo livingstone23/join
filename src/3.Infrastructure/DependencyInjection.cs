@@ -1,7 +1,9 @@
+using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Net.Http;
 using Dapper;
 using JOIN.Application.Interface;
+using JOIN.Domain.Enums;
 using JOIN.Infrastructure.Audit;
 using JOIN.Infrastructure.HealthChecks;
 using JOIN.Infrastructure.Messaging.Logging;
@@ -11,12 +13,16 @@ using JOIN.Infrastructure.Security;
 using JOIN.Infrastructure.Security.Jwt;
 using JOIN.Infrastructure.Security.Mfa;
 using JOIN.Infrastructure.Messaging.Sms;
+using JOIN.Infrastructure.Storage;
+using JOIN.Infrastructure.Storage.AzureBlob;
 using JOIN.Infrastructure.Storage.Local;
+using JOIN.Infrastructure.Storage.S3;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
 using Polly;
 
 
@@ -94,25 +100,60 @@ public static class DependencyInjection
         }
 
         // ------------------------------------------------------------------
-        // File storage adapter (SPEC 36) — único adapter implementado en esta
-        // spec: LocalDiskFileStorageAdapter sobre FileStorage:Local:RootPath.
-        // "FileStorage:Provider" se deja documentado en appsettings.json pero
-        // todavía no tiene switch (no hay un segundo adapter concreto; cuando
-        // se agregue Azure Blob/S3, este bloque gana la rama correspondiente).
+        // File storage adapters (SPEC 49-post). Four providers behind a
+        // single contract: local disk (always registered — the de-facto
+        // fallback for legacy rows and dev/testing), Azure Blob, Amazon
+        // S3 and Cloudflare R2. The active provider is selected by
+        // FileStorage:Provider; the other sections can stay populated so
+        // that pre-existing rows continue to download from the service
+        // where they were uploaded.
         // ------------------------------------------------------------------
         // A relative RootPath is anchored to the host's ContentRootPath rather than
         // the process working directory, which differs between `dotnet run`, IIS
         // and containers and would otherwise scatter attachments across folders.
         services.AddOptions<FileStorageOptions>()
-            .Bind(configuration.GetSection("FileStorage:Local"))
+            .Bind(configuration.GetSection("FileStorage"))
             .PostConfigure<IHostEnvironment>((options, environment) =>
             {
-                if (!Path.IsPathRooted(options.RootPath))
+                if (!Path.IsPathRooted(options.Local.RootPath))
                 {
-                    options.RootPath = Path.Combine(environment.ContentRootPath, options.RootPath);
+                    options.Local.RootPath = Path.Combine(environment.ContentRootPath, options.Local.RootPath);
                 }
-            });
-        services.AddScoped<IFileStorageService, LocalDiskFileStorageAdapter>();
+            })
+            // Falla al arranque si FileStorage:Provider apunta a una
+            // sección incompleta. Un error de despliegue se ve al
+            // levantar la API, no en la primera subida de un usuario.
+            .Validate(options => FileStorageOptionsValidator.IsValid(options, configuration),
+                "FileStorage configuration is invalid. Check that the section for FileStorage:Provider has all required values.")
+            .ValidateOnStart();
+
+        // Local: siempre registrado. Es el provider por defecto, el de
+        // pruebas, y el que permite seguir leyendo adjuntos locales
+        // después de pasar a la nube.
+        services.AddKeyedScoped<IFileStorageService, LocalDiskFileStorageAdapter>(StorageProviderKind.Local);
+
+        if (configuration.GetSection("FileStorage:AzureBlob").Exists()
+            && configuration.GetSection("FileStorage:AzureBlob").Get<AzureBlobStorageOptions>() is { } azureOptions
+            && azureOptions.IsConfigured)
+        {
+            services.AddKeyedScoped<IFileStorageService, AzureBlobFileStorageAdapter>(StorageProviderKind.AzureBlob);
+        }
+
+        if (configuration.GetSection("FileStorage:S3").Exists()
+            && configuration.GetSection("FileStorage:S3").Get<S3StorageOptions>() is { } s3Options
+            && s3Options.IsConfigured)
+        {
+            services.AddKeyedScoped<IFileStorageService, S3CompatibleFileStorageAdapter>(StorageProviderKind.S3);
+        }
+
+        if (configuration.GetSection("FileStorage:CloudflareR2").Exists()
+            && configuration.GetSection("FileStorage:CloudflareR2").Get<CloudflareR2StorageOptions>() is { } r2Options
+            && r2Options.IsConfigured)
+        {
+            services.AddKeyedScoped<IFileStorageService, S3CompatibleFileStorageAdapter>(StorageProviderKind.CloudflareR2);
+        }
+
+        services.AddScoped<IFileStorageResolver, FileStorageResolver>();
 
         return services;
     }

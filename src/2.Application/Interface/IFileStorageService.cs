@@ -1,3 +1,5 @@
+using JOIN.Domain.Enums;
+
 namespace JOIN.Application.Interface;
 
 /// <summary>
@@ -11,6 +13,13 @@ namespace JOIN.Application.Interface;
 /// </summary>
 public interface IFileStorageService
 {
+    /// <summary>
+    /// Proveedor físico detrás de este adapter. La subida graba este valor
+    /// en <c>TicketDocument.StorageProvider</c>; la descarga lo lee para
+    /// resolver el adapter correcto vía <see cref="IFileStorageResolver"/>.
+    /// </summary>
+    StorageProviderKind Kind { get; }
+
     /// <summary>
     /// Persiste el contenido del stream bajo el <paramref name="storageKey"/>
     /// indicado y devuelve el resultado (la misma clave más el tamaño

@@ -1173,6 +1173,7 @@ consumidor real de ese flag en el repo (definido en SPEC 12/16).
 |------|------|
 | `COMPANY_REQUIRED` / `USER_REQUIRED` | 401 |
 | `TICKET_NOT_FOUND` / `TICKET_DOCUMENT_NOT_FOUND` / `FILE_NOT_FOUND_IN_STORAGE` | 404 |
+| `STORAGE_PROVIDER_NOT_CONFIGURED` (SPEC 49-post) | 503 |
 | `ATTACHMENT_SETTINGS_NOT_CONFIGURED` / `INVALID_TICKET_LOG` / `UNSUPPORTED_DOCUMENT_TYPE` / `DOCUMENT_TYPE_NOT_ALLOWED` / `FILE_TOO_LARGE` | 400 |
 | `MAX_FILES_PER_TICKET_REACHED` | 409 |
 | `DAILY_ATTACHMENT_QUOTA_REACHED` | 429 |
@@ -1192,6 +1193,9 @@ curl -s "$BASE_URL/api/v1/tickets/$TICKET_ID/documents" \
 #    Returns 200 with Content-Disposition: attachment; filename="<originalName>".
 #    Returns 404 FILE_NOT_FOUND_IN_STORAGE if the row exists in metadata but the
 #    underlying file is missing from the configured storage root.
+#    Returns 503 STORAGE_PROVIDER_NOT_CONFIGURED (SPEC 49-post) when the row's
+#    StorageProvider (Local, AzureBlob, S3 or CloudflareR2) is not registered in
+#    this environment — recoverable by restoring the corresponding config section.
 curl -s -o downloaded.pdf \
   "$BASE_URL/api/v1/tickets/$TICKET_ID/documents/$DOCUMENT_ID/download" \
   -H "Authorization: Bearer $TOKEN" \
@@ -1204,8 +1208,11 @@ curl -s -o downloaded.pdf \
 #    active log of the ticket (the typical "evidence after creation" flow). When
 #    provided, it must belong to the same TicketId (otherwise 400 INVALID_TICKET_LOG).
 #    DocumentType is inferred server-side from the file extension — the client never
-#    sends it. Accepted extensions: .pdf .doc/.docx .xls/.xlsx .txt/.csv
-#    .png/.jpg/.jpeg/.gif .zip (anything else → 400 UNSUPPORTED_DOCUMENT_TYPE).
+#    sends it. Accepted extensions (SPEC 49-post): .pdf .doc/.docx .xls/.xlsx
+#    .png/.jpg/.jpeg .zip — and any of the above mapped to Text (.txt/.csv) when
+#    AllowedDocumentTypes has the Text bit set (the bitmask controls what each tenant
+#    accepts, but the default seed is Pdf | Word | Excel | Image without Text). .gif
+#    returns 400 UNSUPPORTED_DOCUMENT_TYPE for all tenants.
 curl -s -X POST "$BASE_URL/api/v1/tickets/$TICKET_ID/documents" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Company-Id: $TENANT_ID" \
@@ -1229,6 +1236,52 @@ curl -s -X DELETE "$BASE_URL/api/v1/tickets/$TICKET_ID/documents/$DOCUMENT_ID" \
   -H "X-Company-Id: $TENANT_ID"
 # Returns 404 TICKET_DOCUMENT_NOT_FOUND for cross-ticket or cross-tenant ids.
 ```
+
+### Storage providers (SPEC 49-post)
+
+Each `TicketDocument` row records the `StorageProvider` it was uploaded with (Local,
+AzureBlob, S3 or CloudflareR2). The download handler opens the file from that same
+provider — not the one currently configured — so changing `FileStorage:Provider` in
+the environment does not break existing attachments. The API only returns
+`STORAGE_PROVIDER_NOT_CONFIGURED` (503) when a row points to a provider whose
+section is missing from the current configuration.
+
+Selected by `FileStorage:Provider` in `appsettings.json` or via environment
+variables `FileStorage__...`. Default: `Local` (writes to the path in
+`FileStorage:Local:RootPath`; in Docker this is `/app/data/ticket-attachments`,
+mounted as the named volume `join-attachments`).
+
+```bash
+# Local (default) — path is anchored to the API's content root, not the cwd.
+FileStorage__Provider=Local
+FileStorage__Local__RootPath=/app/data/ticket-attachments
+
+# Azure Blob Storage
+FileStorage__Provider=AzureBlob
+FileStorage__AzureBlob__ConnectionString=DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...
+FileStorage__AzureBlob__ContainerName=ticket-attachments
+FileStorage__AzureBlob__CreateContainerIfNotExists=false
+
+# Amazon S3 (or any S3-compatible service via ServiceUrl + ForcePathStyle=true)
+FileStorage__Provider=S3
+FileStorage__S3__BucketName=join-ticket-attachments
+FileStorage__S3__Region=us-east-1
+FileStorage__S3__AccessKeyId=...
+FileStorage__S3__SecretAccessKey=...
+
+# Cloudflare R2 — same S3 client, different ServiceURL
+FileStorage__Provider=CloudflareR2
+FileStorage__CloudflareR2__AccountId=...
+FileStorage__CloudflareR2__BucketName=join-ticket-attachments
+FileStorage__CloudflareR2__AccessKeyId=...
+FileStorage__CloudflareR2__SecretAccessKey=...
+```
+
+Do not store any of the secrets above in `appsettings.json` (versioned). The
+`appsettings.json` file only carries `Provider` and `Local:RootPath`; everything
+else goes through environment variables or user-secrets. `ValidateOnStart` will
+fail the host build if `FileStorage:Provider` points to a section that is
+missing or incomplete — the error names which field is missing.
 
 ## Calendar module (SPEC 44)
 

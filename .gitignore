@@ -145,6 +145,16 @@ $RECYCLE.BIN/
 .dockerignore
 **/obj/Docker/
 
+# ===================================================
+# 📁 ARCHIVOS DE USUARIO (SPEC 49-post)
+# ===================================================
+# La carpeta App_Data/ guarda adjuntos de tickets subidos al
+# probar localmente. Nunca debe llegar al repo: un archivo
+# confidencial probado en dev terminaría en un commit. El path
+# real se puede configurar vía FileStorage:Local:RootPath
+# (default: App_Data/ticket-attachments, dentro de la API).
+App_Data/
+
 # Azure
 csx/
 *.build.csdef

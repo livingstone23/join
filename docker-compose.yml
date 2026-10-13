@@ -7,3 +7,13 @@ services:
       - .env
     ports:
       - "8080:8080"
+    volumes:
+      # SPEC 49-post: volumen nombrado para los adjuntos locales.
+      # Sobrevive a `docker-compose up -d --force-recreate` y mantiene
+      # los archivos bajo un nombre estable que no depende de rutas
+      # del host. Quien quiera bind-mount a una carpeta del host
+      # puede sobreescribir esto en docker-compose.override.yml.
+      - join-attachments:/app/data/ticket-attachments
+
+volumes:
+  join-attachments:

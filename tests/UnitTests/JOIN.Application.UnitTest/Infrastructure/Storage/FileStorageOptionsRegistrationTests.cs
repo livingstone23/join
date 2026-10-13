@@ -1,6 +1,6 @@
 using FluentAssertions;
 using JOIN.Infrastructure;
-using JOIN.Infrastructure.Storage.Local;
+using JOIN.Infrastructure.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
@@ -10,8 +10,11 @@ using Microsoft.Extensions.Options;
 namespace JOIN.Application.UnitTest.Infrastructure.Storage;
 
 /// <summary>
-/// Verifies how <c>AddInfrastructureServices</c> resolves <see cref="FileStorageOptions.RootPath"/>:
-/// relative paths are anchored to the host content root, absolute paths are left untouched.
+/// Verifies how <c>AddInfrastructureServices</c> resolves
+/// <see cref="LocalStorageOptions.RootPath"/>: relative paths are anchored to the
+/// host content root, absolute paths are left untouched. SPEC 49-post: the
+/// shape of <see cref="FileStorageOptions"/> changed — root path now lives
+/// under <c>FileStorage:Local:RootPath</c> instead of <c>FileStorage:RootPath</c>.
 /// </summary>
 public sealed class FileStorageOptionsRegistrationTests
 {
@@ -22,7 +25,7 @@ public sealed class FileStorageOptionsRegistrationTests
     {
         var options = ResolveOptions("App_Data/ticket-attachments");
 
-        options.RootPath.Should().Be(Path.Combine(ContentRoot, "App_Data/ticket-attachments"));
+        options.Local.RootPath.Should().Be(Path.Combine(ContentRoot, "App_Data/ticket-attachments"));
     }
 
     [Fact]
@@ -32,7 +35,7 @@ public sealed class FileStorageOptionsRegistrationTests
 
         var options = ResolveOptions(absolute);
 
-        options.RootPath.Should().Be(absolute);
+        options.Local.RootPath.Should().Be(absolute);
     }
 
     private static FileStorageOptions ResolveOptions(string rootPath)

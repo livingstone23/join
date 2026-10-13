@@ -1841,41 +1841,82 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     /// Sembrado idempotente de la fila singleton de <see cref="TicketAttachmentSettings"/>
     /// para una empresa del seed de desarrollo. Sin esta fila, ningún upload
     /// funciona en el ambiente de desarrollo (respondería <c>ATTACHMENT_SETTINGS_NOT_CONFIGURED</c>).
-    /// Los defaults siguen la spec: Pdf | Word | Excel | Text | Image, 10 MB,
-    /// 10 archivos por ticket, sin límite diario.
+    /// Los defaults siguen la spec: Pdf | Word | Excel | Image (sin Text — SPEC 49-post
+    /// lo quitó al unificar la regla "no se sube un txt suelto como evidencia de un
+    /// ticket"). 10 MB, 10 archivos por ticket, sin límite diario.
     /// </summary>
+    /// <remarks>
+    /// SPEC 49-post: en bases existentes, si la fila activa conserva exactamente el
+    /// valor del seed anterior (Pdf | Word | Excel | Text | Image), se actualiza al
+    /// nuevo default. Si tiene cualquier otro valor, alguien la configuró y no se
+    /// toca — distinguir sembrado de editado por comparación de valor es la única
+    /// opción confiable porque <c>UpdateTicketAttachmentSettings</c> no estampa
+    /// <c>LastModifiedBy</c>.
+    /// </remarks>
     private async Task SeedTicketAttachmentSettingsAsync(Guid companyId)
     {
+        const JOIN.Domain.Enums.DocumentType previousSeedValue =
+            JOIN.Domain.Enums.DocumentType.Pdf
+            | JOIN.Domain.Enums.DocumentType.Word
+            | JOIN.Domain.Enums.DocumentType.Excel
+            | JOIN.Domain.Enums.DocumentType.Text
+            | JOIN.Domain.Enums.DocumentType.Image;
+
+        const JOIN.Domain.Enums.DocumentType currentSeedValue =
+            JOIN.Domain.Enums.DocumentType.Pdf
+            | JOIN.Domain.Enums.DocumentType.Word
+            | JOIN.Domain.Enums.DocumentType.Excel
+            | JOIN.Domain.Enums.DocumentType.Image;
+
         var existing = await _context.TicketAttachmentSettings
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.GcRecord == 0);
 
-        if (existing is not null)
+        if (existing is null)
         {
-            _logger.LogDebug("Ticket attachment settings already configured for company {CompanyId}; skipping.", companyId);
+            _context.TicketAttachmentSettings.Add(new TicketAttachmentSettings
+            {
+                CompanyId = companyId,
+                AllowedDocumentTypes = currentSeedValue,
+                MaxFileSizeBytes = 10L * 1024 * 1024,
+                MaxFilesPerTicket = 10,
+                MaxFilesPerDay = null,
+                Created = DateTime.UtcNow,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            });
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Ticket attachment settings seeded for company {CompanyId}.", companyId);
             return;
         }
 
-        const int pdfWordExcelTextImage = (int)(JOIN.Domain.Enums.DocumentType.Pdf
-            | JOIN.Domain.Enums.DocumentType.Word
-            | JOIN.Domain.Enums.DocumentType.Excel
-            | JOIN.Domain.Enums.DocumentType.Text
-            | JOIN.Domain.Enums.DocumentType.Image);
-
-        _context.TicketAttachmentSettings.Add(new TicketAttachmentSettings
+        if (existing.AllowedDocumentTypes != previousSeedValue)
         {
-            CompanyId = companyId,
-            AllowedDocumentTypes = (JOIN.Domain.Enums.DocumentType)pdfWordExcelTextImage,
-            MaxFileSizeBytes = 10L * 1024 * 1024,
-            MaxFilesPerTicket = 10,
-            MaxFilesPerDay = null,
-            Created = DateTime.UtcNow,
-            CreatedBy = "System_Seeder",
-            GcRecord = 0
-        });
+            // Alguien (humano o API) ya configuró esta fila; respetar.
+            _logger.LogDebug(
+                "Ticket attachment settings for company {CompanyId} do not match the previous seed value ({Actual}); leaving as configured.",
+                companyId, existing.AllowedDocumentTypes);
+            return;
+        }
+
+        if (existing.AllowedDocumentTypes == currentSeedValue)
+        {
+            // Idempotente: ya quedó en el nuevo valor en una corrida previa.
+            _logger.LogDebug(
+                "Ticket attachment settings for company {CompanyId} already on the current seed value; no change.",
+                companyId);
+            return;
+        }
+
+        existing.AllowedDocumentTypes = currentSeedValue;
+        existing.LastModified = DateTime.UtcNow;
+        existing.LastModifiedBy = "System_Seeder";
 
         await _context.SaveChangesAsync();
-        _logger.LogInformation("Ticket attachment settings seeded for company {CompanyId}.", companyId);
+        _logger.LogInformation(
+            "Ticket attachment settings for company {CompanyId} migrated from previous seed value to {NewValue}.",
+            companyId, currentSeedValue);
     }
 
     private async Task SeedJoinTicketsAsync(Guid joinCompanyId)

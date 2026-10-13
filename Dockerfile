@@ -43,6 +43,13 @@ ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 WORKDIR /app
 COPY --from=build /app/publish .
 
+# SPEC 49-post: crea la carpeta local de adjuntos con permisos
+# para el usuario del contenedor, antes de que la API intente
+# escribir en ella. El volumen nombrado de docker-compose.yml
+# (join-attachments) se monta sobre esta misma ruta.
+RUN mkdir -p /app/data/ticket-attachments \
+    && chown -R $APP_UID:$APP_UID /app/data
+
 # 8080 is the default HTTP port for non-root aspnet images (.NET 8+).
 EXPOSE 8080
 

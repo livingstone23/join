@@ -20,12 +20,12 @@ namespace JOIN.Application.UseCases.Messaging.Tickets.Commands.UploadTicketDocum
 public sealed class UploadTicketDocumentCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
-    IFileStorageService fileStorageService)
+    IFileStorageResolver fileStorageResolver)
     : IRequestHandler<UploadTicketDocumentCommand, Response<TicketDocumentDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
     private readonly ICurrentUserService _currentUserService = currentUserService;
-    private readonly IFileStorageService _fileStorageService = fileStorageService;
+    private readonly IFileStorageResolver _fileStorageResolver = fileStorageResolver;
 
     public async Task<Response<TicketDocumentDto>> Handle(UploadTicketDocumentCommand request, CancellationToken cancellationToken)
     {
@@ -129,7 +129,14 @@ public sealed class UploadTicketDocumentCommandHandler(
         var newName = $"{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{extension}";
         var storageKey = $"{tenantId}/{request.TicketId}/{newName}";
 
-        var saveResult = await _fileStorageService.SaveAsync(
+        // SPEC 49-post: el provider que guarda la fila es el adapter
+        // configurado en el entorno. Si mañana se cambia a Azure, los
+        // adjuntos viejos (guardados como Local) siguen leyéndose con
+        // LocalDisk; los nuevos se graban como AzureBlob. Ver
+        // DownloadTicketDocumentQueryHandler para el camino inverso.
+        var activeProvider = _fileStorageResolver.Current;
+
+        var saveResult = await activeProvider.SaveAsync(
             request.File.Content,
             storageKey,
             request.File.ContentType,
@@ -144,7 +151,7 @@ public sealed class UploadTicketDocumentCommandHandler(
             OriginalName = request.File.FileName,
             NewName = newName,
             Path = storageKey,
-            StorageProvider = StorageProviderKind.Local,
+            StorageProvider = activeProvider.Kind,
             ContentType = request.File.ContentType,
             SizeBytes = saveResult.SizeBytes
         };
@@ -198,6 +205,12 @@ public sealed class UploadTicketDocumentCommandHandler(
     /// tabla del spec sección "Data model". Una extensión no reconocida
     /// devuelve <c>false</c> y el handler emite <c>UNSUPPORTED_DOCUMENT_TYPE</c>.
     /// </summary>
+    /// <remarks>
+    /// SPEC 49-post: <c>.gif</c> se quitó del tipo <c>Image</c>; la subida
+    /// devuelve 400 <c>UNSUPPORTED_DOCUMENT_TYPE</c> para todas las
+    /// empresas. Los <c>.gif</c> ya subidos siguen descargándose: la
+    /// descarga no vuelve a inferir el tipo.
+    /// </remarks>
     internal static bool TryMapExtension(string extension, out DocumentType documentType)
     {
         documentType = DocumentType.None;
@@ -207,7 +220,7 @@ public sealed class UploadTicketDocumentCommandHandler(
             ".doc" or ".docx" => Assign(DocumentType.Word, out documentType),
             ".xls" or ".xlsx" => Assign(DocumentType.Excel, out documentType),
             ".txt" or ".csv" => Assign(DocumentType.Text, out documentType),
-            ".png" or ".jpg" or ".jpeg" or ".gif" => Assign(DocumentType.Image, out documentType),
+            ".png" or ".jpg" or ".jpeg" => Assign(DocumentType.Image, out documentType),
             ".zip" => Assign(DocumentType.Other, out documentType),
             _ => false
         };
