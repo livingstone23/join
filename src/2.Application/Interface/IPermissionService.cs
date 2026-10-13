@@ -79,7 +79,7 @@ public interface IPermissionService
     /// <c>SystemOption</c> — changes that affect every company, so we cannot enumerate them.
     /// </summary>
     /// <remarks>
-    /// <para>Introduced by SPEC 48: <see cref="IMemoryCache"/> cannot remove keys by prefix, so the
+    /// <para>Introduced by SPEC 48: <c>IMemoryCache</c> cannot remove keys by prefix, so the
     /// service exposes a single <see cref="CancellationTokenSource"/> and ties each cached entry to
     /// its token via <c>MemoryCacheEntryOptions.AddExpirationToken</c>.</para>
     /// <para>The next <see cref="GetModuleAccessAsync"/> call rebuilds the per-company snapshot.</para>

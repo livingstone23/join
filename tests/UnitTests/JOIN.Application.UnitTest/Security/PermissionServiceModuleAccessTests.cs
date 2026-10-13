@@ -170,6 +170,23 @@ public sealed class PermissionServiceModuleAccessTests
         result.IsEnabled.Should().BeFalse();
     }
 
+    /// <summary>
+    /// PermissionService is scoped: the request that changes a SystemModule is not the one that cached the
+    /// snapshot. Global invalidation from one instance must drop entries created by another one.
+    /// </summary>
+    [Fact]
+    public async Task InvalidateModuleCacheForAllCompaniesAsync_FromAnotherInstance_ShouldDropSharedCacheEntries()
+    {
+        var (reader, factory, cache) = CreateService();
+        var (writer, _, _) = CreateService();
+        factory.SetResults(BuildRow("Tickets", "Tickets", isEnabled: true));
+        await reader.GetModuleAccessAsync(CompanyId, "Tickets");
+
+        await writer.InvalidateModuleCacheForAllCompaniesAsync();
+
+        cache.TryGetValue($"company-modules:v1:{CompanyId}", out _).Should().BeFalse();
+    }
+
     [Fact]
     public async Task GetModuleAccessAsync_ShouldReturnIsEnabledTrue_WhenResourceIsEnabledByAtLeastOneOfItsModules()
     {

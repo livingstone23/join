@@ -7,8 +7,8 @@ namespace JOIN.Application.Interface;
 /// </summary>
 /// <param name="IsEnabled">
 /// <c>true</c> when at least one of the resource's owning modules is active globally and has an active
-/// (not soft-deleted) <c>CompanyModule</c> row for the company. <c>false</c> when none is, or when the
-/// resource has no <c>SystemOption</c> row at all (treated as not module-scoped and therefore enabled).
+/// (not soft-deleted) <c>CompanyModule</c> row for the company, or when the resource has no
+/// <c>SystemOption</c> row at all (not module-scoped). <c>false</c> when none of its modules is enabled.
 /// </param>
 /// <param name="ModuleName">
 /// Name of the first module that owns the resource, used to compose the <c>MODULE_NOT_ENABLED</c>

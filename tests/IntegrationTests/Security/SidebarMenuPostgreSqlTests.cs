@@ -18,15 +18,17 @@ namespace JOIN.IntegrationTests.Security;
 /// <summary>
 /// SPEC 43-post — the sidebar of a non-SuperAdmin only shows options of modules that are active for its company,
 /// the SuperAdmin menu is never filtered, only the SuperAdmin enables or disables a company's modules, and the
-/// change is visible right away (cache invalidated). Runs on <see cref="PostgreSqlWebApplicationFactory"/> with the
-/// development seed (JOIN-001, manager@join.com, lcano@join.com, livingstone23@gmail.com).
+/// change is visible right away (cache invalidated). Runs on <see cref="ModuleEnforcementPostgreSqlWebApplicationFactory"/>
+/// because SPEC 48-post only filters the menu with <c>Modules:EnforceCompanyModules = true</c> (the switch-off case is in
+/// <see cref="ModuleEnforcementSwitchOffPostgreSqlTests"/>), with the development seed (JOIN-001, manager@join.com,
+/// lcano@join.com, livingstone23@gmail.com).
 /// </summary>
-public sealed class SidebarMenuPostgreSqlTests : IClassFixture<PostgreSqlWebApplicationFactory>
+public sealed class SidebarMenuPostgreSqlTests : IClassFixture<ModuleEnforcementPostgreSqlWebApplicationFactory>
 {
     private const string Password = "ABCabc123*";
-    private readonly PostgreSqlWebApplicationFactory _factory;
+    private readonly ModuleEnforcementPostgreSqlWebApplicationFactory _factory;
 
-    public SidebarMenuPostgreSqlTests(PostgreSqlWebApplicationFactory factory)
+    public SidebarMenuPostgreSqlTests(ModuleEnforcementPostgreSqlWebApplicationFactory factory)
     {
         _factory = factory;
     }

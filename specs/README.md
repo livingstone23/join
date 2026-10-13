@@ -100,12 +100,11 @@ Las filas 40–49 y 99 de la tabla anterior son las copias de `main` del 2026-10
 | 41-post | Visibilidad de registros borrados y restauración para SuperAdmin | Implementado | 38, 40-post |
 | 42-post | Valores iniciales del ticket desde `TicketCompanyDefaults` | Implementado | 41-post |
 | 43-post | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Implementado | 39 |
-
 | 44-post | Módulo Calendario: parametrización, calendarios y actividades | Implementado | 99-post, 43-post, 48-post |
 | 45-post | Calendario: ingreso por canales (agente) y personas pendientes | Implementado | 43-post, 44-post, 48-post |
 | 46-post | Calendario: estructura para sincronizar con Google Calendar | Implementado | 44-post |
-| 47-post | Ingesta de tickets por WhatsApp y correo | **Aprobado** | 34, 35, 36, 99-post, 42-post, 43-post |
-| 48-post | Bloqueo de APIs y menú por módulo activo de la empresa | Borrador | 43-post |
+| 47-post | Ingesta de tickets por WhatsApp y correo | Implementado | 34, 35, 36, 99-post, 42-post, 43-post |
+| 48-post | Bloqueo de APIs y menú por módulo activo de la empresa | Aprobado | 43-post |
 | 49-post | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Borrador | 36 |
 | 51-post | Invalidación de la caché de permisos con la clave `permissions:v2` | Borrador | 17, 25 |
 | 99-post | Canales internos `WEB` y `APP` en el catálogo de canales | Implementado | — |

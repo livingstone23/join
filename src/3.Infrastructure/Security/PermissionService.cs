@@ -44,8 +44,11 @@ public class PermissionService(
     /// wired to this CTS. Cancelling it invalidates every per-company entry at once, which is what we need
     /// when <see cref="Domain.Admin.SystemModule"/> rows change (because <see cref="IMemoryCache"/> cannot
     /// remove keys by prefix).
+    /// Static on purpose: <see cref="PermissionService"/> is registered as scoped, so an instance field
+    /// would only live for one request and the cancellation would never reach entries created by other
+    /// scopes. The <see cref="IMemoryCache"/> it guards is a process-wide singleton, and so is this token.
     /// </summary>
-    private CancellationTokenSource _moduleVersionCts = new();
+    private static CancellationTokenSource _moduleVersionCts = new();
 
     /// <summary>
     /// Validates whether the current user has permission to execute the requested action,
@@ -59,11 +62,11 @@ public class PermissionService(
     /// When <paramref name="explicitFlag"/> is provided, evaluates that flag directly;
     /// otherwise falls back to the HTTP-verb default mapping.
     /// </summary>
-    /// <param name="userId">The authenticated user ID.</param>
+    /// <param name="userId">The authenticated user identifier.</param>
     /// <param name="companyId">The active company identifier.</param>
     /// <param name="resourceName">The controller or resource name being requested.</param>
     /// <param name="actionType">The HTTP method associated with the request.</param>
-    /// <param name="explicitFlag">Optional explicit flag override (e.g. <see cref="PermissionFlags.CanExport"/> on a GET endpoint).</param>
+    /// <param name="explicitFlag">Optional explicit flag override (e.g. <see cref="PermissionFlags.CanExport"/> on GET).</param>
     /// <returns><c>true</c> when access is granted; otherwise, <c>false</c>.</returns>
     public async Task<bool> HasPermissionAsync(string userId, string companyId, string resourceName, string actionType, PermissionFlags? explicitFlag)
     {
@@ -251,17 +254,17 @@ public class PermissionService(
     {
         // IMemoryCache cannot remove keys by prefix; cancel the shared token so every entry tied to it expires.
         // The next GetModuleAccessAsync call will rebuild its per-company snapshot lazily.
+        // The previous source is not disposed: a concurrent GetModuleAccessAsync may still be reading its Token.
         var previous = Interlocked.Exchange(ref _moduleVersionCts, new CancellationTokenSource());
         previous.Cancel();
-        previous.Dispose();
         return Task.CompletedTask;
     }
 
     /// <summary>
     /// SPEC 48 B: Dapper query that resolves, for the given company, every (ControllerName, ModuleName, IsEnabled)
-    /// triple that drives <see cref="GetModuleAccessAsync"/>. Cross-DB syntax (Dapper): PG uses lowercase column
-    /// names and boolean literals; SQL Server uses quoted/pascalcase. The query is engine-agnostic because the
-    /// schema names and joins are identical and the boolean column compares work on both engines.
+    /// triple that drives <see cref="GetModuleAccessAsync"/>. PostgreSQL syntax (fork <c>main_postgresql</c>):
+    /// lowercase identifiers and a boolean expression for <c>IsEnabled</c>. Rows are ordered so the
+    /// "first owning module" reported in <c>MODULE_NOT_ENABLED</c> is stable.
     /// </summary>
     private const string ModuleAccessQuerySql = """
         SELECT so.controllername AS ControllerName,
@@ -272,6 +275,7 @@ public class PermissionService(
         LEFT JOIN admin.companymodules cm ON cm.moduleid = sm.id AND cm.companyid = @CompanyId
                                          AND cm.isactive = TRUE AND cm.gcrecord = 0
         WHERE so.gcrecord = 0 AND so.controllername IS NOT NULL AND so.controllername <> ''
+        ORDER BY so.controllername, sm.name
         """;
 
     /// <summary>
@@ -285,8 +289,7 @@ public class PermissionService(
     }
 
     /// <summary>
-    /// Maps the seven permission flags for a single resource, OR-merged across all
-    /// roles the user holds in the current tenant.
+    /// Maps a single <see cref="PermissionFlags"/> bit to the corresponding boolean in the snapshot.
     /// </summary>
     private static bool EvaluateFlag(PermissionFlagsSnapshot snapshot, PermissionFlags flag) => flag switch
     {

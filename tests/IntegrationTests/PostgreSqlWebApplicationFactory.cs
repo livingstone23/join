@@ -18,7 +18,7 @@ namespace JOIN.IntegrationTests;
 /// (<see cref="CapturingEmailService"/>, <see cref="TestCurrentUserService"/>). The host's own
 /// startup migrates (<c>InitialPostgres</c>) and seeds — no extra migration logic lives here.
 /// </summary>
-public sealed class PostgreSqlWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public class PostgreSqlWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     // Same eager-read constraint as CustomWebApplicationFactory: rate limits must be set via
     // environment variables before any host in this process builds.
@@ -51,17 +51,31 @@ public sealed class PostgreSqlWebApplicationFactory : WebApplicationFactory<Prog
         }
     }
 
+    /// <summary>
+    /// Extra configuration values layered over the defaults, for derived factories that need a
+    /// different host setup (e.g. <see cref="ModuleEnforcementPostgreSqlWebApplicationFactory"/>).
+    /// </summary>
+    protected virtual IReadOnlyDictionary<string, string?> AdditionalConfiguration { get; } =
+        new Dictionary<string, string?>();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
 
         builder.ConfigureAppConfiguration((_, config) =>
         {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
+            var settings = new Dictionary<string, string?>
             {
                 ["DatabaseProvider"] = "PostgreSQL",
                 ["ConnectionStrings:DefaultConnection"] = ConnectionString
-            });
+            };
+
+            foreach (var (key, value) in AdditionalConfiguration)
+            {
+                settings[key] = value;
+            }
+
+            config.AddInMemoryCollection(settings);
         });
 
         builder.ConfigureTestServices(services =>

@@ -26,22 +26,22 @@ public sealed class GetCompanyModulesDiagnosticsQueryHandler(
     : IRequestHandler<GetCompanyModulesDiagnosticsQuery, Response<CompanyModulesDiagnosticsDto>>
 {
     /// <summary>
-    /// Names of every active <c>IsBase = TRUE</c> module. Drives the "complete" check below.
+    /// Two result sets in one round trip:
+    /// <list type="number">
+    /// <item>Names of every <c>IsBase = TRUE</c> module (drives the "complete" check).</item>
+    /// <item>One row per active company that has at least one base module without an active
+    /// <c>CompanyModule</c> row, OR at least one user whose role grants a permission (any flag) on an
+    /// option of a module that is not enabled for the company — inactive for the company or inactive
+    /// globally, the same rule the API gate applies. Companies without problems are left out.</item>
+    /// </list>
+    /// Aliases have no underscores because Dapper maps columns to properties by name (case-insensitive).
     /// </summary>
-    private const string BaseModulesSql = """
+    private const string DiagnosticsSql = """
         SELECT name
         FROM admin.systemmodules
         WHERE isbase = TRUE AND gcrecord = 0
         ORDER BY name;
-        """;
 
-    /// <summary>
-    /// One row per active company that has at least one base module without an active
-    /// <c>CompanyModule</c> row, OR at least one user whose role grants permissions on options of a
-    /// module not active for the company. The list is pre-filtered by the WHERE clause so the API
-    /// returns only companies that need attention before enabling the switch.
-    /// </summary>
-    private const string CompanyProblemsSql = """
         WITH base AS (
             SELECT id, name
             FROM admin.systemmodules
@@ -49,19 +49,19 @@ public sealed class GetCompanyModulesDiagnosticsQueryHandler(
         ),
         active_companies AS (
             SELECT id, name
-            FROM admin.companies
-            WHERE gcrecord = 0
+            FROM common.companies
+            WHERE isactive = TRUE AND gcrecord = 0
         ),
         missing AS (
             SELECT
                 c.id   AS companyid,
                 c.name AS companyname,
                 COALESCE(
-                    array_agg(b.name) FILTER (WHERE cm.id IS NULL),
+                    array_agg(b.name ORDER BY b.name) FILTER (WHERE b.id IS NOT NULL AND cm.id IS NULL),
                     ARRAY[]::TEXT[]
-                ) AS missing_base_modules
+                ) AS missingbasemodules
             FROM active_companies c
-            CROSS JOIN base b
+            LEFT JOIN base b ON TRUE  -- keeps companies when no base module exists
             LEFT JOIN admin.companymodules cm
                 ON cm.companyid = c.id
                AND cm.moduleid = b.id
@@ -71,19 +71,20 @@ public sealed class GetCompanyModulesDiagnosticsQueryHandler(
         ),
         affected_users AS (
             SELECT
-                urc.companyid                                        AS companyid,
-                COUNT(DISTINCT urc.userid)                           AS affected_user_count
+                urc.companyid              AS companyid,
+                COUNT(DISTINCT urc.userid) AS affectedusercount
             FROM security.userrolecompanies urc
             INNER JOIN security.rolesystemoptions rso
                 ON rso.roleid    = urc.roleid
                AND rso.companyid = urc.companyid
                AND rso.gcrecord  = 0
+               AND (rso.canread OR rso.cancreate OR rso.canupdate OR rso.candelete
+                    OR rso.candownload OR rso.canexport OR rso.canexecute)
             INNER JOIN security.systemoptions so
                 ON so.id        = rso.systemoptionid
                AND so.gcrecord  = 0
             INNER JOIN admin.systemmodules sm
                 ON sm.id        = so.moduleid
-               AND sm.isactive  = TRUE
                AND sm.gcrecord  = 0
             LEFT JOIN admin.companymodules cm
                 ON cm.companyid = urc.companyid
@@ -91,18 +92,18 @@ public sealed class GetCompanyModulesDiagnosticsQueryHandler(
                AND cm.isactive  = TRUE
                AND cm.gcrecord  = 0
             WHERE urc.gcrecord = 0
-              AND cm.id IS NULL
+              AND (sm.isactive = FALSE OR cm.id IS NULL)
             GROUP BY urc.companyid
         )
         SELECT
             m.companyid,
             m.companyname,
-            m.missing_base_modules,
-            COALESCE(a.affected_user_count, 0) AS affected_user_count
+            m.missingbasemodules,
+            COALESCE(a.affectedusercount, 0) AS affectedusercount
         FROM missing m
         LEFT JOIN affected_users a ON a.companyid = m.companyid
-        WHERE cardinality(m.missing_base_modules) > 0
-           OR COALESCE(a.affected_user_count, 0) > 0
+        WHERE cardinality(m.missingbasemodules) > 0
+           OR COALESCE(a.affectedusercount, 0) > 0
         ORDER BY m.companyname;
         """;
 
@@ -112,12 +113,11 @@ public sealed class GetCompanyModulesDiagnosticsQueryHandler(
         CancellationToken cancellationToken)
     {
         using var connection = connectionFactory.CreateConnection();
+        using var grid = await connection.QueryMultipleAsync(
+            new CommandDefinition(DiagnosticsSql, cancellationToken: cancellationToken));
 
-        var baseModuleNames = (await connection.QueryAsync<string>(
-            new CommandDefinition(BaseModulesSql, cancellationToken: cancellationToken))).AsList();
-
-        var rows = (await connection.QueryAsync<CompanyProblemRow>(
-            new CommandDefinition(CompanyProblemsSql, cancellationToken: cancellationToken))).AsList();
+        var baseModuleNames = (await grid.ReadAsync<string>()).AsList();
+        var rows = (await grid.ReadAsync<CompanyProblemRow>()).AsList();
 
         var entries = rows
             .Select(row => new CompanyDiagnosticsEntry

@@ -7,6 +7,11 @@
 > **Depends on:** SPEC 43-post (`SystemModule.IsBase`, cada `SystemOption` conectada a su módulo real, menú filtrado, solo SuperAdmin habilita módulos).
 > **Related:** SPEC 44 (el calendario deja de revisar el módulo por su cuenta), SPEC 45 (endpoints del agente).
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-10-01)
+> **Ajuste por SPEC 48-post (implementación, 2026-10-13):** implementada en la rama `spec-48-post-company-module-api-enforcement`.
+> (1) **Token global estático:** `PermissionService` está registrado como *scoped*, así que el `CancellationTokenSource` de la sección E es un campo estático (uno por proceso, igual que el `IMemoryCache`); como campo de instancia la invalidación global no llegaba a las entradas creadas en otros requests. El método se llama `InvalidateModuleCacheForAllCompaniesAsync` y hay además `InvalidateCompanyModuleCacheAsync(companyId)` para la invalidación por empresa.
+> (2) **Diagnóstico:** una sola ida a la base (`QueryMultiple`); empresas de `common.companies` con `isactive = TRUE`; `usersWithPermissionsInDisabledModules` cuenta usuarios con al menos un flag en `true` en opciones de módulos no habilitados para la empresa (inactivos para ella **o** inactivos globalmente, la misma regla del filtro). El conteo es por módulo de la opción: no descuenta un `ControllerName` que además esté en otro módulo habilitado.
+> (3) **Calendario (F6):** `CalendarCompanyGuard` ya existía sin chequeo de módulo (SPEC 44-post se implementó con esta decisión); no hubo cambios de código.
+> (4) **Tests:** `ModuleEnforcementPostgreSqlTests` usa `ModuleEnforcementPostgreSqlWebApplicationFactory` (interruptor encendido); `ModuleEnforcementSwitchOffPostgreSqlTests` cubre el interruptor apagado; `SidebarMenuPostgreSqlTests` (SPEC 43-post) pasa a la factory con el interruptor encendido.
 > **Objective:** Que una empresa no pueda usar las APIs de un módulo que no tiene activo en `Admin.CompanyModules`, respondiendo `403` con el código `MODULE_NOT_ENABLED`, con un único interruptor de configuración que enciende a la vez el bloqueo de APIs y el filtro del menú, y un endpoint de diagnóstico para revisar las empresas antes de encenderlo.
 
 ---
@@ -221,13 +226,13 @@ Tests de la sección H. `dotnet build` sin warnings nuevos, `dotnet test` con el
 
 ## Acceptance criteria
 
-- [ ] Con `Modules:EnforceCompanyModules = false`, menú y APIs se comportan exactamente como antes de esta spec.
-- [ ] Con el interruptor encendido, ningún usuario no SuperAdmin puede usar las APIs de un módulo inactivo para su empresa o inactivo globalmente: recibe `403` con `code = "MODULE_NOT_ENABLED"` y el nombre del módulo.
-- [ ] Con el interruptor encendido, el menú no muestra opciones de módulos inactivos, y nunca muestra una opción cuya API respondería `MODULE_NOT_ENABLED`.
-- [ ] El SuperAdmin no se ve afectado en ningún caso.
-- [ ] Activar o desactivar un módulo de una empresa se refleja en APIs y menú sin esperar a que venza el cache.
-- [ ] `GET /CompanyModules/diagnostics` lista las empresas con módulos base faltantes y los usuarios afectados; solo lo usa el SuperAdmin.
-- [ ] El Calendario ya no tiene un chequeo propio de módulo; `CALENDAR_MODULE_NOT_ENABLED` no existe.
+- [x] Con `Modules:EnforceCompanyModules = false`, menú y APIs se comportan exactamente como antes de esta spec.
+- [x] Con el interruptor encendido, ningún usuario no SuperAdmin puede usar las APIs de un módulo inactivo para su empresa o inactivo globalmente: recibe `403` con `code = "MODULE_NOT_ENABLED"` y el nombre del módulo.
+- [x] Con el interruptor encendido, el menú no muestra opciones de módulos inactivos, y nunca muestra una opción cuya API respondería `MODULE_NOT_ENABLED`.
+- [x] El SuperAdmin no se ve afectado en ningún caso.
+- [x] Activar o desactivar un módulo de una empresa se refleja en APIs y menú sin esperar a que venza el cache.
+- [x] `GET /CompanyModules/diagnostics` lista las empresas con módulos base faltantes y los usuarios afectados; solo lo usa el SuperAdmin.
+- [x] El Calendario ya no tiene un chequeo propio de módulo; `CALENDAR_MODULE_NOT_ENABLED` no existe.
 
 ---
 

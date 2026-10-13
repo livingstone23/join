@@ -10,7 +10,7 @@
 > **Ajuste por SPEC 44-post (implementación, 2026-10-12):** implementada en la rama `spec-44-post-calendar-core` desde cero.
 > (1) **Orden:** se implementó antes que 48-post (decisión del usuario). El criterio "sin el módulo activo ningún
 > endpoint permite registrar" queda pendiente de 48-post; mientras tanto el módulo solo filtra el menú (SPEC 43-post) y
-> el provisioner. (2) **Validar después de guardar:** los comandos de actividades guardan y luego ejecutan
+> el provisioner (**Ajuste por SPEC 48-post, 2026-10-13:** 48-post ya cubre ese criterio con `Modules:EnforceCompanyModules = true`). (2) **Validar después de guardar:** los comandos de actividades guardan y luego ejecutan
 > `CalendarEventScheduleGuard` dentro de la misma transacción; un error hace rollback (`TransactionBehavior`). Así la
 > validación ve la serie real (cortes y excepciones). (3) **Lecturas de los comandos:** con
 > `ICalendarEventRepository` (EF, misma conexión) y `IUnitOfWork.AcquireScheduleLockAsync` (`pg_advisory_xact_lock`).
