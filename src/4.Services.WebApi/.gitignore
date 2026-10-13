@@ -1,3 +1,7 @@
 bin/
 obj/
 bin\\*
+# Build output written with a Windows-style path separator (e.g. "bin\Debug")
+bin\\*
+# Local ticket attachment storage (FileStorage:RootPath)
+App_Data/

@@ -3,6 +3,7 @@
 
 
 
+using JOIN.Application.UseCases.Messaging.TicketInboundChannels.Common;
 using JOIN.Domain.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -47,7 +48,7 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.HasIndex(t => new { t.CompanyId, t.ChannelId, t.ExternalMessageId })
             .IsUnique()
             .HasFilter("\"externalmessageid\" IS NOT NULL AND \"gcrecord\" = 0")
-            .HasDatabaseName("UX_Tickets_Company_Channel_ExternalMessageId_Active");
+            .HasDatabaseName(TicketInboundErrorCodes.ExternalMessageIdIndex);
 
         builder.Property(t => t.EstimatedTime).HasPrecision(18, 2);
         builder.Property(t => t.ConsumedTime).HasPrecision(18, 2);

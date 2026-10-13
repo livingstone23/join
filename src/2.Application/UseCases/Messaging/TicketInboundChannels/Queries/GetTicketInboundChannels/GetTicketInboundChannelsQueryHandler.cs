@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using Dapper;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
@@ -22,7 +20,7 @@ public sealed class GetTicketInboundChannelsQueryHandler(
         GetTicketInboundChannelsQuery request,
         CancellationToken cancellationToken)
     {
-        if (!currentUserService.IsAuthenticated || currentUserService.CompanyId == Guid.Empty)
+        if (currentUserService.CompanyId == Guid.Empty)
         {
             return Response<IReadOnlyCollection<TicketInboundChannelDto>>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
         }
@@ -82,7 +80,7 @@ public sealed class GetTicketInboundChannelsQueryHandler(
     /// Si el token es demasiado corto para que valga la pena enmascararlo, devuelve
     /// solo asteriscos.
     /// </summary>
-    internal static string MaskToken(string? token)
+    public static string MaskToken(string? token)
     {
         if (string.IsNullOrEmpty(token))
         {

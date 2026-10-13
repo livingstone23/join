@@ -2,7 +2,6 @@ using JOIN.Application.UseCases.Messaging.TicketInboundChannels.Common;
 using Asp.Versioning;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
-using JOIN.Application.UseCases.Calendars.Common;
 using JOIN.Application.UseCases.Messaging.TicketInboundChannels.Commands.CreateTicketInboundChannel;
 using JOIN.Application.UseCases.Messaging.TicketInboundChannels.Commands.DeleteTicketInboundChannel;
 using JOIN.Application.UseCases.Messaging.TicketInboundChannels.Queries.GetTicketInboundChannels;
@@ -30,8 +29,7 @@ public class TicketInboundChannelsController(ISender sender) : ControllerBase
 
     /// <summary>
     /// Lista los canales de ingesta activos del tenant. El <c>WebhookToken</c> siempre
-    /// viaja enmascarado; <c>WebhookUrl</c> se devuelve vacío (el navegador reconstruye
-    /// la URL a partir de <c>window.location.origin</c> concatenando <c>/api/v1/inbound/{segment}/{token}</c>).
+    /// viaja enmascarado, también dentro de <c>WebhookUrl</c>.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(Response<IReadOnlyCollection<TicketInboundChannelDto>>), StatusCodes.Status200OK)]
@@ -48,6 +46,13 @@ public class TicketInboundChannelsController(ISender sender) : ControllerBase
         {
             return MapError(response);
         }
+
+        // The listed URL carries the masked token: it shows where the webhook points, never the secret.
+        response.Data = response.Data!
+            .Select(item => ResolveInboundSegment(item.ChannelCode) is { } segment
+                ? item with { WebhookUrl = BuildWebhookUrl(segment, item.WebhookTokenMasked) }
+                : item)
+            .ToList();
 
         return Ok(response);
     }
@@ -126,9 +131,8 @@ public class TicketInboundChannelsController(ISender sender) : ControllerBase
     private IActionResult MapError<T>(Response<T> response) => response.Message switch
     {
         "COMPANY_REQUIRED" => Unauthorized(response),
-        "TICKET_INBOUND_CHANNEL_NOT_FOUND" => NotFound(response),
-        "INBOUND_CHANNEL_ALREADY_ACTIVE" => Conflict(response),
-        TicketInboundErrorCodes.UnsupportedChannel => BadRequest(response),
+        TicketInboundErrorCodes.NotFound => NotFound(response),
+        TicketInboundErrorCodes.AlreadyActive => Conflict(response),
         _ => BadRequest(response)
     };
 

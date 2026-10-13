@@ -1,69 +1,59 @@
 namespace JOIN.Application.UseCases.Messaging.TicketInboundChannels.Common;
 
 /// <summary>
-/// Error codes returned by SPEC 47 (inbound ticket ingestion) handlers in
-/// <c>Response&lt;T&gt;.Message</c>. Co-located with <c>WebhookTokenGenerator</c>
-/// because the controllers (F5/F6) and the inbound command (F4) share them.
-/// <para>
-/// The two codes referenced directly by <c>InboundWhatsAppController.MapRegisterError</c>
-/// and <c>InboundEmailController.MapRegisterError</c> — <c>NO_TICKET_ADMIN_CONFIGURED</c>
-/// and <c>TICKET_DEFAULTS_NOT_CONFIGURED</c> — are kept as plain string constants
-/// without the <c>TICKET_INBOUND_</c> prefix to remain identical to the hard-coded
-/// strings the controller branches match against.
-/// </para>
+/// Error codes returned in <c>Response&lt;T&gt;.Message</c> by the SPEC 47 handlers (inbound channel CRUD and
+/// inbound ticket ingestion). The controllers map them to HTTP status codes.
 /// </summary>
 public static class TicketInboundErrorCodes
 {
     /// <summary>
-    /// The tenant has no <c>TicketUserCompany.IsSuperAdminTicket</c> configured, so the
-    /// inbound ticket has no author to attribute the creation to. The provider gets an
-    /// explicit 400 — the message is never silently dropped.
+    /// The tenant has no active <c>TicketUserCompany.IsSuperAdminTicket</c>, so the inbound ticket has no author.
+    /// HTTP 400 — the provider gets an explicit error and the message is never silently dropped.
     /// </summary>
     public const string NoTicketAdmin = "NO_TICKET_ADMIN_CONFIGURED";
 
     /// <summary>
-    /// The tenant has no <c>TicketCompanyDefault</c> (or its required fields are missing),
-    /// so a ticket cannot be created without manual completion.
+    /// The tenant has no <c>TicketCompanyDefault</c>, one of its three required defaults (status, complexity,
+    /// time unit) is missing, or the configured initial status is not usable (SPEC 42). HTTP 400.
     /// </summary>
     public const string DefaultsMissing = "TICKET_DEFAULTS_NOT_CONFIGURED";
 
     /// <summary>
-    /// The webhook URL carried a token that doesn't resolve to an active
-    /// <c>TicketInboundChannel</c>, or the inbound command's CompanyId/ChannelId
-    /// pair doesn't match any active row. The controllers translate this to HTTP 404.
+    /// The supplied <c>(CompanyId, ChannelId)</c> has no active <c>TicketInboundChannel</c> (the token was
+    /// rotated between the controller lookup and the handler). The webhooks answer a bare HTTP 404.
     /// </summary>
-    public const string InvalidToken = "TICKET_INBOUND_INVALID_TOKEN";
+    public const string InboundChannelNotFound = "INBOUND_CHANNEL_NOT_FOUND";
+
+    /// <summary> An active inbound channel already exists for the company and channel. HTTP 409. </summary>
+    public const string AlreadyActive = "INBOUND_CHANNEL_ALREADY_ACTIVE";
 
     /// <summary>
-    /// The resolved <c>TicketInboundChannel.ChannelId</c> belongs to a
-    /// <c>CommunicationChannel</c> with a <c>Code</c> that the receiving controller
-    /// does not handle (e.g. a SENDGRID inbound channel hit by the WhatsApp webhook).
-    /// Treated exactly as <see cref="InvalidToken"/> from the outside — HTTP 404.
+    /// The <c>CommunicationChannel.Code</c> is not one handled by an inbound webhook (only <c>WHATSAPP</c> and
+    /// <c>SENDGRID</c> are). HTTP 400.
     /// </summary>
-    public const string ChannelMismatch = "TICKET_INBOUND_CHANNEL_MISMATCH";
+    public const string UnsupportedChannel = "UNSUPPORTED_INBOUND_CHANNEL";
+
+    /// <summary> The communication channel does not exist or is inactive. HTTP 400. </summary>
+    public const string InvalidChannel = "INVALID_CHANNEL";
+
+    /// <summary> The inbound channel to delete does not exist in the current tenant. HTTP 404. </summary>
+    public const string NotFound = "TICKET_INBOUND_CHANNEL_NOT_FOUND";
 
     /// <summary>
-    /// The <c>CommunicationChannel.Code</c> is not one the system supports for inbound
-    /// ingestion (webhook on Telegram, Twilio SMS, App, etc.). HTTP 400.
-    /// </summary>
-    public const string UnsupportedChannel = "TICKET_INBOUND_UNSUPPORTED_CHANNEL";
-
-    /// <summary>
-    /// Payload missing required fields (e.g. Twilio posted without <c>MessageSid</c>,
-    /// SendGrid without a body). HTTP 400.
+    /// The provider payload lacks a required field (Twilio without <c>MessageSid</c>, SendGrid without a body).
+    /// HTTP 400.
     /// </summary>
     public const string PayloadInvalid = "TICKET_INBOUND_PAYLOAD_INVALID";
 
     /// <summary>
-    /// Idempotency hit — a ticket with the same <c>(CompanyId, ChannelId, ExternalMessageId)</c>
-    /// already exists. The handler returns it (HTTP 200) with <c>IsDuplicate = true</c>.
-    /// This constant is informational and only used in test assertions.
+    /// Informational <c>Message</c> of a successful response when the <c>ExternalMessageId</c> was already
+    /// registered and the existing ticket is returned (webhook retry).
     /// </summary>
     public const string Duplicate = "TICKET_INBOUND_DUPLICATE";
 
-    /// <summary>
-    /// Lost the dedup race at insert time (PostgresException 23505). The handler
-    /// re-queries and returns the existing ticket with <c>IsDuplicate = true</c>.
-    /// </summary>
-    public const string DuplicateRace = "TICKET_INBOUND_DUPLICATE_RACE";
+    /// <summary> Unique index of active <c>(CompanyId, ChannelId)</c> rows in <c>TicketInboundChannels</c>. </summary>
+    public const string CompanyChannelIndex = "UX_TicketInboundChannels_Company_Channel_Active";
+
+    /// <summary> Unique index of active <c>(CompanyId, ChannelId, ExternalMessageId)</c> rows in <c>Tickets</c>. </summary>
+    public const string ExternalMessageIdIndex = "UX_Tickets_Company_Channel_ExternalMessageId_Active";
 }

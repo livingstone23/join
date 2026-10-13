@@ -1,6 +1,7 @@
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
+using JOIN.Application.UseCases.Messaging.TicketInboundChannels.Common;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Messaging;
 using MediatR;
@@ -25,7 +26,7 @@ public sealed class DeleteTicketInboundChannelCommandHandler(
         DeleteTicketInboundChannelCommand request,
         CancellationToken cancellationToken)
     {
-        if (!_currentUserService.IsAuthenticated || _currentUserService.CompanyId == Guid.Empty)
+        if (_currentUserService.CompanyId == Guid.Empty)
         {
             return Response<Guid>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
         }
@@ -35,7 +36,7 @@ public sealed class DeleteTicketInboundChannelCommandHandler(
 
         if (entity is null || entity.GcRecord != BaseAuditableEntity.ActiveGcRecord || entity.CompanyId != _currentUserService.CompanyId)
         {
-            return Response<Guid>.Error("TICKET_INBOUND_CHANNEL_NOT_FOUND", ["Ticket inbound channel not found for the current tenant."]);
+            return Response<Guid>.Error(TicketInboundErrorCodes.NotFound, ["Ticket inbound channel not found for the current tenant."]);
         }
 
         entity.MarkAsDeleted();

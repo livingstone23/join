@@ -3667,8 +3667,8 @@ namespace JOIN.Persistence.Migrations
 
                     b.Property<string>("WebhookToken")
                         .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("webhooktoken");
 
                     b.HasKey("Id")

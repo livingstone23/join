@@ -105,6 +105,10 @@ builder.Services.AddProblemDetails(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
+// SPEC 47 — media of WhatsApp messages received through Twilio (inbound ticket webhook).
+builder.Services.AddHttpClient(TwilioMediaDownloader.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddScoped<TwilioMediaDownloader>();
+
 var passwordPolicySection = builder.Configuration.GetSection("PasswordPolicy");
 builder.Services.Configure<PasswordPolicySettings>(passwordPolicySection);
 var passwordPolicySettings = passwordPolicySection.Get<PasswordPolicySettings>() ?? new PasswordPolicySettings();

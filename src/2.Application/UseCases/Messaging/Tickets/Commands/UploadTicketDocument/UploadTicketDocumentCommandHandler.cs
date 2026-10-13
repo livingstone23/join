@@ -198,7 +198,7 @@ public sealed class UploadTicketDocumentCommandHandler(
     /// tabla del spec sección "Data model". Una extensión no reconocida
     /// devuelve <c>false</c> y el handler emite <c>UNSUPPORTED_DOCUMENT_TYPE</c>.
     /// </summary>
-    private static bool TryMapExtension(string extension, out DocumentType documentType)
+    internal static bool TryMapExtension(string extension, out DocumentType documentType)
     {
         documentType = DocumentType.None;
         return extension switch

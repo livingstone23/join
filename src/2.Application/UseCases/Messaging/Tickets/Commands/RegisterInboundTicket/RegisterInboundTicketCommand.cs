@@ -2,20 +2,30 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
 using MediatR;
 
-namespace JOIN.Application.UseCases.Messaging.Tickets.RegisterInboundTicket;
+namespace JOIN.Application.UseCases.Messaging.Tickets.Commands.RegisterInboundTicket;
 
 /// <summary>
-/// Registra un ticket a partir de un mensaje entrante desde un canal externo
-/// (WhatsApp, SendGrid) — SPEC 47 F4. Es la ruta sin JWT: <c>CompanyId</c> y
-/// <c>ChannelId</c> se pasan explícitamente porque el token del webhook
-/// resolvió el tenant en el controller.
+/// Registers a ticket from a message received on an external channel (WhatsApp, e-mail) — SPEC 47 F4. It is the
+/// route without JWT: <c>CompanyId</c> and <c>ChannelId</c> come from the webhook token resolved by the controller,
+/// never from <c>ICurrentUserService</c>.
 /// <para>
-/// <c>ExternalMessageId</c> actúa como clave de idempotencia (Twilio
-/// <c>MessageSid</c> / SendGrid <c>Message-ID</c> / hash SHA-256 fallback);
-/// el handler la usa para devolver el ticket existente ante un reintento del
-/// proveedor, no para crear un duplicado.
+/// Not an <c>ITransactionalCommand</c>: the ticket is committed on its own <c>SaveChangesAsync</c> and the
+/// attachments afterwards, best-effort, so a failing attachment never rolls the ticket back; and a lost race on the
+/// <c>ExternalMessageId</c> index (PostgreSQL 23505) can be answered with the winner instead of an aborted transaction.
 /// </para>
 /// </summary>
+/// <param name="CompanyId">Tenant resolved from the webhook token.</param>
+/// <param name="ChannelId">Channel resolved from the webhook token.</param>
+/// <param name="SenderIdentifier">E.164 phone or e-mail address, depending on the channel.</param>
+/// <param name="SenderDisplayName">Display name of the sender, when the provider sends it.</param>
+/// <param name="MessageSubject">Subject (empty for WhatsApp).</param>
+/// <param name="MessageBody">Message text.</param>
+/// <param name="ExternalMessageId">Provider message id (Twilio <c>MessageSid</c>, e-mail <c>Message-ID</c> or its SHA-256 fallback): idempotency key.</param>
+/// <param name="Attachments">Files received with the message.</param>
+/// <param name="SkippedAttachments">
+/// Attachments the controller could not obtain (e.g. a failed Twilio media download), with the reason. They are
+/// recorded in the internal note of the ticket together with the ones the handler rejects.
+/// </param>
 public sealed record RegisterInboundTicketCommand(
     Guid CompanyId,
     Guid ChannelId,
@@ -24,5 +34,6 @@ public sealed record RegisterInboundTicketCommand(
     string MessageSubject,
     string MessageBody,
     string ExternalMessageId,
-    IReadOnlyList<InboundAttachment> Attachments)
-    : ITransactionalCommand<Response<TicketDto>>;
+    IReadOnlyList<InboundAttachment> Attachments,
+    IReadOnlyList<string>? SkippedAttachments = null)
+    : IRequest<Response<TicketDto>>;

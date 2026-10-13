@@ -13,6 +13,13 @@ namespace JOIN.Services.WebApi.Services;
 /// </summary>
 public class CurrentUserService : ICurrentUserService
 {
+    /// <summary>
+    /// <c>HttpContext.Items</c> key where an anonymous inbound webhook (SPEC 47) stores the tenant resolved from its
+    /// webhook token. It only applies to unauthenticated requests and takes precedence over the <c>X-Company-Id</c>
+    /// header, so the tenant of a webhook is always the one its token belongs to.
+    /// </summary>
+    public const string InboundCompanyIdItemKey = "JOIN.InboundWebhook.CompanyId";
+
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     /// <summary>
@@ -60,7 +67,13 @@ public class CurrentUserService : ICurrentUserService
                 return Guid.Empty;
             }
 
-            // 2. Optional fallback for local development/testing without authentication.
+            // 2. Anonymous inbound webhook: the tenant of the resolved webhook token (SPEC 47).
+            if (httpContext.Items.TryGetValue(InboundCompanyIdItemKey, out var inboundCompanyId) && inboundCompanyId is Guid inboundTenant)
+            {
+                return inboundTenant;
+            }
+
+            // 3. Optional fallback for local development/testing without authentication.
             var headerValue = httpContext.Request.Headers["X-Company-Id"].FirstOrDefault();
             if (!string.IsNullOrEmpty(headerValue) && Guid.TryParse(headerValue, out var headerCompanyId))
             {

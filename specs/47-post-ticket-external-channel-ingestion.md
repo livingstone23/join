@@ -22,7 +22,7 @@
 
 ## Adaptación a PostgreSQL (fork `main_postgresql`)
 
-Sigue `Pospuesto`, igual que en `main`: al retomarla se revisa completa contra el estado final del fork. Además:
+Retomada y aprobada en el fork (en `main` SPEC 47 sigue `Pospuesto`). Diferencias respecto de `main`:
 
 | Tema | En `main` (SQL Server) | En esta versión |
 |---|---|---|
@@ -314,6 +314,25 @@ Attachments        = cada parte de archivo del multipart
 - [ ] `JOIN.Application` ≥ 90% line coverage (gate de CI).
 - [ ] Ningún endpoint de ingesta expone `Response<TicketDto>` completo hacia el proveedor externo (solo `{ ticketCode }`).
 - [ ] `CURL_REQUESTS.md` documenta los 3 endpoints de `TicketInboundChannels` y el contrato esperado por los dos webhooks.
+
+---
+
+## Notas de implementación (2026-10-13)
+
+> **Ajuste por implementación:** lo que sigue precisa cómo quedó el código donde el texto de arriba era ambiguo o no se podía cumplir literalmente. No cambia el alcance; el estado lo decide el usuario.
+
+- **Tenant en la ruta anónima.** Los filtros globales de EF filtran por `ICurrentUserService.CompanyId`, que en un webhook sin JWT es vacío. Por eso: (1) el handler lee todo con `GetAllIncludingDeletedAsync` acotado explícitamente por `CompanyId` + `GcRecord = 0`; (2) tras resolver el token, el controller guarda la empresa en `HttpContext.Items[CurrentUserService.InboundCompanyIdItemKey]`, que `CurrentUserService` usa para requests no autenticados con prioridad sobre `X-Company-Id`, de modo que los colaboradores (`TicketInitialStatusResolver`, `TicketDtoAssembler`, `TicketCodeGenerator`) ven el tenant del token.
+- **Resolución del token** en Application: `ResolveTicketInboundChannelQuery` (Dapper, única consulta del módulo sin `@TenantId`: el token es la credencial del tenant). Filtra token, `GcRecord = 0` en ambas tablas, canal activo y `Code` esperado.
+- **Controllers** en `Controllers/Messaging/` (`InboundWhatsAppController`, `InboundEmailController`, base común `InboundTicketWebhookController`). El `404` es sin cuerpo (`EmptyResult`; `NotFound()` lo convertiría en ProblemDetails). Respuesta `200` = `{ "ticketCode": "..." }`.
+- **`RegisterInboundTicketCommand`** vive en `UseCases/Messaging/Tickets/Commands/RegisterInboundTicket/`, es `IRequest` (no `ITransactionalCommand`: el ticket se confirma solo y los adjuntos después, y una carrera 23505 se responde con el ticket ganador vía `IDatabaseErrorClassifier`). Agrega el parámetro opcional `SkippedAttachments` para que las descargas de Twilio fallidas lleguen a la nota interna.
+- **Flujo del handler**: canal de ingesta activo → `IsSuperAdminTicket` → deduplicación → defaults (complejidad y unidad de tiempo de `TicketCompanyDefault`; estado por `TicketInitialStatusResolver`, SPEC 42-post; un estado inválido también es `TICKET_DEFAULTS_NOT_CONFIGURED`) → persona por `IntakeRequesterResolver` (SPEC 45-post; ambiguo = sin vincular). `Name` = asunto, si no el cuerpo en una línea, si no `"Mensaje de {remitente}"` (máx. 150); `Description` máx. 2000.
+- **Adjuntos**: mismas reglas que SPEC 36 (extensión, tipos permitidos, tamaño, máximo por ticket, cuota diaria), anclados al log `Creation`. Los omitidos (incluida la falta de `TicketAttachmentSettings` o un fallo de almacenamiento) quedan en una única nota `InternalNote` con `IsOnlyForCreatedAndAssigned = true`.
+- **WhatsApp**: `MessageSubject = ""`; Twilio no envía nombre de archivo, se usa `whatsapp-{MessageSid}-{N}{ext}` con la extensión del `MediaContentType` (`.bin` si es desconocida, y se omite). `TwilioMediaDownloader` es inyectable (`IHttpClientFactory`, timeout 15 s) y **solo envía las credenciales por HTTPS a `api.twilio.com`**: la URL viene del payload y sin esa restricción quien tenga un token podría hacer que la API mande las credenciales a otro host.
+- **CRUD**: el resultado del alta es `CreatedTicketInboundChannelDto` (además de lo pedido: `companyId`, `channelCode`, `channelName`, `description`, `createdAt`); la entidad tiene `Description` opcional (500). El listado devuelve `webhookUrl` con el token enmascarado. Una carrera en el índice `(CompanyId, ChannelId)` también responde `409`. Códigos: `INVALID_CHANNEL`, `UNSUPPORTED_INBOUND_CHANNEL`, `INBOUND_CHANNEL_ALREADY_ACTIVE`, `TICKET_INBOUND_CHANNEL_NOT_FOUND`, `TICKET_INBOUND_PAYLOAD_INVALID`, `NO_TICKET_ADMIN_CONFIGURED`, `TICKET_DEFAULTS_NOT_CONFIGURED`.
+- **Seed**: exactamente las tres filas de rol de la sección E; los roles privilegiados reciben acceso total por `PrivilegedRoleNames`.
+- **Migración** `AddTicketInboundChannelsAndExternalMessageId` regenerada sobre el modelo con 45-post/46-post (`WebhookToken` `varchar(100)`).
+- **Pendiente fuera del código**: `IntakeRequesterResolver` sigue en `UseCases/Calendars/ChannelIntake` (su comentario sugiere moverlo a `Admin/Persons` al retomar SPEC 47; no se movió para no tocar 45-post). Smokes reales con Twilio Sandbox y SendGrid (F10.3–F10.5) no ejecutados; cubiertos por los tests de integración con payloads simulados.
+- **Tests**: 79 unitarios del módulo (handlers, validadores, query por token, downloader, controllers) y `TicketInboundIngestionPostgreSqlTests` (4 escenarios: índices y seed, CRUD con roles, WhatsApp con reintentos concurrentes, correo con adjunto y rotación).
 
 ---
 

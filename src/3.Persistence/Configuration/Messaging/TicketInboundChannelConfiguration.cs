@@ -1,6 +1,7 @@
 // Copyright (c) 2026-2027 JOIN Inc. All rights reserved.
 // See LICENSE in the project root for license information.
 
+using JOIN.Application.UseCases.Messaging.TicketInboundChannels.Common;
 using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
 using Microsoft.EntityFrameworkCore;
@@ -34,7 +35,7 @@ public sealed class TicketInboundChannelConfiguration : IEntityTypeConfiguration
 
         builder.Property(x => x.WebhookToken)
             .IsRequired()
-            .HasMaxLength(128);
+            .HasMaxLength(100);
 
         builder.Property(x => x.Description)
             .HasMaxLength(500);
@@ -50,7 +51,7 @@ public sealed class TicketInboundChannelConfiguration : IEntityTypeConfiguration
         builder.HasIndex(x => new { x.CompanyId, x.ChannelId })
             .IsUnique()
             .HasFilter("\"gcrecord\" = 0")
-            .HasDatabaseName("UX_TicketInboundChannels_Company_Channel_Active");
+            .HasDatabaseName(TicketInboundErrorCodes.CompanyChannelIndex);
 
         builder.HasOne(x => x.Company)
             .WithMany()

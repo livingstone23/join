@@ -3404,14 +3404,12 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // SPEC 37 — UsuarioSimple solo lee, sin Download/Export/Execute.
         new("UsuarioSimple", "TicketStatusTransitions", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
 
-        // SPEC 47 — canales de ingesta inbound (Twilio WhatsApp, SendGrid email). CanUpdate=false
-        // por diseño: rotar es delete + create. Admin y SuperAdminCompany reciben acceso total vía
-        // PrivilegedRoleNames; Agent y Person no tienen fila (denegado por defecto).
-        new("SuperAdmin", "TicketInboundChannels", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
-        new("Manager", "TicketInboundChannels", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
-        new("Supervisor", "TicketInboundChannels", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
-        new("Coordinador", "TicketInboundChannels", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
-        new("UsuarioSimple", "TicketInboundChannels", true, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
+        // SPEC 47 — canales de ingesta (webhooks de WhatsApp/correo). El recurso entrega tokens de webhook, así que el
+        // reparto es más restrictivo que el de los catálogos. CanUpdate = false en todos: no hay update, rotar es
+        // delete + create. Admin y SuperAdminCompany (PrivilegedRoleNames) y SuperAdmin tienen acceso total.
+        new("Manager", "TicketInboundChannels", true, true, false, true, CanDownload: false, CanExport: false, CanExecute: true),
+        new("Supervisor", "TicketInboundChannels", true, false, false, false),
+        new("UsuarioSimple", "TicketInboundChannels", false, false, false, false, CanDownload: false, CanExport: false, CanExecute: false),
 
         // SPEC 36 — adjuntos de tickets por rol. TicketAttachmentSettings es la config
         // singleton por empresa (no endpoint de descarga propio); TicketDocuments es

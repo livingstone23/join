@@ -1,387 +1,310 @@
-using System;
-using System.IO;
-using System.Linq;
-using System.Text;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
-using JOIN.Application.UseCases.Calendars.Common;
+using JOIN.Application.UseCases.Calendars.ChannelIntake;
 using JOIN.Application.UseCases.Messaging.TicketInboundChannels.Common;
+using JOIN.Application.UseCases.Messaging.Tickets.Commands.UploadTicketDocument;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
-using JOIN.Domain.Enums;
 using JOIN.Domain.Common;
+using JOIN.Domain.Enums;
 using JOIN.Domain.Messaging;
-using JOIN.Domain.Security;
 using JOIN.Domain.Support;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using TicketAttachmentSettingsEntity = JOIN.Domain.Messaging.TicketAttachmentSettings;
 
-namespace JOIN.Application.UseCases.Messaging.Tickets.RegisterInboundTicket;
+namespace JOIN.Application.UseCases.Messaging.Tickets.Commands.RegisterInboundTicket;
 
 /// <summary>
-/// Maneja la creación de un ticket a partir de un mensaje entrante (SPEC 47 F4).
-/// El flujo completo aparece en la sección "RegisterInboundTicketCommand — flujo
-/// completo" del spec; lo resumo aquí en el mismo orden:
-/// <list type="number">
-/// <item>Lookup por <c>(CompanyId, ChannelId, ExternalMessageId)</c> — dedup. Si existe, devolverlo.</item>
-/// <item>Resolver <c>TicketUserCompany.IsSuperAdminTicket</c> activo — sin él, ningún ticket puede atribuirse.</item>
-/// <item>Cargar <c>TicketCompanyDefault</c> con los tres defaults obligatorios (status / complexity / time unit).</item>
-/// <item>Buscar <c>PersonContact</c> por <c>SenderIdentifier</c> para resolver <c>PersonId</c>; si no hay match, dejar el remitente en el <c>Description</c>.</item>
-/// <item>Generar código vía <see cref="TicketCodeGenerator"/>.</item>
-/// <item>Persistir ticket + log <c>Creation</c> + adjuntos (best-effort, ningún adjunto falla el alta).</item>
-/// <item>Cubrir la carrera de dedup contra el índice único filtrado (PostgresException 23505).</item>
-/// </list>
+/// Handles <see cref="RegisterInboundTicketCommand"/> (SPEC 47 F4, "RegisterInboundTicketCommand — flujo completo").
+/// <para>
+/// There is no JWT on this route, so every read is scoped explicitly by the <c>CompanyId</c> of the command
+/// (<c>GetAllIncludingDeletedAsync</c> with <c>CompanyId</c> and <c>GcRecord == 0</c>) instead of relying on the
+/// tenant query filter. The webhook controllers also expose that tenant to <c>ICurrentUserService</c> for the
+/// collaborators that read through it (<see cref="TicketInitialStatusResolver"/>, <see cref="TicketDtoAssembler"/>).
+/// </para>
 /// </summary>
 public sealed class RegisterInboundTicketCommandHandler(
     IUnitOfWork unitOfWork,
     IFileStorageService fileStorageService,
     TicketDtoAssembler ticketDtoAssembler,
     TicketCodeGenerator ticketCodeGenerator,
+    TicketInitialStatusResolver initialStatusResolver,
+    IntakeRequesterResolver requesterResolver,
+    IDatabaseErrorClassifier errorClassifier,
     ILogger<RegisterInboundTicketCommandHandler> logger)
     : IRequestHandler<RegisterInboundTicketCommand, Response<TicketDto>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-    private readonly IFileStorageService _fileStorageService = fileStorageService;
-    private readonly TicketDtoAssembler _ticketDtoAssembler = ticketDtoAssembler;
-    private readonly TicketCodeGenerator _ticketCodeGenerator = ticketCodeGenerator;
-    private readonly ILogger<RegisterInboundTicketCommandHandler> _logger = logger;
+    /// <summary> Maximum length of <c>Ticket.Name</c>. </summary>
+    public const int NameMaxLength = 150;
+
+    /// <summary> Maximum length of <c>Ticket.Description</c>. </summary>
+    public const int DescriptionMaxLength = 2000;
+
+    private const int LogSummaryMaxLength = 2000;
 
     /// <inheritdoc />
     public async Task<Response<TicketDto>> Handle(RegisterInboundTicketCommand request, CancellationToken cancellationToken)
     {
-        // --- 1. Confirm a TicketInboundChannel exists for (CompanyId, ChannelId) (handler trust boundary).
-        // El controller ya validó el token; acá sólo verificamos que la fila siga activa.
-        var inboundRepository = _unitOfWork.GetRepository<TicketInboundChannel>();
-        var allInbound = await inboundRepository.GetAllAsync();
-        var inboundActive = allInbound.Any(x =>
-            x.CompanyId == request.CompanyId
-            && x.ChannelId == request.ChannelId
-            && x.GcRecord == BaseAuditableEntity.ActiveGcRecord);
+        var companyId = request.CompanyId;
 
-        if (!inboundActive)
+        // --- 0. The inbound channel must still be active (it may have been rotated after the controller lookup). ---
+        var inboundChannels = await unitOfWork.GetRepository<TicketInboundChannel>().GetAllIncludingDeletedAsync(x =>
+            x.CompanyId == companyId && x.ChannelId == request.ChannelId && x.GcRecord == BaseAuditableEntity.ActiveGcRecord);
+        var channel = await unitOfWork.GetRepository<CommunicationChannel>().GetAsync(request.ChannelId);
+
+        if (!inboundChannels.Any() || channel is null)
         {
             return Response<TicketDto>.Error(
-                TicketInboundErrorCodes.InvalidToken,
-                ["No active inbound channel is configured for the supplied company + channel."]);
+                TicketInboundErrorCodes.InboundChannelNotFound,
+                ["No active inbound channel is configured for the company and channel."]);
         }
 
-        // --- 2. Dedup: existing ticket? ---
-        var dedup = await TryFindExistingTicket(request, cancellationToken);
-        if (dedup is { } existingTicket)
-        {
-            return await BuildResponseAsync(existingTicket, isDuplicate: true, cancellationToken);
-        }
+        // --- 1. Author: the active IsSuperAdminTicket of the company. ---
+        var ticketAdminUserId = (await unitOfWork.GetRepository<TicketUserCompany>().GetAllIncludingDeletedAsync(x =>
+                x.CompanyId == companyId && x.GcRecord == BaseAuditableEntity.ActiveGcRecord && x.IsSuperAdminTicket))
+            .OrderBy(x => x.Created)
+            .Select(x => (Guid?)x.UserId)
+            .FirstOrDefault();
 
-        // --- 2. Resolve IsSuperAdminTicket for the tenant ---
-        var ticketAdminUserId = await ResolveSuperAdminUserIdAsync(request.CompanyId, cancellationToken);
-        if (ticketAdminUserId is null)
+        if (ticketAdminUserId is not { } authorUserId)
         {
+            logger.LogWarning(
+                "[RegisterInboundTicket] Rejected inbound message {ExternalMessageId}: company {CompanyId} has no active IsSuperAdminTicket.",
+                request.ExternalMessageId, companyId);
             return Response<TicketDto>.Error(
                 TicketInboundErrorCodes.NoTicketAdmin,
-                ["No active TicketUserCompany with IsSuperAdminTicket is configured for the current tenant."]);
+                ["No active TicketUserCompany with IsSuperAdminTicket is configured for the company."]);
         }
 
-        // --- 3. Load TicketCompanyDefault ---
-        var defaultsRepository = _unitOfWork.GetRepository<TicketCompanyDefault>();
-        var allDefaults = await defaultsRepository.GetAllAsync();
-        var defaults = allDefaults.FirstOrDefault(x => x.CompanyId == request.CompanyId && x.GcRecord == BaseAuditableEntity.ActiveGcRecord);
-
-        if (defaults is null
-            || defaults.TicketStatusDefaultId is null
-            || defaults.TicketComplexityDefaultId is null
-            || defaults.TimeUnitDefaultId is null)
+        // --- 2. Idempotency: a provider retry returns the ticket already created. ---
+        var existing = await FindExistingTicketAsync(request, cancellationToken);
+        if (existing is not null)
         {
-            return Response<TicketDto>.Error(
-                TicketInboundErrorCodes.DefaultsMissing,
-                ["The tenant has no TicketCompanyDefault or its required fields are missing."]);
+            return await BuildResponseAsync(existing, isDuplicate: true, cancellationToken);
         }
 
-        // --- 4. Resolve channel (for Name + FK) + requester person ---
-        var channelRepository = _unitOfWork.GetRepository<CommunicationChannel>();
-        var channel = await channelRepository.GetAsync(request.ChannelId);
-        var channelName = channel?.Name ?? "External";
+        // --- 3. Defaults: complexity and time unit from TicketCompanyDefault, status from TicketInitialStatusResolver (SPEC 42). ---
+        var defaults = (await unitOfWork.GetRepository<TicketCompanyDefault>().GetAllIncludingDeletedAsync(x =>
+                x.CompanyId == companyId && x.GcRecord == BaseAuditableEntity.ActiveGcRecord))
+            .FirstOrDefault();
 
-        var requesterPersonId = await ResolveRequesterPersonIdAsync(request, cancellationToken);
-
-        // --- 5/6. Build the ticket entity ---
-        var subject = Truncate(request.MessageSubject, 150, addEllipsis: true);
-        if (string.IsNullOrWhiteSpace(subject))
+        if (defaults?.TicketStatusDefaultId is null
+            || defaults.TicketComplexityDefaultId is not { } complexityId
+            || defaults.TimeUnitDefaultId is not { } timeUnitId)
         {
-            subject = Truncate(request.MessageBody, 150, addEllipsis: true);
+            return DefaultsMissing(companyId, request, ["The company has no TicketCompanyDefault or its status, complexity or time unit default is missing."]);
         }
 
-        var descriptionBuilder = new System.Text.StringBuilder();
-        if (requesterPersonId is null)
+        var initialStatus = await initialStatusResolver.ResolveAsync(companyId, null, cancellationToken);
+        if (!initialStatus.IsSuccess)
         {
-            var display = string.IsNullOrWhiteSpace(request.SenderDisplayName) ? request.SenderIdentifier : request.SenderDisplayName;
-            descriptionBuilder.Append("Remitente: ").Append(display).Append(" (").Append(request.SenderIdentifier).Append(")\n\n");
-        }
-        descriptionBuilder.Append(request.MessageBody);
-        var description = descriptionBuilder.ToString();
-        if (description.Length > 2000)
-        {
-            description = description[..2000];
+            return DefaultsMissing(companyId, request, initialStatus.Errors?.ToList() ?? [initialStatus.Message]);
         }
 
+        // --- 4. Requester: same normalization as the calendar agent (SPEC 45-post). Ambiguous = not linked. ---
+        var senderIdentifier = request.SenderIdentifier.Trim();
+        var match = await requesterResolver.LookupByChannelAsync(companyId, channel.Code ?? string.Empty, senderIdentifier, cancellationToken);
+        var personId = match.Found ? match.PersonId : null;
+
+        // --- 5..8. Build the ticket. ---
+        var sender = string.IsNullOrWhiteSpace(request.SenderDisplayName) ? senderIdentifier : request.SenderDisplayName.Trim();
         var ticket = new Ticket
         {
-            CompanyId = request.CompanyId,
+            CompanyId = companyId,
             ChannelId = request.ChannelId,
-            ExternalMessageId = request.ExternalMessageId,
-            TicketStatusId = defaults.TicketStatusDefaultId!.Value,
-            TicketComplexityId = defaults.TicketComplexityDefaultId!.Value,
-            TimeUnitId = defaults.TimeUnitDefaultId!.Value,
-            PersonId = requesterPersonId,
+            ExternalMessageId = request.ExternalMessageId.Trim(),
+            TicketStatusId = initialStatus.Data,
+            TicketComplexityId = complexityId,
+            TimeUnitId = timeUnitId,
             AreaId = defaults.AreaDefaultId,
             ProjectId = defaults.ProjectDefaultId,
-            CreatedByUserId = ticketAdminUserId.Value,
+            PersonId = personId,
+            CreatedByUserId = authorUserId,
             AssignedToUserId = null,
-            Name = subject,
-            Description = description,
-            IsVisibleToExternals = true,
-            EstimatedTime = 0m,
-            ConsumedTime = 0m
+            Name = BuildName(request, sender),
+            Description = BuildDescription(request, personId is null ? $"Remitente: {sender} ({senderIdentifier})\n\n" : null),
+            IsVisibleToExternals = true
         };
 
-        await _ticketCodeGenerator.AssignCodeAsync(ticket, DateTime.UtcNow, cancellationToken);
+        await ticketCodeGenerator.AssignCodeAsync(ticket, DateTime.UtcNow, cancellationToken);
+        ticket.AddLog(authorUserId, LogType.Creation, $"Ticket creado automáticamente desde {channel.Name} ({sender})");
 
-        ticket.AddLog(
-            ticketAdminUserId.Value,
-            LogType.Creation,
-            $"Ticket creado automáticamente desde {channelName} ({DisplayOf(request)})");
-
-        // --- 7. Persist + dedup-race guard ---
-        var ticketRepository = _unitOfWork.GetRepository<Ticket>();
+        // --- 9. Persist. A concurrent retry that committed first wins: answer with its ticket. ---
         try
         {
-            await ticketRepository.InsertAsync(ticket);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await unitOfWork.GetRepository<Ticket>().InsertAsync(ticket);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
         }
-        catch (Exception ex) when (IsPostgresUniqueViolation(ex))
+        catch (Exception exception) when (errorClassifier.IsUniqueViolation(exception, TicketInboundErrorCodes.ExternalMessageIdIndex))
         {
-            // Perdimos la carrera: alguien insertó con el mismo ExternalMessageId.
-            // Re-buscamos y devolvemos el existente.
-            var raced = await TryFindExistingTicket(request, cancellationToken);
-            if (raced is null)
+            var winner = await FindExistingTicketAsync(request, cancellationToken);
+            if (winner is null)
             {
-                // Algo raro: el INSERT chocó pero el SELECT no encuentra nada.
-                // Devolver el error original que el handler superior va a transformar a 500.
                 throw;
             }
 
-            return await BuildResponseAsync(raced, isDuplicate: true, cancellationToken);
+            return await BuildResponseAsync(winner, isDuplicate: true, cancellationToken);
         }
 
-        // --- 8. Attachments (best-effort) ---
-        if (request.Attachments.Count > 0)
-        {
-            await TryPersistAttachmentsAsync(ticket, request.Attachments, cancellationToken);
-        }
+        // --- 10. Attachments, best-effort: a rejected file is skipped and noted, never fails the ticket. ---
+        await PersistAttachmentsAsync(ticket, authorUserId, request, cancellationToken);
 
+        // --- 11. Response. ---
         return await BuildResponseAsync(ticket, isDuplicate: false, cancellationToken);
     }
 
-    /// <summary>
-    /// Devuelve el ticket existente si hay un match activo con el mismo
-    /// <c>(CompanyId, ChannelId, ExternalMessageId)</c>; <c>null</c> cuando no.
-    /// </summary>
-    private async Task<Ticket?> TryFindExistingTicket(RegisterInboundTicketCommand request, CancellationToken cancellationToken)
+    private Response<TicketDto> DefaultsMissing(Guid companyId, RegisterInboundTicketCommand request, List<string> errors)
     {
-        var ticketRepository = _unitOfWork.GetRepository<Ticket>();
-        var all = await ticketRepository.GetAllIncludingDeletedAsync(t =>
+        logger.LogWarning(
+            "[RegisterInboundTicket] Rejected inbound message {ExternalMessageId}: company {CompanyId} has incomplete ticket defaults ({Errors}).",
+            request.ExternalMessageId, companyId, string.Join("; ", errors));
+        return Response<TicketDto>.Error(TicketInboundErrorCodes.DefaultsMissing, errors);
+    }
+
+    private async Task<Ticket?> FindExistingTicketAsync(RegisterInboundTicketCommand request, CancellationToken cancellationToken)
+    {
+        var externalMessageId = request.ExternalMessageId.Trim();
+        var matches = await unitOfWork.GetRepository<Ticket>().GetAllIncludingDeletedAsync(t =>
             t.CompanyId == request.CompanyId
             && t.ChannelId == request.ChannelId
-            && t.ExternalMessageId == request.ExternalMessageId
+            && t.ExternalMessageId == externalMessageId
             && t.GcRecord == BaseAuditableEntity.ActiveGcRecord);
 
-        return all.FirstOrDefault();
+        return matches.FirstOrDefault();
     }
 
     /// <summary>
-    /// Resuelve el usuario "admin de tickets" de la empresa: <c>IsSuperAdminTicket = true</c> activo.
+    /// Validates each attachment with the same rules as <c>UploadTicketDocumentCommandHandler</c> (SPEC 36: type,
+    /// whitelist, size, files per ticket, daily quota), stores the accepted ones anchored to the <c>Creation</c> log
+    /// and records the skipped ones (including <see cref="RegisterInboundTicketCommand.SkippedAttachments"/>) in an
+    /// internal note visible only to the creator and the assignee.
     /// </summary>
-    private async Task<Guid?> ResolveSuperAdminUserIdAsync(Guid companyId, CancellationToken cancellationToken)
+    private async Task PersistAttachmentsAsync(Ticket ticket, Guid authorUserId, RegisterInboundTicketCommand request, CancellationToken cancellationToken)
     {
-        var repository = _unitOfWork.GetRepository<TicketUserCompany>();
-        var rows = await repository.GetAllAsync();
-        var row = rows.FirstOrDefault(x =>
-            x.CompanyId == companyId
-            && x.GcRecord == BaseAuditableEntity.ActiveGcRecord
-            && x.IsSuperAdminTicket);
+        var skipped = new List<string>(request.SkippedAttachments ?? []);
 
-        if (row is null)
+        if (request.Attachments.Count > 0)
         {
-            return null;
+            var settings = (await unitOfWork.GetRepository<TicketAttachmentSettingsEntity>().GetAllIncludingDeletedAsync(x =>
+                    x.CompanyId == ticket.CompanyId && x.GcRecord == BaseAuditableEntity.ActiveGcRecord))
+                .FirstOrDefault();
+
+            if (settings is null)
+            {
+                skipped.AddRange(request.Attachments.Select(a => $"{a.FileName}: la empresa no tiene configuración de adjuntos"));
+            }
+            else
+            {
+                await StoreAcceptedAttachmentsAsync(ticket, settings, request.Attachments, skipped, cancellationToken);
+            }
         }
 
-        var userRepository = _unitOfWork.GetRepository<ApplicationUser>();
-        var user = await userRepository.GetAsync(row.UserId);
-        return user is not null ? user.Id : (Guid?)null;
+        if (skipped.Count > 0)
+        {
+            var summary = "Adjuntos omitidos al registrar el ticket:\n- " + string.Join("\n- ", skipped);
+            ticket.AddLog(authorUserId, LogType.InternalNote, Truncate(summary, LogSummaryMaxLength), isOnlyForCreatedAndAssigned: true);
+            // The ticket is already tracked: UpdateAsync marks the new log as Added (its client-side Id would make
+            // change detection treat it as an existing row).
+            await unitOfWork.GetRepository<Ticket>().UpdateAsync(ticket);
+            logger.LogWarning(
+                "[RegisterInboundTicket] Ticket {TicketId}: skipped {SkippedCount} attachment(s).",
+                ticket.Id, skipped.Count);
+        }
+
+        if (skipped.Count > 0 || request.Attachments.Count > 0)
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
     }
 
-    /// <summary>
-    /// Busca un <c>Person</c> cuyo <c>PersonContact.ContactValue</c> activo empate exacto con el
-    /// <c>SenderIdentifier</c>. Coincidencia case-insensitive para emails y exacta para teléfonos.
-    /// </summary>
-    private async Task<Guid?> ResolveRequesterPersonIdAsync(RegisterInboundTicketCommand request, CancellationToken cancellationToken)
+    private async Task StoreAcceptedAttachmentsAsync(
+        Ticket ticket,
+        TicketAttachmentSettingsEntity settings,
+        IReadOnlyList<InboundAttachment> attachments,
+        List<string> skipped,
+        CancellationToken cancellationToken)
     {
-        var contactsRepository = _unitOfWork.GetRepository<PersonContact>();
-        var contacts = await contactsRepository.GetAllAsync();
-
-        var identifier = request.SenderIdentifier?.Trim() ?? string.Empty;
-        if (string.IsNullOrEmpty(identifier))
-        {
-            return null;
-        }
-
-        var candidate = contacts.FirstOrDefault(c =>
-            c.CompanyId == request.CompanyId
-            && c.GcRecord == BaseAuditableEntity.ActiveGcRecord
-            && c.IsActive
-            && MatchesIdentifier(c, identifier));
-
-        return candidate?.PersonId;
-    }
-
-    /// <summary>
-    /// Match por tipo de contacto: emails son case-insensitive, teléfonos son exactos (E.164).
-    /// </summary>
-    private static bool MatchesIdentifier(PersonContact contact, string identifier)
-    {
-        if (string.IsNullOrWhiteSpace(contact.ContactValue))
-        {
-            return false;
-        }
-
-        return contact.ContactType switch
-        {
-            ContactType.PrimaryEmail => string.Equals(contact.ContactValue.Trim(), identifier, StringComparison.OrdinalIgnoreCase),
-            ContactType.AlternativeEmail => string.Equals(contact.ContactValue.Trim(), identifier, StringComparison.OrdinalIgnoreCase),
-            ContactType.MobilePhone => string.Equals(contact.ContactValue.Trim(), identifier, StringComparison.Ordinal),
-            ContactType.WhatsApp => string.Equals(contact.ContactValue.Trim(), identifier, StringComparison.Ordinal),
-            ContactType.Landline => string.Equals(contact.ContactValue.Trim(), identifier, StringComparison.Ordinal),
-            _ => false
-        };
-    }
-
-    /// <summary>
-    /// Recorre cada <see cref="InboundAttachment"/>, aplica las reglas de
-    /// <c>TicketAttachmentSettings</c> (mejor esfuerzo) y persiste los bytes /
-    /// metadata. Nunca aborta la creación del ticket.
-    /// </summary>
-    private async Task TryPersistAttachmentsAsync(Ticket ticket, IReadOnlyList<InboundAttachment> attachments, CancellationToken cancellationToken)
-    {
-        var settingsRepository = _unitOfWork.GetRepository<JOIN.Domain.Messaging.TicketAttachmentSettings>();
-        var allSettings = await settingsRepository.GetAllAsync();
-        var settings = allSettings.FirstOrDefault(x => x.CompanyId == ticket.CompanyId && x.GcRecord == BaseAuditableEntity.ActiveGcRecord);
-
-        if (settings is null)
-        {
-            _logger.LogWarning(
-                "[RegisterInboundTicket] Skipping {AttachmentCount} attachments: no TicketAttachmentSettings configured for company {CompanyId}.",
-                attachments.Count, ticket.CompanyId);
-            return;
-        }
-
-        // El log Creation persiste en ticket.TicketLogs tras el InsertAsync; usamos el primero para anclar.
-        var ticketLog = ticket.TicketLogs.FirstOrDefault();
-
-        var documentRepository = _unitOfWork.GetRepository<TicketDocument>();
-        var documentsPersisted = 0;
-        var documentsSkipped = 0;
+        var creationLogId = ticket.TicketLogs.First(l => l.LogType == LogType.Creation).Id;
+        var documentRepository = unitOfWork.GetRepository<TicketDocument>();
+        var todayUtc = DateTime.UtcNow.Date;
+        var storedToday = settings.MaxFilesPerDay.HasValue
+            ? (await documentRepository.GetAllIncludingDeletedAsync(d =>
+                d.CompanyId == ticket.CompanyId && d.GcRecord == BaseAuditableEntity.ActiveGcRecord && d.Created >= todayUtc)).Count()
+            : 0;
+        var storedForTicket = 0;
 
         foreach (var attachment in attachments)
         {
-            if (attachment.Length > settings.MaxFileSizeBytes)
-            {
-                _logger.LogWarning(
-                    "[RegisterInboundTicket] Skipping attachment {FileName}: {Size} bytes > MaxFileSizeBytes {Max}.",
-                    attachment.FileName, attachment.Length, settings.MaxFileSizeBytes);
-                documentsSkipped++;
-                continue;
-            }
-
             var extension = Path.GetExtension(attachment.FileName)?.ToLowerInvariant() ?? string.Empty;
-            if (!TryMapExtension(extension, out var documentType))
+            string? reason = null;
+
+            if (!UploadTicketDocumentCommandHandler.TryMapExtension(extension, out var documentType))
             {
-                _logger.LogWarning(
-                    "[RegisterInboundTicket] Skipping attachment {FileName}: unsupported extension '{Extension}'.",
-                    attachment.FileName, extension);
-                documentsSkipped++;
+                reason = $"extensión '{extension}' no soportada";
+            }
+            else if (!settings.AllowedDocumentTypes.HasFlag(documentType))
+            {
+                reason = $"tipo '{documentType}' no permitido";
+            }
+            else if (attachment.Length > settings.MaxFileSizeBytes)
+            {
+                reason = $"{attachment.Length} bytes supera el máximo de {settings.MaxFileSizeBytes}";
+            }
+            else if (storedForTicket >= settings.MaxFilesPerTicket)
+            {
+                reason = $"se alcanzó el máximo de {settings.MaxFilesPerTicket} adjuntos por ticket";
+            }
+            else if (settings.MaxFilesPerDay is { } maxPerDay && storedToday >= maxPerDay)
+            {
+                reason = $"se alcanzó la cuota diaria de {maxPerDay} adjuntos";
+            }
+
+            if (reason is not null)
+            {
+                skipped.Add($"{attachment.FileName}: {reason}");
                 continue;
             }
 
-            if (!settings.AllowedDocumentTypes.HasFlag(documentType))
-            {
-                _logger.LogWarning(
-                    "[RegisterInboundTicket] Skipping attachment {FileName}: document type '{DocumentType}' not allowed for company {CompanyId}.",
-                    attachment.FileName, documentType, ticket.CompanyId);
-                documentsSkipped++;
-                continue;
-            }
+            var newName = $"{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{extension}";
+            var storageKey = $"{ticket.CompanyId}/{ticket.Id}/{newName}";
 
             try
             {
-                var newName = $"{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{extension}";
-                var storageKey = $"{ticket.CompanyId}/{ticket.Id}/{newName}";
-                var saveResult = await _fileStorageService.SaveAsync(
-                    attachment.Content,
-                    storageKey,
-                    attachment.ContentType,
-                    cancellationToken);
+                var saveResult = await fileStorageService.SaveAsync(attachment.Content, storageKey, attachment.ContentType, cancellationToken);
 
                 await documentRepository.InsertAsync(new TicketDocument
                 {
                     TicketId = ticket.Id,
                     CompanyId = ticket.CompanyId,
-                    TicketLogsId = ticketLog?.Id ?? Guid.Empty,
+                    TicketLogsId = creationLogId,
                     DocumentType = documentType,
                     OriginalName = attachment.FileName,
                     NewName = newName,
                     Path = storageKey,
                     StorageProvider = StorageProviderKind.Local,
                     ContentType = attachment.ContentType,
-                    SizeBytes = saveResult.SizeBytes,
-                    Created = DateTime.UtcNow,
-                    CreatedBy = ticket.CreatedByUserId.ToString(),
-                    GcRecord = BaseAuditableEntity.ActiveGcRecord
+                    SizeBytes = saveResult.SizeBytes
                 });
-                documentsPersisted++;
+
+                storedForTicket++;
+                storedToday++;
             }
-            catch (Exception ex)
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                _logger.LogWarning(
-                    ex,
-                    "[RegisterInboundTicket] Skipping attachment {FileName}: storage provider failed.",
-                    attachment.FileName);
-                documentsSkipped++;
+                logger.LogWarning(exception, "[RegisterInboundTicket] Storage failed for attachment {FileName} of ticket {TicketId}.", attachment.FileName, ticket.Id);
+                skipped.Add($"{attachment.FileName}: falló el almacenamiento");
             }
-        }
-
-        if (documentsPersisted > 0)
-        {
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-        }
-
-        if (documentsSkipped > 0)
-        {
-            _logger.LogInformation(
-                "[RegisterInboundTicket] Ticket {TicketId}: persisted {Persisted} attachment(s), skipped {Skipped}.",
-                ticket.Id, documentsPersisted, documentsSkipped);
         }
     }
 
-    /// <summary>
-    /// Cierra el flujo devolviendo el <see cref="TicketDto"/> correspondiente.
-    /// </summary>
     private async Task<Response<TicketDto>> BuildResponseAsync(Ticket ticket, bool isDuplicate, CancellationToken cancellationToken)
     {
-        var companyRepository = _unitOfWork.GetRepository<Company>();
-        var company = await companyRepository.GetAsync(ticket.CompanyId);
+        var company = await unitOfWork.GetRepository<Company>().GetAsync(ticket.CompanyId);
+        var dto = await ticketDtoAssembler.BuildAsync(ticket, company!, cancellationToken);
 
-        var dto = await _ticketDtoAssembler.BuildAsync(ticket, company!, cancellationToken);
         return new Response<TicketDto>
         {
             IsSuccess = true,
@@ -390,67 +313,18 @@ public sealed class RegisterInboundTicketCommandHandler(
         };
     }
 
-    private static string Truncate(string? value, int maxLength, bool addEllipsis)
+    /// <summary> Subject, else the first characters of the body (on one line), else "Mensaje de {sender}". </summary>
+    private static string BuildName(RegisterInboundTicketCommand request, string sender)
     {
-        if (string.IsNullOrEmpty(value))
-        {
-            return string.Empty;
-        }
+        var source = !string.IsNullOrWhiteSpace(request.MessageSubject) ? request.MessageSubject : request.MessageBody;
+        var singleLine = string.Join(' ', (source ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
-        if (value.Length <= maxLength)
-        {
-            return value;
-        }
-
-        return addEllipsis ? value[..(maxLength - 1)] + "…" : value[..maxLength];
+        return Truncate(string.IsNullOrEmpty(singleLine) ? $"Mensaje de {sender}" : singleLine, NameMaxLength);
     }
 
-    private static string DisplayOf(RegisterInboundTicketCommand request) =>
-        string.IsNullOrWhiteSpace(request.SenderDisplayName)
-            ? request.SenderIdentifier
-            : $"{request.SenderDisplayName} ({request.SenderIdentifier})";
+    private static string BuildDescription(RegisterInboundTicketCommand request, string? senderPrefix) =>
+        Truncate($"{senderPrefix}{request.MessageBody?.Trim()}", DescriptionMaxLength);
 
-    /// <summary>
-    /// Detecta la violación de índice único de PostgreSQL (SQLSTATE 23505) sin
-    /// tomar dependencia dura del paquete Npgsql — mismo criterio que
-    /// <c>GlobalExceptionHandler.IsPostgresUniqueViolation</c>.
-    /// </summary>
-    private static bool IsPostgresUniqueViolation(Exception exception)
-    {
-        for (var current = exception; current is not null; current = current.InnerException)
-        {
-            if (current.GetType().FullName == "Npgsql.PostgresException")
-            {
-                var sqlState = current.GetType().GetProperty("SqlState")?.GetValue(current) as string;
-                return sqlState == "23505";
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Mapea la extensión a <see cref="DocumentType"/> — mismo criterio que
-    /// <c>UploadTicketDocumentCommandHandler.TryMapExtension</c> (SPEC 36).
-    /// </summary>
-    private static bool TryMapExtension(string extension, out DocumentType documentType)
-    {
-        documentType = DocumentType.None;
-        return extension switch
-        {
-            ".pdf" => Assign(DocumentType.Pdf, out documentType),
-            ".doc" or ".docx" => Assign(DocumentType.Word, out documentType),
-            ".xls" or ".xlsx" => Assign(DocumentType.Excel, out documentType),
-            ".txt" or ".csv" => Assign(DocumentType.Text, out documentType),
-            ".png" or ".jpg" or ".jpeg" or ".gif" => Assign(DocumentType.Image, out documentType),
-            ".zip" => Assign(DocumentType.Other, out documentType),
-            _ => false
-        };
-
-        static bool Assign(DocumentType value, out DocumentType slot)
-        {
-            slot = value;
-            return true;
-        }
-    }
+    private static string Truncate(string value, int maxLength) =>
+        value.Length <= maxLength ? value : value[..maxLength];
 }

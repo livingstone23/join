@@ -1,37 +1,19 @@
 using System.Security.Cryptography;
 using System.Text;
-using Dapper;
-using JOIN.Application.Common;
-using JOIN.Application.DTO.Messaging;
-using JOIN.Application.Interface;
+using Asp.Versioning;
 using JOIN.Application.UseCases.Messaging.Tickets;
-using JOIN.Application.UseCases.Messaging.Tickets.RegisterInboundTicket;
+using JOIN.Application.UseCases.Messaging.Tickets.Commands.RegisterInboundTicket;
 using JOIN.Domain.Common;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using Asp.Versioning;
 
-namespace JOIN.Services.WebApi.Controllers.Inbound;
+namespace JOIN.Services.WebApi.Controllers.Messaging;
 
 /// <summary>
-/// Webhook anónimo que recibe correos entrantes vía SendGrid Inbound Parse
-/// (<c>multipart/form-data</c>) y los traduce a
-/// <c>RegisterInboundTicketCommand</c> para crear un ticket sin JWT
-/// (SPEC 47 F6).
-/// <para>
-/// La URL lleva el <c>webhookToken</c> de la empresa/canal configurado en
-/// <c>TicketInboundChannel</c>: <c>POST /api/v1/inbound/email/{token}</c>.
-/// El token se resuelve contra la BD; sin match, sin canal con
-/// <c>Code = SENDGRID</c> activo, o soft-deleted → <c>404</c> desnudo (no
-/// se filtra información sobre la validez del token).
-/// </para>
-/// <para>
-/// A diferencia del canal de WhatsApp, los adjuntos llegan ya materializados
-/// como partes del multipart (<see cref="IFormFile"/>) — no hay fetch
-/// saliente extra.
-/// </para>
+/// Anonymous webhook for e-mails received through SendGrid Inbound Parse (SPEC 47 F6):
+/// <c>POST /api/v1/inbound/email/{token}</c> with SendGrid's <c>multipart/form-data</c> body. The token must belong
+/// to an active inbound channel whose <c>CommunicationChannel.Code</c> is <c>SENDGRID</c>.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
@@ -39,233 +21,115 @@ namespace JOIN.Services.WebApi.Controllers.Inbound;
 [AllowAnonymous]
 public class InboundEmailController(
     ISender sender,
-    ISqlConnectionFactory connectionFactory,
-    ILogger<InboundEmailController> logger) : ControllerBase
+    ILogger<InboundEmailController> logger) : InboundTicketWebhookController(sender, logger)
 {
-    private readonly ISender _sender = sender ?? throw new ArgumentNullException(nameof(sender));
-    private readonly ISqlConnectionFactory _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
-    private readonly ILogger<InboundEmailController> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
     /// <summary>
-    /// Recibe un correo entrante desde SendGrid Inbound Parse, lo mapea a un
-    /// <see cref="RegisterInboundTicketCommand"/> y devuelve un cuerpo mínimo
-    /// con el <c>ticketCode</c> creado (o el existente si el proveedor
-    /// reintenta con el mismo <c>Message-ID</c> o hash de payload).
+    /// Registers the e-mail as a ticket and answers <c>{ ticketCode }</c> (the existing code when SendGrid retries
+    /// the same message). Unknown, rotated or non-SendGrid token: bare <c>404</c>.
     /// </summary>
-    /// <param name="token">Token de webhook que identifica el <c>TicketInboundChannel</c> de la empresa.</param>
-    /// <param name="form">Multipart/form-data de SendGrid Inbound Parse.</param>
-    /// <param name="cancellationToken">Token de cancelación.</param>
+    /// <param name="token">Webhook token of the company's e-mail inbound channel.</param>
+    /// <param name="form">SendGrid fields: <c>from</c>, <c>subject</c>, <c>text</c>/<c>html</c>, <c>headers</c>, <c>attachments</c> and the files <c>attachmentN</c>.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     [HttpPost("{token}")]
     [Consumes("multipart/form-data")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(InboundTicketResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Receive(
-        [FromRoute] string token,
-        [FromForm] IFormCollection form,
-        CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Receive([FromRoute] string token, [FromForm] IFormCollection form, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            return NotFound();
-        }
-
         var channel = await ResolveChannelAsync(token, CommunicationChannelCodes.SendGrid, cancellationToken);
         if (channel is null)
         {
-            return NotFound();
+            return BareNotFound();
         }
 
-        var from = ParseEmailAddressOnly(form["from"].ToString());
-        var senderDisplayName = ParseDisplayName(form["from"].ToString());
-        var subject = form["subject"].ToString();
+        var rawFrom = form["from"].ToString();
+        var from = ParseAddress(rawFrom);
+        var subject = form["subject"].ToString().Trim();
         var text = form["text"].ToString();
-        var html = form["html"].ToString();
-        var body = !string.IsNullOrEmpty(text) ? text : html;
+        var body = string.IsNullOrWhiteSpace(text) ? form["html"].ToString() : text;
 
-        if (string.IsNullOrWhiteSpace(body))
+        if (string.IsNullOrEmpty(from) || string.IsNullOrWhiteSpace(body))
         {
-            _logger.LogWarning(
-                "[InboundEmail] Rejected inbound message: missing both 'text' and 'html' bodies for company {CompanyId}.",
-                channel.CompanyId);
-            return BadRequest(Response<object>.Error("MISSING_BODY", ["SendGrid did not send a 'text' or 'html' body."]));
+            return InvalidPayload("SendGrid payload without 'from' or without a 'text'/'html' body.");
         }
 
         var attachments = new List<InboundAttachment>();
-        var attachmentCount = int.TryParse(form["attachments"], out var n) ? n : 0;
-        for (var i = 1; i <= attachmentCount; i++)
+        foreach (var file in form.Files.Where(f => f.Length > 0))
         {
-            var file = form.Files.GetFile($"attachment{i}");
-            if (file is null || file.Length == 0)
+            var buffer = new MemoryStream();
+            await using (var source = file.OpenReadStream())
             {
-                continue;
+                await source.CopyToAsync(buffer, cancellationToken);
             }
 
-            // Copia a MemoryStream para que el handler pueda leerlo sin
-            // depender del ciclo de vida del IFormFile (que ASP.NET dispone
-            // al terminar la request). El buffer NO se envuelve en `using`
-            // porque su dueño pasa a ser el InboundAttachment: si lo
-            // disposáramos acá, el handler recibiría un stream ya cerrado.
-            var sourceStream = file.OpenReadStream();
-            var buffer = new MemoryStream(checked((int)file.Length));
-            await sourceStream.CopyToAsync(buffer, cancellationToken);
-            sourceStream.Dispose();
             buffer.Position = 0;
-
             attachments.Add(new InboundAttachment(
                 buffer,
-                file.FileName,
+                string.IsNullOrWhiteSpace(file.FileName) ? file.Name : file.FileName,
                 string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
                 file.Length));
         }
-
-        var externalMessageId = ExtractMessageId(form["headers"].ToString())
-            ?? ComputePayloadHash(from, subject, body);
 
         var command = new RegisterInboundTicketCommand(
             CompanyId: channel.CompanyId,
             ChannelId: channel.ChannelId,
             SenderIdentifier: from,
-            SenderDisplayName: senderDisplayName,
-            MessageSubject: subject ?? string.Empty,
+            SenderDisplayName: ParseDisplayName(rawFrom),
+            MessageSubject: subject,
             MessageBody: body,
-            ExternalMessageId: externalMessageId,
+            ExternalMessageId: ExtractMessageId(form["headers"].ToString()) ?? ComputePayloadHash(from, subject, body),
             Attachments: attachments);
 
-        var response = await _sender.Send(command, cancellationToken);
-        if (!response.IsSuccess)
-        {
-            return MapRegisterError(response);
-        }
-
-        return Ok(new InboundTicketResponse(
-            TicketId: response.Data!.Id,
-            TicketCode: response.Data.Code,
-            IsDuplicate: false));
+        return await RegisterAsync(command, cancellationToken);
     }
 
-    /// <summary>
-    /// Resuelve un <c>TicketInboundChannel</c> activo por su token de webhook,
-    /// verificando además que su <c>CommunicationChannel.Code</c> sea
-    /// <c>SENDGRID</c>. Devuelve <c>null</c> en cualquier caso de "no match".
-    /// </summary>
-    private async Task<ResolvedChannel?> ResolveChannelAsync(string token, string expectedCode, CancellationToken cancellationToken)
+    /// <summary> Address of a <c>From</c> such as <c>"Name &lt;a@b.com&gt;"</c>, or the trimmed value. </summary>
+    public static string ParseAddress(string? rawFrom)
     {
-        const string sql = """
-            SELECT tic.Id, tic.CompanyId, tic.ChannelId
-            FROM Messaging.TicketInboundChannels tic
-            INNER JOIN Common.CommunicationChannels cc ON cc.Id = tic.ChannelId
-            WHERE tic.WebhookToken = @token
-              AND tic.GcRecord = 0
-              AND cc.GcRecord = 0
-              AND cc.Code = @expectedCode
-            LIMIT 1
-            """;
-
-        using var connection = _connectionFactory.CreateConnection();
-        var row = await connection.QuerySingleOrDefaultAsync<ResolvedChannel>(
-            new CommandDefinition(
-                sql,
-                new { token, expectedCode },
-                cancellationToken: cancellationToken));
-
-        return row;
+        var value = rawFrom?.Trim() ?? string.Empty;
+        var start = value.LastIndexOf('<');
+        var end = value.LastIndexOf('>');
+        return start >= 0 && end > start ? value[(start + 1)..end].Trim() : value;
     }
 
-    private IActionResult MapRegisterError(Response<TicketDto> response)
+    /// <summary> Display name of a <c>From</c> such as <c>"Name &lt;a@b.com&gt;"</c>; <c>null</c> when absent. </summary>
+    public static string? ParseDisplayName(string? rawFrom)
     {
-        return response.Message switch
-        {
-            "NO_TICKET_ADMIN_CONFIGURED" or "TICKET_DEFAULTS_NOT_CONFIGURED"
-                => BadRequest(response),
-            _ => BadRequest(response)
-        };
-    }
-
-    /// <summary>
-    /// De un From tipo <c>"Name" &lt;a@b.com&gt;</c> deja solo <c>a@b.com</c>.
-    /// </summary>
-    private static string ParseEmailAddressOnly(string rawFrom)
-    {
-        if (string.IsNullOrWhiteSpace(rawFrom))
-        {
-            return string.Empty;
-        }
-
-        var start = rawFrom.IndexOf('<');
-        var end = rawFrom.IndexOf('>');
-        if (start >= 0 && end > start)
-        {
-            return rawFrom.Substring(start + 1, end - start - 1).Trim();
-        }
-
-        return rawFrom.Trim();
-    }
-
-    /// <summary>
-    /// De un From tipo <c>"Name" &lt;a@b.com&gt;</c> extrae <c>Name</c>. Si no
-    /// viene en ese formato, devuelve <c>null</c>.
-    /// </summary>
-    private static string? ParseDisplayName(string rawFrom)
-    {
-        if (string.IsNullOrWhiteSpace(rawFrom))
+        var value = rawFrom?.Trim() ?? string.Empty;
+        var start = value.LastIndexOf('<');
+        if (start <= 0)
         {
             return null;
         }
 
-        var lt = rawFrom.IndexOf('<');
-        if (lt <= 0)
-        {
-            return null;
-        }
-
-        var display = rawFrom[..lt].Trim().Trim('"', '\'');
-        return string.IsNullOrWhiteSpace(display) ? null : display;
+        var display = value[..start].Trim().Trim('"', '\'').Trim();
+        return display.Length == 0 ? null : display;
     }
 
-    /// <summary>
-    /// Busca una línea <c>Message-ID: &lt;id&gt;</c> en el bloque de headers
-    /// crudo que SendGrid entrega en el campo <c>headers</c> del multipart.
-    /// Devuelve <c>null</c> si no la encuentra — en ese caso el caller usa
-    /// un hash del payload como fallback determinístico.
-    /// </summary>
-    private static string? ExtractMessageId(string? rawHeaders)
+    /// <summary> <c>Message-ID</c> of the raw <c>headers</c> field, without angle brackets; <c>null</c> when absent. </summary>
+    public static string? ExtractMessageId(string? rawHeaders)
     {
-        if (string.IsNullOrWhiteSpace(rawHeaders))
+        const string prefix = "Message-ID:";
+        foreach (var rawLine in (rawHeaders ?? string.Empty).Split('\n'))
         {
-            return null;
-        }
-
-        foreach (var rawLine in rawHeaders.Split('\n'))
-        {
-            var line = rawLine.Trim().TrimEnd('\r');
-            const string prefix = "Message-ID:";
-            if (line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            var line = rawLine.Trim();
+            if (!line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
-                var value = line[prefix.Length..].Trim();
-                if (value.Length >= 2 && value[0] == '<' && value[^1] == '>')
-                {
-                    value = value[1..^1];
-                }
-                return string.IsNullOrWhiteSpace(value) ? null : value;
+                continue;
             }
+
+            var value = line[prefix.Length..].Trim().TrimStart('<').TrimEnd('>').Trim();
+            return value.Length == 0 ? null : value;
         }
 
         return null;
     }
 
     /// <summary>
-    /// Hash SHA-256 determinístico de los campos que identifican unívocamente
-    /// al mensaje cuando SendGrid no expone <c>Message-ID</c>: misma
-    /// combinación <c>(from, subject, body)</c> en reintentos del proveedor
-    /// produce siempre el mismo id, habilitando la deduplicación.
+    /// Deterministic fallback key when SendGrid does not expose <c>Message-ID</c>: SHA-256 of from + subject + body
+    /// (SPEC 47 "Decisions"), so a retry of the same e-mail is recognized.
     /// </summary>
-    private static string ComputePayloadHash(string from, string subject, string body)
-    {
-        var payload = $"{from}\n{subject}\n{body}";
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
-
-    private sealed record ResolvedChannel(Guid Id, Guid CompanyId, Guid ChannelId);
+    public static string ComputePayloadHash(string from, string subject, string body) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{from}\n{subject}\n{body}"))).ToLowerInvariant();
 }

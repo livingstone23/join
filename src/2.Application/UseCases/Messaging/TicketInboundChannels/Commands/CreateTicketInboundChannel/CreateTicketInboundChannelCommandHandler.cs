@@ -1,10 +1,7 @@
-using System;
-using System.Linq;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Messaging;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
-using JOIN.Application.UseCases.Calendars.Common;
 using JOIN.Application.UseCases.Messaging.TicketInboundChannels.Common;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Common;
@@ -14,68 +11,52 @@ using MediatR;
 namespace JOIN.Application.UseCases.Messaging.TicketInboundChannels.Commands.CreateTicketInboundChannel;
 
 /// <summary>
-/// Maneja la creación de un <c>TicketInboundChannel</c>. Aplica tres reglas antes
-/// de tocar la BD:
-/// <list type="number">
-/// <item><c>ChannelId</c> debe existir y estar activo.</item>
-/// <item>Su <c>CommunicationChannel.Code</c> debe ser uno de los soportados para ingesta
-/// (<c>WHATSAPP</c>, <c>SENDGRID</c>); el resto devuelve <see cref="TicketInboundErrorCodes.UnsupportedChannel"/>.</item>
-/// <item>No debe existir otra fila activa para <c>(CompanyId, ChannelId)</c> — la violación
-/// del índice único filtrado se traduce a <see cref="TicketInboundErrorCodes.UnsupportedChannel"/>-equivalente
-/// <c>INBOUND_CHANNEL_ALREADY_ACTIVE</c> (409).</item>
-/// </list>
+/// Handles <see cref="CreateTicketInboundChannelCommand"/> (SPEC 47 F2): the channel must exist, be active and have a
+/// <c>Code</c> handled by an inbound webhook (<c>WHATSAPP</c>, <c>SENDGRID</c>), and the company may have at most one
+/// active row per channel — rotating a token is delete + create. A concurrent create that loses the race on the
+/// filtered unique index is answered with the same 409.
 /// </summary>
 public sealed class CreateTicketInboundChannelCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IDatabaseErrorClassifier errorClassifier)
     : IRequestHandler<CreateTicketInboundChannelCommand, Response<CreatedTicketInboundChannelDto>>
 {
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-    private readonly ICurrentUserService _currentUserService = currentUserService;
-
     /// <inheritdoc />
     public async Task<Response<CreatedTicketInboundChannelDto>> Handle(
         CreateTicketInboundChannelCommand request,
         CancellationToken cancellationToken)
     {
-        if (!_currentUserService.IsAuthenticated || _currentUserService.CompanyId == Guid.Empty)
+        var companyId = currentUserService.CompanyId;
+        if (companyId == Guid.Empty)
         {
             return Response<CreatedTicketInboundChannelDto>.Error("COMPANY_REQUIRED", ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        var companyId = _currentUserService.CompanyId;
-
-        var channelRepository = _unitOfWork.GetRepository<CommunicationChannel>();
-        var channel = await channelRepository.GetAsync(request.ChannelId);
-
+        var channel = await unitOfWork.GetRepository<CommunicationChannel>().GetAsync(request.ChannelId);
         if (channel is null || !channel.IsActive || channel.GcRecord != BaseAuditableEntity.ActiveGcRecord)
         {
             return Response<CreatedTicketInboundChannelDto>.Error(
-                "INVALID_CHANNEL",
+                TicketInboundErrorCodes.InvalidChannel,
                 ["The specified communication channel does not exist or is inactive."]);
         }
 
-        // Drive the spec's "ruteo por Code, nunca por Name" requirement.
-        var code = channel.Code;
-        if (code is not (CommunicationChannelCodes.WhatsApp or CommunicationChannelCodes.SendGrid))
+        // Routing is always by Code, never by Name (SPEC 47 D).
+        if (channel.Code is not (CommunicationChannelCodes.WhatsApp or CommunicationChannelCodes.SendGrid))
         {
             return Response<CreatedTicketInboundChannelDto>.Error(
                 TicketInboundErrorCodes.UnsupportedChannel,
-                [$"Communication channel '{code}' is not supported for inbound ingestion."]);
+                [$"Communication channel '{channel.Code}' is not supported for inbound ingestion."]);
         }
 
-        var repository = _unitOfWork.GetRepository<TicketInboundChannel>();
-        var existing = await repository.GetAllAsync();
-        var activeExists = existing.Any(x =>
-            x.CompanyId == companyId
-            && x.ChannelId == request.ChannelId
-            && x.GcRecord == BaseAuditableEntity.ActiveGcRecord);
+        var repository = unitOfWork.GetRepository<TicketInboundChannel>();
+        var activeExists = (await repository.GetAllIncludingDeletedAsync(x =>
+                x.CompanyId == companyId && x.ChannelId == request.ChannelId && x.GcRecord == BaseAuditableEntity.ActiveGcRecord))
+            .Any();
 
         if (activeExists)
         {
-            return Response<CreatedTicketInboundChannelDto>.Error(
-                "INBOUND_CHANNEL_ALREADY_ACTIVE",
-                ["An active inbound channel already exists for this company + communication channel."]);
+            return AlreadyActive();
         }
 
         var entity = new TicketInboundChannel
@@ -83,17 +64,17 @@ public sealed class CreateTicketInboundChannelCommandHandler(
             CompanyId = companyId,
             ChannelId = request.ChannelId,
             WebhookToken = WebhookTokenGenerator.Generate(),
-            Description = request.Description?.Trim()
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim()
         };
 
-        await repository.InsertAsync(entity);
-        var result = await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        if (result <= 0)
+        try
         {
-            return Response<CreatedTicketInboundChannelDto>.Error(
-                "CREATE_FAILED",
-                ["No records were affected while creating the inbound channel."]);
+            await repository.InsertAsync(entity);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception exception) when (errorClassifier.IsUniqueViolation(exception, TicketInboundErrorCodes.CompanyChannelIndex))
+        {
+            return AlreadyActive();
         }
 
         return new Response<CreatedTicketInboundChannelDto>
@@ -105,13 +86,18 @@ public sealed class CreateTicketInboundChannelCommandHandler(
                 Id = entity.Id,
                 CompanyId = entity.CompanyId,
                 ChannelId = entity.ChannelId,
-                ChannelCode = channel.Code ?? string.Empty,
+                ChannelCode = channel.Code,
                 ChannelName = channel.Name,
                 Description = entity.Description,
                 WebhookToken = entity.WebhookToken,
-                WebhookUrl = string.Empty, // el controller lo construye desde HttpContext
+                WebhookUrl = string.Empty, // built by the controller from the request host
                 CreatedAt = entity.Created
             }
         };
     }
+
+    private static Response<CreatedTicketInboundChannelDto> AlreadyActive() =>
+        Response<CreatedTicketInboundChannelDto>.Error(
+            TicketInboundErrorCodes.AlreadyActive,
+            ["An active inbound channel already exists for this company and communication channel."]);
 }

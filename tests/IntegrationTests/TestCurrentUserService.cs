@@ -65,6 +65,13 @@ public sealed class TestCurrentUserService : ICurrentUserService
                     return Guid.Empty;
                 }
 
+                // Same precedence as CurrentUserService: an anonymous inbound webhook carries the tenant of its token.
+                if (httpContext.Items.TryGetValue(JOIN.Services.WebApi.Services.CurrentUserService.InboundCompanyIdItemKey, out var inbound)
+                    && inbound is Guid inboundCompanyId)
+                {
+                    return inboundCompanyId;
+                }
+
                 var headerValue = httpContext.Request.Headers["X-Company-Id"].FirstOrDefault();
                 if (!string.IsNullOrEmpty(headerValue) && Guid.TryParse(headerValue, out var headerCompanyId))
                 {

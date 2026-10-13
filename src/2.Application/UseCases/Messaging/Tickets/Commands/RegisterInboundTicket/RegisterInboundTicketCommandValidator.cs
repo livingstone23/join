@@ -1,15 +1,11 @@
 using FluentValidation;
 
-namespace JOIN.Application.UseCases.Messaging.Tickets.RegisterInboundTicket;
+namespace JOIN.Application.UseCases.Messaging.Tickets.Commands.RegisterInboundTicket;
 
 /// <summary>
-/// Validaciones de entrada para <see cref="RegisterInboundTicketCommand"/> — la
-/// ruta sin JWT exige controles estrictos porque no hay <c>ICurrentUserService</c>
-/// que descarte el request antes. La unicidad por <c>ExternalMessageId</c> la
-/// resuelve el handler. Las cadenas que pueden ir vacías en condiciones reales
-/// (un WhatsApp sin texto) se acotan en longitud pero NO se fuerzan no-vacías
-/// — los controllers de ingesta ya aplican la validación específica de su
-/// proveedor antes de armar el comando.
+/// Input validation for <see cref="RegisterInboundTicketCommand"/>. Subject and body are not limited here: the
+/// handler truncates them (150 / 2000 characters), because rejecting a long e-mail would make the provider retry it
+/// forever.
 /// </summary>
 public sealed class RegisterInboundTicketCommandValidator : AbstractValidator<RegisterInboundTicketCommand>
 {
@@ -30,10 +26,7 @@ public sealed class RegisterInboundTicketCommandValidator : AbstractValidator<Re
             .NotEmpty().WithMessage("SenderIdentifier is required.")
             .MaximumLength(200).WithMessage("SenderIdentifier cannot exceed 200 characters.");
 
-        RuleFor(x => x.MessageSubject)
-            .MaximumLength(200).WithMessage("MessageSubject cannot exceed 200 characters.");
-
-        RuleFor(x => x.MessageBody)
-            .MaximumLength(8000).WithMessage("MessageBody cannot exceed 8000 characters.");
+        RuleFor(x => x.Attachments)
+            .NotNull().WithMessage("Attachments cannot be null.");
     }
 }
