@@ -1,6 +1,6 @@
 # SPEC 53 — Tickets: mis capacidades, usuarios asignables e inactividad en los valores por defecto
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 34 (roster `TicketUserCompany`), SPEC 35 (acciones de ciclo de vida y `TicketUserCompanyCapabilityResolver`), SPEC 37 (SLA e inactividad), SPEC 43-post (permisos por ruta). Rama de trabajo: `spec-53-ticket-capabilities-and-inactivity`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`.
 > **Date:** 2026-10-13
 > **Objective:** Darle al frontend tres datos que hoy no puede obtener sin permisos de administración: las capacidades de ticket del usuario autenticado, la lista de usuarios a los que se puede asignar un ticket y el máximo de días sin actividad de la empresa.
