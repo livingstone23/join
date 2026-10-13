@@ -100,6 +100,13 @@ public record TicketCompanyDefaultDto : SoftDeletableDto
     public string? ChannelName { get; init; }
 
     /// <summary>
+    /// Gets the inactivity threshold in days (SPEC 53). <c>null</c> means tickets in this
+    /// tenant are never marked inactive by <c>TicketSlaCalculator</c>. Drives the
+    /// "Supera el máximo de {n} días" badge in FE-18 and the inactivity count of SPEC 52.
+    /// </summary>
+    public int? MaxDayTicketInactivity { get; init; }
+
+    /// <summary>
     /// Gets the UTC creation timestamp.
     /// </summary>
     public DateTime CreatedAt { get; init; }

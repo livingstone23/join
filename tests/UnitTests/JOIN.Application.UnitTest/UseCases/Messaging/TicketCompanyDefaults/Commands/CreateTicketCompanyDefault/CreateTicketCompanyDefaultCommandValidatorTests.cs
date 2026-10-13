@@ -83,6 +83,37 @@ public sealed class CreateTicketCompanyDefaultCommandValidatorTests
     }
 
     /// <summary>
+    /// SPEC 53 — <c>null</c> disables inactivity marking; a positive integer is
+    /// the only other acceptable value. Zero or negative must be rejected.
+    /// </summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(-7)]
+    public void Validate_WhenMaxDayTicketInactivityIsNotPositive_ShouldReturnError(int value)
+    {
+        var result = _validator.Validate(CreateValidCommand() with { MaxDayTicketInactivity = value });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle(x =>
+            x.PropertyName == nameof(CreateTicketCompanyDefaultCommand.MaxDayTicketInactivity)
+            && x.ErrorMessage == "MaxDayTicketInactivity must be null or greater than zero.");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(1)]
+    [InlineData(7)]
+    [InlineData(30)]
+    public void Validate_WhenMaxDayTicketInactivityIsNullOrPositive_ShouldPass(int? value)
+    {
+        var result = _validator.Validate(CreateValidCommand() with { MaxDayTicketInactivity = value });
+
+        result.IsValid.Should().BeTrue();
+        result.Errors.Should().BeEmpty();
+    }
+
+    /// <summary>
     /// Creates a valid command for reuse across validator scenarios.
     /// </summary>
     private static CreateTicketCompanyDefaultCommand CreateValidCommand()

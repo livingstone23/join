@@ -42,5 +42,10 @@ public sealed class UpdateTicketCompanyDefaultCommandValidator : AbstractValidat
         RuleFor(x => x.ChannelDefaultId)
             .Must(value => !value.HasValue || value.Value != Guid.Empty)
             .WithMessage("The default communication channel identifier is invalid.");
+
+        // SPEC 53 — null disables inactivity; otherwise the threshold must be positive.
+        RuleFor(x => x.MaxDayTicketInactivity)
+            .Must(value => !value.HasValue || value.Value >= 1)
+            .WithMessage("MaxDayTicketInactivity must be null or greater than zero.");
     }
 }

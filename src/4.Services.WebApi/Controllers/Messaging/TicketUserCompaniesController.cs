@@ -5,6 +5,8 @@ using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Commands.CreateTic
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Commands.DeleteTicketUserCompany;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Commands.RestoreTicketUserCompany;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Commands.UpdateTicketUserCompany;
+using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetAssignableTicketUsers;
+using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetMyTicketCapabilities;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetSystemWideTicketUserCompanies;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetTicketUserCompanies;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetTicketUserCompanyById;
@@ -30,6 +32,73 @@ namespace JOIN.Services.WebApi.Controllers.Messaging;
 public class TicketUserCompaniesController(ISender sender) : ControllerBase
 {
     private readonly ISender _sender = sender ?? throw new ArgumentNullException(nameof(sender));
+
+    /// <summary>
+    /// Returns the caller's ticket-management capabilities for the active
+    /// tenant (SPEC 53). Reads the active company from the token, so the
+    /// SuperAdmin company override is honored the same way every other
+    /// tenant-scoped query honors it. A user outside the roster receives 200
+    /// with <c>IsMember = false</c> and every capability flag <c>false</c>.
+    /// Gated by <c>CanRead</c> on <c>Tickets</c>, not on
+    /// <c>TicketUserCompanies</c> — anyone who works tickets needs this data.
+    /// </summary>
+    [HttpGet("me")]
+    [PermissionResource("Tickets")]
+    [ProducesResponseType(typeof(Response<TicketMyCapabilitiesDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetMine(
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new GetMyTicketCapabilitiesQuery(companyId), cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            if (response.Message == "COMPANY_REQUIRED" || response.Message == "USER_REQUIRED")
+            {
+                return Unauthorized(response);
+            }
+
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Returns the active users of the active tenant the caller may assign a
+    /// ticket to (SPEC 53). The list mirrors the <c>CanResolveTicket = TRUE</c>
+    /// + active filter that <c>CreateTicket</c> (initial assignee) and
+    /// <c>ReassignTicket</c> (target) validate against, so the FE-17 "Asignar a"
+    /// dropdown cannot offer a destination the backend would reject.
+    /// Gated by <c>CanRead</c> on <c>Tickets</c>, not on
+    /// <c>TicketUserCompanies</c> — the agent needs the list even without
+    /// permission to administer the roster.
+    /// </summary>
+    [HttpGet("assignable")]
+    [PermissionResource("Tickets")]
+    [ProducesResponseType(typeof(Response<IReadOnlyList<TicketAssignableUserDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetAssignable(
+        [FromQuery] Guid? companyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _sender.Send(new GetAssignableTicketUsersQuery(companyId), cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            if (response.Message == "COMPANY_REQUIRED")
+            {
+                return Unauthorized(response);
+            }
+
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
 
     /// <summary>
     /// Retrieves a paginated, tenant-scoped list of ticket-roster entries with optional capability filters.

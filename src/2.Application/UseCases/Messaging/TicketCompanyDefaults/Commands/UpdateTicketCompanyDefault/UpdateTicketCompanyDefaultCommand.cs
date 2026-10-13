@@ -60,4 +60,10 @@ public record UpdateTicketCompanyDefaultCommand : ITransactionalCommand<Response
     /// Gets the optional default communication channel identifier.
     /// </summary>
     public Guid? ChannelDefaultId { get; init; }
+
+    /// <summary>
+    /// Gets the optional inactivity threshold in days (SPEC 53).
+    /// <c>null</c> disables inactivity marking on this tenant; otherwise must be <c>&gt;= 1</c>.
+    /// </summary>
+    public int? MaxDayTicketInactivity { get; init; }
 }

@@ -152,4 +152,58 @@ public sealed class TicketUserCompanyCapabilityResolverTests
 
         public TicketUserCompanyCapabilityResolver CreateResolver() => new(UnitOfWorkMock.Object);
     }
+
+    // ── SPEC 53 — ResolveWithMembershipAsync: same lookup, plus IsMember ──────────────
+
+    /// <summary>
+    /// When the caller is not on the roster, the projection must carry
+    /// <c>IsMember = false</c> alongside the all-<c>false</c> capability flags
+    /// — the frontend uses this to distinguish "out of roster" from
+    /// "on the roster with no flags".
+    /// </summary>
+    [Fact]
+    public async Task ResolveWithMembershipAsync_WhenNoActiveRosterRow_ShouldReturnIsMemberFalse()
+    {
+        var userId = _fixture.Create<Guid>();
+        var companyId = _fixture.Create<Guid>();
+        var context = new ResolverTestContext();
+        context.RepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(Array.Empty<TicketUserCompany>());
+
+        var capability = await context.CreateResolver().ResolveWithMembershipAsync(userId, companyId, CancellationToken.None);
+
+        capability.IsMember.Should().BeFalse();
+        capability.IsSuperAdminTicket.Should().BeFalse();
+        capability.CanFinishTicket.Should().BeFalse();
+        capability.CanResolveTicket.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// When an active roster row exists, the projection carries
+    /// <c>IsMember = true</c> and the row's capability flags verbatim.
+    /// </summary>
+    [Fact]
+    public async Task ResolveWithMembershipAsync_WhenActiveRosterRowExists_ShouldReturnIsMemberTrue()
+    {
+        var userId = _fixture.Create<Guid>();
+        var companyId = _fixture.Create<Guid>();
+        var row = new TicketUserCompany
+        {
+            CompanyId = companyId,
+            UserId = userId,
+            IsSuperAdminTicket = false,
+            CanFinishTicket = false,
+            CanResolveTicket = true,
+            GcRecord = 0
+        };
+
+        var context = new ResolverTestContext();
+        context.RepositoryMock.Setup(x => x.GetAllAsync()).ReturnsAsync(new[] { row });
+
+        var capability = await context.CreateResolver().ResolveWithMembershipAsync(userId, companyId, CancellationToken.None);
+
+        capability.IsMember.Should().BeTrue();
+        capability.IsSuperAdminTicket.Should().BeFalse();
+        capability.CanFinishTicket.Should().BeFalse();
+        capability.CanResolveTicket.Should().BeTrue();
+    }
 }

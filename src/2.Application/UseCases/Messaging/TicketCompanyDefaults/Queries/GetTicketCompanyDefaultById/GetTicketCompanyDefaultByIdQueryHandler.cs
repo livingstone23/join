@@ -51,6 +51,7 @@ public sealed class GetTicketCompanyDefaultByIdQueryHandler(
                 p.Name AS ProjectName,
                 tcd.ChannelDefaultId,
                 ch.Name AS ChannelName,
+                tcd.MaxDayTicketInactivity,
                 tcd.Created AS CreatedAt
             FROM Messaging.TicketCompanyDefaults tcd
             LEFT JOIN Messaging.TicketStatuses ts ON tcd.TicketStatusDefaultId = ts.Id

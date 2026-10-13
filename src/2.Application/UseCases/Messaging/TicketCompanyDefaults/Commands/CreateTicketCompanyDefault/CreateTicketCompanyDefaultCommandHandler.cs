@@ -169,6 +169,7 @@ public sealed class CreateTicketCompanyDefaultCommandHandler(
             ProjectName = projectName,
             ChannelDefaultId = entity.ChannelDefaultId,
             ChannelName = channelName,
+            MaxDayTicketInactivity = entity.MaxDayTicketInactivity,
             CreatedAt = entity.Created
         };
 }

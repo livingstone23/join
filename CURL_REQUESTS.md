@@ -700,12 +700,15 @@ with corrupt JSON surface with an empty `changes[]` instead of failing the page.
 `metadata` carries `bulkOperationId` for grouped bulk writes (RoleSystemOptions
 matrix upsert and bulk role updates).
 
-## TicketUserCompanies — `/api/v1/TicketUserCompanies` (SPEC 34)
+## TicketUserCompanies — `/api/v1/TicketUserCompanies` (SPEC 34, SPEC 53)
 
 Tenant-scoped CRUD over the ticket-management roster (the `User ↔ Company` link
 with `IsSuperAdminTicket`, `CanFinishTicket` and `CanResolveTicket` flags).
 Tenant-scoped endpoints are gated by the flags attached to the `TicketUserCompanies`
 resource; the cross-tenant `system-wide` endpoint is gated by the `SuperAdmin` role.
+SPEC 53 adds two short-circuits for the agent UI — `/me` (capabilities of the
+caller) and `/assignable` (assignable resolvers) — gated by `CanRead` on
+`Tickets`, not on `TicketUserCompanies`, so any agent can read them.
 
 ```bash
 # 1. List (paginated, tenant-scoped, optional filters)
@@ -717,6 +720,38 @@ curl -s "$BASE_URL/api/v1/TicketUserCompanies?pageNumber=1&pageSize=10" \
 curl -s "$BASE_URL/api/v1/TicketUserCompanies?isSuperAdminTicket=true" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Company-Id: $TENANT_ID"
+```
+
+```bash
+# 1b. Capabilities of the caller (SPEC 53) — drives the "Finalizar" /
+#     "Reasignar" buttons in FE-18 and the "Asignarme a mí" toggle in FE-17.
+#     Gated by CanRead on Tickets (NOT TicketUserCompanies).
+#     A caller outside the roster receives 200 with isMember=false and every
+#     capability flag false — the frontend hides capability-gated actions,
+#     it does not surface a missing-row error.
+curl -s "$BASE_URL/api/v1/TicketUserCompanies/me" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+# Returns 200 with Response<TicketMyCapabilitiesDto>:
+#   isMember, isSuperAdminTicket, canFinishTicket, canResolveTicket.
+# Returns 401 COMPANY_REQUIRED without a token CompanyId.
+# Returns 403 without CanRead on Tickets.
+```
+
+```bash
+# 1c. Assignable resolvers of the active tenant (SPEC 53) — drives the
+#     "Asignar a" dropdown in FE-17 and the "Reasignar" target picker in FE-18.
+#     Same CanResolveTicket = TRUE filter that CreateTicket (initial
+#     assignee) and ReassignTicket (target) validate against, so the
+#     frontend cannot offer a destination the backend would reject.
+#     Gated by CanRead on Tickets (NOT TicketUserCompanies).
+curl -s "$BASE_URL/api/v1/TicketUserCompanies/assignable" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+# Returns 200 with Response<IReadOnlyList<TicketAssignableUserDto>>
+# (userId, userName, userEmail, ordered by lastName, firstName).
+# Returns 401 COMPANY_REQUIRED without a token CompanyId.
+# Returns 403 without CanRead on Tickets.
 ```
 
 ```bash
@@ -1040,6 +1075,56 @@ curl -s -X POST "$BASE_URL/api/v1/Tickets/$ID/notes" \
 # Allowed logType values:
 #   2 = InternalNote  → IsOnlyForCreatedAndAssigned = true  (hidden from third viewers)
 #   3 = ExternalNote  → IsOnlyForCreatedAndAssigned = false (visible to every reader)
+```
+
+## TicketCompanyDefaults — `/api/v1/TicketCompanyDefaults` (SPEC 42, SPEC 53)
+
+Tenant-scoped CRUD over the `TicketCompanyDefaults` row that backs the ticket
+code generator, the default status on create, and (SPEC 53) the inactivity
+threshold that drives `TicketSlaCalculator`. The endpoints are gated by the
+flags attached to the `TicketCompanyDefaults` permission resource (HTTP-verb
+defaults: GET → CanRead, POST → CanCreate, PUT → CanUpdate, DELETE → CanDelete).
+
+The inactivity threshold (`maxDayTicketInactivity`) is optional. SPEC 53:
+
+- `null` (or omitted) → tickets in this tenant are never marked inactive by
+  `TicketSlaCalculator` (the pre-SPEC-53 default).
+- A positive integer → open tickets with no activity for more than N days
+  report `isInactive = true` on `GET /Tickets` and `GET /Tickets/{id}`.
+- `0` or a negative integer → 400 with the FluentValidation message
+  `"MaxDayTicketInactivity must be null or greater than zero."`.
+
+```bash
+# 1. List the active tenant defaults (returns the inactivity threshold)
+curl -s "$BASE_URL/api/v1/TicketCompanyDefaults" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID"
+
+# 2. Create with an inactivity threshold of 7 days
+curl -s -X POST "$BASE_URL/api/v1/TicketCompanyDefaults" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "startCode": "TCK",
+    "codeSequenceLength": 6,
+    "usePersonalizedCode": false,
+    "ticketStatusDefaultId": "22222222-2222-2222-2222-222222222222",
+    "maxDayTicketInactivity": 7
+  }'
+
+# 3. Update — null disables the inactivity threshold on the tenant
+curl -s -X PUT "$BASE_URL/api/v1/TicketCompanyDefaults/$ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Company-Id: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "startCode": "TCK",
+    "codeSequenceLength": 6,
+    "usePersonalizedCode": false,
+    "ticketStatusDefaultId": "22222222-2222-2222-2222-222222222222",
+    "maxDayTicketInactivity": null
+  }'
 ```
 
 ## TicketStatusTransitions — `/api/v1/TicketStatusTransitions` (SPEC 37)
