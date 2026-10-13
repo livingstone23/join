@@ -51,6 +51,8 @@ public sealed class ModuleEnforcementPostgreSqlTests : IClassFixture<ModuleEnfor
             {
                 problem.RootElement.GetProperty("code").GetString().Should().Be("MODULE_NOT_ENABLED");
                 problem.RootElement.GetProperty("module").GetString().Should().Be("Tickets");
+                problem.RootElement.TryGetProperty("traceId", out _).Should().BeTrue("the global ProblemDetails setup applies (C)");
+                problem.RootElement.GetProperty("instance").GetString().Should().Be("/api/v1/Tickets");
             }
 
             (await superAdmin.GetAsync("/api/v1/Tickets")).StatusCode.Should().Be(HttpStatusCode.OK,
@@ -65,6 +67,54 @@ public sealed class ModuleEnforcementPostgreSqlTests : IClassFixture<ModuleEnfor
 
         (await manager.GetAsync("/api/v1/Tickets")).StatusCode.Should().Be(HttpStatusCode.OK,
             "reactivating the module invalidates the per-company module cache");
+    }
+
+    /// <summary>
+    /// A module inactive globally (<c>SystemModule.IsActive = false</c>) blocks every company, and the change made
+    /// through <c>PUT /SystemModules</c> reaches the module cache built by another request (global version token).
+    /// </summary>
+    [Fact]
+    public async Task GloballyInactiveModule_Returns403_AndReactivatingRestoresAccessWithoutRestart()
+    {
+        using var manager = await ModuleTestHelpers.LoginAsync(_factory, "manager@join.com");
+        using var superAdmin = await ModuleTestHelpers.LoginAsync(_factory, "lcano@join.com");
+        var module = await ModuleTestHelpers.SystemModuleAsync(_factory, "Tickets");
+
+        (await manager.GetAsync("/api/v1/Tickets")).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        try
+        {
+            await SetSystemModuleActiveAsync(superAdmin, module, isActive: false);
+
+            var blocked = await manager.GetAsync("/api/v1/Tickets");
+            var body = await blocked.Content.ReadAsStringAsync();
+            blocked.StatusCode.Should().Be(HttpStatusCode.Forbidden, body);
+            using var problem = JsonDocument.Parse(body);
+            problem.RootElement.GetProperty("code").GetString().Should().Be("MODULE_NOT_ENABLED");
+
+            (await superAdmin.GetAsync("/api/v1/Tickets")).StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+        finally
+        {
+            await SetSystemModuleActiveAsync(superAdmin, module, isActive: true);
+        }
+
+        (await manager.GetAsync("/api/v1/Tickets")).StatusCode.Should().Be(HttpStatusCode.OK,
+            "reactivating the module cancels the global module-cache token");
+    }
+
+    private static async Task SetSystemModuleActiveAsync(HttpClient superAdmin, Domain.Admin.SystemModule module, bool isActive)
+    {
+        var response = await superAdmin.PutAsJsonAsync($"/api/v1/SystemModules/{module.Id}", new
+        {
+            name = module.Name,
+            description = module.Description,
+            icon = module.Icon,
+            isActive,
+            isBase = module.IsBase,
+            order = module.Order
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -194,6 +244,13 @@ internal static class ModuleTestHelpers
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         return await db.Companies.IgnoreQueryFilters().Where(c => c.TaxId == "JOIN-001").Select(c => c.Id).SingleAsync();
+    }
+
+    public static async Task<Domain.Admin.SystemModule> SystemModuleAsync(PostgreSqlWebApplicationFactory factory, string moduleName)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.SystemModules.IgnoreQueryFilters().AsNoTracking().SingleAsync(m => m.Name == moduleName && m.GcRecord == 0);
     }
 
     public static async Task<Guid> JoinCompanyModuleIdAsync(PostgreSqlWebApplicationFactory factory, string moduleName)

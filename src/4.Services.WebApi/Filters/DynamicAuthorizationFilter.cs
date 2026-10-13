@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
 
@@ -103,19 +105,7 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
             var access = await _permissionService.GetModuleAccessAsync(parsedCompanyId, permissionResource, context.HttpContext.RequestAborted);
             if (!access.IsEnabled)
             {
-                context.Result = new ObjectResult(new ProblemDetails
-                {
-                    Status = StatusCodes.Status403Forbidden,
-                    Title = "Module not enabled",
-                    Detail = access.ModuleName is null
-                        ? "The company does not have any of the modules required for this resource enabled."
-                        : $"The company does not have the module '{access.ModuleName}' enabled.",
-                    Extensions =
-                    {
-                        ["code"] = "MODULE_NOT_ENABLED",
-                        ["module"] = access.ModuleName
-                    }
-                })
+                context.Result = new ObjectResult(BuildModuleNotEnabledProblem(context.HttpContext, access.ModuleName))
                 {
                     StatusCode = StatusCodes.Status403Forbidden
                 };
@@ -172,5 +162,26 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
         }
 
         return string.IsNullOrWhiteSpace(controllerName) ? null : controllerName;
+    }
+
+    /// <summary>
+    /// SPEC 48 C: <c>403 MODULE_NOT_ENABLED</c> body. Built through the registered <see cref="ProblemDetailsFactory"/>
+    /// so the global <c>CustomizeProblemDetails</c> in <c>Program.cs</c> adds <c>instance</c>, <c>traceId</c> and
+    /// <c>timestamp</c>, like every other error; falls back to a plain <see cref="ProblemDetails"/> without it.
+    /// </summary>
+    private static ProblemDetails BuildModuleNotEnabledProblem(HttpContext httpContext, string? moduleName)
+    {
+        const string title = "Module not enabled";
+        var detail = moduleName is null
+            ? "The company does not have any of the modules required for this resource enabled."
+            : $"The company does not have the module '{moduleName}' enabled.";
+
+        var factory = httpContext.RequestServices?.GetService<ProblemDetailsFactory>();
+        var problem = factory?.CreateProblemDetails(httpContext, StatusCodes.Status403Forbidden, title, detail: detail)
+                      ?? new ProblemDetails { Status = StatusCodes.Status403Forbidden, Title = title, Detail = detail };
+
+        problem.Extensions["code"] = "MODULE_NOT_ENABLED";
+        problem.Extensions["module"] = moduleName;
+        return problem;
     }
 }

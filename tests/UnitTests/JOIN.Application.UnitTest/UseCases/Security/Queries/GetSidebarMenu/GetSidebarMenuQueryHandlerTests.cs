@@ -334,9 +334,27 @@ public sealed class GetSidebarMenuQueryHandlerTests : IDisposable
         _currentUserMock.Setup(x => x.IsInRole("SuperAdmin")).Returns(true);
         _fakeConnection.SetResults(FakeResultSet.Empty("Id", "Name", "Icon", "ControllerName", "ParentId", "CanRead", "CanCreate", "CanUpdate", "CanDelete"));
 
-        await CreateHandler().Handle(new GetSidebarMenuQuery(), CancellationToken.None);
+        await CreateHandler(enforceCompanyModules: true).Handle(new GetSidebarMenuQuery(), CancellationToken.None);
 
         _fakeConnection.LastCommandText.Should().NotContain("Admin.CompanyModules");
+        _fakeConnection.LastCommandText.Should().Contain("Security.RoleSystemOptions");
+    }
+
+    /// <summary>
+    /// SPEC 48 D (B5): with <c>Modules:EnforceCompanyModules = false</c> the menu of a non-SuperAdmin is built as
+    /// before SPEC 43 — no module filter and no pruning of empty parents.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenEnforceCompanyModulesIsOff_ShouldNotFilterByCompanyModulesForNonSuperAdmin()
+    {
+        SetupAuthenticatedUser();
+        _currentUserMock.Setup(x => x.IsInRole("SuperAdmin")).Returns(false);
+        _fakeConnection.SetResults(FakeResultSet.Empty("Id", "Name", "Icon", "ControllerName", "ParentId", "CanRead", "CanCreate", "CanUpdate", "CanDelete"));
+
+        await CreateHandler(enforceCompanyModules: false).Handle(new GetSidebarMenuQuery(), CancellationToken.None);
+
+        _fakeConnection.LastCommandText.Should().NotContain("Admin.CompanyModules");
+        _fakeConnection.LastCommandText.Should().NotContain("Admin.SystemModules");
         _fakeConnection.LastCommandText.Should().Contain("Security.RoleSystemOptions");
     }
 

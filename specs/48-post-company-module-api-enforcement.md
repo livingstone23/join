@@ -1,6 +1,6 @@
 # SPEC 48-post — Bloqueo de APIs y menú por módulo activo de la empresa (`CompanyModule`)
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Origen:** copia de SPEC 48 de `main` (estado allí al copiarla: Borrador), adaptada a PostgreSQL para el fork `main_postgresql`. Se implementa **desde cero** en el fork, sin traer commits de `main` (decisión del usuario, 2026-10-09).
 > **Rama de trabajo:** `spec-48-post-company-module-api-enforcement`, creada desde `main_postgresql`; PR hacia `main_postgresql`, nunca hacia `main`.
 > **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 99) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
@@ -12,6 +12,8 @@
 > (2) **Diagnóstico:** una sola ida a la base (`QueryMultiple`); empresas de `common.companies` con `isactive = TRUE`; `usersWithPermissionsInDisabledModules` cuenta usuarios con al menos un flag en `true` en opciones de módulos no habilitados para la empresa (inactivos para ella **o** inactivos globalmente, la misma regla del filtro). El conteo es por módulo de la opción: no descuenta un `ControllerName` que además esté en otro módulo habilitado.
 > (3) **Calendario (F6):** `CalendarCompanyGuard` ya existía sin chequeo de módulo (SPEC 44-post se implementó con esta decisión); no hubo cambios de código.
 > (4) **Tests:** `ModuleEnforcementPostgreSqlTests` usa `ModuleEnforcementPostgreSqlWebApplicationFactory` (interruptor encendido); `ModuleEnforcementSwitchOffPostgreSqlTests` cubre el interruptor apagado; `SidebarMenuPostgreSqlTests` (SPEC 43-post) pasa a la factory con el interruptor encendido.
+> (5) **ProblemDetails (C):** el cuerpo del `403` se arma con `ProblemDetailsFactory`, porque un `new ProblemDetails` no pasa por `CustomizeProblemDetails` de `Program.cs` y salía sin `instance`/`traceId`/`timestamp`.
+> (6) **Verificación (F7, 2026-10-13):** `EXPLAIN ANALYZE` de la consulta de la sección B y del diagnóstico contra la base migrada (≤ 3,3 ms). Smoke con Docker sobre un contenedor descartable con la seed: con el interruptor encendido, desactivar `Tickets` → `GET /api/v1/Tickets` del Manager responde `403 MODULE_NOT_ENABLED` y el menú pierde Tickets; reactivarlo → `200` sin reiniciar; con el interruptor apagado, todo igual que antes. La seed no tiene usuarios en la empresa privada (`PRIV-001`), así que el smoke usa el Manager de `JOIN-001`.
 > **Objective:** Que una empresa no pueda usar las APIs de un módulo que no tiene activo en `Admin.CompanyModules`, respondiendo `403` con el código `MODULE_NOT_ENABLED`, con un único interruptor de configuración que enciende a la vez el bloqueo de APIs y el filtro del menú, y un endpoint de diagnóstico para revisar las empresas antes de encenderlo.
 
 ---
