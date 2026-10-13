@@ -83,7 +83,7 @@ public sealed class PermissionServiceTests
     }
 
     private static PermissionService CreateService(ApplicationDbContext ctx) =>
-        new(ctx, new MemoryCache(new MemoryCacheOptions()));
+        new(ctx, new MemoryCache(new MemoryCacheOptions()), Mock.Of<ISqlConnectionFactory>());
 
     private static RoleSystemOption BuildRoleOption(
         Guid roleId,

@@ -1,8 +1,10 @@
 using FluentAssertions;
+using JOIN.Application.Common.Settings;
 using JOIN.Application.Interface;
 using JOIN.Application.UnitTest.UseCases.Messaging.Tickets.Queries.TestDoubles;
 using JOIN.Application.UseCases.Security.Queries.GetSidebarMenu;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Security.Queries.GetSidebarMenu;
@@ -83,8 +85,8 @@ public sealed class GetSidebarMenuQueryHandlerTests : IDisposable
         _currentUserMock.Setup(x => x.CompanyId).Returns(Guid.NewGuid());
     }
 
-    private GetSidebarMenuQueryHandler CreateHandler() =>
-        new(_connectionFactoryMock.Object, _currentUserMock.Object, _cache);
+    private GetSidebarMenuQueryHandler CreateHandler(bool enforceCompanyModules = false) =>
+        new(_connectionFactoryMock.Object, _currentUserMock.Object, _cache, Options.Create(new ModuleEnforcementSettings { EnforceCompanyModules = enforceCompanyModules }));
 
     // ── authentication guard tests ────────────────────────────────────────────
 
@@ -312,7 +314,7 @@ public sealed class GetSidebarMenuQueryHandlerTests : IDisposable
         _currentUserMock.Setup(x => x.IsInRole("SuperAdmin")).Returns(false);
         _fakeConnection.SetResults(FakeResultSet.Empty("Id", "Name", "Icon", "ControllerName", "ParentId", "CanRead", "CanCreate", "CanUpdate", "CanDelete"));
 
-        await CreateHandler().Handle(new GetSidebarMenuQuery(), CancellationToken.None);
+        await CreateHandler(enforceCompanyModules: true).Handle(new GetSidebarMenuQuery(), CancellationToken.None);
 
         _fakeConnection.LastCommandText.Should().Contain("INNER JOIN Admin.SystemModules sm");
         _fakeConnection.LastCommandText.Should().Contain("sm.IsActive = TRUE");
@@ -354,7 +356,7 @@ public sealed class GetSidebarMenuQueryHandlerTests : IDisposable
             WithVisibility(MakeSidebarRow(Guid.NewGuid(), "Hidden child", parentId: parentId), false),
             WithVisibility(MakeSidebarRow(rootId, "Standalone"), true)));
 
-        var result = await CreateHandler().Handle(new GetSidebarMenuQuery(), CancellationToken.None);
+        var result = await CreateHandler(enforceCompanyModules: true).Handle(new GetSidebarMenuQuery(), CancellationToken.None);
 
         result.Data.Should().ContainSingle().Which.Id.Should().Be(rootId);
     }
@@ -373,7 +375,7 @@ public sealed class GetSidebarMenuQueryHandlerTests : IDisposable
             WithVisibility(MakeSidebarRow(parentId, "Tickets parent"), true),
             WithVisibility(MakeSidebarRow(childId, "Tickets", parentId: parentId), true)));
 
-        var result = await CreateHandler().Handle(new GetSidebarMenuQuery(), CancellationToken.None);
+        var result = await CreateHandler(enforceCompanyModules: true).Handle(new GetSidebarMenuQuery(), CancellationToken.None);
 
         var parent = result.Data.Should().ContainSingle().Subject;
         parent.Id.Should().Be(parentId);

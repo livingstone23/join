@@ -1,5 +1,6 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Domain.Admin;
 using MediatR;
@@ -14,7 +15,9 @@ namespace JOIN.Application.UseCases.Admin.SystemModules.Commands;
 /// Handles system module creation commands using the transactional write stack.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
-public sealed class CreateSystemModuleCommandHandler(IUnitOfWork unitOfWork)
+public sealed class CreateSystemModuleCommandHandler(
+    IUnitOfWork unitOfWork,
+    IPermissionService permissionService)
     : IRequestHandler<CreateSystemModuleCommand, Response<SystemModuleDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
@@ -63,6 +66,10 @@ public sealed class CreateSystemModuleCommandHandler(IUnitOfWork unitOfWork)
                 "CREATE_FAILED",
                 ["No records were affected while creating the system module."]);
         }
+
+        // SPEC 48 E: a brand-new module may already be referenced by seeded SystemOptions, so the
+        // per-company module snapshot must rebuild globally before the next API call decides.
+        await permissionService.InvalidateModuleCacheForAllCompaniesAsync(cancellationToken);
 
         return new Response<SystemModuleDto>
         {

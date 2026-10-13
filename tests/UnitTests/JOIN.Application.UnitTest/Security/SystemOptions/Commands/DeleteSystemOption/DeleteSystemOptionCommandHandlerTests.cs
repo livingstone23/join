@@ -1,3 +1,4 @@
+using JOIN.Application.Interface;
 using FluentAssertions;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.UnitTest.Common.TestDoubles;
@@ -153,6 +154,6 @@ public sealed class DeleteSystemOptionCommandHandlerTests
             return entity;
         }
 
-        public DeleteSystemOptionCommandHandler CreateHandler() => new(UnitOfWorkMock.Object, new SystemOptionCascadeCoordinator(UnitOfWorkMock.Object));
+        public DeleteSystemOptionCommandHandler CreateHandler() => new(UnitOfWorkMock.Object, new SystemOptionCascadeCoordinator(UnitOfWorkMock.Object), Mock.Of<IPermissionService>());
     }
 }

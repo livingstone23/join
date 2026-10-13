@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
 using JOIN.Application.Mappings.Security.SystemOption;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Domain.Security;
 using MediatR;
@@ -14,7 +15,8 @@ namespace JOIN.Application.UseCases.Security.SystemOptions.Commands;
 /// </summary>
 public sealed class UpdateSystemOptionCommandHandler(
     IUnitOfWork unitOfWork,
-    ISystemOptionMapper mapper)
+    ISystemOptionMapper mapper,
+    IPermissionService permissionService)
     : IRequestHandler<UpdateSystemOptionCommand, Response<SystemOptionDto>>
 {
     public async Task<Response<SystemOptionDto>> Handle(UpdateSystemOptionCommand request, CancellationToken cancellationToken)
@@ -48,6 +50,9 @@ public sealed class UpdateSystemOptionCommandHandler(
         mapper.ApplyUpdate(request, entity);
         await repository.UpdateAsync(entity);
         var result = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // SPEC 48 E: a ModuleId or ControllerName change rewrites the (resource → module) map for every company.
+        await permissionService.InvalidateModuleCacheForAllCompaniesAsync(cancellationToken);
         if (result <= 0)
         {
             return new Response<SystemOptionDto>

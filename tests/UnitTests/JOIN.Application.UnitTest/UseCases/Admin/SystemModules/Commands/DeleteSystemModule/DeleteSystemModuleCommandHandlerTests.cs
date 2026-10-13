@@ -1,3 +1,4 @@
+using JOIN.Application.Interface;
 using AutoFixture;
 using FluentAssertions;
 using JOIN.Application.Interface.Persistence;
@@ -341,7 +342,7 @@ public sealed class DeleteSystemModuleCommandHandlerTests
 
         public DeleteSystemModuleCommandHandler CreateHandler()
         {
-            return new DeleteSystemModuleCommandHandler(UnitOfWorkMock.Object, new SystemOptionCascadeCoordinator(UnitOfWorkMock.Object));
+            return new DeleteSystemModuleCommandHandler(UnitOfWorkMock.Object, new SystemOptionCascadeCoordinator(UnitOfWorkMock.Object), Mock.Of<IPermissionService>());
         }
     }
 }

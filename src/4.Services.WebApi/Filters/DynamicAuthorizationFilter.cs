@@ -1,9 +1,12 @@
+using JOIN.Application.Common.Settings;
 using JOIN.Application.Interface;
 using JOIN.Domain.Security;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.Extensions.Options;
 using System.Security.Claims;
 
 namespace JOIN.Services.WebApi.Filters;
@@ -11,10 +14,13 @@ namespace JOIN.Services.WebApi.Filters;
 /// <summary>
 /// Global authorization filter that intercepts HTTP requests and validates user permissions
 /// dynamically based on the requested controller, HTTP method, and any explicit flag overrides.
+/// SPEC 48 adds a module-level check (before the per-role permission check) so non-SuperAdmin
+/// users cannot call APIs of modules that are not active for their company.
 /// </summary>
 public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
 {
     private readonly IPermissionService _permissionService;
+    private readonly IOptions<ModuleEnforcementSettings> _moduleSettings;
 
     // Constant role name for SuperAdmin users who bypass all permission checks.
     // This is a simple string comparison, so it should be kept in sync with the actual role name used in the system.
@@ -24,9 +30,12 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
     // (e.g. "PersonsController" → "Persons") to match the seed `SystemOption.ControllerName`.
     private const string ControllerSuffix = "Controller";
 
-    public DynamicAuthorizationFilter(IPermissionService permissionService)
+    public DynamicAuthorizationFilter(
+        IPermissionService permissionService,
+        IOptions<ModuleEnforcementSettings> moduleSettings)
     {
         _permissionService = permissionService;
+        _moduleSettings = moduleSettings;
     }
 
     public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
@@ -80,13 +89,41 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
 
         // --- REGULAR USERS ---
         // Block access immediately if a regular user is missing the tenant context (CompanyId).
-        if (string.IsNullOrEmpty(companyId))
+        if (string.IsNullOrEmpty(companyId) || !Guid.TryParse(companyId, out var parsedCompanyId))
         {
             context.Result = new UnauthorizedResult();
             return;
         }
 
-        // 4. Validate permissions against the cache or database via the Application layer service.
+        // 4. SPEC 48 — module-level gate (B1/B2/B4). Runs BEFORE the permission check so the user always
+        // sees the same error regardless of role, and so an unassigned module is unreachable. The switch
+        // defaults to false; deployments enable it after reviewing GET /CompanyModules/diagnostics.
+        if (_moduleSettings.Value.EnforceCompanyModules)
+        {
+            var access = await _permissionService.GetModuleAccessAsync(parsedCompanyId, permissionResource, context.HttpContext.RequestAborted);
+            if (!access.IsEnabled)
+            {
+                context.Result = new ObjectResult(new ProblemDetails
+                {
+                    Status = StatusCodes.Status403Forbidden,
+                    Title = "Module not enabled",
+                    Detail = access.ModuleName is null
+                        ? "The company does not have any of the modules required for this resource enabled."
+                        : $"The company does not have the module '{access.ModuleName}' enabled.",
+                    Extensions =
+                    {
+                        ["code"] = "MODULE_NOT_ENABLED",
+                        ["module"] = access.ModuleName
+                    }
+                })
+                {
+                    StatusCode = StatusCodes.Status403Forbidden
+                };
+                return;
+            }
+        }
+
+        // 5. Validate permissions against the cache or database via the Application layer service.
         bool hasAccess = await _permissionService.HasPermissionAsync(
             userId, companyId, permissionResource, httpMethod, explicitFlag);
 

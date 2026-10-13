@@ -1,3 +1,4 @@
+using JOIN.Application.Interface;
 using AutoFixture;
 using FluentAssertions;
 using JOIN.Application.Interface.Persistence;
@@ -260,7 +261,7 @@ public sealed class UpdateSystemModuleCommandHandlerTests
 
         public UpdateSystemModuleCommandHandler CreateHandler()
         {
-            return new UpdateSystemModuleCommandHandler(UnitOfWorkMock.Object);
+            return new UpdateSystemModuleCommandHandler(UnitOfWorkMock.Object, Mock.Of<IPermissionService>());
         }
     }
 }

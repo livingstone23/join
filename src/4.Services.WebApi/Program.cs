@@ -119,6 +119,7 @@ builder.Services.Configure<PaginationSettings>(paginationSection);
 builder.Services.Configure<PerformanceSettings>(builder.Configuration.GetSection("Performance"));
 builder.Services.Configure<JOIN.Application.Common.Options.AppUrlsOptions>(builder.Configuration.GetSection(JOIN.Application.Common.Options.AppUrlsOptions.SectionName));
 builder.Services.Configure<JOIN.Application.Common.Options.MfaOptions>(builder.Configuration.GetSection(JOIN.Application.Common.Options.MfaOptions.SectionName));
+builder.Services.Configure<JOIN.Application.Common.Settings.ModuleEnforcementSettings>(builder.Configuration.GetSection(JOIN.Application.Common.Settings.ModuleEnforcementSettings.SectionName));
 
 // Application Layer (MediatR, FluentValidation Pipeline)
 builder.Services.AddApplicationServices();

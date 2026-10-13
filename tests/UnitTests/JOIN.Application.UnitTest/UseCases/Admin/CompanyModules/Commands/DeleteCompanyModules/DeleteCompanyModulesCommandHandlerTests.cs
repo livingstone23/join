@@ -88,6 +88,6 @@ public sealed class DeleteCompanyModulesCommandHandlerTests
         }
 
         public DeleteCompanyModulesCommandHandler CreateHandler() =>
-            new(UnitOfWorkMock.Object, CurrentUserServiceMock.Object, new CompanyPermissionCacheInvalidator(UnitOfWorkMock.Object, PermissionServiceMock.Object));
+            new(UnitOfWorkMock.Object, CurrentUserServiceMock.Object, new CompanyPermissionCacheInvalidator(UnitOfWorkMock.Object, PermissionServiceMock.Object), Mock.Of<IPermissionService>());
     }
 }

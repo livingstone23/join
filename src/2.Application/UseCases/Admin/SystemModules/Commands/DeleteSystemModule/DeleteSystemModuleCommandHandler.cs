@@ -1,4 +1,5 @@
 using JOIN.Application.Common;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Domain.Admin;
 using JOIN.Application.UseCases.Security.SystemOptions;
@@ -17,7 +18,8 @@ namespace JOIN.Application.UseCases.Admin.SystemModules.Commands;
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
 public sealed class DeleteSystemModuleCommandHandler(
     IUnitOfWork unitOfWork,
-    SystemOptionCascadeCoordinator cascadeCoordinator)
+    SystemOptionCascadeCoordinator cascadeCoordinator,
+    IPermissionService permissionService)
     : IRequestHandler<DeleteSystemModuleCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
@@ -64,6 +66,9 @@ public sealed class DeleteSystemModuleCommandHandler(
                 "DELETE_FAILED",
                 ["No records were affected while deleting the system module."]);
         }
+
+        // SPEC 48 E: a deleted module (and its options) must not appear in any per-company snapshot.
+        await permissionService.InvalidateModuleCacheForAllCompaniesAsync(cancellationToken);
 
         return new Response<Guid>
         {

@@ -291,4 +291,21 @@ public class CompanyModulesController(ISender sender, ICurrentUserService curren
         var response = await _sender.Send(new RestoreCompanyModuleCommand(id, companyId), cancellationToken);
         return this.ToRestoreResult(response);
     }
+
+    /// <summary>
+    /// SPEC 48 F: pre-flight diagnostics for the <c>Modules:EnforceCompanyModules</c> switch.
+    /// Returns active companies with missing base modules and the count of users who would be
+    /// impacted when the switch flips to true. SuperAdmin only. Empty <c>companies</c> means
+    /// the deployment is safe to enable.
+    /// </summary>
+    [HttpGet("diagnostics")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(Response<CompanyModulesDiagnosticsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetDiagnostics(CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(new GetCompanyModulesDiagnosticsQuery(), cancellationToken);
+        return Ok(response);
+    }
 }

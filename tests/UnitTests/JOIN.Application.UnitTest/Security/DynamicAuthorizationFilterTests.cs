@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Security.Claims;
 using FluentAssertions;
+using JOIN.Application.Common.Settings;
 using JOIN.Application.Interface;
 using JOIN.Domain.Security;
 using JOIN.Services.WebApi.Filters;
@@ -10,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace JOIN.Application.UnitTest.Security;
@@ -132,7 +134,7 @@ public sealed class DynamicAuthorizationFilterTests
                 It.IsAny<PermissionFlags?>()))
             .ReturnsAsync(hasAccess);
 
-        return new DynamicAuthorizationFilter(serviceMock.Object);
+        return new DynamicAuthorizationFilter(serviceMock.Object, Options.Create(new ModuleEnforcementSettings()));
     }
 
     [Fact]
@@ -379,5 +381,163 @@ public sealed class DynamicAuthorizationFilterTests
                 It.IsAny<string>(),
                 It.IsAny<PermissionFlags?>()),
             Times.Once);
+    }
+
+    // ── SPEC 48 module gate ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds a filter where <c>EnforceCompanyModules</c> is true and the service
+    /// reports the resource's module as enabled. The HasPermissionAsync path is exercised
+    /// after the module gate (when the gate lets the request through).
+    /// </summary>
+    private static DynamicAuthorizationFilter CreateEnforcedModuleFilter(
+        out Mock<IPermissionService> serviceMock,
+        bool moduleEnabled = true,
+        bool hasAccess = true)
+    {
+        serviceMock = new Mock<IPermissionService>();
+        serviceMock
+            .Setup(s => s.GetModuleAccessAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ModuleAccessResult(moduleEnabled, "Tickets"));
+        serviceMock
+            .Setup(s => s.HasPermissionAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<PermissionFlags?>()))
+            .ReturnsAsync(hasAccess);
+
+        return new DynamicAuthorizationFilter(
+            serviceMock.Object,
+            Options.Create(new ModuleEnforcementSettings { EnforceCompanyModules = true }));
+    }
+
+    [Fact]
+    public async Task OnAuthorizationAsync_WhenEnforceCompanyModulesOff_ShouldNotCallModuleGate()
+    {
+        var ctx = BuildContext(
+            typeof(PersonsController),
+            "List",
+            httpMethod: "GET",
+            claims: new[]
+            {
+                (ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+                ("CompanyId", Guid.NewGuid().ToString())
+            });
+
+        var filter = CreateFilter(out var serviceMock, hasAccess: true);
+
+        await filter.OnAuthorizationAsync(ctx);
+
+        serviceMock.Verify(
+            s => s.GetModuleAccessAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        ctx.Result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task OnAuthorizationAsync_WhenEnforceCompanyModulesOn_AndModuleEnabled_ShouldCallPermissionService()
+    {
+        var ctx = BuildContext(
+            typeof(PersonsController),
+            "List",
+            httpMethod: "GET",
+            claims: new[]
+            {
+                (ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+                ("CompanyId", Guid.NewGuid().ToString())
+            });
+
+        var filter = CreateEnforcedModuleFilter(out var serviceMock, moduleEnabled: true, hasAccess: true);
+
+        await filter.OnAuthorizationAsync(ctx);
+
+        serviceMock.Verify(
+            s => s.GetModuleAccessAsync(It.IsAny<Guid>(), "Persons", It.IsAny<CancellationToken>()),
+            Times.Once);
+        serviceMock.Verify(
+            s => s.HasPermissionAsync(
+                It.IsAny<string>(), It.IsAny<string>(), "Persons", "GET", It.IsAny<PermissionFlags?>()),
+            Times.Once);
+        ctx.Result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task OnAuthorizationAsync_WhenEnforceCompanyModulesOn_AndModuleDisabled_ShouldReturn403WithModuleNotEnabledCode()
+    {
+        var ctx = BuildContext(
+            typeof(PersonsController),
+            "List",
+            httpMethod: "GET",
+            claims: new[]
+            {
+                (ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+                ("CompanyId", Guid.NewGuid().ToString())
+            });
+
+        var filter = CreateEnforcedModuleFilter(out var serviceMock, moduleEnabled: false, hasAccess: true);
+
+        await filter.OnAuthorizationAsync(ctx);
+
+        var result = ctx.Result.Should().BeOfType<ObjectResult>().Subject;
+        result.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+
+        var problem = result.Value.Should().BeOfType<ProblemDetails>().Subject;
+        problem.Status.Should().Be(StatusCodes.Status403Forbidden);
+        problem.Extensions.Should().ContainKey("code").WhoseValue.Should().Be("MODULE_NOT_ENABLED");
+        problem.Extensions.Should().ContainKey("module").WhoseValue.Should().Be("Tickets");
+
+        // HasPermissionAsync must NOT run — the module gate fires first.
+        serviceMock.Verify(
+            s => s.HasPermissionAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<PermissionFlags?>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task OnAuthorizationAsync_WhenEnforceCompanyModulesOn_AndSuperAdmin_ShouldSkipModuleGate()
+    {
+        var ctx = BuildContext(
+            typeof(PersonsController),
+            "List",
+            httpMethod: "GET",
+            claims: new[]
+            {
+                (ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+                (ClaimTypes.Role, SuperAdminRoleName)
+            });
+
+        var filter = CreateEnforcedModuleFilter(out var serviceMock, moduleEnabled: false);
+
+        await filter.OnAuthorizationAsync(ctx);
+
+        serviceMock.Verify(
+            s => s.GetModuleAccessAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        ctx.Result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task OnAuthorizationAsync_WhenEnforceCompanyModulesOn_AndSkipDynamicAuthorization_ShouldSkipModuleGate()
+    {
+        var ctx = BuildContext(
+            typeof(SkipController),
+            "Get",
+            httpMethod: "GET",
+            claims: new[]
+            {
+                (ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+                ("CompanyId", Guid.NewGuid().ToString())
+            });
+
+        var filter = CreateEnforcedModuleFilter(out var serviceMock, moduleEnabled: false);
+
+        await filter.OnAuthorizationAsync(ctx);
+
+        serviceMock.Verify(
+            s => s.GetModuleAccessAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        ctx.Result.Should().BeNull();
     }
 }

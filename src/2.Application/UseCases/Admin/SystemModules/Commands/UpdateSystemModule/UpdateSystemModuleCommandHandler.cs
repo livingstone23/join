@@ -1,5 +1,6 @@
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Domain.Admin;
 using MediatR;
@@ -14,7 +15,10 @@ namespace JOIN.Application.UseCases.Admin.SystemModules.Commands;
 /// Handles system module update commands using the transactional write stack.
 /// </summary>
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
-public sealed class UpdateSystemModuleCommandHandler(IUnitOfWork unitOfWork)
+/// <param name="permissionService">SPEC 48 E: IsActive changes affect every tenant's module snapshot.</param>
+public sealed class UpdateSystemModuleCommandHandler(
+    IUnitOfWork unitOfWork,
+    IPermissionService permissionService)
     : IRequestHandler<UpdateSystemModuleCommand, Response<SystemModuleDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
@@ -70,6 +74,10 @@ public sealed class UpdateSystemModuleCommandHandler(IUnitOfWork unitOfWork)
                 "UPDATE_FAILED",
                 ["No records were affected while updating the system module."]);
         }
+
+        // SPEC 48 E: toggling IsActive (or renaming a module) changes every company's module snapshot;
+        // cancel the global token so each per-company cache entry rebuilds on next call.
+        await permissionService.InvalidateModuleCacheForAllCompaniesAsync(cancellationToken);
 
         return new Response<SystemModuleDto>
         {

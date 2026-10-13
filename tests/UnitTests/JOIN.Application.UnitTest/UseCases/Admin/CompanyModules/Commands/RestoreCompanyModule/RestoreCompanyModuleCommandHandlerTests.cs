@@ -185,6 +185,7 @@ public sealed class RestoreCompanyModuleCommandHandlerTests
             => new(
                 CurrentUserServiceMock.Object,
                 new SoftDeleteRestorer(UnitOfWorkMock.Object, CurrentUserServiceMock.Object),
-                new CompanyPermissionCacheInvalidator(UnitOfWorkMock.Object, PermissionServiceMock.Object));
+                new CompanyPermissionCacheInvalidator(UnitOfWorkMock.Object, PermissionServiceMock.Object),
+                Mock.Of<IPermissionService>());
     }
 }

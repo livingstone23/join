@@ -18,7 +18,8 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 public sealed class CreateCompanyModulesCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
-    CompanyPermissionCacheInvalidator cacheInvalidator)
+    CompanyPermissionCacheInvalidator cacheInvalidator,
+    IPermissionService permissionService)
     : IRequestHandler<CreateCompanyModulesCommand, Response<CompanyModuleDto>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
@@ -81,6 +82,9 @@ public sealed class CreateCompanyModulesCommandHandler(
 
         // SPEC 43: the company's menu and permissions change right away, not when the cache expires.
         await cacheInvalidator.InvalidateAsync(entity.CompanyId, cancellationToken);
+
+        // SPEC 48 E: the per-company module snapshot must also rebuild so the API gate reflects the change.
+        await permissionService.InvalidateCompanyModuleCacheAsync(entity.CompanyId, cancellationToken);
 
         return new Response<CompanyModuleDto>
         {

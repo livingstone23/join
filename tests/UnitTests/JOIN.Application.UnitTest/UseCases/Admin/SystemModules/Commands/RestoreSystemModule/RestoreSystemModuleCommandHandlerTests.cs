@@ -104,7 +104,7 @@ public sealed class RestoreSystemModuleCommandHandlerTests
         public RestoreSystemModuleCommandHandler CreateHandler()
         {
             var restorer = new SoftDeleteRestorer(UnitOfWorkMock.Object, CurrentUserServiceMock.Object);
-            return new(CurrentUserServiceMock.Object, restorer, new SystemOptionCascadeCoordinator(UnitOfWorkMock.Object));
+            return new(CurrentUserServiceMock.Object, restorer, new SystemOptionCascadeCoordinator(UnitOfWorkMock.Object), Mock.Of<IPermissionService>());
         }
     }
 }

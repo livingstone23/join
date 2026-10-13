@@ -1,8 +1,10 @@
+using Dapper;
 using JOIN.Application.Interface;
 using JOIN.Domain.Security;
 using JOIN.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Primitives;
 
 namespace JOIN.Infrastructure.Security;
 
@@ -11,10 +13,15 @@ namespace JOIN.Infrastructure.Security;
 /// </summary>
 /// <param name="dbContext">Database context used to load effective role permissions.</param>
 /// <param name="memoryCache">Cache used to reduce repetitive permission queries.</param>
-public class PermissionService(ApplicationDbContext dbContext, IMemoryCache memoryCache) : IPermissionService
+/// <param name="connectionFactory">Read-only connection factory used to query the module mapping (SPEC 48).</param>
+public class PermissionService(
+    ApplicationDbContext dbContext,
+    IMemoryCache memoryCache,
+    ISqlConnectionFactory connectionFactory) : IPermissionService
 {
     private readonly ApplicationDbContext _dbContext = dbContext;
     private readonly IMemoryCache _memoryCache = memoryCache;
+    private readonly ISqlConnectionFactory _connectionFactory = connectionFactory;
 
     /// <summary>
     /// Cache key version prefix. Bumped to <c>v2</c> in SPEC 17 because the cached value
@@ -22,6 +29,23 @@ public class PermissionService(ApplicationDbContext dbContext, IMemoryCache memo
     /// Existing caches with the previous key are ignored and re-built on first call.
     /// </summary>
     private const string CacheKeyPrefix = "permissions:v2";
+
+    /// <summary>
+    /// Cache key prefix for the per-company module snapshot (SPEC 48). The cached value is
+    /// <c>Dictionary&lt;string, ModuleAccessResult&gt;</c> keyed by the normalized resource name
+    /// (same normalization as <see cref="HasPermissionAsync"/>), where each entry tells whether
+    /// any owning module is enabled for the company, plus that module's name for error messages.
+    /// </summary>
+    private const string ModuleCacheKeyPrefix = "company-modules:v1";
+
+    /// <summary>
+    /// Global version token (SPEC 48, E): every <c>company-modules:v1:{companyId}</c> entry is created
+    /// with <see cref="MemoryCacheEntryOptions.AddExpirationToken(MemoryCacheEntryOptions, System.Threading.CancellationToken)"/>
+    /// wired to this CTS. Cancelling it invalidates every per-company entry at once, which is what we need
+    /// when <see cref="Domain.Admin.SystemModule"/> rows change (because <see cref="IMemoryCache"/> cannot
+    /// remove keys by prefix).
+    /// </summary>
+    private CancellationTokenSource _moduleVersionCts = new();
 
     /// <summary>
     /// Validates whether the current user has permission to execute the requested action,
@@ -35,11 +59,11 @@ public class PermissionService(ApplicationDbContext dbContext, IMemoryCache memo
     /// When <paramref name="explicitFlag"/> is provided, evaluates that flag directly;
     /// otherwise falls back to the HTTP-verb default mapping.
     /// </summary>
-    /// <param name="userId">The authenticated user identifier.</param>
+    /// <param name="userId">The authenticated user ID.</param>
     /// <param name="companyId">The active company identifier.</param>
     /// <param name="resourceName">The controller or resource name being requested.</param>
     /// <param name="actionType">The HTTP method associated with the request.</param>
-    /// <param name="explicitFlag">Optional explicit flag override (e.g. <see cref="PermissionFlags.CanExport"/> on GET).</param>
+    /// <param name="explicitFlag">Optional explicit flag override (e.g. <see cref="PermissionFlags.CanExport"/> on a GET endpoint).</param>
     /// <returns><c>true</c> when access is granted; otherwise, <c>false</c>.</returns>
     public async Task<bool> HasPermissionAsync(string userId, string companyId, string resourceName, string actionType, PermissionFlags? explicitFlag)
     {
@@ -145,8 +169,124 @@ public class PermissionService(ApplicationDbContext dbContext, IMemoryCache memo
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// SPEC 48 B: per-company module snapshot. The query joins <c>Security.SystemOptions</c> to its
+    /// <c>Admin.SystemModules</c> and <c>LEFT JOIN</c>s <c>Admin.CompanyModules</c> for the company, so a
+    /// resource with no module-scoped <c>SystemOption</c> row simply does not appear in the result and
+    /// is treated as "not module-scoped" (enabled). The cache expires absolutely every 30 minutes and
+    /// slides every 10; it also listens to the global version token (<see cref="InvalidateModuleCacheForAllCompaniesAsync"/>).
+    /// </remarks>
+    public async Task<ModuleAccessResult> GetModuleAccessAsync(Guid companyId, string resourceName, CancellationToken cancellationToken = default)
+    {
+        if (companyId == Guid.Empty || string.IsNullOrWhiteSpace(resourceName))
+        {
+            // Defensive: an empty tenant or resource name is not module-scoped, mirror the SQL behavior.
+            return new ModuleAccessResult(IsEnabled: true, ModuleName: null);
+        }
+
+        var cacheKey = $"{ModuleCacheKeyPrefix}:{companyId}";
+        var snapshot = await _memoryCache.GetOrCreateAsync(cacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30);
+            entry.SlidingExpiration = TimeSpan.FromMinutes(10);
+            entry.AddExpirationToken(new CancellationChangeToken(_moduleVersionCts.Token));
+
+            using var connection = _connectionFactory.CreateConnection();
+            var rows = (await connection.QueryAsync<ModuleAccessSqlRow>(
+                new CommandDefinition(ModuleAccessQuerySql, new { CompanyId = companyId }, cancellationToken: cancellationToken)))
+                .AsList();
+
+            // Each row is one (resource, module) pair. Many modules can own the same resource, so we keep
+            // every name so callers can check "any module enabled" against the full set; the first module
+            // name is what the filter surfaces in the MODULE_NOT_ENABLED message.
+            var map = new Dictionary<string, ModuleAccessResult>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in rows)
+            {
+                var normalizedNames = NormalizeControllerNames(row.ControllerName);
+                foreach (var name in normalizedNames)
+                {
+                    if (row.IsEnabled)
+                    {
+                        // Once any owning module is enabled for the company, the resource is enabled and
+                        // its first module name becomes the one the user sees in error messages.
+                        map[name] = new ModuleAccessResult(IsEnabled: true, ModuleName: row.ModuleName);
+                        continue;
+                    }
+
+                    // Otherwise keep the first module name we saw for that resource so the message is stable.
+                    if (!map.ContainsKey(name))
+                    {
+                        map[name] = new ModuleAccessResult(IsEnabled: false, ModuleName: row.ModuleName);
+                    }
+                }
+            }
+
+            return map;
+        }) ?? new Dictionary<string, ModuleAccessResult>(StringComparer.OrdinalIgnoreCase);
+
+        var normalizedResources = NormalizeControllerNames(resourceName);
+        foreach (var name in normalizedResources)
+        {
+            if (snapshot.TryGetValue(name, out var entry))
+            {
+                return entry;
+            }
+        }
+
+        // A resource without a SystemOption is not module-scoped; permission check still applies, but the
+        // module gate lets the request through so HasPermissionAsync can decide.
+        return new ModuleAccessResult(IsEnabled: true, ModuleName: null);
+    }
+
+    /// <inheritdoc />
+    public Task InvalidateCompanyModuleCacheAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        _memoryCache.Remove($"{ModuleCacheKeyPrefix}:{companyId}");
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task InvalidateModuleCacheForAllCompaniesAsync(CancellationToken cancellationToken = default)
+    {
+        // IMemoryCache cannot remove keys by prefix; cancel the shared token so every entry tied to it expires.
+        // The next GetModuleAccessAsync call will rebuild its per-company snapshot lazily.
+        var previous = Interlocked.Exchange(ref _moduleVersionCts, new CancellationTokenSource());
+        previous.Cancel();
+        previous.Dispose();
+        return Task.CompletedTask;
+    }
+
     /// <summary>
-    /// Maps a single <see cref="PermissionFlags"/> bit to the corresponding boolean in the snapshot.
+    /// SPEC 48 B: Dapper query that resolves, for the given company, every (ControllerName, ModuleName, IsEnabled)
+    /// triple that drives <see cref="GetModuleAccessAsync"/>. Cross-DB syntax (Dapper): PG uses lowercase column
+    /// names and boolean literals; SQL Server uses quoted/pascalcase. The query is engine-agnostic because the
+    /// schema names and joins are identical and the boolean column compares work on both engines.
+    /// </summary>
+    private const string ModuleAccessQuerySql = """
+        SELECT so.controllername AS ControllerName,
+               sm.name           AS ModuleName,
+               (sm.isactive AND cm.id IS NOT NULL) AS IsEnabled
+        FROM security.systemoptions so
+        INNER JOIN admin.systemmodules sm ON sm.id = so.moduleid AND sm.gcrecord = 0
+        LEFT JOIN admin.companymodules cm ON cm.moduleid = sm.id AND cm.companyid = @CompanyId
+                                         AND cm.isactive = TRUE AND cm.gcrecord = 0
+        WHERE so.gcrecord = 0 AND so.controllername IS NOT NULL AND so.controllername <> ''
+        """;
+
+    /// <summary>
+    /// Maps the Dapper row of <see cref="ModuleAccessQuerySql"/> to a flat projection.
+    /// </summary>
+    private sealed class ModuleAccessSqlRow
+    {
+        public string ControllerName { get; set; } = string.Empty;
+        public string ModuleName { get; set; } = string.Empty;
+        public bool IsEnabled { get; set; }
+    }
+
+    /// <summary>
+    /// Maps the seven permission flags for a single resource, OR-merged across all
+    /// roles the user holds in the current tenant.
     /// </summary>
     private static bool EvaluateFlag(PermissionFlagsSnapshot snapshot, PermissionFlags flag) => flag switch
     {

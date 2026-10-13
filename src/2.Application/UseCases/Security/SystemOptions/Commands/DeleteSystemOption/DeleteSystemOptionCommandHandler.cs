@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using JOIN.Application.Common;
+using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using MediatR;
 
@@ -15,7 +16,8 @@ namespace JOIN.Application.UseCases.Security.SystemOptions.Commands;
 /// <param name="unitOfWork">Unit of work used for transactional persistence.</param>
 public sealed class DeleteSystemOptionCommandHandler(
     IUnitOfWork unitOfWork,
-    SystemOptionCascadeCoordinator cascadeCoordinator)
+    SystemOptionCascadeCoordinator cascadeCoordinator,
+    IPermissionService permissionService)
     : IRequestHandler<DeleteSystemOptionCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
@@ -53,6 +55,9 @@ public sealed class DeleteSystemOptionCommandHandler(
         {
             return Response<Guid>.Error("DELETE_FAILED", ["No records were affected while deleting the system option."]);
         }
+
+        // SPEC 48 E: a deleted option removes its (resource → module) entry for every company.
+        await permissionService.InvalidateModuleCacheForAllCompaniesAsync(cancellationToken);
 
         return new Response<Guid>
         {

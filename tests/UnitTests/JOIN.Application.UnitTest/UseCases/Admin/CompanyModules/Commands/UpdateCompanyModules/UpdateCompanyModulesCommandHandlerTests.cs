@@ -265,7 +265,8 @@ public sealed class UpdateCompanyModulesCommandHandlerTests
             return new UpdateCompanyModulesCommandHandler(
                 UnitOfWorkMock.Object,
                 CurrentUserServiceMock.Object,
-                new CompanyPermissionCacheInvalidator(UnitOfWorkMock.Object, PermissionServiceMock.Object));
+                new CompanyPermissionCacheInvalidator(UnitOfWorkMock.Object, PermissionServiceMock.Object),
+                Mock.Of<IPermissionService>());
         }
 
         /// <summary>

@@ -13,7 +13,8 @@ namespace JOIN.Application.UseCases.Admin.CompanyModules.Commands;
 public sealed class RestoreCompanyModuleCommandHandler(
     ICurrentUserService currentUserService,
     SoftDeleteRestorer restorer,
-    CompanyPermissionCacheInvalidator cacheInvalidator)
+    CompanyPermissionCacheInvalidator cacheInvalidator,
+    IPermissionService permissionService)
     : IRequestHandler<RestoreCompanyModuleCommand, Response<Guid>>
 {
     /// <inheritdoc />
@@ -39,8 +40,13 @@ public sealed class RestoreCompanyModuleCommandHandler(
 
         if (response.IsSuccess)
         {
+            var tenantId = TenantResolver.Resolve(currentUserService, request.CompanyId);
+
             // SPEC 43: the restored module shows up in the company's menu right away.
-            await cacheInvalidator.InvalidateAsync(TenantResolver.Resolve(currentUserService, request.CompanyId), cancellationToken);
+            await cacheInvalidator.InvalidateAsync(tenantId, cancellationToken);
+
+            // SPEC 48 E: the per-company module snapshot must also rebuild so the API gate reflects the change.
+            await permissionService.InvalidateCompanyModuleCacheAsync(tenantId, cancellationToken);
         }
 
         return response;

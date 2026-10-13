@@ -13,7 +13,8 @@ namespace JOIN.Application.UseCases.Admin.SystemModules.Commands;
 public sealed class RestoreSystemModuleCommandHandler(
     ICurrentUserService currentUserService,
     SoftDeleteRestorer restorer,
-    SystemOptionCascadeCoordinator cascadeCoordinator)
+    SystemOptionCascadeCoordinator cascadeCoordinator,
+    IPermissionService permissionService)
     : IRequestHandler<RestoreSystemModuleCommand, Response<Guid>>
 {
     /// <inheritdoc />
@@ -29,11 +30,19 @@ public sealed class RestoreSystemModuleCommandHandler(
             return Response<Guid>.Error("SUPERADMIN_REQUIRED", ["Only a SuperAdmin can restore deleted records."]);
         }
 
-        return await restorer.RestoreAsync<SystemModule>(
+        var response = await restorer.RestoreAsync<SystemModule>(
             request.Id,
             request.CompanyId,
             // SPEC 41 (decision 2026-10-08): bring back the children deleted in the same cascade.
             restoreCascade: (entity, stamp, _) => cascadeCoordinator.RestoreSubtreeAsync(entity.Id, rootOptionId: null, stamp),
             cancellationToken: cancellationToken);
+
+        if (response.IsSuccess)
+        {
+            // SPEC 48 E: a restored module (and its options) must appear in every per-company snapshot.
+            await permissionService.InvalidateModuleCacheForAllCompaniesAsync(cancellationToken);
+        }
+
+        return response;
     }
 }

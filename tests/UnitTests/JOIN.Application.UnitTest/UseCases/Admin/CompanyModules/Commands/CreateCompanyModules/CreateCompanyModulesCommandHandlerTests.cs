@@ -280,7 +280,8 @@ public sealed class CreateCompanyModulesCommandHandlerTests
             return new CreateCompanyModulesCommandHandler(
                 UnitOfWorkMock.Object,
                 CurrentUserServiceMock.Object,
-                new CompanyPermissionCacheInvalidator(UnitOfWorkMock.Object, PermissionServiceMock.Object));
+                new CompanyPermissionCacheInvalidator(UnitOfWorkMock.Object, PermissionServiceMock.Object),
+                Mock.Of<IPermissionService>());
         }
 
         /// <summary>

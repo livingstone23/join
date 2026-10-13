@@ -1,9 +1,11 @@
 using Dapper;
 using JOIN.Application.Common;
+using JOIN.Application.Common.Settings;
 using JOIN.Application.DTO.Security;
 using JOIN.Application.Interface;
 using MediatR;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace JOIN.Application.UseCases.Security.Queries.GetSidebarMenu;
 
@@ -14,10 +16,12 @@ namespace JOIN.Application.UseCases.Security.Queries.GetSidebarMenu;
 /// <param name="connectionFactory">Factory used to create engine-agnostic read connections.</param>
 /// <param name="currentUserService">Current user context used to resolve the active tenant.</param>
 /// <param name="memoryCache">In-memory cache used to avoid rebuilding the same menu repeatedly.</param>
+/// <param name="moduleSettings">SPEC 48 D: when <c>EnforceCompanyModules</c> is false, the menu is not filtered by module.</param>
 public sealed class GetSidebarMenuQueryHandler(
     ISqlConnectionFactory connectionFactory,
     ICurrentUserService currentUserService,
-    IMemoryCache memoryCache)
+    IMemoryCache memoryCache,
+    IOptions<ModuleEnforcementSettings> moduleSettings)
     : IRequestHandler<GetSidebarMenuQuery, Response<IReadOnlyCollection<MenuOptionResponse>>>
 {
     /// <summary>
@@ -117,8 +121,10 @@ public sealed class GetSidebarMenuQueryHandler(
             parameters.Add("UserId", userId);
             parameters.Add("CompanyId", companyId);
 
-            // SPEC 43: the SuperAdmin menu is not filtered by company modules (A8).
-            var filterByCompanyModules = !currentUserService.IsInRole("SuperAdmin");
+            // SPEC 48 D (B5): a single switch gates both the menu filter and the API filter, so they
+            // never contradict each other. SuperAdmin is never filtered (SPEC 43 A8) regardless of the switch.
+            var filterByCompanyModules = moduleSettings.Value.EnforceCompanyModules
+                                         && !currentUserService.IsInRole("SuperAdmin");
             var directPermissionsSql = BuildDirectPermissionsSql(filterByCompanyModules);
 
             var rows = (await connection.QueryAsync<SidebarMenuSqlRow>(

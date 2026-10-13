@@ -1,3 +1,4 @@
+using JOIN.Application.Interface;
 using FluentAssertions;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
@@ -52,7 +53,7 @@ public sealed class UpdateSystemOptionCommandHandlerTests
         };
         mapperMock.Setup(x => x.ToDto(existing)).Returns(dto);
 
-        var handler = new UpdateSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object);
+        var handler = new UpdateSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, Mock.Of<IPermissionService>());
 
         var cmd = new UpdateSystemOptionCommand(
             Id: id,
@@ -91,7 +92,7 @@ public sealed class UpdateSystemOptionCommandHandlerTests
         repoMock.Setup(x => x.GetAsync(It.IsAny<Guid>())).ReturnsAsync((SystemOption?)null);
 
         var mapperMock = new Mock<ISystemOptionMapper>();
-        var handler = new UpdateSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object);
+        var handler = new UpdateSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, Mock.Of<IPermissionService>());
 
         var cmd = new UpdateSystemOptionCommand(Guid.NewGuid(), "X", "/x", null, null, null);
         var response = await handler.Handle(cmd, CancellationToken.None);

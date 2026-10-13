@@ -1,3 +1,4 @@
+using JOIN.Application.Interface;
 using FluentAssertions;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
@@ -57,7 +58,7 @@ public sealed class CreateSystemOptionCommandHandlerTests
         mapperMock.Setup(x => x.ToEntity(It.IsAny<CreateSystemOptionCommand>())).Returns(new SystemOption());
         mapperMock.Setup(x => x.ToDto(It.IsAny<SystemOption>())).Returns(dto);
 
-        var handler = new CreateSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object);
+        var handler = new CreateSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, Mock.Of<IPermissionService>());
 
         var cmd = new CreateSystemOptionCommand(
             ModuleId: dto.ModuleId,
@@ -98,7 +99,7 @@ public sealed class CreateSystemOptionCommandHandlerTests
         var mapperMock = new Mock<ISystemOptionMapper>();
         mapperMock.Setup(x => x.ToEntity(It.IsAny<CreateSystemOptionCommand>())).Returns(new SystemOption());
 
-        var handler = new CreateSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object);
+        var handler = new CreateSystemOptionCommandHandler(unitOfWorkMock.Object, mapperMock.Object, Mock.Of<IPermissionService>());
 
         var cmd = new CreateSystemOptionCommand(Guid.NewGuid(), "Test", "/test", null, null, null);
         var response = await handler.Handle(cmd, CancellationToken.None);
