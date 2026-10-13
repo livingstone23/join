@@ -1,6 +1,6 @@
 # SPEC 50 — `main_postgresql`: pendientes para llevar QA a PostgreSQL
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Historia (2026-10-09):** vuelve a Borrador por cambio de alcance. El usuario decidió traer las specs de `main` al fork como **serie `-post`** (copias adaptadas a PostgreSQL de 40–49, 51 y 99, implementadas desde cero en el fork; ver `specs/README.md` → "Serie `-post`"). Se elimina la sección 0 (único `git merge main` + migración `Port_Specs_40_49`) con su fase F0 y sus criterios; la sección F pasa a verificar la convención de la serie. El resto (A–E) no cambia.
 > **Depends on:** SPEC 39 (fork `main_postgresql`, `Implementado`). No depende de las `-post`; si alguna ya está implementada al arrancar, sus tests `*PostgreSqlTests` entran en la paridad de E. Rama de trabajo: `spec-50-postgresql-qa-readiness`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql` — nunca hacia `main`.
 > **Date:** 2026-10-07
