@@ -162,14 +162,13 @@ public sealed class GetTicketSummaryQueryHandlerTests
     }
 
     /// <summary>
-    /// SuperAdmin may target another company; non-SuperAdmin cannot (mirrors
-    /// <see cref="TenantResolver"/> behavior used everywhere else).
+    /// SPEC 52: the summary takes no company parameter; a SuperAdmin also gets
+    /// the active company of the token, never another one or the global view.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenSuperAdminTargetsAnotherCompany_ShouldQueryThatCompany()
+    public async Task Handle_WhenSuperAdmin_ShouldUseTokenCompany()
     {
         var tokenCompanyId = _fixture.Create<Guid>();
-        var targetCompanyId = _fixture.Create<Guid>();
         var context = new TestContext(tokenCompanyId, isSuperAdmin: true);
         context.Connection.SetResults(
             FakeResultSet.Empty(
@@ -178,27 +177,9 @@ public sealed class GetTicketSummaryQueryHandlerTests
                 "MaxDayTicketInactivity", "LastActivityAt"));
 
         var handler = context.CreateHandler();
-        var response = await handler.Handle(new GetTicketSummaryQuery(CompanyId: targetCompanyId), CancellationToken.None);
+        var response = await handler.Handle(new GetTicketSummaryQuery(), CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
-        context.Connection.CapturedParameters["TenantId"].Should().Be(targetCompanyId);
-    }
-
-    [Fact]
-    public async Task Handle_WhenNonSuperAdminTargetsAnotherCompany_ShouldStillUseTokenCompany()
-    {
-        var tokenCompanyId = _fixture.Create<Guid>();
-        var otherCompanyId = _fixture.Create<Guid>();
-        var context = new TestContext(tokenCompanyId, isSuperAdmin: false);
-        context.Connection.SetResults(
-            FakeResultSet.Empty(
-                "Id", "Created", "AssignedToUserId",
-                "ResolutionTimeUnits", "ComplexityTimeUnitCode",
-                "MaxDayTicketInactivity", "LastActivityAt"));
-
-        var handler = context.CreateHandler();
-        await handler.Handle(new GetTicketSummaryQuery(CompanyId: otherCompanyId), CancellationToken.None);
-
         context.Connection.CapturedParameters["TenantId"].Should().Be(tokenCompanyId);
     }
 

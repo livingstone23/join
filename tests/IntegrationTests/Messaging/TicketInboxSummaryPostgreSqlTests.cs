@@ -51,16 +51,29 @@ public sealed class TicketInboxSummaryPostgreSqlTests : IClassFixture<CustomWebA
 
     /// <summary>
     /// Happy path: with a mix of assigned, unassigned, breached and inactive
-    /// open tickets, plus a finalized one, the summary returns the right four
-    /// counts and excludes the final-status ticket from every figure.
+    /// open tickets, plus a final-status one that closed far past its SLA, the
+    /// summary returns the right four counts. The final ticket stays active
+    /// (<c>GcRecord = 0</c>) so its exclusion comes from <c>IsFinal</c> alone; a
+    /// soft-deleted open ticket and the tickets of another company are excluded too.
     /// </summary>
     [Fact]
     public async Task Summary_ShouldReturnTheFourCountsAndExcludeFinalAndSoftDeletedTickets()
     {
         var seeded = await SeedTenantAsync(configureInactivityThreshold: true);
-        var tickets = await SeedTicketsAsync(seeded);
+        await SeedTicketsAsync(seeded);
 
-        await SoftDeleteTicketAsync(tickets.Finished);
+        // Soft-deleted open, unassigned, breached ticket: must not count anywhere.
+        var deletedOpenId = Guid.NewGuid();
+        await using (var conn = new NpgsqlConnection(_factory.ConnectionString))
+        {
+            await conn.OpenAsync();
+            await InsertTicketAsync(conn, seeded, deletedOpenId, DateTime.UtcNow.AddDays(-20), seeded.InProgressStatusId, null);
+        }
+        await SoftDeleteTicketAsync(deletedOpenId);
+
+        // Another company with the same fixture: its tickets must not leak into this tenant's counts.
+        var otherTenant = await SeedTenantAsync(configureInactivityThreshold: true);
+        await SeedTicketsAsync(otherTenant);
 
         using var client = await CreateClientWithTicketsPermissionAsync(seeded.CompanyId);
         var response = await client.GetAsync("/api/v1/Tickets/summary");
@@ -73,7 +86,9 @@ public sealed class TicketInboxSummaryPostgreSqlTests : IClassFixture<CustomWebA
         //   openUnassigned    → created -200h    (breached, inactive — >7d)
         //   breachedAssigned  → created -72h     (breached, not inactive)
         //   inactive          → created -30d     (breached, inactive)
-        //   finished          → IsFinal, then soft-deleted → excluded entirely
+        //   finished          → IsFinal, closed 90 days late, still active → excluded by IsFinal
+        //   deletedOpen       → open + unassigned + breached, soft-deleted → excluded
+        //   other company     → same five tickets in another tenant → excluded
         data.GetProperty("openCount").GetInt32().Should().Be(4);
         data.GetProperty("slaBreachedCount").GetInt32().Should().Be(3);
         data.GetProperty("inactiveCount").GetInt32().Should().Be(2);
@@ -201,7 +216,7 @@ public sealed class TicketInboxSummaryPostgreSqlTests : IClassFixture<CustomWebA
     public async Task TicketsPaged_WithUnassignedTrue_ShouldReturnOnlyUnassignedAndAgreeOnTotalCount()
     {
         var seeded = await SeedTenantAsync(configureInactivityThreshold: true);
-        await SeedTicketsAsync(seeded);
+        var tickets = await SeedTicketsAsync(seeded);
 
         using var client = await CreateClientWithTicketsPermissionAsync(seeded.CompanyId);
 
@@ -210,10 +225,10 @@ public sealed class TicketInboxSummaryPostgreSqlTests : IClassFixture<CustomWebA
         response.StatusCode.Should().Be(HttpStatusCode.OK, body);
         var data = Data(body);
         var items = data.GetProperty("items").EnumerateArray().ToList();
-        items.Should().NotBeEmpty();
-        items.Should().OnlyContain(i => i.GetProperty("assignedToUserId").ValueKind == JsonValueKind.Null);
-        var totalCount = data.GetProperty("totalCount").GetInt32();
-        items.Count.Should().BeLessThanOrEqualTo(totalCount);
+        // The fixture has exactly one unassigned ticket (openUnassigned); the other four are assigned.
+        items.Should().ContainSingle()
+            .Which.GetProperty("id").GetGuid().Should().Be(tickets.OpenUnassigned);
+        data.GetProperty("totalCount").GetInt32().Should().Be(1, "the COUNT shares the WHERE clause with the page");
     }
 
     /// <summary>

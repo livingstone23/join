@@ -5,9 +5,8 @@ using MediatR;
 namespace JOIN.Application.UseCases.Messaging.Tickets.Queries;
 
 /// <summary>
-/// Tenant-scoped inbox summary (SPEC 52). Always counts the active company
-/// from the token; the optional <paramref name="CompanyId"/> override is
-/// honored only for SuperAdmin, like every other tenant-scoped query.
+/// Tenant-scoped inbox summary (SPEC 52). Takes no parameters: it always counts
+/// the active company from the token, also for SuperAdmin (no <c>companyId</c> override).
 /// </summary>
-public sealed record GetTicketSummaryQuery(Guid? CompanyId = null)
+public sealed record GetTicketSummaryQuery
     : IRequest<Response<TicketSummaryDto>>;

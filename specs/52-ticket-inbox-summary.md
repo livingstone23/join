@@ -78,13 +78,26 @@ public record TicketSummaryDto
 
 ## Acceptance criteria
 
-- [ ] `GET /Tickets/summary` devuelve los 4 conteos de la empresa activa, sin contar tickets borrados ni de otras empresas.
-- [ ] Un ticket con estado `IsFinal` no cuenta en ningún total, aunque haya cerrado fuera de plazo.
-- [ ] Para el mismo conjunto de tickets, `SlaBreachedCount` e `InactiveCount` coinciden con las filas que `GET /Tickets` marca con `isSlaBreached`/`isInactive` (test que compara ambos).
-- [ ] Una empresa sin `TicketCompanyDefaults.MaxDayTicketInactivity` devuelve `InactiveCount = 0`.
-- [ ] Un usuario sin `CanRead` sobre `Tickets` recibe 403.
-- [ ] `GET /Tickets?unassigned=true` devuelve solo tickets sin asignar y su `TotalCount` es coherente; con `assignedToUserId` responde 400 `INVALID_ASSIGNEE_FILTER`.
-- [ ] Tests unitarios del handler y de integración (`CustomWebApplicationFactory`, `postgres:17`).
+- [x] `GET /Tickets/summary` devuelve los 4 conteos de la empresa activa, sin contar tickets borrados ni de otras empresas. *(integración: ticket abierto borrado y una segunda empresa con los mismos tickets)*
+- [x] Un ticket con estado `IsFinal` no cuenta en ningún total, aunque haya cerrado fuera de plazo. *(integración: ticket final activo, cerrado 90 días tarde)*
+- [x] Para el mismo conjunto de tickets, `SlaBreachedCount` e `InactiveCount` coinciden con las filas que `GET /Tickets` marca con `isSlaBreached`/`isInactive` (test que compara ambos).
+- [x] Una empresa sin `TicketCompanyDefaults.MaxDayTicketInactivity` devuelve `InactiveCount = 0`.
+- [x] Un usuario sin `CanRead` sobre `Tickets` recibe 403.
+- [x] `GET /Tickets?unassigned=true` devuelve solo tickets sin asignar y su `TotalCount` es coherente; con `assignedToUserId` responde 400 `INVALID_ASSIGNEE_FILTER`.
+- [x] Tests unitarios del handler y de integración (`CustomWebApplicationFactory`, `postgres:17`).
+
+## Registro de implementación (2026-10-13)
+
+Rama `spec-52-ticket-inbox-summary` (commits a7dc5b7 y 6454f94, más la revisión final sin commitear).
+
+- **A.** `TicketSummaryDto`, `GetTicketSummaryQuery`/`GetTicketSummaryQueryHandler` (un SQL sobre los abiertos con `LEFT JOIN` agregado de `TicketLogs`; conteos en C# con `TicketSlaCalculator`) y `GET /Tickets/summary` en `TicketsController`.
+- **B.** `GetTicketsQuery.Unassigned` + `?unassigned=true`: `AND t.AssignedToUserId IS NULL` en el `whereClause` compartido con el `COUNT`; junto con `assignedToUserId` responde 400 `INVALID_ASSIGNEE_FILTER`.
+- **Plan 3.** `TicketInboxSummaryExplainPostgreSqlTests` hace el `EXPLAIN` del SQL nuevo contra la base migrada: no hace falta el índice de "Risks".
+- **Plan 4.** `CURL_REQUESTS.md` (summary, `unassigned` y el código de error) e índice de specs actualizados.
+- **Revisión final:** la prueba de integración del resumen borraba el ticket final, así que su exclusión venía de `GcRecord` y no de `IsFinal`. Ahora el ticket final queda activo, y se agregaron un ticket abierto borrado y una segunda empresa con los mismos tickets. La prueba de `unassigned=true` verifica el ticket exacto y `TotalCount = 1`.
+- **Decisión del usuario (2026-10-13, opción A):** el código aceptaba `?companyId=` en `/summary` (el SuperAdmin podía pedir el resumen de otra empresa, como en `GET /Tickets`), en contra de "Sin parámetros" del Scope. Se quitó: `GetTicketSummaryQuery` no tiene parámetros y el handler usa siempre `CompanyId` del token, también para el SuperAdmin. Los dos unit tests de ese parámetro se reemplazaron por `Handle_WhenSuperAdmin_ShouldUseTokenCompany`. El front no cambia (FE-16 nunca enviaba `companyId`).
+- **Verificación:** build Release sin errores (los warnings ya existían); unit tests 3197 OK (2 skipped), cobertura de líneas 94,5 % (gate 90 %); integración completa 242/242 OK.
+- **Frontend:** FE-15 y FE-16 llevan la nota "Ajuste por BE-52". La implementación en el front (tarjetas, badge y quitar el filtro en memoria de "Sin asignar") queda pendiente en FE-16.
 
 ## Decisions
 

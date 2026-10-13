@@ -34,7 +34,8 @@ public sealed class GetTicketSummaryQueryHandler(
                 ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        var tenantId = TenantResolver.Resolve(currentUserService, request.CompanyId);
+        // SPEC 52: always the active company of the token, SuperAdmin included.
+        var tenantId = currentUserService.CompanyId;
 
         // Only the inputs the calculator actually consumes. Last activity is
         // aggregated in SQL with a LEFT JOIN + GROUP BY so we don't run one
