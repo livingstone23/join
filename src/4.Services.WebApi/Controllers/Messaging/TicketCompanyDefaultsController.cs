@@ -163,7 +163,8 @@ public class TicketCompanyDefaultsController(ISender sender) : ControllerBase
             TimeUnitDefaultId = dto.TimeUnitDefaultId,
             AreaDefaultId = dto.AreaDefaultId,
             ProjectDefaultId = dto.ProjectDefaultId,
-            ChannelDefaultId = dto.ChannelDefaultId
+            ChannelDefaultId = dto.ChannelDefaultId,
+            MaxDayTicketInactivity = dto.MaxDayTicketInactivity
         };
 
         var response = await _sender.Send(command, cancellationToken);
@@ -207,7 +208,8 @@ public class TicketCompanyDefaultsController(ISender sender) : ControllerBase
             TimeUnitDefaultId = dto.TimeUnitDefaultId,
             AreaDefaultId = dto.AreaDefaultId,
             ProjectDefaultId = dto.ProjectDefaultId,
-            ChannelDefaultId = dto.ChannelDefaultId
+            ChannelDefaultId = dto.ChannelDefaultId,
+            MaxDayTicketInactivity = dto.MaxDayTicketInactivity
         };
 
         var response = await _sender.Send(command, cancellationToken);

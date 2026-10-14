@@ -1,8 +1,9 @@
 # SPEC 53 — Tickets: mis capacidades, usuarios asignables e inactividad en los valores por defecto
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 34 (roster `TicketUserCompany`), SPEC 35 (acciones de ciclo de vida y `TicketUserCompanyCapabilityResolver`), SPEC 37 (SLA e inactividad), SPEC 43-post (permisos por ruta). Rama de trabajo: `spec-53-ticket-capabilities-and-inactivity`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`.
 > **Date:** 2026-10-13
+> **Ajuste por implementación (2026-10-13):** (1) Tabla de errores: `COMPANY_REQUIRED`/`USER_REQUIRED` responden **401**, no 400. Es lo que hacen los handlers de SPEC 35 ("mismos códigos") y lo que manda CLAUDE.md (401 si falta `CompanyId`). (2) `/assignable` también exige que el usuario esté activo, no borrado y vinculado a la empresa (`UserCompanies`), porque `CreateTicket`/`ReassignTicket` rechazan sin ese vínculo (`INVALID_ASSIGNED_USER_TENANT`); es lo que pide la decisión "evita que el frontend ofrezca destinos que el backend rechaza". (3) `/me` y `/assignable` no aceptan `?companyId=`: siempre usan la empresa del token, también el SuperAdmin (misma regla que SPEC 52, opción A). Sin cambio de alcance.
 > **Objective:** Darle al frontend tres datos que hoy no puede obtener sin permisos de administración: las capacidades de ticket del usuario autenticado, la lista de usuarios a los que se puede asignar un ticket y el máximo de días sin actividad de la empresa.
 > **Origen:** fase B de FE-18 (detalle: "Finalizar", "Reasignar", hueco de inactividad), FE-17 ("Asignar a" del alta) y brecha 3 de FE-15. SPEC 34 ya dejaba `GET /TicketUserCompanies/me` como pendiente "si SPEC 35 lo necesita"; SPEC 35 descartó `GET /Tickets/my-capabilities` y remitió a esa ruta.
 
@@ -23,7 +24,7 @@
 - **A. `GET /api/v1/TicketUserCompanies/me`** en `TicketUserCompaniesController`, con `[PermissionResource("Tickets")]` a nivel de acción (mismo patrón que `GET /CalendarUserConfigurations/me` con `Calendar`): basta con poder leer tickets. Sin parámetros; usa el usuario y la empresa del token.
   - Responde `Response<TicketMyCapabilitiesDto>` con los flags que devuelve `TicketUserCompanyCapabilityResolver.ResolveAsync` (única fuente de verdad), más `IsMember`.
   - Un usuario que no está en el roster recibe **200** con todo en `false` (no 404): el frontend solo oculta acciones.
-- **B. `GET /api/v1/TicketUserCompanies/assignable`** en el mismo controlador, también con `[PermissionResource("Tickets")]`: los miembros activos (`GcRecord = 0`) del roster de la empresa activa con `CanResolveTicket = true`, ordenados por nombre. Es el mismo criterio que validan `CreateTicket` (asignado inicial) y `ReassignTicket` (destino).
+- **B. `GET /api/v1/TicketUserCompanies/assignable`** en el mismo controlador, también con `[PermissionResource("Tickets")]`, sin parámetros: los miembros activos (`GcRecord = 0`) del roster de la empresa activa con `CanResolveTicket = true`, cuyo usuario está activo, no borrado y vinculado a la empresa (`UserCompanies`), ordenados por nombre. Es el mismo criterio que validan `CreateTicket` (asignado inicial) y `ReassignTicket` (destino).
   - Responde `Response<IReadOnlyList<TicketAssignableUserDto>>`. Sin paginación (un roster por empresa es chico); si crece, se pagina en otra spec.
 - **C. `MaxDayTicketInactivity` en los DTO de `TicketCompanyDefaults`:** se agrega a `TicketCompanyDefaultDto` (lectura), `CreateTicketCompanyDefaultDto` y `UpdateTicketCompanyDefaultDto` (escritura), con sus comandos, mapeos y validadores. `null` = nunca se marca inactivo (comportamiento actual de `TicketSlaCalculator`).
 
@@ -77,7 +78,7 @@ public record TicketAssignableUserDto
 | Código | HTTP | Cuándo |
 |---|---|---|
 | (estándar) | 401 / 403 | Sin token / sin `CanRead` sobre `Tickets` |
-| `COMPANY_REQUIRED`, `USER_REQUIRED` | 400 | Token sin empresa o sin usuario (mismos códigos que los handlers de SPEC 35) |
+| `COMPANY_REQUIRED`, `USER_REQUIRED` | 401 | Token sin empresa o sin usuario (mismos códigos y status que los handlers de SPEC 35) |
 
 ---
 
@@ -90,13 +91,35 @@ public record TicketAssignableUserDto
 
 ## Acceptance criteria
 
-- [ ] Un usuario con `CanRead` sobre `Tickets` y **sin** permiso sobre `TicketUserCompanies` obtiene 200 en `/me` y en `/assignable`.
-- [ ] `/me` devuelve los mismos flags que usa `FinishTicket`/`ReassignTicket` para ese usuario (test que compara con el resolver); un usuario fuera del roster recibe `IsMember = false` y todo en `false`.
-- [ ] `/assignable` devuelve solo miembros activos con `CanResolveTicket` de la empresa activa; no incluye borrados ni usuarios de otra empresa.
-- [ ] Asignar al crear o reasignar a cualquier usuario de `/assignable` no da `INVALID_ASSIGNED_USER_NOT_RESOLVER` (test de integración).
-- [ ] `TicketCompanyDefaultDto` incluye `MaxDayTicketInactivity`; crear y editar lo guardan; `null` lo desactiva y `0` o negativo da 400.
-- [ ] Un ticket inactivo según el valor guardado aparece con `isInactive = true` en `GET /Tickets` y `GET /Tickets/{id}` (sin cambios en el cálculo, solo se verifica la configuración desde la API).
-- [ ] Tests unitarios de los handlers y de integración (`CustomWebApplicationFactory`, `postgres:17`).
+- [x] Un usuario con `CanRead` sobre `Tickets` y **sin** permiso sobre `TicketUserCompanies` obtiene 200 en `/me` y en `/assignable`.
+- [x] `/me` devuelve los mismos flags que usa `FinishTicket`/`ReassignTicket` para ese usuario (test que compara con el resolver); un usuario fuera del roster recibe `IsMember = false` y todo en `false`.
+- [x] `/assignable` devuelve solo miembros activos con `CanResolveTicket` de la empresa activa; no incluye borrados ni usuarios de otra empresa.
+- [x] Asignar al crear o reasignar a cualquier usuario de `/assignable` no da `INVALID_ASSIGNED_USER_NOT_RESOLVER` (test de integración).
+- [x] `TicketCompanyDefaultDto` incluye `MaxDayTicketInactivity`; crear y editar lo guardan; `null` lo desactiva y `0` o negativo da 400.
+- [x] Un ticket inactivo según el valor guardado aparece con `isInactive = true` en `GET /Tickets` y `GET /Tickets/{id}` (sin cambios en el cálculo, solo se verifica la configuración desde la API).
+- [x] Tests unitarios de los handlers y de integración (`CustomWebApplicationFactory`, `postgres:17`).
+
+## Registro de implementación (2026-10-13)
+
+Rama `spec-53-ticket-capabilities-and-inactivity` (commits 089c2ed y 8c2aa60, más la revisión final sin commitear).
+
+- **A.** `GET /TicketUserCompanies/me` → `GetMyTicketCapabilitiesQuery`. Usa `TicketUserCompanyCapabilityResolver.ResolveWithMembershipAsync`; `ResolveAsync` (el que usan `CreateTicket`, `ReassignTicket` y `FinishTicket`) ahora delega en ese mismo método, así que `/me` y los comandos comparten la misma búsqueda.
+- **B.** `GET /TicketUserCompanies/assignable` → `GetAssignableTicketUsersQuery` (Dapper): roster activo con `CanResolveTicket`, usuario activo y no borrado, con vínculo activo en `UserCompanies`.
+- **C.** `MaxDayTicketInactivity` en los tres DTO, en los comandos de crear y editar, en los validadores (`null` o `>= 1`), en las tres consultas de lectura y en el controlador.
+- **Plan 4.** `TicketCapabilitiesAndInactivityExplainPostgreSqlTests` hace el `EXPLAIN` de `/assignable` contra la base migrada. `CURL_REQUESTS.md` e índice actualizados.
+- **Revisión final:**
+  - Se quitó `?companyId=` de `/me` y `/assignable`.
+  - Se agregó a `/assignable` el filtro de usuario activo y vinculado a la empresa. Con el filtro quitado, la prueba de integración falla.
+  - Se corrigió la tabla de errores (401).
+  - `TicketCompanyDefaultMapperTests` fallaba desde 8c2aa60 porque afirmaba que `ApplyUpdate` no tocaba `MaxDayTicketInactivity`; ahora verifica que lo copia, incluido `null`.
+  - Nuevas pruebas de integración:
+    - Usuario con un rol que solo da `Tickets`: recibe 403 en `GET /TicketUserCompanies` y 200 en `/me` y `/assignable`.
+    - Lo que dice `/me` coincide con `TICKET_REASSIGN_FORBIDDEN`/`TICKET_FINISH_FORBIDDEN`.
+    - Reasignar a un usuario de `/assignable` funciona.
+    - `/assignable` excluye a usuarios desvinculados, inactivos o borrados.
+    - `isInactive` también se refleja en `GET /Tickets/{id}`.
+- **Verificación:** build Release sin errores; unit tests 3221 OK (2 skipped), cobertura de líneas 94,51 % (gate 90 %); integración completa 253/253 OK.
+- **Frontend:** FE-15, FE-17, FE-18 y FE-19 llevan la nota "Ajuste por BE-53". La implementación en el front queda pendiente en esas specs.
 
 ## Decisions
 

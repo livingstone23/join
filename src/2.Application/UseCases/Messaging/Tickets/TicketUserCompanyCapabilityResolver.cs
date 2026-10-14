@@ -20,6 +20,28 @@ public sealed class TicketUserCompanyCapabilityResolver(IUnitOfWork unitOfWork)
         Guid companyId,
         CancellationToken cancellationToken)
     {
+        // Same lookup as ResolveWithMembershipAsync, so GET /TicketUserCompanies/me (SPEC 53)
+        // and the commands that enforce these flags can never disagree.
+        var capability = await ResolveWithMembershipAsync(userId, companyId, cancellationToken);
+
+        return new TicketUserCompanyCapability(
+            capability.IsSuperAdminTicket,
+            capability.CanFinishTicket,
+            capability.CanResolveTicket);
+    }
+
+    /// <summary>
+    /// Returns the capability flags plus <see cref="TicketUserCompanyCapability.IsMember"/>,
+    /// which is <c>true</c> exactly when the caller has an active row on the roster.
+    /// Used by <c>GET /TicketUserCompanies/me</c> (SPEC 53) so the front can render the
+    /// right buttons even when the caller is not on the roster (in which case
+    /// <see cref="TicketUserCompanyCapability"/> already returns all flags <c>false</c>).
+    /// </summary>
+    public async Task<TicketUserCompanyCapabilityWithMembership> ResolveWithMembershipAsync(
+        Guid userId,
+        Guid companyId,
+        CancellationToken cancellationToken)
+    {
         var repository = unitOfWork.GetRepository<TicketUserCompany>();
         var all = await repository.GetAllAsync();
 
@@ -30,10 +52,11 @@ public sealed class TicketUserCompanyCapabilityResolver(IUnitOfWork unitOfWork)
 
         return row is null
             ? default
-            : new TicketUserCompanyCapability(
-                row.IsSuperAdminTicket,
-                row.CanFinishTicket,
-                row.CanResolveTicket);
+            : new TicketUserCompanyCapabilityWithMembership(
+                IsMember: true,
+                IsSuperAdminTicket: row.IsSuperAdminTicket,
+                CanFinishTicket: row.CanFinishTicket,
+                CanResolveTicket: row.CanResolveTicket);
     }
 }
 
@@ -42,6 +65,19 @@ public sealed class TicketUserCompanyCapabilityResolver(IUnitOfWork unitOfWork)
 /// returned by <see cref="TicketUserCompanyCapabilityResolver.ResolveAsync"/>.
 /// </summary>
 public readonly record struct TicketUserCompanyCapability(
+    bool IsSuperAdminTicket,
+    bool CanFinishTicket,
+    bool CanResolveTicket);
+
+/// <summary>
+/// Same three capability flags plus an <see cref="IsMember"/> marker. Spec
+/// <c>GET /TicketUserCompanies/me</c> (SPEC 53) needs <see cref="IsMember"/>
+/// to distinguish "caller is on the roster, just not enabled" from
+/// "caller is not on the roster at all" without changing
+/// <see cref="TicketUserCompanyCapability"/> for existing callers.
+/// </summary>
+public readonly record struct TicketUserCompanyCapabilityWithMembership(
+    bool IsMember,
     bool IsSuperAdminTicket,
     bool CanFinishTicket,
     bool CanResolveTicket);
