@@ -42,7 +42,8 @@ public sealed class GetMyTicketCapabilitiesQueryHandler(
                 ["The authenticated user identifier is required."]);
         }
 
-        var tenantId = TenantResolver.Resolve(currentUserService, request.CompanyId);
+        // SPEC 53: always the active company of the token, SuperAdmin included.
+        var tenantId = currentUserService.CompanyId;
         var capability = await resolver.ResolveWithMembershipAsync(userId, tenantId, cancellationToken);
 
         return new Response<TicketMyCapabilitiesDto>

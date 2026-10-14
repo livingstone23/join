@@ -66,33 +66,26 @@ public sealed class GetAssignableTicketUsersQueryHandlerTests
         context.Connection.LastCommandText.Should().Contain("tuc.CompanyId = @TenantId");
         context.Connection.LastCommandText.Should().Contain("tuc.GcRecord = 0");
         context.Connection.LastCommandText.Should().Contain("tuc.CanResolveTicket = TRUE");
+        // Same eligibility CreateTicket/ReassignTicket check: active user still linked to the company.
+        context.Connection.LastCommandText.Should().Contain("u.GcRecord = 0");
+        context.Connection.LastCommandText.Should().Contain("u.IsActive = TRUE");
+        context.Connection.LastCommandText.Should().Contain("FROM Security.UserCompanies uc");
         context.Connection.CapturedParameters["TenantId"].Should().Be(companyId);
     }
 
+    /// <summary>
+    /// SPEC 53: no company parameter; a SuperAdmin also gets the active company of the token.
+    /// </summary>
     [Fact]
-    public async Task Handle_WhenNonSuperAdminTargetsAnotherCompany_ShouldStillUseTokenCompany()
+    public async Task Handle_WhenSuperAdmin_ShouldUseTokenCompany()
     {
         var tokenCompany = _fixture.Create<Guid>();
-        var otherCompany = _fixture.Create<Guid>();
-        var context = new TestContext(tokenCompany, isSuperAdmin: false);
-        context.Connection.SetResults(FakeResultSet.Empty("UserId", "UserName", "UserEmail"));
-
-        await context.CreateHandler().Handle(new GetAssignableTicketUsersQuery(CompanyId: otherCompany), CancellationToken.None);
-
-        context.Connection.CapturedParameters["TenantId"].Should().Be(tokenCompany);
-    }
-
-    [Fact]
-    public async Task Handle_WhenSuperAdminTargetsAnotherCompany_ShouldQueryThatCompany()
-    {
-        var tokenCompany = _fixture.Create<Guid>();
-        var targetCompany = _fixture.Create<Guid>();
         var context = new TestContext(tokenCompany, isSuperAdmin: true);
         context.Connection.SetResults(FakeResultSet.Empty("UserId", "UserName", "UserEmail"));
 
-        await context.CreateHandler().Handle(new GetAssignableTicketUsersQuery(CompanyId: targetCompany), CancellationToken.None);
+        await context.CreateHandler().Handle(new GetAssignableTicketUsersQuery(), CancellationToken.None);
 
-        context.Connection.CapturedParameters["TenantId"].Should().Be(targetCompany);
+        context.Connection.CapturedParameters["TenantId"].Should().Be(tokenCompany);
     }
 
     private sealed class TestContext

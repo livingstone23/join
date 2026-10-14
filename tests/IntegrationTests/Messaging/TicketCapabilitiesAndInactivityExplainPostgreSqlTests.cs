@@ -35,6 +35,14 @@ public sealed class TicketCapabilitiesAndInactivityExplainPostgreSqlTests : ICla
             WHERE tuc.companyid = @tenant
               AND tuc.gcrecord = 0
               AND tuc.canresolveticket = TRUE
+              AND u.gcrecord = 0
+              AND u.isactive = TRUE
+              AND EXISTS (
+                  SELECT 1
+                  FROM security.usercompanies uc
+                  WHERE uc.userid = tuc.userid
+                    AND uc.companyid = tuc.companyid
+                    AND uc.gcrecord = 0)
             ORDER BY u.lastname ASC, u.firstname ASC;
             """;
 
@@ -51,6 +59,7 @@ public sealed class TicketCapabilitiesAndInactivityExplainPostgreSqlTests : ICla
         planJson.Should().Contain("\"Relation Name\": \"ticketusercompanies\"");
         planJson.Should().Contain("\"Relation Name\": \"users\"");
         planJson.Should().Contain("canresolveticket");
+        planJson.Should().Contain("\"Relation Name\": \"usercompanies\"");
     }
 
     private async Task<Guid> ReadJoinCompanyIdAsync()

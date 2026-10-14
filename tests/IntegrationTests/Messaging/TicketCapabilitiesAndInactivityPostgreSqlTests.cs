@@ -81,6 +81,54 @@ public sealed class TicketCapabilitiesAndInactivityPostgreSqlTests : IClassFixtu
         data.GetProperty("isSuperAdminTicket").GetBoolean().Should().BeFalse();
     }
 
+    /// <summary>
+    /// SPEC 53 criteria 1 and 2: a non-SuperAdmin user whose role grants <c>Tickets</c> but
+    /// nothing on <c>TicketUserCompanies</c> is rejected by the roster administration
+    /// endpoint, yet gets 200 on <c>/me</c> and <c>/assignable</c>; and the flags
+    /// <c>/me</c> reports are exactly the ones <c>ReassignTicket</c> and <c>FinishTicket</c> enforce.
+    /// </summary>
+    [Fact]
+    public async Task TicketsOnlyReader_GetsMeAndAssignable_AndMeMatchesWhatReassignAndFinishEnforce()
+    {
+        var tenant = await SeedTenantAsync();
+        var reader = await SeedUserAsync(tenant.CompanyId, "reader");
+        await GrantTicketsOnlyRoleAsync(tenant.CompanyId, reader.Id);
+        await AddRosterRowAsync(tenant.CompanyId, reader.Id, canResolve: true, canFinish: false, isSuperAdmin: false);
+
+        using var client = await CreateClientAsync(tenant.CompanyId, reader);
+
+        (await client.GetAsync("/api/v1/TicketUserCompanies")).StatusCode
+            .Should().Be(HttpStatusCode.Forbidden, "the role has no permission on TicketUserCompanies");
+
+        var meResponse = await client.GetAsync("/api/v1/TicketUserCompanies/me");
+        var meBody = await meResponse.Content.ReadAsStringAsync();
+        meResponse.StatusCode.Should().Be(HttpStatusCode.OK, meBody);
+        var me = Data(meBody);
+        me.GetProperty("isMember").GetBoolean().Should().BeTrue();
+        me.GetProperty("canResolveTicket").GetBoolean().Should().BeTrue();
+        me.GetProperty("canFinishTicket").GetBoolean().Should().BeFalse();
+        me.GetProperty("isSuperAdminTicket").GetBoolean().Should().BeFalse();
+
+        var assignableResponse = await client.GetAsync("/api/v1/TicketUserCompanies/assignable");
+        var assignableBody = await assignableResponse.Content.ReadAsStringAsync();
+        assignableResponse.StatusCode.Should().Be(HttpStatusCode.OK, assignableBody);
+        Data(assignableBody).EnumerateArray().Select(e => e.GetProperty("userId").GetGuid())
+            .Should().Contain(reader.Id);
+
+        // /me says isSuperAdminTicket = false and canFinishTicket = false: the commands must agree.
+        var ticketId = await CreateTicketAsync(client, tenant, assignedToUserId: null);
+
+        var reassign = await client.PutAsJsonAsync($"/api/v1/Tickets/{ticketId}/reassign", new { newAssignedToUserId = reader.Id });
+        var reassignBody = await reassign.Content.ReadAsStringAsync();
+        reassign.StatusCode.Should().Be(HttpStatusCode.Forbidden, reassignBody);
+        reassignBody.Should().Contain("TICKET_REASSIGN_FORBIDDEN");
+
+        var finish = await client.PutAsJsonAsync($"/api/v1/Tickets/{ticketId}/finish", new { ticketStatusId = tenant.FinalStatusId });
+        var finishBody = await finish.Content.ReadAsStringAsync();
+        finish.StatusCode.Should().Be(HttpStatusCode.Forbidden, finishBody);
+        finishBody.Should().Contain("TICKET_FINISH_FORBIDDEN");
+    }
+
     // ── /assignable ──────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -91,6 +139,15 @@ public sealed class TicketCapabilitiesAndInactivityPostgreSqlTests : IClassFixtu
         var resolver2 = await SeedResolverAsync(tenant, canResolve: true, canFinish: true, isSuperAdmin: false);
         var nonResolver = await SeedResolverAsync(tenant, canResolve: false, canFinish: true, isSuperAdmin: true);
         var softDeleted = await SeedResolverAsync(tenant, canResolve: true, canFinish: true, isSuperAdmin: false, softDelete: true);
+
+        // Roster resolvers that CreateTicket/ReassignTicket would reject anyway: user no longer
+        // linked to the company (INVALID_ASSIGNED_USER_TENANT), deactivated, or deleted.
+        var unlinked = await SeedResolverAsync(tenant, canResolve: true, canFinish: false, isSuperAdmin: false);
+        await UnlinkUserFromCompanyAsync(tenant.CompanyId, unlinked.ResolverId);
+        var inactiveUser = await SeedResolverAsync(tenant, canResolve: true, canFinish: false, isSuperAdmin: false);
+        await SetUserStateAsync(inactiveUser.ResolverId, isActive: false, deleted: false);
+        var deletedUser = await SeedResolverAsync(tenant, canResolve: true, canFinish: false, isSuperAdmin: false);
+        await SetUserStateAsync(deletedUser.ResolverId, isActive: true, deleted: true);
 
         // Member of a DIFFERENT company — must not appear.
         var otherTenant = await SeedTenantAsync(suffix: "X");
@@ -109,6 +166,7 @@ public sealed class TicketCapabilitiesAndInactivityPostgreSqlTests : IClassFixtu
         ids.Should().NotContain(nonResolver.ResolverId);
         ids.Should().NotContain(softDeleted.ResolverId);
         ids.Should().NotContain(otherResolver.ResolverId);
+        ids.Should().NotContain(new[] { unlinked.ResolverId, inactiveUser.ResolverId, deletedUser.ResolverId });
     }
 
     [Fact]
@@ -147,6 +205,30 @@ public sealed class TicketCapabilitiesAndInactivityPostgreSqlTests : IClassFixtu
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created, raw);
         raw.Should().NotContain("INVALID_ASSIGNED_USER_NOT_RESOLVER");
         raw.Should().NotContain("INVALID_ASSIGNED_USER");
+    }
+
+    [Fact]
+    public async Task AssignableUser_ShouldBeAcceptedByReassignTicketAsTarget()
+    {
+        // SPEC 53 criterion 4 (reassign half): the actor holds IsSuperAdminTicket on the roster
+        // (ReassignTicket checks the roster, not the SuperAdmin role), the target comes from /assignable.
+        var tenant = await SeedTenantAsync();
+        var resolver = await SeedResolverAsync(tenant, canResolve: true, canFinish: false, isSuperAdmin: false);
+
+        using var client = await CreateSuperAdminClientAsync(tenant.CompanyId);
+        var callerId = await dbUserIdFromClientAsync(client);
+        await AddRosterRowAsync(tenant.CompanyId, callerId, canResolve: false, canFinish: true, isSuperAdmin: true);
+
+        var listBody = await (await client.GetAsync("/api/v1/TicketUserCompanies/assignable")).Content.ReadAsStringAsync();
+        var targets = Data(listBody).EnumerateArray().Select(e => e.GetProperty("userId").GetGuid()).ToList();
+        targets.Should().ContainSingle().Which.Should().Be(resolver.ResolverId);
+
+        var ticketId = await CreateTicketAsync(client, tenant, assignedToUserId: null);
+        var reassign = await client.PutAsJsonAsync($"/api/v1/Tickets/{ticketId}/reassign", new { newAssignedToUserId = targets[0] });
+        var body = await reassign.Content.ReadAsStringAsync();
+
+        reassign.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        Data(body).GetProperty("assignedToUserId").GetGuid().Should().Be(resolver.ResolverId);
     }
 
     // ── MaxDayTicketInactivity ────────────────────────────────────────────────────────
@@ -267,6 +349,11 @@ public sealed class TicketCapabilitiesAndInactivityPostgreSqlTests : IClassFixtu
             .First(c => c.GetProperty("id").GetGuid() == ticketId);
         item.GetProperty("isInactive").GetBoolean().Should().BeTrue();
 
+        var byIdResponse = await client.GetAsync($"/api/v1/Tickets/{ticketId}");
+        var byIdBody = await byIdResponse.Content.ReadAsStringAsync();
+        byIdResponse.StatusCode.Should().Be(HttpStatusCode.OK, byIdBody);
+        Data(byIdBody).GetProperty("isInactive").GetBoolean().Should().BeTrue("GET /Tickets/{id} uses the same stored threshold");
+
         // Disable the threshold and re-check.
         var update = await client.PutAsJsonAsync($"/api/v1/TicketCompanyDefaults/{defaultId}", new
         {
@@ -283,6 +370,9 @@ public sealed class TicketCapabilitiesAndInactivityPostgreSqlTests : IClassFixtu
             .GetProperty("items").EnumerateArray()
             .First(c => c.GetProperty("id").GetGuid() == ticketId);
         itemAfter.GetProperty("isInactive").GetBoolean().Should().BeFalse();
+
+        var byIdAfter = Data(await (await client.GetAsync($"/api/v1/Tickets/{ticketId}")).Content.ReadAsStringAsync());
+        byIdAfter.GetProperty("isInactive").GetBoolean().Should().BeFalse();
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────────
@@ -572,6 +662,95 @@ public sealed class TicketCapabilitiesAndInactivityPostgreSqlTests : IClassFixtu
             CreatedBy = Creator
         });
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Creates a role in the tenant whose only grant is the <c>Tickets</c> resource
+    /// (read/create/update), assigns it to <paramref name="userId"/>, and nothing on
+    /// <c>TicketUserCompanies</c> — the "agent" profile SPEC 53 is written for.
+    /// </summary>
+    private async Task GrantTicketsOnlyRoleAsync(Guid companyId, Guid userId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var roleName = $"S53Agent{Guid.NewGuid():N}"[..20];
+        var role = new ApplicationRole
+        {
+            Id = Guid.NewGuid(),
+            Name = roleName,
+            NormalizedName = roleName.ToUpperInvariant(),
+            ConcurrencyStamp = Guid.NewGuid().ToString(),
+            CreatedBy = Creator
+        };
+        db.Set<ApplicationRole>().Add(role);
+
+        var ticketsOptionId = await db.SystemOptions.IgnoreQueryFilters()
+            .Where(o => o.ControllerName == "Tickets" && o.GcRecord == 0)
+            .Select(o => o.Id)
+            .FirstAsync();
+
+        db.UserRoleCompanies.Add(new UserRoleCompany
+        {
+            UserId = userId,
+            RoleId = role.Id,
+            CompanyId = companyId,
+            CreatedBy = Creator
+        });
+        db.RoleSystemOptions.Add(new RoleSystemOption
+        {
+            CompanyId = companyId,
+            RoleId = role.Id,
+            SystemOptionId = ticketsOptionId,
+            CanRead = true,
+            CanCreate = true,
+            CanUpdate = true,
+            CreatedBy = Creator
+        });
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Creates an open ticket through the API and returns its id.
+    /// </summary>
+    private static async Task<Guid> CreateTicketAsync(HttpClient client, Tenant tenant, Guid? assignedToUserId)
+    {
+        var response = await client.PostAsJsonAsync("/api/v1/Tickets", new
+        {
+            name = "SPEC 53 ticket",
+            description = "SPEC 53 fixture",
+            estimatedTime = 1m,
+            consumedTime = 0m,
+            ticketStatusId = tenant.InitialStatusId,
+            ticketComplexityId = tenant.ComplexityId,
+            timeUnitId = tenant.TimeUnitId,
+            channelId = tenant.ChannelId,
+            assignedToUserId
+        });
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.Created, body);
+        return Data(body).GetProperty("id").GetGuid();
+    }
+
+    private async Task UnlinkUserFromCompanyAsync(Guid companyId, Guid userId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var link = await db.UserCompanies.FirstAsync(uc => uc.UserId == userId && uc.CompanyId == companyId);
+        link.MarkAsDeleted();
+        await db.SaveChangesAsync();
+    }
+
+    private async Task SetUserStateAsync(Guid userId, bool isActive, bool deleted)
+    {
+        await using var conn = new NpgsqlConnection(_factory.ConnectionString);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand(
+            "UPDATE security.users SET isactive = @active, gcrecord = @gc WHERE id = @id", conn);
+        cmd.Parameters.AddWithValue("active", isActive);
+        cmd.Parameters.AddWithValue("gc", deleted ? 1 : 0);
+        cmd.Parameters.AddWithValue("id", userId);
+        (await cmd.ExecuteNonQueryAsync()).Should().Be(1);
     }
 
     private static JsonElement Data(string body)

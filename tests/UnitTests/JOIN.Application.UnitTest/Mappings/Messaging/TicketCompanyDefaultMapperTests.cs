@@ -35,6 +35,7 @@ public sealed class TicketCompanyDefaultMapperTests
         entity.AreaDefaultId.Should().Be(command.AreaDefaultId);
         entity.ProjectDefaultId.Should().Be(command.ProjectDefaultId);
         entity.ChannelDefaultId.Should().Be(command.ChannelDefaultId);
+        entity.MaxDayTicketInactivity.Should().Be(command.MaxDayTicketInactivity); // SPEC 53
 
         entity.Id.Should().NotBeEmpty();
         entity.CompanyId.Should().Be(Guid.Empty);
@@ -43,7 +44,6 @@ public sealed class TicketCompanyDefaultMapperTests
         entity.LastModified.Should().BeNull();
         entity.LastModifiedBy.Should().BeNull();
         entity.GcRecord.Should().Be(BaseAuditableEntity.ActiveGcRecord);
-        entity.MaxDayTicketInactivity.Should().BeNull();
         entity.TicketStatusDefault.Should().BeNull();
         entity.TicketComplexityDefault.Should().BeNull();
         entity.TimeUnitDefault.Should().BeNull();
@@ -67,7 +67,8 @@ public sealed class TicketCompanyDefaultMapperTests
             TimeUnitDefaultId = null,
             AreaDefaultId = null,
             ProjectDefaultId = null,
-            ChannelDefaultId = null
+            ChannelDefaultId = null,
+            MaxDayTicketInactivity = null
         };
 
         // Act
@@ -81,6 +82,7 @@ public sealed class TicketCompanyDefaultMapperTests
         entity.AreaDefaultId.Should().BeNull();
         entity.ProjectDefaultId.Should().BeNull();
         entity.ChannelDefaultId.Should().BeNull();
+        entity.MaxDayTicketInactivity.Should().BeNull("SPEC 53: null disables the inactivity marker");
     }
 
     /// <summary>
@@ -113,7 +115,6 @@ public sealed class TicketCompanyDefaultMapperTests
         var originalCompanyId = entity.CompanyId;
         var originalCreated = entity.Created;
         var originalCreatedBy = entity.CreatedBy;
-        var originalMaxDayTicketInactivity = entity.MaxDayTicketInactivity;
 
         // Act
         _mapper.ApplyUpdate(command, entity);
@@ -132,7 +133,7 @@ public sealed class TicketCompanyDefaultMapperTests
         entity.AreaDefaultId.Should().Be(command.AreaDefaultId);
         entity.ProjectDefaultId.Should().Be(command.ProjectDefaultId);
         entity.ChannelDefaultId.Should().Be(command.ChannelDefaultId);
-        entity.MaxDayTicketInactivity.Should().Be(originalMaxDayTicketInactivity);
+        entity.MaxDayTicketInactivity.Should().Be(command.MaxDayTicketInactivity); // SPEC 53: now part of the update contract
         entity.TicketStatusDefault.Should().BeNull();
         entity.TicketComplexityDefault.Should().BeNull();
         entity.TimeUnitDefault.Should().BeNull();
@@ -155,7 +156,8 @@ public sealed class TicketCompanyDefaultMapperTests
             TimeUnitDefaultId = null,
             AreaDefaultId = null,
             ProjectDefaultId = null,
-            ChannelDefaultId = null
+            ChannelDefaultId = null,
+            MaxDayTicketInactivity = null
         };
         var entity = CreateValidEntity();
 
@@ -169,6 +171,7 @@ public sealed class TicketCompanyDefaultMapperTests
         entity.AreaDefaultId.Should().BeNull();
         entity.ProjectDefaultId.Should().BeNull();
         entity.ChannelDefaultId.Should().BeNull();
+        entity.MaxDayTicketInactivity.Should().BeNull("SPEC 53: null disables the inactivity marker (the entity had 30)");
     }
 
     /// <summary>
@@ -199,7 +202,8 @@ public sealed class TicketCompanyDefaultMapperTests
         TimeUnitDefaultId = Guid.NewGuid(),
         AreaDefaultId = Guid.NewGuid(),
         ProjectDefaultId = Guid.NewGuid(),
-        ChannelDefaultId = Guid.NewGuid()
+        ChannelDefaultId = Guid.NewGuid(),
+        MaxDayTicketInactivity = 10
     };
 
     private static UpdateTicketCompanyDefaultCommand CreateValidUpdateCommand() => new()
@@ -213,7 +217,8 @@ public sealed class TicketCompanyDefaultMapperTests
         TimeUnitDefaultId = Guid.NewGuid(),
         AreaDefaultId = Guid.NewGuid(),
         ProjectDefaultId = Guid.NewGuid(),
-        ChannelDefaultId = Guid.NewGuid()
+        ChannelDefaultId = Guid.NewGuid(),
+        MaxDayTicketInactivity = 14
     };
 
     private static TicketCompanyDefault CreateValidEntity()

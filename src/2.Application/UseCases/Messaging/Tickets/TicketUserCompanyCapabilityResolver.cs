@@ -20,20 +20,14 @@ public sealed class TicketUserCompanyCapabilityResolver(IUnitOfWork unitOfWork)
         Guid companyId,
         CancellationToken cancellationToken)
     {
-        var repository = unitOfWork.GetRepository<TicketUserCompany>();
-        var all = await repository.GetAllAsync();
+        // Same lookup as ResolveWithMembershipAsync, so GET /TicketUserCompanies/me (SPEC 53)
+        // and the commands that enforce these flags can never disagree.
+        var capability = await ResolveWithMembershipAsync(userId, companyId, cancellationToken);
 
-        var row = all.FirstOrDefault(x =>
-            x.GcRecord == 0
-            && x.CompanyId == companyId
-            && x.UserId == userId);
-
-        return row is null
-            ? default
-            : new TicketUserCompanyCapability(
-                row.IsSuperAdminTicket,
-                row.CanFinishTicket,
-                row.CanResolveTicket);
+        return new TicketUserCompanyCapability(
+            capability.IsSuperAdminTicket,
+            capability.CanFinishTicket,
+            capability.CanResolveTicket);
     }
 
     /// <summary>

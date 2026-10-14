@@ -9,7 +9,8 @@ namespace JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetAss
 /// assign a ticket to (SPEC 53). Same <c>CanResolveTicket = TRUE</c> filter that
 /// <c>CreateTicket</c> (initial assignee) and <c>ReassignTicket</c> (target)
 /// validate against, so the FE-17 dropdown cannot list destinations the
-/// backend would reject.
+/// backend would reject. Takes no parameters: always the active company of the
+/// token, SuperAdmin included (SPEC 53, same rule as SPEC 52).
 /// </summary>
-public sealed record GetAssignableTicketUsersQuery(Guid? CompanyId = null)
+public sealed record GetAssignableTicketUsersQuery
     : IRequest<Response<IReadOnlyList<TicketAssignableUserDto>>>;

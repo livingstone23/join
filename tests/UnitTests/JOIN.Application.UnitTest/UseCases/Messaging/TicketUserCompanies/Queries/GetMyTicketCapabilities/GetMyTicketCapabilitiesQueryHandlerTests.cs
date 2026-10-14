@@ -89,53 +89,34 @@ public sealed class GetMyTicketCapabilitiesQueryHandlerTests
         response.Data.CanResolveTicket.Should().BeFalse();
     }
 
+    /// <summary>
+    /// SPEC 53: no company parameter; a SuperAdmin also gets its capabilities in the
+    /// active company of the token, not a roster row it may have in another company.
+    /// </summary>
     [Fact]
-    public async Task Handle_WhenNonSuperAdminRequestsAnotherCompany_ShouldStillUseTokenCompany()
+    public async Task Handle_WhenSuperAdmin_ShouldResolveAgainstTokenCompanyOnly()
     {
         var tokenCompany = _fixture.Create<Guid>();
         var otherCompany = _fixture.Create<Guid>();
         var userId = _fixture.Create<Guid>();
-        var context = new TestContext(tokenCompany, userId.ToString(), isSuperAdmin: false);
-        context.SeedRoster(new TicketUserCompany
-        {
-            CompanyId = tokenCompany,
-            UserId = userId,
-            IsSuperAdminTicket = false,
-            CanFinishTicket = false,
-            CanResolveTicket = true,
-            GcRecord = 0
-        });
-
-        var response = await context.CreateHandler().Handle(new GetMyTicketCapabilitiesQuery(CompanyId: otherCompany), CancellationToken.None);
-
-        // The handler must have queried the token company, not the requested one.
-        response.Data!.IsMember.Should().BeTrue();
-        response.Data.CanResolveTicket.Should().BeTrue();
-        // And the roster lookup must have been asked exactly once with the token company.
-        context.RepositoryMock.Verify(x => x.GetAllAsync(), Times.Once);
-    }
-
-    [Fact]
-    public async Task Handle_WhenSuperAdminTargetsAnotherCompany_ShouldQueryThatCompany()
-    {
-        var tokenCompany = _fixture.Create<Guid>();
-        var targetCompany = _fixture.Create<Guid>();
-        var userId = _fixture.Create<Guid>();
         var context = new TestContext(tokenCompany, userId.ToString(), isSuperAdmin: true);
         context.SeedRoster(new TicketUserCompany
         {
-            CompanyId = targetCompany,
+            CompanyId = otherCompany,
             UserId = userId,
-            IsSuperAdminTicket = false,
-            CanFinishTicket = false,
+            IsSuperAdminTicket = true,
+            CanFinishTicket = true,
             CanResolveTicket = true,
             GcRecord = 0
         });
 
-        var response = await context.CreateHandler().Handle(new GetMyTicketCapabilitiesQuery(CompanyId: targetCompany), CancellationToken.None);
+        var response = await context.CreateHandler().Handle(new GetMyTicketCapabilitiesQuery(), CancellationToken.None);
 
-        response.Data!.IsMember.Should().BeTrue();
-        response.Data.CanResolveTicket.Should().BeTrue();
+        response.IsSuccess.Should().BeTrue();
+        response.Data!.IsMember.Should().BeFalse("the only roster row belongs to another company");
+        response.Data.IsSuperAdminTicket.Should().BeFalse();
+        response.Data.CanFinishTicket.Should().BeFalse();
+        response.Data.CanResolveTicket.Should().BeFalse();
     }
 
     private sealed class TestContext

@@ -10,7 +10,10 @@ namespace JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetAss
 /// Returns the active resolvers of the current tenant's ticket roster
 /// (SPEC 53). Dapper over <c>Messaging.TicketUserCompanies</c> joined to
 /// <c>Security.Users</c>; same <c>UserName</c> projection as
-/// <see cref="GetTicketUserCompaniesQueryHandler"/>. Unpaged because a roster
+/// <see cref="GetTicketUserCompaniesQueryHandler"/>. Besides the roster row, the user
+/// must be active, not deleted and still linked to the company (<c>UserCompanies</c>):
+/// <c>CreateTicket</c>/<c>ReassignTicket</c> reject a user without that link
+/// (<c>INVALID_ASSIGNED_USER_TENANT</c>), so it is never offered. Unpaged because a roster
 /// per tenant is small; if it grows past a reasonable limit, paginate in a
 /// separate spec.
 /// </summary>
@@ -29,6 +32,14 @@ public sealed class GetAssignableTicketUsersQueryHandler(
         WHERE tuc.CompanyId = @TenantId
           AND tuc.GcRecord = 0
           AND tuc.CanResolveTicket = TRUE
+          AND u.GcRecord = 0
+          AND u.IsActive = TRUE
+          AND EXISTS (
+              SELECT 1
+              FROM Security.UserCompanies uc
+              WHERE uc.UserId = tuc.UserId
+                AND uc.CompanyId = tuc.CompanyId
+                AND uc.GcRecord = 0)
         ORDER BY u.LastName ASC, u.FirstName ASC;
         """;
 
@@ -43,7 +54,8 @@ public sealed class GetAssignableTicketUsersQueryHandler(
                 ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        var tenantId = TenantResolver.Resolve(currentUserService, request.CompanyId);
+        // SPEC 53: always the active company of the token, SuperAdmin included.
+        var tenantId = currentUserService.CompanyId;
 
         using var connection = connectionFactory.CreateConnection();
         var rows = (await connection.QueryAsync<TicketAssignableUserDto>(

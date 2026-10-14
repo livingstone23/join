@@ -6,8 +6,8 @@ namespace JOIN.Application.UseCases.Messaging.TicketUserCompanies.Queries.GetMyT
 
 /// <summary>
 /// Tenant-scoped query that returns the current user's ticket capabilities
-/// (SPEC 53). Always reads the active company from the token; the
-/// <paramref name="CompanyId"/> override is honored only for SuperAdmin.
+/// (SPEC 53). Takes no parameters: always the user and the active company of
+/// the token, SuperAdmin included.
 /// </summary>
-public sealed record GetMyTicketCapabilitiesQuery(Guid? CompanyId = null)
+public sealed record GetMyTicketCapabilitiesQuery
     : IRequest<Response<TicketMyCapabilitiesDto>>;

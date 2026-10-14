@@ -729,6 +729,8 @@ curl -s "$BASE_URL/api/v1/TicketUserCompanies?isSuperAdminTicket=true" \
 #     A caller outside the roster receives 200 with isMember=false and every
 #     capability flag false — the frontend hides capability-gated actions,
 #     it does not surface a missing-row error.
+#     No parameters: always the caller and the company of the token
+#     (SuperAdmin included; no ?companyId= override).
 curl -s "$BASE_URL/api/v1/TicketUserCompanies/me" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Company-Id: $TENANT_ID"
@@ -743,8 +745,12 @@ curl -s "$BASE_URL/api/v1/TicketUserCompanies/me" \
 #     "Asignar a" dropdown in FE-17 and the "Reasignar" target picker in FE-18.
 #     Same CanResolveTicket = TRUE filter that CreateTicket (initial
 #     assignee) and ReassignTicket (target) validate against, so the
-#     frontend cannot offer a destination the backend would reject.
+#     frontend cannot offer a destination the backend would reject: the user
+#     must also be active, not deleted and still linked to the company
+#     (UserCompanies), otherwise CreateTicket/ReassignTicket answer
+#     INVALID_ASSIGNED_USER_TENANT.
 #     Gated by CanRead on Tickets (NOT TicketUserCompanies).
+#     No parameters: always the company of the token (no ?companyId= override).
 curl -s "$BASE_URL/api/v1/TicketUserCompanies/assignable" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Company-Id: $TENANT_ID"
