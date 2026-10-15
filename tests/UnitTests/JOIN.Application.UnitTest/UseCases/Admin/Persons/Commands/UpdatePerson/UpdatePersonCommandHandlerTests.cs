@@ -3,12 +3,16 @@ using FluentAssertions;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Admin;
+using JOIN.Application.Interface.Persistence.Customers;
+using JOIN.Application.Common;
+using JOIN.Application.Services.Customers;
 using JOIN.Application.Mappings;
 using JOIN.Application.UseCases.Admin.PersonAddresses;
 using JOIN.Application.UseCases.Admin.PersonContacts;
 using JOIN.Application.UseCases.Admin.Persons.Commands;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
+using JOIN.Domain.Customers;
 using JOIN.Domain.Enums;
 using Moq;
 
@@ -401,6 +405,125 @@ public sealed class UpdatePersonCommandHandlerTests
     }
 
     /// <summary>
+    /// SPEC 55 rule 7: deactivating a person deactivates its customer (source PersonDeactivated).
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenPersonIsDeactivated_ShouldDeactivateItsCustomer()
+    {
+        var (context, request, person) = ArrangeUpdate(isActive: false);
+        var customer = Customer.Create(person.CompanyId, person.Id, Guid.NewGuid(), "C000000001", Guid.NewGuid());
+        context.CustomerRepositoryMock
+            .Setup(x => x.GetByPersonAsync(person.CompanyId, person.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(customer);
+        context.CustomerActivationMock
+            .Setup(x => x.DeactivateAsync(person.CompanyId, customer.Id, CustomerStatusSource.PersonDeactivated, It.IsAny<Guid>(), person.Id, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Response<CustomerActivationResult> { IsSuccess = true, Data = new(customer, CustomerStatusAction.Deactivated) });
+
+        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue(response.Message);
+        person.IsActive.Should().BeFalse();
+        context.CustomerActivationMock.Verify(
+            x => x.DeactivateAsync(person.CompanyId, customer.Id, CustomerStatusSource.PersonDeactivated, It.IsAny<Guid>(), person.Id, null, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// SPEC 55 rule 7: a person without customer is deactivated without touching customers.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenPersonWithoutCustomerIsDeactivated_ShouldNotCallTheActivationService()
+    {
+        var (context, request, _) = ArrangeUpdate(isActive: false);
+
+        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue(response.Message);
+        context.CustomerActivationMock.VerifyNoOtherCalls();
+    }
+
+    /// <summary>
+    /// SPEC 55 rule 7: reactivating a person never reactivates its customer.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenPersonIsReactivated_ShouldNotReactivateItsCustomer()
+    {
+        var (context, request, person) = ArrangeUpdate(isActive: true, personActive: false);
+
+        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue(response.Message);
+        person.IsActive.Should().BeTrue();
+        context.CustomerRepositoryMock.VerifyNoOtherCalls();
+        context.CustomerActivationMock.VerifyNoOtherCalls();
+    }
+
+    /// <summary>
+    /// A failure deactivating the customer aborts the person update with that error.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenCustomerDeactivationFails_ShouldReturnItsError()
+    {
+        var (context, request, person) = ArrangeUpdate(isActive: false);
+        var customer = Customer.Create(person.CompanyId, person.Id, Guid.NewGuid(), "C000000001", Guid.NewGuid());
+        context.CustomerRepositoryMock
+            .Setup(x => x.GetByPersonAsync(person.CompanyId, person.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(customer);
+        context.CustomerActivationMock
+            .Setup(x => x.DeactivateAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CustomerStatusSource>(), It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<CustomerActivationResult>.Error("CUSTOMER_NOT_FOUND"));
+
+        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+
+        response.Message.Should().Be("CUSTOMER_NOT_FOUND");
+        context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Without an authenticated user the customer cannot be deactivated (who did it goes to the history).
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenDeactivatingACustomerWithoutUser_ShouldReturnUserRequired()
+    {
+        var (context, request, person) = ArrangeUpdate(isActive: false);
+        context.CurrentUserServiceMock.SetupGet(x => x.UserId).Returns((string?)null);
+        context.CustomerRepositoryMock
+            .Setup(x => x.GetByPersonAsync(person.CompanyId, person.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Customer.Create(person.CompanyId, person.Id, Guid.NewGuid(), "C000000001", Guid.NewGuid()));
+
+        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+
+        response.Message.Should().Be("USER_REQUIRED");
+    }
+
+    /// <summary>
+    /// Arranges a valid update without collections, saving one row.
+    /// </summary>
+    private (UpdatePersonTestContext Context, UpdatePersonCommand Request, Person Person) ArrangeUpdate(bool isActive, bool personActive = true)
+    {
+        var companyId = _fixture.Create<Guid>();
+        var personId = _fixture.Create<Guid>();
+        var context = CreateContext(companyId);
+        var person = CreateExistingPerson(personId, companyId, _fixture.Create<Guid>(), _fixture.Create<Guid>(), _fixture.Create<Guid>(), _fixture.Create<Guid>());
+        if (!personActive)
+        {
+            person.Deactivate();
+        }
+
+        var request = CreateValidCommand(personId, null, null) with { IsActive = isActive, Addresses = [], Contacts = [] };
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.PersonsRepositoryMock.Setup(x => x.GetForUpdateAsync(personId, companyId)).ReturnsAsync(person);
+        context.IdentificationTypeRepositoryMock.Setup(x => x.GetAsync(request.IdentificationTypeId)).ReturnsAsync(new IdentificationType { Name = "Passport" });
+        context.PersonsRepositoryMock
+            .Setup(x => x.ExistsByCompanyAndIdentificationExceptIdAsync(companyId, personId, request.IdentificationTypeId, request.IdentificationNumber))
+            .ReturnsAsync(false);
+        SetupValidGenderReference(context, companyId, request.GenderId!.Value);
+        context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        return (context, request, person);
+    }
+
+    /// <summary>
     /// Creates a valid update command that can be customized for collection synchronization scenarios.
     /// </summary>
     private UpdatePersonCommand CreateValidCommand(Guid customerId, Guid? existingAddressId, Guid? existingContactId)
@@ -642,6 +765,7 @@ public sealed class UpdatePersonCommandHandlerTests
             CurrentUserServiceMock.SetupGet(x => x.IsAuthenticated).Returns(true);
 
             UnitOfWorkMock.SetupGet(x => x.Persons).Returns(PersonsRepositoryMock.Object);
+            UnitOfWorkMock.SetupGet(x => x.Customers).Returns(CustomerRepositoryMock.Object);
             UnitOfWorkMock.SetupGet(x => x.PersonContacts).Returns(PersonContactRepoForCoordinatorMock.Object);
             UnitOfWorkMock.SetupGet(x => x.PersonAddresses).Returns(PersonAddressRepoForCoordinatorMock.Object);
 
@@ -681,6 +805,8 @@ public sealed class UpdatePersonCommandHandlerTests
         }
 
         public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
+        public Mock<ICustomerRepository> CustomerRepositoryMock { get; } = new();
+        public Mock<ICustomerActivationService> CustomerActivationMock { get; } = new();
         public Mock<IPersonMapper> MapperMock { get; } = new();
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IPersonsRepository> PersonsRepositoryMock { get; } = new();
@@ -706,7 +832,8 @@ public sealed class UpdatePersonCommandHandlerTests
                 MapperMock.Object,
                 CurrentUserServiceMock.Object,
                 coordinator,
-                addressDefaultCoordinator);
+                addressDefaultCoordinator,
+                CustomerActivationMock.Object);
         }
     }
 }

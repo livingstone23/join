@@ -1,5 +1,6 @@
 using JOIN.Application.Interface.Persistence.Admin;
 using JOIN.Application.Interface.Persistence.Calendars;
+using JOIN.Application.Interface.Persistence.Customers;
 using JOIN.Application.Interface.Persistence.Security;
 
 namespace JOIN.Application.Interface.Persistence;
@@ -23,6 +24,7 @@ public interface IUnitOfWork : IDisposable
     ICompanyModuleRepository CompanyModules { get; }
     IUserCompanyRepository UserCompanies { get; }
     ICalendarEventRepository CalendarEvents { get; }
+    ICustomerRepository Customers { get; }
 
     // --- 2. Scalable Access ---
     // This allows access to any entity without modifying this interface ever again
@@ -52,5 +54,14 @@ public interface IUnitOfWork : IDisposable
     /// (PostgreSQL <c>pg_advisory_xact_lock</c>). Must run inside the command's transaction.
     /// </summary>
     Task AcquireScheduleLockAsync(Guid companyId, Guid ownerUserId, CancellationToken cancellationToken = default);
+
+    // --- 6. Customer per person lock (SPEC 55) ---
+
+    /// <summary>
+    /// Takes a transaction-scoped lock on <c>(companyId, personId)</c> so two concurrent events cannot both try to
+    /// create the customer of the same person (PostgreSQL <c>pg_advisory_xact_lock</c>). Must run inside the
+    /// command's transaction; released when it commits or rolls back.
+    /// </summary>
+    Task AcquireCustomerPersonLockAsync(Guid companyId, Guid personId, CancellationToken cancellationToken = default);
 
 }

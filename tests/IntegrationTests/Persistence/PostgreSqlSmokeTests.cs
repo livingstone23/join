@@ -364,10 +364,10 @@ public sealed class PostgreSqlSmokeTests : IClassFixture<CustomWebApplicationFac
             "SELECT id FROM admin.personcontacts WHERE gcrecord = 0 ORDER BY id LIMIT 1"),
         new("ux_persons_company_idtype_idnumber", "admin.persons",
             "SELECT id FROM admin.persons WHERE gcrecord = 0 ORDER BY id LIMIT 1"),
-        new("ux_customers_company_customercode", "admin.customers", CustomerSourceSql,
-            new() { ["userid"] = "(SELECT u.id FROM security.users u WHERE u.id <> t.userid ORDER BY u.id LIMIT 1)" }),
-        new("ux_customers_company_person_user", "admin.customers", CustomerSourceSql,
-            new() { ["customercode"] = "'CSMOKE2'" }),
+        // SPEC 55: customers live in the customer schema; the copy needs another person because
+        // ux_customers_company_person (one customer per person, no filter) would reject it first.
+        new("ux_customers_company_customercode", "customer.customers", CustomerSourceSql,
+            new() { ["personid"] = "(SELECT p2.id FROM admin.persons p2 WHERE p2.companyid = t.companyid AND p2.id <> t.personid AND NOT EXISTS (SELECT 1 FROM customer.customers c2 WHERE c2.personid = p2.id) ORDER BY p2.id LIMIT 1)" }),
         new("ux_genders_company_code", "admin.genders",
             "SELECT id FROM admin.genders WHERE gcrecord = 0 ORDER BY id LIMIT 1",
             new() { ["name"] = "t.name || ' dup'" }),
@@ -401,13 +401,17 @@ public sealed class PostgreSqlSmokeTests : IClassFixture<CustomWebApplicationFac
             "SELECT id FROM messaging.ticketcompanydefaults WHERE gcrecord = 0 ORDER BY id LIMIT 1"),
     };
 
-    // The seed creates no customers or regions: the source row is inserted inside the test transaction.
+    // The seed creates no regions: the source row is inserted inside the test transaction. Customers are
+    // seeded (SPEC 54), but the source is a fresh one for a person that is not a customer yet.
     private const string CustomerSourceSql =
         """
-        INSERT INTO admin.customers
-            (id, personid, userid, customercode, personlifecyclestage, isactive, activatedat, created, gcrecord, companyid)
-        SELECT gen_random_uuid(), p.id, u.id, 'CSMOKE', 1, TRUE, NOW(), NOW(), 0, p.companyid
-        FROM admin.persons p CROSS JOIN security.users u
+        INSERT INTO customer.customers
+            (id, personid, userid, customercode, customerstageid, isactive, activatedat, created, gcrecord, companyid)
+        SELECT gen_random_uuid(), p.id, u.id, 'CSMOKE', st.id, TRUE, NOW(), NOW(), 0, p.companyid
+        FROM admin.persons p
+        CROSS JOIN security.users u
+        INNER JOIN customer.customerstages st ON st.companyid = p.companyid AND st.isdefault = TRUE AND st.gcrecord = 0
+        WHERE NOT EXISTS (SELECT 1 FROM customer.customers c WHERE c.personid = p.id)
         ORDER BY p.id, u.id LIMIT 1
         RETURNING id
         """;

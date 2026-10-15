@@ -20,6 +20,7 @@ using JOIN.Persistence.Contexts;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using JOIN.Domain.Customers;
 
 namespace JOIN.IntegrationTests.Persistence;
 
@@ -189,7 +190,10 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
             user.NormalizedEmail = user.Email!.ToUpperInvariant();
             user.SecurityStamp = Guid.NewGuid().ToString();
             db.Add(user);
-            var customer = Customer.Create(companyA, personId, user.Id, $"C{Guid.NewGuid():N}"[..10], PersonLifecycleStage.Lead);
+            var stage = CustomerStage.Create(companyA, $"S{Guid.NewGuid():N}"[..10], $"Stage {Guid.NewGuid():N}", null, 1, isDefault: false);
+            stage.CreatedBy = Creator;
+            db.Add(stage);
+            var customer = Customer.Create(companyA, personId, user.Id, $"C{Guid.NewGuid():N}"[..10], stage.Id);
             customer.CreatedBy = Creator;
             db.Add(customer);
             await db.SaveChangesAsync();
@@ -633,32 +637,7 @@ public sealed partial class SoftDeleteVisibilityGuardPostgreSqlTests : IClassFix
                 IdentificationNumber = name
             }, a, b);
         }),
-        ["Customer"] = new("Customers", "Customers", "customerCode", true, async (db, tag, a, b) =>
-        {
-            var identificationType = await SeedIdentificationTypeAsync(db);
-            async Task<Customer> NewCustomerAsync(Guid company, string code, int stamp)
-            {
-                var person = await SeedPersonAsync(db, company, identificationType);
-                var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = $"c{Guid.NewGuid():N}"[..12], Email = $"c{Guid.NewGuid():N}"[..12] + "@t.local" };
-                user.NormalizedUserName = user.UserName!.ToUpperInvariant();
-                user.NormalizedEmail = user.Email!.ToUpperInvariant();
-                user.SecurityStamp = Guid.NewGuid().ToString();
-                db.Add(user);
-                var customer = Customer.Create(company, person, user.Id, code, PersonLifecycleStage.Lead);
-                customer.GcRecord = stamp;
-                customer.CreatedBy = Creator;
-                db.Add(customer);
-                return customer;
-            }
-
-            // CustomerCode allows 10 characters: a 9-char tag + the a/d/b suffix.
-            var code = tag[..9];
-            var activeA = await NewCustomerAsync(a, $"{code}a", 0);
-            var deletedA = await NewCustomerAsync(a, $"{code}d", DeletedStamp);
-            var activeB = await NewCustomerAsync(b, $"{code}b", 0);
-            await db.SaveChangesAsync();
-            return new SeededRows(code, activeA.Id, deletedA.Id, activeB.Id);
-        }),
+        // SPEC 55: customers are never deleted nor restored, so they are not a case here.
         ["PersonAddress"] = PersonChildCase("PersonAddress", async (db, company, person) =>
         {
             var catalogs = await SeedAddressCatalogsAsync(db);

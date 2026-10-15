@@ -7,6 +7,7 @@ using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Calendars;
 using JOIN.Domain.Common;
+using JOIN.Domain.Customers;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
 using JOIN.Domain.Support;
@@ -45,7 +46,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Area> Areas => Set<Area>();
     public DbSet<CompanyModule> CompanyModules => Set<CompanyModule>();
     public DbSet<Person> Persons => Set<Person>();
-    public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<PersonAddress> PersonAddresses => Set<PersonAddress>();
     public DbSet<PersonContact> PersonContacts => Set<PersonContact>();
     // SPEC 45 — pending confirmations of people created by a channel agent.
@@ -131,6 +131,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<UserCalendar> UserCalendars => Set<UserCalendar>();
     public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
     public DbSet<CalendarEventLog> CalendarEventLogs => Set<CalendarEventLog>();
+
+    // --- 8. CUSTOMER MODULE (SPEC 55) ---
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<CustomerStage> CustomerStages => Set<CustomerStage>();
+    public DbSet<CustomerStatusHistory> CustomerStatusHistory => Set<CustomerStatusHistory>();
 
     // --- 9. CALENDAR EXTERNAL SYNC (SPEC 46-post) ---
     public DbSet<CalendarExternalConnection> CalendarExternalConnections => Set<CalendarExternalConnection>();
@@ -251,7 +256,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<UserCommunicationChannel>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
         // Administrative / Catalog rows that are tenant-owned (each company maintains its own list)
-        builder.Entity<Customer>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<Gender>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<Industry>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<TaxRegime>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
@@ -260,6 +264,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<PersonBusinessProfile>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<PersonEmployment>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<PersonFinancialProfile>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+
+        // Customers (SPEC 55): Customer schema. Customers are never deleted (GcRecord stays 0); stages are a soft-deleted catalog.
+        builder.Entity<Customer>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CustomerStage>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CustomerStatusHistory>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
         // Messaging / Tickets
         builder.Entity<Ticket>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);

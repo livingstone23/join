@@ -112,6 +112,35 @@ public class PersonsController(IMediator mediator) : ControllerBase
     }
 
     /// <summary>
+    /// Searches the company's persons and customers with a single text (SPEC 54): names, full name, identification
+    /// number and customer code. One row per person, with its customer data (active or inactive) when it has one.
+    /// Exact identification/code matches first, then active customers, inactive customers and plain persons.
+    /// </summary>
+    /// <param name="term">Text to search, at least 2 characters after trimming.</param>
+    /// <param name="limit">Maximum rows (default 20, clamped to 1–50).</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    [HttpGet("lookup")]
+    [ProducesResponseType(typeof(Response<IReadOnlyList<PersonLookupItemDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Lookup(
+        [FromQuery] string? term = null,
+        [FromQuery] int? limit = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new GetPersonLookupQuery(term, limit), cancellationToken);
+
+        if (response.IsSuccess)
+        {
+            return Ok(response);
+        }
+
+        return response.Message == "COMPANY_REQUIRED"
+            ? Unauthorized(response)
+            : BadRequest(response);
+    }
+
+    /// <summary>
     /// Creates a new customer aggregate in the current tenant context.
     /// The command persists the main customer record and may also initialize related value objects and child collections according to the business rules enforced in the Application layer.
     /// </summary>

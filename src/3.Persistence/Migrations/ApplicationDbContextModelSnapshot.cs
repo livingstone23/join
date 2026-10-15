@@ -124,98 +124,6 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("companymodules", "admin");
                 });
 
-            modelBuilder.Entity("JOIN.Domain.Admin.Customer", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("ActivatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("activatedat");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("companyid");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text")
-                        .HasColumnName("createdby");
-
-                    b.Property<string>("CustomerCode")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasColumnName("customercode");
-
-                    b.Property<DateTime?>("DeactivatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deactivatedat");
-
-                    b.Property<int>("GcRecord")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("gcrecord");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("isactive");
-
-                    b.Property<DateTime?>("LastModified")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("lastmodified");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("text")
-                        .HasColumnName("lastmodifiedby");
-
-                    b.Property<Guid>("PersonId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("personid");
-
-                    b.Property<int>("PersonLifecycleStage")
-                        .HasColumnType("integer")
-                        .HasColumnName("personlifecyclestage");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("userid");
-
-                    b.HasKey("Id")
-                        .HasName("pk_customers");
-
-                    b.HasIndex("PersonId")
-                        .HasDatabaseName("ix_customers_personid");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_customers_userid");
-
-                    b.HasIndex("CompanyId", "CustomerCode")
-                        .IsUnique()
-                        .HasDatabaseName("ux_customers_company_customercode")
-                        .HasFilter("\"gcrecord\" = 0");
-
-                    b.HasIndex("CompanyId", "PersonLifecycleStage")
-                        .HasDatabaseName("ix_customers_company_personlifecyclestage");
-
-                    b.HasIndex("CompanyId", "PersonId", "UserId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_customers_company_person_user")
-                        .HasFilter("\"gcrecord\" = 0");
-
-                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("CompanyId", "PersonId", "UserId"), false);
-
-                    b.ToTable("customers", "admin");
-                });
-
             modelBuilder.Entity("JOIN.Domain.Admin.EntityStatus", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3236,6 +3144,257 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("streettypes", "common");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Customers.Customer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("activatedat");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<string>("CustomerCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("customercode");
+
+                    b.Property<Guid>("CustomerStageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customerstageid");
+
+                    b.Property<DateTime?>("DeactivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deactivatedat");
+
+                    b.Property<int>("GcRecord")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("personid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("userid");
+
+                    b.HasKey("Id")
+                        .HasName("pk_customers");
+
+                    b.HasIndex("CustomerStageId")
+                        .HasDatabaseName("ix_customers_customerstageid");
+
+                    b.HasIndex("PersonId")
+                        .HasDatabaseName("ix_customers_personid");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_customers_userid");
+
+                    b.HasIndex("CompanyId", "CustomerCode")
+                        .IsUnique()
+                        .HasDatabaseName("ux_customers_company_customercode")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "CustomerStageId")
+                        .HasDatabaseName("ix_customers_company_stage");
+
+                    b.HasIndex("CompanyId", "PersonId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_customers_company_person");
+
+                    b.ToTable("customers", "customer");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.CustomerStage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("isactive");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isdefault");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_customerstages");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_customerstages_company_default")
+                        .HasFilter("\"isdefault\" = TRUE AND \"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_customerstages_company_code")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_customerstages_company_name")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("customerstages", "customer");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.CustomerStatusHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer")
+                        .HasColumnName("action");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customerid");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurredat");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("integer")
+                        .HasColumnName("source");
+
+                    b.Property<Guid?>("SourceReferenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sourcereferenceid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("userid");
+
+                    b.HasKey("Id")
+                        .HasName("pk_customerstatushistory");
+
+                    b.HasIndex("CompanyId")
+                        .HasDatabaseName("ix_customerstatushistory_companyid");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_customerstatushistory_userid");
+
+                    b.HasIndex("CustomerId", "OccurredAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_customerstatushistory_customer_occurredat");
+
+                    b.ToTable("customerstatushistory", "customer");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Messaging.Ticket", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5536,36 +5695,6 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Module");
                 });
 
-            modelBuilder.Entity("JOIN.Domain.Admin.Customer", b =>
-                {
-                    b.HasOne("JOIN.Domain.Common.Company", "Company")
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customers_companies_companyid");
-
-                    b.HasOne("JOIN.Domain.Admin.Person", "Person")
-                        .WithMany()
-                        .HasForeignKey("PersonId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customers_persons_personid");
-
-                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customers_users_userid");
-
-                    b.Navigation("Company");
-
-                    b.Navigation("Person");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("JOIN.Domain.Admin.Gender", b =>
                 {
                     b.HasOne("JOIN.Domain.Common.Company", "Company")
@@ -5823,7 +5952,7 @@ namespace JOIN.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_personpendingconfirmations_companies_companyid");
 
-                    b.HasOne("JOIN.Domain.Admin.Customer", "Customer")
+                    b.HasOne("JOIN.Domain.Customers.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -6026,7 +6155,7 @@ namespace JOIN.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_events_companies_companyid");
 
-                    b.HasOne("JOIN.Domain.Admin.Customer", "Customer")
+                    b.HasOne("JOIN.Domain.Customers.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -6380,6 +6509,87 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("Country");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Customer", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customers_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Customers.CustomerStage", "CustomerStage")
+                        .WithMany()
+                        .HasForeignKey("CustomerStageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customers_customerstages_customerstageid");
+
+                    b.HasOne("JOIN.Domain.Admin.Person", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customers_persons_personid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customers_users_userid");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("CustomerStage");
+
+                    b.Navigation("Person");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.CustomerStage", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customerstages_companies_companyid");
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.CustomerStatusHistory", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customerstatushistory_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Customers.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customerstatushistory_customers_customerid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customerstatushistory_users_userid");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Messaging.Ticket", b =>

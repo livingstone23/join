@@ -1,6 +1,7 @@
 # SPEC 54 — Personas: búsqueda única con marca de cliente y datos semilla
 
-> **Status:** Aprobado
+> **Status:** Implementado
+> **Ajuste por implementación (2026-10-15):** la persona #2 (Norma Osorio, Cedula `103-2001035-1`) ya existe en `SeedJoinPersonsAsync`; el seed es idempotente por documento y la reutiliza, así que en una base vacía se crean **39** personas nuevas (no 40) y las 40 de la lista quedan disponibles. No cambia nada de clientes (#2 es solo persona). Rama `spec-55-54-customers`, en el mismo cambio que SPEC 55. Smoke con Docker (convención 12) hecho: `cano`, `Norma Osorio` y `20548796` devuelven lo esperado.
 > **Depends on:** SPEC 38 (filtros globales), SPEC 39 (fork PostgreSQL), SPEC 43-post (permisos por ruta), **SPEC 55** (un cliente por persona y empresa, activo/inactivo, historial; se implementa antes o en el mismo cambio). Rama de trabajo: `spec-54-person-lookup-with-customer-flag`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-15
 > **Historia (2026-10-15, decisión del usuario):** `Customer.UserId` no es la cuenta de acceso del cliente sino **el usuario que registró el cliente**. Se descarta volverlo opcional: sigue obligatorio, el seed usa el usuario `livingstone23@gmail.com`. El comentario XML de `Customer` y de `Customer.UserId` se corrigió en `main_postgresql` con este significado.

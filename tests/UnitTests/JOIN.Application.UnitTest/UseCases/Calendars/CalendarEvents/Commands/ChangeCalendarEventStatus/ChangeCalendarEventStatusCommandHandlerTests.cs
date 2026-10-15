@@ -14,6 +14,7 @@ using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
 using Moq;
+using JOIN.Domain.Customers;
 
 namespace JOIN.Application.UnitTest.UseCases.Calendars.CalendarEvents.Commands.ChangeCalendarEventStatus;
 

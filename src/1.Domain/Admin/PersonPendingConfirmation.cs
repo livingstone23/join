@@ -4,6 +4,7 @@ using JOIN.Domain.Common;
 using JOIN.Domain.Enums;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
+using JOIN.Domain.Customers;
 
 namespace JOIN.Domain.Admin;
 

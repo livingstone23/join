@@ -1,6 +1,7 @@
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Admin;
 using JOIN.Application.Interface.Persistence.Calendars;
+using JOIN.Application.Interface.Persistence.Customers;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Persistence.Repositories;
 
@@ -15,6 +16,9 @@ internal sealed class LockFreeUnitOfWork(UnitOfWork inner) : IUnitOfWork
 {
     public int LockRequests { get; private set; }
 
+    /// <summary> Customer-per-person lock requests (SPEC 55). </summary>
+    public int CustomerLockRequests { get; private set; }
+
     /// <summary> When set, the next schedule lock throws it (simulates a database error raised mid-command). </summary>
     public Exception? ScheduleLockFailure { get; set; }
 
@@ -28,6 +32,7 @@ internal sealed class LockFreeUnitOfWork(UnitOfWork inner) : IUnitOfWork
     public ICompanyModuleRepository CompanyModules => inner.CompanyModules;
     public IUserCompanyRepository UserCompanies => inner.UserCompanies;
     public ICalendarEventRepository CalendarEvents => inner.CalendarEvents;
+    public ICustomerRepository Customers => inner.Customers;
 
     public IGenericRepository<TEntity> GetRepository<TEntity>() where TEntity : class => inner.GetRepository<TEntity>();
     public Task<int> SaveAsync(CancellationToken cancellationToken = default) => inner.SaveAsync(cancellationToken);
@@ -45,6 +50,12 @@ internal sealed class LockFreeUnitOfWork(UnitOfWork inner) : IUnitOfWork
             throw failure;
         }
 
+        return Task.CompletedTask;
+    }
+
+    public Task AcquireCustomerPersonLockAsync(Guid companyId, Guid personId, CancellationToken cancellationToken = default)
+    {
+        CustomerLockRequests++;
         return Task.CompletedTask;
     }
 

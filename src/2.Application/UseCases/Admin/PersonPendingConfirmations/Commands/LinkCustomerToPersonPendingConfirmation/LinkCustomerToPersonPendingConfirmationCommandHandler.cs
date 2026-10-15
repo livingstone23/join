@@ -6,6 +6,7 @@ using JOIN.Application.UseCases.Calendars.Common;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Enums;
 using MediatR;
+using JOIN.Domain.Customers;
 
 namespace JOIN.Application.UseCases.Admin.PersonPendingConfirmations.Commands.LinkCustomerToPersonPendingConfirmation;
 

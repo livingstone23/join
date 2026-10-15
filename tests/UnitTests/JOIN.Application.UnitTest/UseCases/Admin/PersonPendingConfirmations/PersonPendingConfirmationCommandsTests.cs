@@ -12,6 +12,7 @@ using JOIN.Domain.Calendars.Enums;
 using JOIN.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using static JOIN.Application.UnitTest.UseCases.Calendars.ChannelIntake.IntakeTestData;
+using JOIN.Domain.Customers;
 
 namespace JOIN.Application.UnitTest.UseCases.Admin.PersonPendingConfirmations;
 
@@ -89,8 +90,8 @@ public sealed class PersonPendingConfirmationCommandsTests
     {
         var setup = await WithPendingAsync();
         using var ctx = setup.Ctx;
-        var own = Customer.Create(ctx.CompanyId, setup.PersonId, ctx.OwnerId, "C-001", PersonLifecycleStage.Lead);
-        var foreign = Customer.Create(ctx.CompanyId, setup.Data.PersonId, ctx.OwnerId, "C-002", PersonLifecycleStage.Lead);
+        var own = Customer.Create(ctx.CompanyId, setup.PersonId, ctx.OwnerId, "C-001", Guid.NewGuid());
+        var foreign = Customer.Create(ctx.CompanyId, setup.Data.PersonId, ctx.OwnerId, "C-002", Guid.NewGuid());
         ctx.Db.Customers.AddRange(own, foreign);
         await ctx.Db.SaveChangesAsync();
         ctx.Db.ChangeTracker.Clear();

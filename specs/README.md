@@ -90,8 +90,8 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 50 | `main_postgresql`: pendientes para llevar QA a PostgreSQL (el port de 40–49 pasó a la serie `-post`) | Aprobado | 39 |
 | 52 | Tickets: resumen de la bandeja (`GET /Tickets/summary`) y filtro "sin asignar" | Implementado | 37, 38, 41-post, 43-post |
 | 53 | Tickets: mis capacidades (`/TicketUserCompanies/me`), usuarios asignables e inactividad en los valores por defecto | Implementado | 34, 35, 37, 43-post |
-| 54 | Personas: búsqueda única con marca de cliente (`GET /Persons/lookup`) y datos semilla (40 personas, 30 clientes) | Borrador | 38, 39, 43-post, 55 |
-| 55 | Clientes: uno por persona y empresa, solo activo/inactivo (sin borrado), activación idempotente, historial de eventos, catálogo de etapas por empresa (`CustomerStages`, reemplaza el enum `PersonLifecycleStage`) y esquema propio `Customer` (sale de 54) | Borrador | 38, 39, 40-post, 41-post, 43-post, 45-post |
+| 54 | Personas: búsqueda única con marca de cliente (`GET /Persons/lookup`) y datos semilla (40 personas, 30 clientes) | Implementado | 38, 39, 43-post, 55 |
+| 55 | Clientes: uno por persona y empresa, solo activo/inactivo (sin borrado), activación idempotente, historial de eventos, catálogo de etapas por empresa (`CustomerStages`, reemplaza el enum `PersonLifecycleStage`) y esquema propio `Customer` (sale de 54) | Implementado | 38, 39, 40-post, 41-post, 43-post, 45-post |
 | 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
 
 ### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)

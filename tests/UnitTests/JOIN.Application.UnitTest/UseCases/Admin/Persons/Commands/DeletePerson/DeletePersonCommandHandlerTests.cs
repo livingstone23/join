@@ -14,6 +14,7 @@ using JOIN.Application.UnitTest.Common.TestDoubles;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
 using Moq;
+using JOIN.Domain.Customers;
 
 namespace JOIN.Application.UnitTest.UseCases.Admin.Persons.Commands.DeletePerson;
 

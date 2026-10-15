@@ -7,6 +7,8 @@ using JOIN.Domain.Admin;
 using JOIN.Domain.Calendars;
 using JOIN.Domain.Calendars.Enums;
 using JOIN.Domain.Common;
+using JOIN.Domain.Customers;
+using JOIN.Application.Services.Customers;
 using JOIN.Domain.Enums;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
@@ -80,6 +82,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     {
         await SeedMessagingCatalogsForCompanyAsync(companyId, cancellationToken);
         await SeedCalendarCatalogsForCompanyAsync(companyId, cancellationToken);
+        await SeedCustomerStagesForCompanyAsync(companyId, cancellationToken);
     }
 
     /// <summary>
@@ -233,7 +236,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             var privateCompanyId = await SeedPrivateCompanyAsync();
 
             // 3. Catálogos administrativos
-            var idTypeId = await SeedIdentificationTypesAsync();
+            // SPEC 54: Cedula, Pasaporte and RNC; the existing persons keep Cedula.
+            var idTypes = await SeedIdentificationTypesAsync();
+            var idTypeId = idTypes[CedulaIdentificationType];
 
             // 4. Catálogos geográficos y de comunicación
             await SeedCountriesAsync();
@@ -268,11 +273,17 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedTicketAttachmentSettingsAsync(joinCompanyId);
             await SeedTicketAttachmentSettingsAsync(privateCompanyId);
             await SeedJoinCalendarAsync(joinCompanyId);
+            // SPEC 55: each company's customer stages, before any customer is seeded.
+            await SeedCustomerStagesForCompanyAsync(joinCompanyId);
+            await SeedCustomerStagesForCompanyAsync(privateCompanyId);
 
             // 7. Entidades operacionales (Clientes)
             await SeedJoinPersonsAsync(joinCompanyId, idTypeId);
             await SeedPrivatePersonsAsync(privateCompanyId, idTypeId);
             await SeedJoinPersonAddressesAndContactsAsync(joinCompanyId);
+            // SPEC 54: 40 persons for the "Cliente/Persona" lookup, 30 of them registered as customers.
+            await SeedJoinLookupPersonsAsync(joinCompanyId, idTypes);
+            await SeedJoinCustomersAsync(joinCompanyId);
             await SeedJoinTicketsAsync(joinCompanyId);
 
             // Guardado final para asegurar consistencia
@@ -378,28 +389,88 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         return existing.Id;
     }
 
-    private async Task<Guid> SeedIdentificationTypesAsync()
-    {
-        // Evita duplicados en catálogos globales
-        var existing = await _context.IdentificationTypes
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.Name == "Cedula");
+    private const string CedulaIdentificationType = "Cedula";
+    private const string PasaporteIdentificationType = "Pasaporte";
+    private const string RncIdentificationType = "RNC";
 
-        if (existing == null)
+    /// <summary>
+    /// Global identification type catalog, idempotent by name. Returns name → Id (SPEC 54). "Cedula" keeps its
+    /// name without accent: existing databases look it up by name.
+    /// </summary>
+    private async Task<Dictionary<string, Guid>> SeedIdentificationTypesAsync()
+    {
+        (string Name, string Description)[] seeds =
+        [
+            (CedulaIdentificationType, "National Identification Document"),
+            (PasaporteIdentificationType, "Passport"),
+            (RncIdentificationType, "Registro Nacional de Contribuyentes")
+        ];
+
+        var result = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, description) in seeds)
         {
-            _logger.LogDebug("Inserting Identification Types catalog...");
-            var idType = new IdentificationType 
-            { 
-                Name = "Cedula", 
-                Description = "National Identification Document", 
-                Created = DateTime.UtcNow, 
-                GcRecord = 0 
-            };
-            _context.IdentificationTypes.Add(idType);
-            await _context.SaveChangesAsync();
-            return idType.Id;
+            var existing = await _context.IdentificationTypes
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Name == name);
+
+            if (existing is null)
+            {
+                _logger.LogDebug("Inserting identification type {Name}...", name);
+                existing = new IdentificationType
+                {
+                    Name = name,
+                    Description = description,
+                    Created = DateTime.UtcNow,
+                    GcRecord = 0
+                };
+                _context.IdentificationTypes.Add(existing);
+                await _context.SaveChangesAsync();
+            }
+
+            result[name] = existing.Id;
         }
-        return existing.Id;
+
+        return result;
+    }
+
+    /// <summary>
+    /// SPEC 55 F.17: the four initial customer stages of a company, idempotent by <c>(CompanyId, Code)</c> among live
+    /// rows. <c>CUSTOMER</c> is the default only when the company has no live default yet.
+    /// </summary>
+    public async Task SeedCustomerStagesForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        (string Code, string Name, int SortOrder, bool IsDefault)[] seeds =
+        [
+            (CustomerStage.Codes.Lead, "En contacto", 1, false),
+            (CustomerStage.Codes.Prospect, "En proceso", 2, false),
+            (CustomerStage.Codes.Customer, "Cliente", 3, true),
+            (CustomerStage.Codes.Former, "Cliente anterior", 4, false)
+        ];
+
+        var live = await _context.CustomerStages
+            .IgnoreQueryFilters()
+            .Where(s => s.CompanyId == companyId && s.GcRecord == 0)
+            .ToListAsync(cancellationToken);
+
+        var hasDefault = live.Any(s => s.IsDefault);
+        var inserted = 0;
+        foreach (var seed in seeds)
+        {
+            if (live.Any(s => s.Code == seed.Code))
+            {
+                continue;
+            }
+
+            var isDefault = seed.IsDefault && !hasDefault;
+            _context.CustomerStages.Add(CustomerStage.Create(companyId, seed.Code, seed.Name, null, seed.SortOrder, isDefault));
+            hasDefault |= isDefault;
+            inserted++;
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private async Task SeedDefaultUsersAsync()
@@ -994,6 +1065,145 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         _logger.LogInformation("JOIN customers seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
     }
 
+    /// <summary>
+    /// SPEC 54: the 40 persons of <see cref="GetJoinLookupPersonSeeds"/> in JOIN-001, idempotent by
+    /// <c>(CompanyId, IdentificationNumber)</c> like <see cref="SeedJoinPersonsAsync"/>.
+    /// </summary>
+    private async Task SeedJoinLookupPersonsAsync(Guid companyId, IReadOnlyDictionary<string, Guid> idTypes)
+    {
+        var seeds = GetJoinLookupPersonSeeds();
+        var gendersByName = await GetGenderIdsByNameAsync(companyId);
+        var inserted = 0;
+
+        foreach (var seed in seeds)
+        {
+            var exists = await _context.Persons
+                .IgnoreQueryFilters()
+                .AnyAsync(c => c.CompanyId == companyId && c.IdentificationNumber == seed.IdentificationNumber);
+
+            if (exists) continue;
+
+            Guid? genderId = null;
+            if (seed.PersonType == PersonType.Physical
+                && gendersByName.TryGetValue(seed.Female ? "Femenino" : "Masculino", out var resolvedGenderId))
+            {
+                genderId = resolvedGenderId;
+            }
+
+            var person = new Person
+            {
+                CompanyId = companyId,
+                PersonType = seed.PersonType,
+                FirstName = seed.FirstName,
+                MiddleName = seed.MiddleName,
+                LastName = seed.LastName,
+                SecondLastName = seed.SecondLastName,
+                CommercialName = seed.CommercialName,
+                IdentificationTypeId = idTypes[seed.IdentificationType],
+                IdentificationNumber = seed.IdentificationNumber,
+                GenderId = genderId,
+                Created = DateTime.UtcNow,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            };
+            person.Reactivate();
+
+            _context.Persons.Add(person);
+            inserted++;
+        }
+
+        if (inserted > 0)
+            await _context.SaveChangesAsync();
+
+        _logger.LogInformation("JOIN lookup persons seed finished (SPEC 54). Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
+    }
+
+    /// <summary>
+    /// SPEC 54: registers 30 of the lookup persons as customers of JOIN-001, registered by
+    /// <c>livingstone23@gmail.com</c>, with the stage of the list (by code) and a <c>Created</c> history row (source
+    /// <c>Seed</c>); two are left inactive with a <c>Deactivated</c> row. Idempotent by <c>(CompanyId, PersonId)</c>.
+    /// Writes straight to the context: <see cref="ICustomerActivationService"/> lives in Application.
+    /// </summary>
+    private async Task SeedJoinCustomersAsync(Guid companyId)
+    {
+        const string registeringUserEmail = "livingstone23@gmail.com";
+        var user = await _context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Email == registeringUserEmail);
+
+        if (user is null)
+        {
+            _logger.LogWarning("JOIN customers seed skipped (SPEC 54): user {Email} was not found.", registeringUserEmail);
+            return;
+        }
+
+        var stageIdsByCode = await _context.CustomerStages
+            .IgnoreQueryFilters()
+            .Where(s => s.CompanyId == companyId && s.GcRecord == 0)
+            .ToDictionaryAsync(s => s.Code, s => s.Id);
+
+        var customerSeeds = GetJoinLookupPersonSeeds().Where(s => s.CustomerStageCode is not null).ToList();
+        var identificationNumbers = customerSeeds.Select(s => s.IdentificationNumber).ToList();
+        var personsByIdNumber = await _context.Persons
+            .IgnoreQueryFilters()
+            .Where(p => p.CompanyId == companyId && p.GcRecord == 0 && identificationNumbers.Contains(p.IdentificationNumber))
+            .ToDictionaryAsync(p => p.IdentificationNumber, p => p.Id);
+
+        var existingCustomers = await _context.Customers
+            .IgnoreQueryFilters()
+            .Where(c => c.CompanyId == companyId)
+            .Select(c => new { c.PersonId, c.CustomerCode })
+            .ToListAsync();
+
+        var customerPersonIds = existingCustomers.Select(c => c.PersonId).ToHashSet();
+        var lastSequence = existingCustomers
+            .Select(c => CustomerCodeGenerator.TryParseSequence(c.CustomerCode))
+            .Where(sequence => sequence.HasValue)
+            .Select(sequence => sequence!.Value)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        var inserted = 0;
+        foreach (var seed in customerSeeds)
+        {
+            if (!personsByIdNumber.TryGetValue(seed.IdentificationNumber, out var personId)
+                || customerPersonIds.Contains(personId))
+            {
+                continue;
+            }
+
+            if (!stageIdsByCode.TryGetValue(seed.CustomerStageCode!, out var stageId))
+            {
+                _logger.LogWarning("Customer stage {Code} not found for company {CompanyId}; customer seed for {IdNumber} skipped.",
+                    seed.CustomerStageCode, companyId, seed.IdentificationNumber);
+                continue;
+            }
+
+            var customer = Customer.Create(companyId, personId, user.Id, CustomerCodeGenerator.Format(++lastSequence), stageId);
+            customer.CreatedBy = "System_Seeder";
+            _context.Customers.Add(customer);
+            _context.CustomerStatusHistory.Add(CustomerStatusHistory.Create(
+                companyId, customer.Id, CustomerStatusAction.Created, CustomerStatusSource.Seed, user.Id,
+                occurredAtUtc: customer.ActivatedAt));
+
+            if (seed.CustomerInactive)
+            {
+                customer.Deactivate();
+                _context.CustomerStatusHistory.Add(CustomerStatusHistory.Create(
+                    companyId, customer.Id, CustomerStatusAction.Deactivated, CustomerStatusSource.Seed, user.Id,
+                    occurredAtUtc: customer.DeactivatedAt));
+            }
+
+            customerPersonIds.Add(personId);
+            inserted++;
+        }
+
+        if (inserted > 0)
+            await _context.SaveChangesAsync();
+
+        _logger.LogInformation("JOIN customers seed finished (SPEC 54). Inserted: {Inserted}, Existing: {Existing}", inserted, customerSeeds.Count - inserted);
+    }
+
     private async Task SeedPrivatePersonsAsync(Guid companyId, Guid idTypeId)
     {
         var seeds = GetPrivatePersonSeeds();
@@ -1173,6 +1383,55 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             insertedAddresses,
             insertedContacts);
     }
+
+    /// <summary>
+    /// SPEC 54: 40 persons of JOIN-001 for the "Cliente/Persona" lookup (32 physical, 8 legal; 26 Cedula, 6 Pasaporte,
+    /// 8 RNC). <see cref="LookupPersonSeed.CustomerStageCode"/> marks the 30 that are customers (2 inactive).
+    /// Legal persons carry their representative in FirstName/LastName, as in <see cref="GetJoinPersonSeeds"/>.
+    /// </summary>
+    private static List<LookupPersonSeed> GetJoinLookupPersonSeeds() =>
+    [
+        new(PersonType.Physical, "Livingstone", null, "Cano", null, null, PasaporteIdentificationType, "20548796", false, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Norma", null, "Osorio", null, null, CedulaIdentificationType, "103-2001035-1", true, null),
+        new(PersonType.Physical, "Gabriela", null, "Cano", "Ferreira", null, CedulaIdentificationType, "001-1789456-2", true, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Mateo", null, "Cano", "Ruiz", null, CedulaIdentificationType, "001-1823410-7", false, null),
+        new(PersonType.Physical, "Valeria", null, "Osorio", "Peña", null, CedulaIdentificationType, "402-2150987-3", true, CustomerStage.Codes.Prospect),
+        new(PersonType.Physical, "Andrés", "Felipe", "Quintero", null, null, PasaporteIdentificationType, "AB4417320", false, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Daniela", null, "Castillo", "Mejía", null, CedulaIdentificationType, "223-0098451-6", true, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Rafael", "Antonio", "Guzmán", null, null, CedulaIdentificationType, "031-0456123-9", false, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Isabel", "Cristina", "Rosario", null, null, CedulaIdentificationType, "047-1203389-4", true, CustomerStage.Codes.Lead),
+        new(PersonType.Physical, "Tomás", null, "Herrera", "Báez", null, CedulaIdentificationType, "001-0871245-1", false, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Lucía", null, "Fernández", "Almonte", null, PasaporteIdentificationType, "30981245", true, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Joaquín", null, "Medina", "Paulino", null, CedulaIdentificationType, "402-1987742-0", false, CustomerStage.Codes.Prospect),
+        new(PersonType.Physical, "Camila", null, "Santana", "Veras", null, CedulaIdentificationType, "001-1567023-8", true, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Esteban", null, "Marte", "Cabrera", null, CedulaIdentificationType, "056-0034781-2", false, null),
+        new(PersonType.Physical, "Paola", null, "Jiménez", "Tejada", null, CedulaIdentificationType, "223-0145567-5", true, null),
+        new(PersonType.Physical, "Héctor", "Manuel", "Polanco", null, null, CedulaIdentificationType, "001-0654398-3", false, CustomerStage.Codes.Former),
+        new(PersonType.Physical, "Mariana", null, "Batista", "Cruz", null, PasaporteIdentificationType, "C2245871", true, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Ricardo", null, "Peña", "Lora", null, CedulaIdentificationType, "031-0789012-6", false, null),
+        new(PersonType.Physical, "Natalia", null, "Vásquez", "Ortiz", null, CedulaIdentificationType, "402-2233198-1", true, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Fernando", null, "Abreu", "Matos", null, CedulaIdentificationType, "001-1345987-4", false, CustomerStage.Codes.Lead),
+        new(PersonType.Physical, "Sofía", null, "Encarnación", "Gil", null, CedulaIdentificationType, "047-0987654-0", true, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Alejandro", null, "Núñez", "Brito", null, PasaporteIdentificationType, "41237765", false, null),
+        new(PersonType.Physical, "Verónica", null, "Taveras", "Sosa", null, CedulaIdentificationType, "001-1902345-9", true, CustomerStage.Codes.Customer, CustomerInactive: true),
+        new(PersonType.Physical, "Manuel", "de Jesús", "Acosta", null, null, CedulaIdentificationType, "034-0012876-3", false, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Carolina", null, "Espinal", "Durán", null, CedulaIdentificationType, "402-1765432-8", true, CustomerStage.Codes.Prospect),
+        new(PersonType.Physical, "Diego", null, "Rosario", "Familia", null, CedulaIdentificationType, "001-0567812-2", false, null),
+        new(PersonType.Physical, "Adriana", "Mercedes", "Lugo", null, null, CedulaIdentificationType, "223-0198765-7", true, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Iván", null, "Sánchez", "Holguín", null, PasaporteIdentificationType, "D7781203", false, CustomerStage.Codes.Customer),
+        new(PersonType.Physical, "Elena", null, "Rodríguez", "Cano", null, CedulaIdentificationType, "001-1678901-5", true, CustomerStage.Codes.Customer, CustomerInactive: true),
+        new(PersonType.Physical, "Pablo", null, "Ortega", "Montás", null, CedulaIdentificationType, "031-0567234-1", false, null),
+        new(PersonType.Physical, "Rosa", "Amelia", "Fermín", null, null, CedulaIdentificationType, "047-1456789-2", true, null),
+        new(PersonType.Physical, "Samuel", null, "Díaz", "Mercado", null, CedulaIdentificationType, "001-1234098-6", false, null),
+        new(PersonType.Legal, "Norma", null, "Osorio", null, "Distribuidora Osorio & Asociados S.R.L.", RncIdentificationType, "1-31-45678-2", false, CustomerStage.Codes.Customer),
+        new(PersonType.Legal, "Tomás", null, "Herrera", null, "Agroindustrial Cibao S.A.", RncIdentificationType, "1-01-23456-7", false, CustomerStage.Codes.Customer),
+        new(PersonType.Legal, "Lucía", null, "Fernández", null, "Clínica Santa Lucía S.R.L.", RncIdentificationType, "1-30-98765-4", false, CustomerStage.Codes.Customer),
+        new(PersonType.Legal, "Manuel", null, "Acosta", null, "Ferretería El Progreso S.R.L.", RncIdentificationType, "1-31-11223-5", false, CustomerStage.Codes.Lead),
+        new(PersonType.Legal, "Iván", null, "Sánchez", null, "Transporte Caribe Express S.A.", RncIdentificationType, "1-01-77889-1", false, CustomerStage.Codes.Customer),
+        new(PersonType.Legal, "Rosa", null, "Fermín", null, "Colegio Nuevo Horizonte S.R.L.", RncIdentificationType, "1-30-44556-9", false, CustomerStage.Codes.Prospect),
+        new(PersonType.Legal, "Camila", null, "Santana", null, "Hotel Playa Dorada S.A.", RncIdentificationType, "1-01-99001-3", false, CustomerStage.Codes.Customer),
+        new(PersonType.Legal, "Livingstone", null, "Cano", null, "Software Cano Tech S.R.L.", RncIdentificationType, "1-31-66778-0", false, CustomerStage.Codes.Customer)
+    ];
 
     private static List<PersonSeed> GetJoinPersonSeeds() =>
     [
@@ -3285,6 +3544,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("CustomersMenu", "/customers", "@Icons.Material.Filled.PermContactCalendar", "Customers", null, null, false, false, false, false),
         new("Persons", "/customers/persons", "@Icons.Material.Filled.PeopleAlt", "Customers", "CustomersMenu", "Persons", true, true, true, true),
         new("Customers", "/customers/customers", "@Icons.Material.Filled.Badge", "Customers", "CustomersMenu", "Customers", true, true, true, true, CanDownload: true, IsVisibleMenu: true, OrderMenu: 15),
+        // SPEC 55 — per-company customer stage catalog.
+        new("CustomerStages", "/customers/customer-stages", "@Icons.Material.Filled.Timeline", "Customers", "CustomersMenu", "CustomerStages", true, true, true, true, IsVisibleMenu: true, OrderMenu: 16),
 
 
         new("TicketManagement", "/tickets", "@Icons.Material.Filled.Label", "Tickets", null, null, false, false, false, false),
@@ -3353,6 +3614,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("SuperAdmin", "TicketCompanyDefaults", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "TicketUserCompanies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Customers", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "CustomerStages", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
 
@@ -3363,6 +3625,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Admin", "TicketCompanyDefaults", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Admin", "TicketUserCompanies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Admin", "Customers", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Admin", "CustomerStages", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
         new("Manager", "Administration", false, false, false, false, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Countries", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -3384,6 +3647,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "CustomersMenu", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Persons", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Customers", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "CustomerStages", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
         new("Manager", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "TicketManagement", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -3542,6 +3806,18 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         string IdentificationNumber,
         string? LastName = null,
         string? CommercialName = null);
+    private sealed record LookupPersonSeed(
+        PersonType PersonType,
+        string FirstName,
+        string? MiddleName,
+        string LastName,
+        string? SecondLastName,
+        string? CommercialName,
+        string IdentificationType,
+        string IdentificationNumber,
+        bool Female,
+        string? CustomerStageCode,
+        bool CustomerInactive = false);
     private sealed record DefaultUserSeed(
         string FirstName,
         string LastName,

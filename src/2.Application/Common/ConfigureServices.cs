@@ -4,7 +4,7 @@
 using System.Reflection;
 using FluentValidation;
 using JOIN.Application.Interface;
-using JOIN.Application.Interface.Admin;
+using JOIN.Application.Interface.Customers;
 using JOIN.Application.UseCases.Admin.PersonAddresses;
 using JOIN.Application.UseCases.Calendars.Common;
 using JOIN.Application.UseCases.Admin.Persons;
@@ -19,7 +19,8 @@ using JOIN.Application.UseCases.Admin.PersonPendingConfirmations;
 using JOIN.Application.UseCases.Messaging.TicketUserCompanies;
 using JOIN.Application.UseCases.Messaging.Tickets;
 using JOIN.Application.Mappings;
-using JOIN.Application.Services.Admin;
+using JOIN.Application.Services.Customers;
+using JOIN.Application.UseCases.Customers.CustomerStages;
 using JOIN.Application.Mappings.Security;
 using JOIN.Application.Mappings.Security.RoleSystemOption;
 using JOIN.Application.Mappings.Security.SystemOption;
@@ -89,6 +90,9 @@ public static class ConfigureServices
         services.AddScoped<IRoleSystemOptionMapper, RoleSystemOptionMapper>();
         services.AddScoped<IRoleMapper, RoleMapper>();
         services.AddScoped<ICustomerCodeGenerator, CustomerCodeGenerator>();
+        // SPEC 55 — customers: idempotent activation and one default stage per company.
+        services.AddScoped<ICustomerActivationService, CustomerActivationService>();
+        services.AddScoped<CustomerStageDefaultCoordinator>();
         services.AddScoped<IAuthenticatedSessionIssuer, AuthenticatedSessionIssuer>();
         services.AddScoped<IMfaLoginChallengeIssuer, MfaLoginChallengeIssuer>();
         services.AddScoped<PersonAddressDefaultCoordinator>();

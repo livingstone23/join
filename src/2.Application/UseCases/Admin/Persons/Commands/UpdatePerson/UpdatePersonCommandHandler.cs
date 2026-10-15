@@ -2,10 +2,12 @@ using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Mappings;
+using JOIN.Application.Services.Customers;
 using JOIN.Application.UseCases.Admin.PersonAddresses;
 using JOIN.Application.UseCases.Admin.PersonContacts;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Common;
+using JOIN.Domain.Customers;
 using JOIN.Domain.Enums;
 using MediatR;
 
@@ -26,7 +28,8 @@ public class UpdatePersonCommandHandler(
     IPersonMapper customerMapper,
     ICurrentUserService currentUserService,
     PersonContactPrimaryCoordinator contactPrimaryCoordinator,
-    PersonAddressDefaultCoordinator addressDefaultCoordinator) : IRequestHandler<UpdatePersonCommand, Response<Guid>>
+    PersonAddressDefaultCoordinator addressDefaultCoordinator,
+    ICustomerActivationService customerActivationService) : IRequestHandler<UpdatePersonCommand, Response<Guid>>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
     private readonly IPersonMapper _customerMapper = customerMapper;
@@ -178,13 +181,24 @@ public class UpdatePersonCommandHandler(
             customerEntity.GenderId = request.GenderId;
         }
 
+        var wasActive = customerEntity.IsActive;
         if (request.IsActive)
         {
+            // SPEC 55 rule 7: reactivating the person does NOT reactivate its customer.
             customerEntity.Reactivate();
         }
         else
         {
             customerEntity.Deactivate();
+        }
+
+        if (wasActive && !customerEntity.IsActive)
+        {
+            var deactivationError = await DeactivateCustomerAsync(customerEntity, cancellationToken);
+            if (deactivationError is not null)
+            {
+                return deactivationError;
+            }
         }
 
         var collectionSyncErrors = new List<string>();
@@ -211,6 +225,33 @@ public class UpdatePersonCommandHandler(
             Data = customerEntity.Id,
             Message = "Person updated successfully."
         };
+    }
+
+    /// <summary>
+    /// Deactivates the person's customer, if it has one (SPEC 55 rule 7, source <c>PersonDeactivated</c>).
+    /// </summary>
+    private async Task<Response<Guid>?> DeactivateCustomerAsync(Person person, CancellationToken cancellationToken)
+    {
+        var customer = await _unitOfWork.Customers.GetByPersonAsync(person.CompanyId, person.Id, cancellationToken);
+        if (customer is null)
+        {
+            return null;
+        }
+
+        if (!Guid.TryParse(currentUserService.UserId, out var userId))
+        {
+            return Response<Guid>.Error("USER_REQUIRED", ["The authenticated user could not be resolved."]);
+        }
+
+        var result = await customerActivationService.DeactivateAsync(
+            person.CompanyId,
+            customer.Id,
+            CustomerStatusSource.PersonDeactivated,
+            userId,
+            sourceReferenceId: person.Id,
+            cancellationToken: cancellationToken);
+
+        return result.IsSuccess ? null : Response<Guid>.Error(result.Message, result.Errors);
     }
 
     /// <summary>

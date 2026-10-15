@@ -8,6 +8,7 @@ using JOIN.Domain.Calendars.Enums;
 using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
+using JOIN.Domain.Customers;
 
 namespace JOIN.Application.UseCases.Calendars.Common;
 

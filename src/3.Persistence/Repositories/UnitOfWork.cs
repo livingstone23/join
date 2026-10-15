@@ -6,13 +6,16 @@ using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Admin; // Add your specific interfaces
 using JOIN.Application.Interface.Persistence.Calendars;
+using JOIN.Application.Interface.Persistence.Customers;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Calendars;
+using JOIN.Domain.Customers;
 using JOIN.Domain.Security;
 using JOIN.Persistence.Contexts;
 using JOIN.Persistence.Repositories.Admin;
 using JOIN.Persistence.Repositories.Calendars;
+using JOIN.Persistence.Repositories.Customers;
 using JOIN.Persistence.Repositories.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -57,6 +60,7 @@ public class UnitOfWork : IUnitOfWork
     public ICompanyModuleRepository CompanyModules => new CompanyModuleRepository(_dbContext);
     public IUserCompanyRepository UserCompanies => new UserCompanyRepository(_dbContext);
     public ICalendarEventRepository CalendarEvents => (ICalendarEventRepository)GetRepository<CalendarEvent>();
+    public ICustomerRepository Customers => (ICustomerRepository)GetRepository<Customer>();
 
     // --- 2. DYNAMIC REPOSITORY FACTORY ---
     public IGenericRepository<TEntity> GetRepository<TEntity>() where TEntity : class
@@ -98,6 +102,10 @@ public class UnitOfWork : IUnitOfWork
             else if (typeof(TEntity) == typeof(CalendarEvent))
             {
                 repositoryInstance = new CalendarEventRepository(_dbContext);
+            }
+            else if (typeof(TEntity) == typeof(Customer))
+            {
+                repositoryInstance = new CustomerRepository(_dbContext);
             }
             else if (typeof(TEntity) == typeof(RoleSystemOption))
             {
@@ -170,6 +178,15 @@ public class UnitOfWork : IUnitOfWork
     public async Task AcquireScheduleLockAsync(Guid companyId, Guid ownerUserId, CancellationToken cancellationToken = default)
     {
         var key = $"calendar-schedule:{companyId}:{ownerUserId}";
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))",
+            cancellationToken);
+    }
+
+    // --- 6. CUSTOMER PER PERSON LOCK (SPEC 55) ---
+    public async Task AcquireCustomerPersonLockAsync(Guid companyId, Guid personId, CancellationToken cancellationToken = default)
+    {
+        var key = $"customer-person:{companyId}:{personId}";
         await _dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))",
             cancellationToken);
