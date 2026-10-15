@@ -91,7 +91,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 52 | Tickets: resumen de la bandeja (`GET /Tickets/summary`) y filtro "sin asignar" | Implementado | 37, 38, 41-post, 43-post |
 | 53 | Tickets: mis capacidades (`/TicketUserCompanies/me`), usuarios asignables e inactividad en los valores por defecto | Implementado | 34, 35, 37, 43-post |
 | 54 | Personas: búsqueda única con marca de cliente (`GET /Persons/lookup`) y datos semilla (40 personas, 30 clientes) | Borrador | 38, 39, 43-post, 55 |
-| 55 | Clientes: uno por persona y empresa, solo activo/inactivo (sin borrado), activación idempotente e historial de eventos (sale de 54) | Borrador | 38, 39, 40-post, 41-post, 43-post, 45-post |
+| 55 | Clientes: uno por persona y empresa, solo activo/inactivo (sin borrado), activación idempotente, historial de eventos y catálogo de etapas por empresa (`CustomerStages`, reemplaza el enum `PersonLifecycleStage`) (sale de 54) | Borrador | 38, 39, 40-post, 41-post, 43-post, 45-post |
 | 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
 
 ### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)
@@ -182,7 +182,7 @@ Decisión del usuario (2026-10-09): las specs 40–49, 51 y 99 de `main` se copi
 4. **50**: pendientes para llevar QA a PostgreSQL (sin su antigua sección 0), cuando el usuario lo decida.
 5. **52**: propia del fork (no es copia de `main`). Resumen de la bandeja y filtro "sin asignar" que pide FE-16 (brechas 2 y 4 de FE-15). Sin dependencias pendientes: 37, 38, 41-post y 43-post ya están implementadas.
 6. **53**: propia del fork. Capacidades del usuario, usuarios asignables (`CanResolveTicket`) y `MaxDayTicketInactivity` en los DTO de defaults, que piden FE-17, FE-18 (fase B) y FE-19. Sin dependencias pendientes.
-7. **55** → **54**: propias del fork. 55 deja un cliente por persona y empresa (sin borrado, activo/inactivo, activación idempotente con `ICustomerActivationService` e historial `CustomerStatusHistory`); 54 agrega `GET /Persons/lookup`, que pide FE-27 (y cierra la brecha de FE-22), y el seed de 40 personas y 30 clientes registrados por `livingstone23@gmail.com`. 54 necesita 55; pueden ir en el mismo cambio.
+7. **55** → **54**: propias del fork. 55 deja un cliente por persona y empresa (sin borrado, activo/inactivo, activación idempotente con `ICustomerActivationService` e historial `CustomerStatusHistory`, catálogo de etapas por empresa `CustomerStages` con su opción de menú `/customers/customer-stages`); 54 agrega `GET /Persons/lookup`, que pide FE-27 (y cierra la brecha de FE-22), y el seed de 40 personas y 30 clientes registrados por `livingstone23@gmail.com`. 54 necesita 55; pueden ir en el mismo cambio.
 
 ---
 

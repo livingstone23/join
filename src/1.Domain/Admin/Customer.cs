@@ -35,6 +35,7 @@ public class Customer : BaseTenantEntity
     /// <summary>
     /// Commercial funnel stage (Lead, Prospect, Customer, FormerCustomer). Independent of <see cref="IsActive"/>
     /// (SPEC 55): activating or deactivating never changes it; it is set on creation and changed by PUT /Customers.
+    /// SPEC 55 replaces this enum with <c>CustomerStageId</c>, a per-company catalog (<c>Admin.CustomerStages</c>).
     /// </summary>
     public PersonLifecycleStage PersonLifecycleStage { get; set; }
 
