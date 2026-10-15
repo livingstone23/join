@@ -4,7 +4,8 @@
 > **Depends on:** SPEC 38 (filtros globales), SPEC 39 (fork PostgreSQL), SPEC 40-post (índices únicos), SPEC 41-post (borrado y restauración, que esta spec retira para `Customers`), SPEC 43-post (permisos por ruta), SPEC 45-post (personas pendientes que se vinculan a un cliente). Rama de trabajo: `spec-55-customer-single-per-person-lifecycle`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-15
 > **Historia (2026-10-15, decisión del usuario):** se agrega la regla 7 (persona inactiva → cliente inactivo; al reactivar la persona, el cliente **no** se reactiva solo) y se confirma la regla 6 (etapa independiente del estado). Borrar una persona que tiene cliente queda bloqueado para siempre (el bloqueo de SPEC 41-post ya existe y el cliente nunca se borra).
-> **Historia (2026-10-15, decisión del usuario):** la etapa deja de ser el enum `PersonLifecycleStage`: pasa a un **catálogo por empresa** (`Admin.CustomerStages`, parte F) para que cada empresa defina sus etapas. `Customer.PersonLifecycleStage` se reemplaza por `Customer.CustomerStageId` y el enum se elimina. La regla 6 (etapa independiente del estado) se mantiene.
+> **Historia (2026-10-15, decisión del usuario):** la etapa deja de ser el enum `PersonLifecycleStage`: pasa a un **catálogo por empresa** (`Customer.CustomerStages`, parte F) para que cada empresa defina sus etapas. `Customer.PersonLifecycleStage` se reemplaza por `Customer.CustomerStageId` y el enum se elimina. La regla 6 (etapa independiente del estado) se mantiene.
+> **Historia (2026-10-15, decisión del usuario):** (1) vincular un cliente (a una actividad del calendario o a una persona pendiente) **no** lo activa: solo queda registrado el vínculo y activarlo es decisión del usuario (regla 9; se retira el antiguo punto E.12 y el origen `PersonPendingConfirmation`). (2) Como pronto habrá un módulo de clientes, `Customers`, `CustomerStages` y `CustomerStatusHistory` van en un esquema nuevo **`Customer`** (parte G); se revierte la decisión anterior de quedarse en `Admin`.
 > **Origen:** sale de SPEC 54 (2026-10-15, decisión del usuario): la parte "un cliente por persona" de SPEC 54 creció a una regla de vida completa del cliente y se separa aquí. SPEC 54 depende de esta.
 > **Objective:** Que un cliente exista **una sola vez** por persona y empresa, que nunca se borre ni se duplique, que solo cambie entre activo e inactivo, que cualquier evento pueda activarlo o confirmarlo como activo sin crear filas nuevas y que quede registrado qué evento lo hizo.
 
@@ -15,7 +16,7 @@
 1. **Un cliente por `(CompanyId, PersonId)`.** El `CustomerId` es la identidad permanente de esa persona como cliente de esa empresa. No existen dos filas para la misma persona en la misma empresa, ni vivas ni borradas.
 2. **Solo dos estados: activo o inactivo** (`IsActive`, con `ActivatedAt` / `DeactivatedAt` del último cambio). Un cliente no se borra: se desactiva.
 3. **Activación idempotente.** Uno o más eventos pueden activar o confirmar al cliente: si no existe, se crea activo; si está inactivo, se reactiva; si ya está activo, se confirma (sin cambiar `ActivatedAt`). Nunca se crea una segunda fila. Mismo `CustomerId` y mismo `CustomerCode` de por vida.
-4. **Historial.** Cada creación, activación, confirmación y desactivación deja una fila en `Admin.CustomerStatusHistory` con el origen del evento.
+4. **Historial.** Cada creación, activación, confirmación y desactivación deja una fila en `Customer.CustomerStatusHistory` con el origen del evento.
 5. **`UserId` = quien registró el cliente** (SPEC 54, Historia). No cambia al reactivar; quien hizo cada cambio queda en el historial.
 6. **Etapa independiente del estado** (decisión del usuario). La etapa (`CustomerStageId`, catálogo por empresa, regla 8) es el embudo comercial; `IsActive` es el estado operativo. No se sincronizan: activar o desactivar nunca cambia la etapa, y pueden no coincidir (un cliente inactivo en la etapa "Cliente" es válido). La etapa se fija al crear (la que indique el evento o, si no indica, la etapa por defecto de la empresa) y se cambia con `PUT`.
 7. **La persona manda sobre el cliente** (decisión del usuario):
@@ -24,7 +25,9 @@
    - No se puede activar ni confirmar el cliente de una persona inactiva (`INVALID_PERSON`).
    - Una persona con cliente no se puede borrar (bloqueo de `PersonCascadeCoordinator`, SPEC 41-post); como el cliente nunca se borra, solo se puede desactivar.
 
-8. **Etapas por empresa** (decisión del usuario). Cada empresa administra su propio catálogo de etapas (`Admin.CustomerStages`): crea, renombra, ordena, desactiva y define cuál es la etapa por defecto. Toda empresa tiene **exactamente una** etapa por defecto, activa. Una etapa inactiva no se puede asignar a clientes nuevos ni en un cambio de etapa, pero los clientes que ya la tienen la conservan. Una etapa en uso por algún cliente, o la etapa por defecto, no se puede borrar.
+8. **Etapas por empresa** (decisión del usuario). Cada empresa administra su propio catálogo de etapas (`Customer.CustomerStages`): crea, renombra, ordena, desactiva y define cuál es la etapa por defecto. Toda empresa tiene **exactamente una** etapa por defecto, activa. Una etapa inactiva no se puede asignar a clientes nuevos ni en un cambio de etapa, pero los clientes que ya la tienen la conservan. Una etapa en uso por algún cliente, o la etapa por defecto, no se puede borrar.
+
+9. **Vincular no activa** (decisión del usuario). Asociar un cliente a una actividad del calendario (`CalendarEvent.CustomerId`) o a una persona pendiente (`PersonPendingConfirmation.CustomerId`, SPEC 45-post) solo registra el vínculo: no crea, no activa ni confirma al cliente, y no escribe historial. Un cliente inactivo se puede vincular y sigue inactivo hasta que un usuario lo active.
 
 ## Contexto (estado actual)
 
@@ -44,7 +47,7 @@
 2. Migración `Spec55CustomerSinglePerPerson` (Npgsql, convención 7), en este orden:
    1. Si hay más de una fila por `(companyid, personid)` (sumando vivas y borradas), la migración **falla** con un mensaje que lista los pares; no fusiona ni borra datos. Se resuelven a mano antes de aplicarla.
    2. Las filas borradas (`gcrecord <> 0`) que quedan solas para su persona pasan a `gcrecord = 0`, `isactive = FALSE`, `deactivatedat = COALESCE(deactivatedat, NOW())`: un cliente "borrado" pasa a ser un cliente inactivo.
-   3. Cambio de índice y creación de `admin.customerstatushistory` (punto C).
+   3. Cambio de índice y creación de `customer.customerstatushistory` (punto C).
    4. Clientes activos cuya persona está inactiva pasan a `isactive = FALSE`, `deactivatedat = NOW()` (regla 7).
    5. Una fila de historial `Created` (origen `Migration`) por cliente existente, con `occurredat = activatedat` y `userid` = el `userid` del cliente; más una `Deactivated` (`occurredat = deactivatedat`, origen `Migration`) si está inactivo.
 
@@ -64,7 +67,7 @@
 6. `POST /Customers/{id}/activate` y `POST /Customers/{id}/deactivate`, cuerpo opcional `{ "notes": "..." }` (máx. 500), origen `Manual`. Responden 200 con el cliente; si ya estaba en ese estado, 200 sin cambios (`activate` sobre uno activo registra `Confirmed`; `deactivate` sobre uno inactivo no registra nada). Mismo permiso de actualización que `PUT` (`[PermissionResource("Customers")]`).
 
 **C. Historial**
-7. Entidad `CustomerStatusHistory : BaseTenantEntity` → `Admin.CustomerStatusHistory`:
+7. Entidad `CustomerStatusHistory : BaseTenantEntity` → `Customer.CustomerStatusHistory`:
 
    | Columna | Tipo | Nota |
    |---|---|---|
@@ -72,8 +75,8 @@
    | `CompanyId` | uuid | Tenant |
    | `CustomerId` | uuid | FK a `Customers`, `Restrict` |
    | `Action` | int | `CustomerStatusAction`: `Created = 1`, `Activated = 2`, `Confirmed = 3`, `Deactivated = 4` |
-   | `Source` | int | `CustomerStatusSource`: `Manual = 1`, `Seed = 2`, `Migration = 3`, `PersonPendingConfirmation = 4`, `PersonDeactivated = 5` (se agregan valores con cada evento nuevo) |
-   | `SourceReferenceId` | uuid? | Id del registro que originó el evento (p. ej. la `PersonPendingConfirmation`) |
+   | `Source` | int | `CustomerStatusSource`: `Manual = 1`, `Seed = 2`, `Migration = 3`, `PersonDeactivated = 4` (se agregan valores con cada evento nuevo) |
+   | `SourceReferenceId` | uuid? | Id del registro que originó el evento (p. ej. la `Person` desactivada) |
    | `Notes` | varchar(500)? | |
    | `UserId` | uuid | FK a `Security.Users`: quien hizo el cambio |
    | `OccurredAt` | timestamp with time zone | UTC |
@@ -87,12 +90,12 @@
 11. `Customer` deja documentado en su XML que no se borra (el `GcRecord` heredado de `BaseTenantEntity` se mantiene en 0 siempre; los filtros globales no cambian).
 
 **E. Eventos conectados en esta spec**
-12. `LinkCustomerToPersonPendingConfirmationCommand` (SPEC 45-post) llama a `EnsureActiveAsync` sobre el cliente vinculado con origen `PersonPendingConfirmation` y `SourceReferenceId` = la pendiente: vincular confirma al cliente como activo (lo reactiva si estaba inactivo). *(Supuesto a confirmar por el usuario.)*
+12. `LinkCustomerToPersonPendingConfirmationCommand` (SPEC 45-post) y el vínculo de clientes en actividades del calendario **no cambian**: no llaman a `ICustomerActivationService` (regla 9). El de personas pendientes sigue exigiendo que el cliente exista; acepta clientes inactivos.
 13. `UpdatePersonCommandHandler`: cuando la persona pasa de activa a inactiva, llama a `ICustomerActivationService.DeactivateAsync` sobre su cliente (si tiene) con origen `PersonDeactivated` (regla 7). Al pasar de inactiva a activa no hace nada con el cliente. Cualquier otro flujo que desactive personas usa el mismo servicio.
 14. Otros eventos (alta de ticket, actividad de calendario, ingreso por canal…) **no** se conectan en esta spec: cada uno agrega su valor de `CustomerStatusSource` y su llamada en la spec que lo pida.
 
 **F. Catálogo de etapas por empresa**
-15. Entidad `CustomerStage : BaseTenantEntity` → `Admin.CustomerStages` (mismo patrón que `Gender` / `TicketStatus`):
+15. Entidad `CustomerStage : BaseTenantEntity` → `Customer.CustomerStages` (mismo patrón que `Gender` / `TicketStatus`):
 
     | Columna | Tipo | Nota |
     |---|---|---|
@@ -125,7 +128,18 @@
     - `CustomerStageDto`: `Id`, `Code`, `Name`, `Description`, `SortOrder`, `IsDefault`, `IsActive`, `CustomersCount`, campos de `SoftDeletableDto`.
 19. **Menú y permisos** (seed de `SeedMenuAndPermissionsAsync`, cambia el checksum): `SystemOption` `CustomerStages`, ruta `/customers/customer-stages`, módulo `Customers`, padre `CustomersMenu`, recurso `CustomerStages`, visible en el menú, con las cuatro acciones. `RoleSystemOptions`: SuperAdmin, Admin y Manager con las mismas banderas que tienen sobre `Customers`.
 20. **Clientes con la etapa:** `CreateCustomerCommand.CustomerStageId` (opcional: sin valor, la etapa por defecto); `UpdateCustomerCommand.CustomerStageId` (obligatoria); ambos validan que la etapa sea de la empresa, viva y activa (`INVALID_CUSTOMER_STAGE`). `CustomerResponseDto`: `PersonLifecycleStage`/`PersonLifecycleStageName` → `CustomerStageId`, `CustomerStageCode`, `CustomerStageName`. `GET /Customers`: el filtro `personLifecycleStage` → `customerStageId`.
-21. **Migración de datos** (dentro de `Spec55CustomerSinglePerPerson`, antes del paso de historial): crear `admin.customerstages`; insertar las cuatro etapas para cada empresa de `common.companies` (`gen_random_uuid()`, `NOW()`); agregar `customerstageid` nula; `UPDATE` de cada cliente según su `personlifecyclestage` (1→`LEAD`, 2→`PROSPECT`, 3→`CUSTOMER`, 4→`FORMER` de su empresa); `SET NOT NULL`; crear la FK y el índice; borrar `personlifecyclestage`.
+21. **Migración de datos** (dentro de `Spec55CustomerSinglePerPerson`, antes del paso de historial): crear `customer.customerstages`; insertar las cuatro etapas para cada empresa de `common.companies` (`gen_random_uuid()`, `NOW()`); agregar `customerstageid` nula; `UPDATE` de cada cliente según su `personlifecyclestage` (1→`LEAD`, 2→`PROSPECT`, 3→`CUSTOMER`, 4→`FORMER` de su empresa); `SET NOT NULL`; crear la FK y el índice; borrar `personlifecyclestage`.
+
+**G. Esquema `Customer`** (decisión del usuario)
+22. Esquema nuevo `Customer` (físico `customer`, convención 1), singular como `Calendar`. Contiene `Customer.Customers`, `Customer.CustomerStages` y `Customer.CustomerStatusHistory`. Las tablas nuevas de esta spec se crean ahí directamente.
+23. La migración mueve la tabla existente, antes de los demás pasos: `EnsureSchema("Customer")` + `RenameTable("Customers", "Admin", newSchema: "Customer")` (en PostgreSQL, `ALTER TABLE admin.customers SET SCHEMA customer`: conserva datos, PK, FK e índices). Se inspecciona el `Up()` (convención 7).
+24. Código, con el mismo corte que el módulo de calendario:
+    - Dominio: `src/1.Domain/Customers/` (`Customer`, `CustomerStage`, `CustomerStatusHistory`, enums `CustomerStatusAction`/`CustomerStatusSource`), namespace `JOIN.Domain.Customers`.
+    - Configuración EF: `src/3.Persistence/Configuration/Customers/`.
+    - Aplicación: `src/2.Application/UseCases/Customers/` (`Customers/`, `CustomerStages/`) y `src/2.Application/Services/Customers/` (`ICustomerActivationService`, `CustomerCodeGenerator`); DTOs en `src/2.Application.DTO/Customers/`.
+    - API: `src/4.Services.WebApi/Controllers/Customers/` (`CustomersController`, `CustomerStagesController`).
+25. SQL Dapper que nombra la tabla pasa a `customer.customers`: `CustomerQuerySql`, `GetCustomersPagedQueryHandler` y la consulta de `GET /Persons/lookup` (SPEC 54). Se buscan con `grep -rniE "admin\.customers"` sobre `src` y `tests`, y debe quedar sin resultados (salvo migraciones).
+26. **No cambian:** las rutas de la API (`/api/v1/Customers`, `/api/v1/CustomerStages`), los recursos de permisos, las rutas del menú (`/customers/...`) ni el módulo `Customers` de `SystemModules`.
 
 **Out:**
 - Cambios en `Ticket`, en el calendario o en la búsqueda (SPEC 54).
@@ -156,7 +170,7 @@
 4. `deactivate` y luego `activate` dejan `IsActive` como corresponde, actualizan `DeactivatedAt` / `ActivatedAt` y registran `Deactivated` y `Activated`.
 5. `DELETE /Customers/{id}` y `POST /Customers/{id}/restore` ya no existen.
 6. `GET /Customers/{id}/status-history` lista los eventos en orden descendente con origen y usuario.
-7. Vincular una persona pendiente a un cliente inactivo lo reactiva y registra `Activated` con origen `PersonPendingConfirmation`.
+7. Vincular una persona pendiente o una actividad del calendario a un cliente inactivo lo deja inactivo y no escribe historial.
 8. La migración, sobre una base con un cliente borrado y sin duplicados, lo deja inactivo y vivo; con duplicados `(companyid, personid)`, falla sin tocar datos.
 9. `INSERT` directo de una segunda fila `(companyid, personid)` en la base falla con `23505`.
 10. Desactivar una persona con cliente activo deja al cliente inactivo con historial `Deactivated` / `PersonDeactivated`; reactivar la persona deja al cliente inactivo; `activate` del cliente mientras la persona está inactiva responde 400 `INVALID_PERSON`.
@@ -168,7 +182,8 @@
 16. `POST /Customers` sin `customerStageId` asigna la etapa por defecto; con una etapa inactiva o de otra empresa responde 400 `INVALID_CUSTOMER_STAGE`; desactivar una etapa no cambia a los clientes que la tienen.
 17. Borrar una etapa en uso responde 409 `CUSTOMER_STAGE_IN_USE`; borrar una sin uso y no por defecto funciona, y el SuperAdmin la puede restaurar.
 18. La opción `/customers/customer-stages` aparece en el menú de Clientes para SuperAdmin, Admin y Manager.
-19. Tests de integración (`CustomWebApplicationFactory`, `postgres:17`) para 1–8, 10, 11 y 12–17; `EXPLAIN` del SQL nuevo (convención 10).
+19. La tabla está en `customer.customers` con los mismos datos e índices; `admin.customers` ya no existe; ningún SQL de `src` nombra `admin.customers`.
+20. Tests de integración (`CustomWebApplicationFactory`, `postgres:17`) para 1–8, 10, 11 y 12–17 y 19; `EXPLAIN` del SQL nuevo (convención 10).
 
 ## Decisiones
 
@@ -176,7 +191,8 @@
 - **Alta idempotente** (decisión del usuario): el alta manual y los eventos se comportan igual; no hay que saber si ya existía para "activar".
 - **Historial en tabla propia** (decisión del usuario): responde por qué un cliente está activo o inactivo y qué eventos lo confirmaron; `ActivatedAt`/`DeactivatedAt` siguen como resumen del último cambio.
 - **`UserId` del token en el alta:** si `UserId` es quien registra, no puede venir del cuerpo (se podría registrar a nombre de otro).
-- **El esquema no cambia** (`Admin`), por lo mismo que en SPEC 54.
+- **Esquema `Customer`** (decisión del usuario, revierte la anterior): prepara el módulo de clientes; el mismo corte que `Calendar` (esquema, carpetas y namespace propios). `Person` y sus hijos siguen en `Admin` por ahora (ver Pendientes del README).
+- **Vincular no activa** (decisión del usuario): un vínculo es un registro, no una confirmación de la relación comercial.
 - **Persona → cliente en una sola dirección** (decisión del usuario): desactivar la persona desactiva al cliente, pero reactivarla no lo reactiva, porque el cliente pudo estar inactivo por otra razón. El historial dice por qué está inactivo.
 - **Etapa y estado separados** (decisión del usuario): la etapa sigue el embudo comercial (puede incluir etapas como "En contacto" o "En proceso", que todavía no compran); el estado dice si la relación está vigente.
 - **Catálogo por empresa en vez de enum** (decisión del usuario): cada empresa tiene su propio embudo. Las cuatro etapas iniciales conservan el significado del enum para no perder datos, y desde ahí cada empresa las edita.

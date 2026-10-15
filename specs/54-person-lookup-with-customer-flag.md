@@ -5,15 +5,16 @@
 > **Date:** 2026-10-15
 > **Historia (2026-10-15, decisión del usuario):** `Customer.UserId` no es la cuenta de acceso del cliente sino **el usuario que registró el cliente**. Se descarta volverlo opcional: sigue obligatorio, el seed usa el usuario `livingstone23@gmail.com`. El comentario XML de `Customer` y de `Customer.UserId` se corrigió en `main_postgresql` con este significado.
 > **Historia (2026-10-15, decisión del usuario):** un cliente existe una sola vez por persona y empresa, no se borra y solo pasa entre activo e inactivo, activado o confirmado por eventos con historial. Esa regla sale de esta spec a **SPEC 55**, que reemplaza a la antigua parte A (índice, migración y alta). La etapa del cliente pasa de enum a catálogo por empresa (SPEC 55, parte F): el contrato trae `CustomerStageId`/`CustomerStageCode`/`CustomerStageName` y el seed asigna etapas por código. Aquí cambian también: el lookup distingue cliente activo de inactivo (`IsCustomerActive`; un cliente inactivo sigue siendo cliente) y el seed registra el historial con origen `Seed`.
-> **Objective:** Que el frontend busque en una sola llamada entre las personas y los clientes (`Admin.Customers`) de la empresa, con un único texto, y sepa por cada resultado si es cliente y qué tipo de identificación tiene. Que no repite personas lo garantiza SPEC 55 (un cliente por persona y empresa).
+> **Objective:** Que el frontend busque en una sola llamada entre las personas y los clientes (`Customer.Customers`) de la empresa, con un único texto, y sepa por cada resultado si es cliente y qué tipo de identificación tiene. Que no repite personas lo garantiza SPEC 55 (un cliente por persona y empresa).
+> **Ajuste por SPEC 55 (2026-10-15):** los clientes pasan al esquema `Customer` (`customer.customers`); se actualizan las referencias y se retira la decisión de dejarlos en `Admin`. Sin cambio de alcance.
 > **Origen:** FE-27 (buscador "Cliente/Persona" del ticket) y la brecha de FE-22 (`GET /Persons` sin búsqueda única, `join_frontb/specs/README.md`).
 
 ---
 
 ## Contexto
 
-- `Customer` (`Admin.Customers`) vincula una `Person` con un código de cliente (`C` + 9 dígitos, `CustomerCodeGenerator`) y una etapa del catálogo de su empresa (`CustomerStageId`, SPEC 55). Su `UserId` (FK obligatoria a `Security.Users`) es **el usuario que registró el cliente**, no una cuenta de acceso del cliente.
-- SPEC 55 deja un único cliente por `(CompanyId, PersonId)`, sin borrado, con estado activo o inactivo e historial en `Admin.CustomerStatusHistory`.
+- `Customer` (`Customer.Customers`) vincula una `Person` con un código de cliente (`C` + 9 dígitos, `CustomerCodeGenerator`) y una etapa del catálogo de su empresa (`CustomerStageId`, SPEC 55). Su `UserId` (FK obligatoria a `Security.Users`) es **el usuario que registró el cliente**, no una cuenta de acceso del cliente.
+- SPEC 55 deja un único cliente por `(CompanyId, PersonId)`, sin borrado, con estado activo o inactivo e historial en `Customer.CustomerStatusHistory`.
 - El ticket guarda solo `PersonId` (`Messaging.Tickets`). Elegir un cliente en el ticket es elegir su persona: no hace falta una columna nueva en `Ticket`.
 - El frontend busca hoy con `GET /Persons` por `firstName`, `lastName`, `commercialName` e `identificationNumber` en cuatro llamadas en paralelo y une los resultados. No puede saber cuáles son clientes: `GET /Customers` no filtra por documento ni devuelve identificación.
 - El seed (`DatabaseSeeder`) solo crea el tipo de identificación `Cedula`, no siembra ningún `Customer` y todas las personas de `JOIN-001` usan cédula.
@@ -35,13 +36,12 @@
 **B. Datos semilla (PostgreSQL)**
 9. `SeedIdentificationTypesAsync` agrega `Pasaporte` y `RNC` al catálogo global, además de `Cedula` (no se renombra: el seed la busca por nombre). Devuelve un diccionario nombre → Id en vez de un único Guid; las personas existentes siguen con `Cedula`.
 10. Nuevo `SeedJoinLookupPersonsAsync(joinCompanyId, idTypes)`: 40 personas nuevas en `JOIN-001` (lista de abajo). Idempotente por `(CompanyId, IdentificationNumber)`, igual que `SeedJoinPersonsAsync`.
-11. Nuevo `SeedJoinCustomersAsync(joinCompanyId)`: 30 de esas 40 se registran como `Customer` con `UserId` = el usuario `livingstone23@gmail.com` (quien los registra; ya existe en `GetDefaultUserSeeds`, se busca por correo con `IgnoreQueryFilters`; si no existe, se registra un warning y no se siembran clientes), código con `CustomerCodeGenerator` (`C000000001`…), etapa según la lista, por `Code` del catálogo de `JOIN-001` (`LEAD`, `PROSPECT`, `CUSTOMER`, `FORMER`, sembrado por SPEC 55 antes que los clientes). Idempotente por `(CompanyId, PersonId)`. Cada cliente nuevo registra en `Admin.CustomerStatusHistory` (SPEC 55) una fila `Created` con origen `Seed`. Dos se dejan inactivos (`Deactivate()` + fila `Deactivated`, origen `Seed`) para validar que salen como `(cli inactivo)`. El seed escribe directo en el contexto (no usa `ICustomerActivationService`, que vive en Application).
+11. Nuevo `SeedJoinCustomersAsync(joinCompanyId)`: 30 de esas 40 se registran como `Customer` con `UserId` = el usuario `livingstone23@gmail.com` (quien los registra; ya existe en `GetDefaultUserSeeds`, se busca por correo con `IgnoreQueryFilters`; si no existe, se registra un warning y no se siembran clientes), código con `CustomerCodeGenerator` (`C000000001`…), etapa según la lista, por `Code` del catálogo de `JOIN-001` (`LEAD`, `PROSPECT`, `CUSTOMER`, `FORMER`, sembrado por SPEC 55 antes que los clientes). Idempotente por `(CompanyId, PersonId)`. Cada cliente nuevo registra en `Customer.CustomerStatusHistory` (SPEC 55) una fila `Created` con origen `Seed`. Dos se dejan inactivos (`Deactivate()` + fila `Deactivated`, origen `Seed`) para validar que salen como `(cli inactivo)`. El seed escribe directo en el contexto (no usa `ICustomerActivationService`, que vive en Application).
 12. Ambos se llaman en el paso 7 de `SeedAsync`, después de `SeedJoinPersonAddressesAndContactsAsync` y antes de `SeedJoinTicketsAsync`. No tocan `SeedMenuAndPermissionsAsync` ni su checksum.
 13. Fechas con `DateTime.UtcNow` (convención 5).
 
 **Out:**
 - Columna nueva en `Ticket` o cambios en los endpoints de tickets.
-- Mover `Customers` a un esquema propio (ver Decisiones).
 - Paginación del lookup (es un autocompletado: solo `limit`).
 - Búsqueda por correo o teléfono.
 - Contactos y direcciones para las 40 personas nuevas.
@@ -76,7 +76,7 @@
 
 ## Datos semilla: 40 personas de `JOIN-001`
 
-Cédula con formato `NNN-NNNNNNN-N`, pasaporte con 8 dígitos o letra + 7 dígitos, RNC con formato `N-NN-NNNNN-N`. "Cliente" indica si se registra en `Admin.Customers` y el `Code` de su etapa; `—` = solo persona.
+Cédula con formato `NNN-NNNNNNN-N`, pasaporte con 8 dígitos o letra + 7 dígitos, RNC con formato `N-NN-NNNNN-N`. "Cliente" indica si se registra en `Customer.Customers` y el `Code` de su etapa; `—` = solo persona.
 
 | # | Tipo | Nombre | Identificación | Cliente |
 |---|---|---|---|---|
@@ -140,7 +140,7 @@ Casos que la lista cubre a propósito:
 6. Una sola consulta SQL, sin N+1 por cliente; `EXPLAIN` sin errores contra la base migrada (convención 10).
 7. Una persona sin cliente sale con `IsCustomer = false`, `IsCustomerActive = false` y `CustomerId`/`CustomerCode` y los campos de etapa nulos.
 8. La migración aplica sobre una base existente sin pérdida de datos y el seed corre dos veces seguidas sin duplicar personas, clientes ni tipos de identificación.
-9. Tras el seed en una base vacía: 3 tipos de identificación, 40 personas nuevas en `JOIN-001` y 30 filas en `Admin.Customers` (2 inactivas), todas con `UserId` del usuario `livingstone23@gmail.com`, y 32 filas en `Admin.CustomerStatusHistory` (30 `Created` + 2 `Deactivated`, origen `Seed`).
+9. Tras el seed en una base vacía: 3 tipos de identificación, 40 personas nuevas en `JOIN-001` y 30 filas en `Customer.Customers` (2 inactivas), todas con `UserId` del usuario `livingstone23@gmail.com`, y 32 filas en `Customer.CustomerStatusHistory` (30 `Created` + 2 `Deactivated`, origen `Seed`).
 10. Tests de integración (`CustomWebApplicationFactory`, `postgres:17`) para 1–5, 7 y `INVALID_SEARCH_TERM`.
 11. Smoke con Docker (convención 12): `curl` de `GET /Persons/lookup?term=cano`, `?term=Norma Osorio` y `?term=20548796` con el token de `JOIN-001`.
 
@@ -149,7 +149,7 @@ Casos que la lista cubre a propósito:
 - **`GET /Persons/lookup` y no una ruta bajo `Tickets`:** sirve también a FE-22 ("Relacionado con") y cierra su brecha. Exige el mismo permiso que ya pide el buscador actual (`Persons`).
 - **`UserId` = usuario que registró el cliente** (decisión del usuario, 2026-10-15): no es una cuenta de acceso del cliente, así que no hay que crear usuarios para sembrar clientes ni volverlo opcional.
 - **Unicidad, estado e historial del cliente en SPEC 55:** aquí solo se leen. Un cliente inactivo sigue siendo cliente (decisión del usuario, 2026-10-15) y el frontend lo marca `(cli inactivo)`.
-- **`Customers` se queda en el esquema `Admin`:** los esquemas agrupan por módulo (`Admin`, `Messaging`, `Calendars`, `Security`, `Common`), y `Customer` depende de `Person`, que vive en `Admin`. Un esquema propio de una sola tabla obligaría a una migración de `SET SCHEMA`, a reescribir el SQL de Dapper (`admin.customers`) y no aporta aislamiento. Si en el futuro hay un módulo de clientes con varias tablas (contratos, segmentos, portal), se evalúa en su propia spec.
+- **Esquema `Customer`:** `Customers` y sus tablas viven en el esquema `Customer` (SPEC 55, parte G, decisión del usuario 2026-10-15); la consulta del lookup une `admin.persons` con `customer.customers`.
 - **`Cedula` sin tilde:** el seed la busca por nombre; renombrarla rompería bases existentes. Se corrige, si se quiere, desde el CRUD de tipos de identificación.
 
 ## Riesgos

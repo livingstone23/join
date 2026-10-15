@@ -10,6 +10,8 @@ namespace JOIN.Domain.Admin;
 /// it only switches between active and inactive (<see cref="Reactivate"/> / <see cref="Deactivate"/>),
 /// and every event that creates, activates, confirms or deactivates it is logged in CustomerStatusHistory.
 /// Deactivating its <see cref="Person"/> deactivates the customer; reactivating the person does NOT reactivate it.
+/// Linking a customer to a calendar activity or a pending person does NOT activate it (SPEC 55).
+/// SPEC 55 moves this entity to the <c>Customer</c> schema and the <c>JOIN.Domain.Customers</c> namespace.
 /// The customer is not a system user: <see cref="UserId"/> only records who registered it.
 /// </summary>
 public class Customer : BaseTenantEntity
@@ -35,7 +37,7 @@ public class Customer : BaseTenantEntity
     /// <summary>
     /// Commercial funnel stage (Lead, Prospect, Customer, FormerCustomer). Independent of <see cref="IsActive"/>
     /// (SPEC 55): activating or deactivating never changes it; it is set on creation and changed by PUT /Customers.
-    /// SPEC 55 replaces this enum with <c>CustomerStageId</c>, a per-company catalog (<c>Admin.CustomerStages</c>).
+    /// SPEC 55 replaces this enum with <c>CustomerStageId</c>, a per-company catalog (<c>Customer.CustomerStages</c>).
     /// </summary>
     public PersonLifecycleStage PersonLifecycleStage { get; set; }
 

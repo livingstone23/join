@@ -91,7 +91,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 52 | Tickets: resumen de la bandeja (`GET /Tickets/summary`) y filtro "sin asignar" | Implementado | 37, 38, 41-post, 43-post |
 | 53 | Tickets: mis capacidades (`/TicketUserCompanies/me`), usuarios asignables e inactividad en los valores por defecto | Implementado | 34, 35, 37, 43-post |
 | 54 | Personas: búsqueda única con marca de cliente (`GET /Persons/lookup`) y datos semilla (40 personas, 30 clientes) | Borrador | 38, 39, 43-post, 55 |
-| 55 | Clientes: uno por persona y empresa, solo activo/inactivo (sin borrado), activación idempotente, historial de eventos y catálogo de etapas por empresa (`CustomerStages`, reemplaza el enum `PersonLifecycleStage`) (sale de 54) | Borrador | 38, 39, 40-post, 41-post, 43-post, 45-post |
+| 55 | Clientes: uno por persona y empresa, solo activo/inactivo (sin borrado), activación idempotente, historial de eventos, catálogo de etapas por empresa (`CustomerStages`, reemplaza el enum `PersonLifecycleStage`) y esquema propio `Customer` (sale de 54) | Borrador | 38, 39, 40-post, 41-post, 43-post, 45-post |
 | 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
 
 ### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)
@@ -201,6 +201,7 @@ Decisiones o verificaciones que no tienen spec propia todavía:
 | 44 | Mejoras diferidas del calendario: invitados, calendarios privados, turnos nocturnos, permisos de medio día. |
 | 41 | Al implementarla, incluir las entidades del calendario (44, 45, 46). |
 | 55 | Conectar más eventos a `ICustomerActivationService` (alta de ticket, actividad de calendario, ingreso por canal): cada uno en la spec que lo pida, con su `CustomerStatusSource`. |
+| 55 | Candidatas a pasar al esquema `Customer` cuando se cree el módulo de clientes: `PersonPendingConfirmations` (cola de revisión del menú Clientes) y, si se decide, el agregado `Person` (`Persons` + direcciones, contactos, empleos, perfiles comercial y financiero) con sus catálogos (`Genders`, `IdentificationTypes`, `Industries`, `IncomeRanges`, `TaxRegimes`). Hoy siguen en `Admin`. |
 | 38 (F0) | Ejecutar `docs/migrations/spec-38-data-audit.sql` contra la base de desarrollo y pegar los conteos en el PR; si hay filas afectadas, decidir si se reasignan. |
 | 38 (D) | Smoke manual: un `SuperAdminCompany` solo ve su empresa y sus módulos, y no puede borrar empresas ni modificar módulos; validar con `join_frontb`. |
 | ~~40-post~~ | ~~`DapperContext.CreateConnection()` siempre crea `SqlConnection`~~ Resuelto (2026-10-09, rama `fix-post-dapper-dateonly-and-dappercontext`): `DapperContext` elige Npgsql o SqlClient según `DatabaseProvider`, igual que `SqlConnectionFactory`, y un handler de Dapper (`DateOnlyCompatibleDateTimeHandler`) lee las columnas `date` (que Npgsql devuelve como `DateOnly`) en propiedades `DateTime`. Caso D.2 de SPEC 40-post ejecutado: cuatro `PUT /Persons` → 200. |
