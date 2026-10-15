@@ -9,6 +9,7 @@ namespace JOIN.Domain.Admin;
 /// A person is a customer at most once per company (SPEC 55): the row is never duplicated nor deleted,
 /// it only switches between active and inactive (<see cref="Reactivate"/> / <see cref="Deactivate"/>),
 /// and every event that creates, activates, confirms or deactivates it is logged in CustomerStatusHistory.
+/// Deactivating its <see cref="Person"/> deactivates the customer; reactivating the person does NOT reactivate it.
 /// The customer is not a system user: <see cref="UserId"/> only records who registered it.
 /// </summary>
 public class Customer : BaseTenantEntity
@@ -32,7 +33,8 @@ public class Customer : BaseTenantEntity
     public string CustomerCode { get; private set; } = string.Empty;
 
     /// <summary>
-    /// Person lifecycle stage.
+    /// Commercial funnel stage (Lead, Prospect, Customer, FormerCustomer). Independent of <see cref="IsActive"/>
+    /// (SPEC 55): activating or deactivating never changes it; it is set on creation and changed by PUT /Customers.
     /// </summary>
     public PersonLifecycleStage PersonLifecycleStage { get; set; }
 
