@@ -200,7 +200,6 @@ Decisiones o verificaciones que no tienen spec propia todavía:
 | 46 | Acciones de sincronización con Google (OAuth, envío, webhook, worker). |
 | 44 | Mejoras diferidas del calendario: invitados, calendarios privados, turnos nocturnos, permisos de medio día. |
 | 41 | Al implementarla, incluir las entidades del calendario (44, 45, 46). |
-| 55 | Qué pasa con el cliente cuando se borra su `Person` (hoy no hay cascada; ¿se bloquea el borrado o se desactiva el cliente?). |
 | 55 | Conectar más eventos a `ICustomerActivationService` (alta de ticket, actividad de calendario, ingreso por canal): cada uno en la spec que lo pida, con su `CustomerStatusSource`. |
 | 38 (F0) | Ejecutar `docs/migrations/spec-38-data-audit.sql` contra la base de desarrollo y pegar los conteos en el PR; si hay filas afectadas, decidir si se reasignan. |
 | 38 (D) | Smoke manual: un `SuperAdminCompany` solo ve su empresa y sus módulos, y no puede borrar empresas ni modificar módulos; validar con `join_frontb`. |
