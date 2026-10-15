@@ -6,8 +6,10 @@ namespace JOIN.Domain.Admin;
 
 /// <summary>
 /// Represents a customer of the company: a CRM <see cref="Person"/> with a customer code and a lifecycle stage.
-/// A person is a customer at most once per company (SPEC 54). The customer is not a system user:
-/// <see cref="UserId"/> only records who registered it.
+/// A person is a customer at most once per company (SPEC 55): the row is never duplicated nor deleted,
+/// it only switches between active and inactive (<see cref="Reactivate"/> / <see cref="Deactivate"/>),
+/// and every event that creates, activates, confirms or deactivates it is logged in CustomerStatusHistory.
+/// The customer is not a system user: <see cref="UserId"/> only records who registered it.
 /// </summary>
 public class Customer : BaseTenantEntity
 {
@@ -19,6 +21,7 @@ public class Customer : BaseTenantEntity
     /// <summary>
     /// Foreign key to the <see cref="ApplicationUser"/> who registered this customer (audit of the registration).
     /// It is NOT the customer's login account: customers do not need to be system users.
+    /// It does not change on reactivation; who made each later change is in the status history (SPEC 55).
     /// The seed uses the user <c>livingstone23@gmail.com</c> (SPEC 54).
     /// </summary>
     public Guid UserId { get; set; }
