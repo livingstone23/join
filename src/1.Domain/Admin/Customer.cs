@@ -5,7 +5,9 @@ using JOIN.Domain.Security;
 namespace JOIN.Domain.Admin;
 
 /// <summary>
-/// Represents a customer in the system linking a CRM person with an identity user and lifecycle stage.
+/// Represents a customer of the company: a CRM <see cref="Person"/> with a customer code and a lifecycle stage.
+/// A person is a customer at most once per company (SPEC 54). The customer is not a system user:
+/// <see cref="UserId"/> only records who registered it.
 /// </summary>
 public class Customer : BaseTenantEntity
 {
@@ -15,7 +17,9 @@ public class Customer : BaseTenantEntity
     public Guid PersonId { get; set; }
 
     /// <summary>
-    /// Foreign key to the ApplicationUser (Authentication record).
+    /// Foreign key to the <see cref="ApplicationUser"/> who registered this customer (audit of the registration).
+    /// It is NOT the customer's login account: customers do not need to be system users.
+    /// The seed uses the user <c>livingstone23@gmail.com</c> (SPEC 54).
     /// </summary>
     public Guid UserId { get; set; }
 
@@ -37,10 +41,11 @@ public class Customer : BaseTenantEntity
 
     public virtual Person Person { get; set; } = null!;
 
+    /// <summary>User who registered the customer (see <see cref="UserId"/>).</summary>
     public virtual ApplicationUser User { get; set; } = null!;
 
     /// <summary>
-    /// Creates a new customer for the specified tenant, person, and user.
+    /// Creates a new customer for the specified tenant and person, registered by <paramref name="userId"/>.
     /// </summary>
     public static Customer Create(
         Guid companyId,

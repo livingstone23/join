@@ -1,16 +1,18 @@
-# SPEC 54 — Personas: búsqueda única con marca de cliente, cliente sin usuario y datos semilla
+# SPEC 54 — Personas: búsqueda única con marca de cliente, unicidad de cliente por persona y datos semilla
 
 > **Status:** Borrador
 > **Depends on:** SPEC 38 (filtros globales), SPEC 39 (fork PostgreSQL), SPEC 40-post (índices únicos filtrados), SPEC 41-post (restauración), SPEC 43-post (permisos por ruta). Rama de trabajo: `spec-54-person-lookup-with-customer-flag`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-15
-> **Objective:** Que el frontend busque en una sola llamada entre las personas y los clientes (`Admin.Customers`) de la empresa, con un único texto, y sepa por cada resultado si es cliente y qué tipo de identificación tiene. Para poder sembrar y validar clientes reales, un cliente deja de exigir un usuario de acceso.
+> **Historia (2026-10-15, decisión del usuario):** `Customer.UserId` no es la cuenta de acceso del cliente sino **el usuario que registró el cliente**. Se descarta volverlo opcional: sigue obligatorio, el seed usa el usuario `livingstone23@gmail.com` y la parte A queda solo en la unicidad por persona. El comentario XML de `Customer` y de `Customer.UserId` se corrigió en `main_postgresql` con este significado.
+> **Objective:** Que el frontend busque en una sola llamada entre las personas y los clientes (`Admin.Customers`) de la empresa, con un único texto, y sepa por cada resultado si es cliente y qué tipo de identificación tiene. Una persona solo puede ser cliente una vez por empresa, para que la búsqueda no repita filas.
 > **Origen:** FE-27 (buscador "Cliente/Persona" del ticket) y la brecha de FE-22 (`GET /Persons` sin búsqueda única, `join_frontb/specs/README.md`).
 
 ---
 
 ## Contexto
 
-- `Customer` (`Admin.Customers`) vincula una `Person` con un código de cliente (`C` + 9 dígitos, `CustomerCodeGenerator`) y una etapa (`PersonLifecycleStage`). Hoy además exige un `UserId` (FK a `Security.Users`), así que no se puede registrar un cliente que no tenga cuenta de acceso.
+- `Customer` (`Admin.Customers`) vincula una `Person` con un código de cliente (`C` + 9 dígitos, `CustomerCodeGenerator`) y una etapa (`PersonLifecycleStage`). Su `UserId` (FK obligatoria a `Security.Users`) es **el usuario que registró el cliente**, no una cuenta de acceso del cliente.
+- El índice único actual es `(CompanyId, PersonId, UserId)`: dos usuarios distintos pueden registrar como cliente a la misma persona, y la búsqueda la mostraría dos veces.
 - El ticket guarda solo `PersonId` (`Messaging.Tickets`). Elegir un cliente en el ticket es elegir su persona: no hace falta una columna nueva en `Ticket`.
 - El frontend busca hoy con `GET /Persons` por `firstName`, `lastName`, `commercialName` e `identificationNumber` en cuatro llamadas en paralelo y une los resultados. No puede saber cuáles son clientes: `GET /Customers` no filtra por documento ni devuelve identificación.
 - El seed (`DatabaseSeeder`) solo crea el tipo de identificación `Cedula`, no siembra ningún `Customer` y todas las personas de `JOIN-001` usan cédula.
@@ -19,30 +21,28 @@
 
 **In:**
 
-**A. Cliente sin usuario obligatorio**
-1. `Customer.UserId` pasa a `Guid?` (FK opcional a `Security.Users`, `OnDelete` sin cambio). `Customer.Create` acepta `userId` nulo; si viene, sigue validando que no sea `Guid.Empty`.
-2. Índice único `(CompanyId, PersonId, UserId)` → se reemplaza por `UX_Customers_Company_Person` sobre `(CompanyId, PersonId)` con `HasFilter("\"gcrecord\" = 0")`: una persona es cliente **una sola vez** por empresa, tenga o no usuario. Es lo que garantiza que la búsqueda no repita personas.
-3. Migración `Spec54CustomerOptionalUser` (Npgsql, convención 7): `ALTER COLUMN userid DROP NOT NULL`, cambio de índice. Antes de crear el índice nuevo, la migración verifica que no haya duplicados `(companyid, personid)` vivos; si los hay, falla con un mensaje claro (no borra datos).
-4. `CreateCustomerCommand.UserId` y `UpdateCustomer` aceptan `null`. El validador quita `NotEmpty` de `UserId`; si viene, el handler mantiene sus validaciones actuales (usuario existe, activo y miembro de la empresa).
-5. El handler de alta rechaza una segunda alta de la misma persona en la empresa con `CUSTOMER_PERSON_ALREADY_EXISTS` (409), en lugar de comparar `PersonId` + `UserId`. La restauración (`RestoreCustomerCommandHandler`) aplica la misma regla y solo comprueba el borrado del usuario padre cuando `UserId` tiene valor.
-6. `CustomerQuerySql`: `INNER JOIN security.users` → `LEFT JOIN`. `CustomerResponseDto.UserId` → `Guid?`, `UserEmail` → `string?`.
+**A. Un cliente por persona y empresa**
+1. `Customer.UserId` **no cambia**: sigue `Guid` obligatorio y significa "usuario que registró el cliente" (comentario XML ya corregido en `Customer.cs`).
+2. Índice único `(CompanyId, PersonId, UserId)` → se reemplaza por `UX_Customers_Company_Person` sobre `(CompanyId, PersonId)` con `HasFilter("\"gcrecord\" = 0")`: una persona es cliente **una sola vez** por empresa, la haya registrado quien la haya registrado. Es lo que garantiza que la búsqueda no repita personas.
+3. Migración `Spec54CustomerUniquePerson` (Npgsql, convención 7): solo el cambio de índice. Antes de crearlo, la migración verifica que no haya duplicados `(companyid, personid)` vivos; si los hay, falla con un mensaje claro (no borra datos).
+4. El handler de alta rechaza una segunda alta de la misma persona en la empresa con `CUSTOMER_PERSON_ALREADY_EXISTS` (409), en lugar de comparar `PersonId` + `UserId`. La restauración (`RestoreCustomerCommandHandler`) aplica la misma regla en su chequeo de duplicados.
 
 **B. Búsqueda única**
-7. `GET /api/v1/Persons/lookup?term={texto}&limit={n}` en `PersonsController` (`[PermissionResource("Persons")]`, acción de lectura, igual que `GET /Persons`).
-8. `limit`: default 20, mínimo 1, máximo 50 (fuera de rango se ajusta al borde, sin error).
-9. Busca con `ILIKE '%' || @Term || '%'` (convención 6) en `firstname`, `middlename`, `lastname`, `secondlastname`, `commercialname`, `identificationnumber`, el nombre completo concatenado (`CONCAT_WS(' ', firstname, middlename, lastname, secondlastname)`, para que "Norma Osorio" encuentre a la persona) y `customercode`. El texto se recorta (`Trim`) y se escapan `%`, `_` y `\`.
-10. `term` vacío o con menos de 2 caracteres tras el `Trim` → 400 `INVALID_SEARCH_TERM`.
-11. Solo personas **activas y no borradas** de la empresa del token. El cliente solo cuenta si está activo (`isactive = TRUE`) y no borrado.
-12. **Una fila por persona**, aunque coincida por varios campos o tenga un cliente borrado además del vivo. Se arma con un `LEFT JOIN` al cliente vivo de la persona (único por el índice del punto 2), sin `DISTINCT` sobre texto.
-13. Orden: (1) coincidencia exacta de `identificationnumber` o `customercode` (sin distinguir mayúsculas), (2) clientes antes que personas, (3) nombre completo ascendente, (4) `id` (desempate estable).
-14. Consulta Dapper en `GetPersonLookupQuery` (`UseCases/Admin/Persons/Queries/GetPersonLookup/`), con `LIMIT @Limit` (convención 6).
+5. `GET /api/v1/Persons/lookup?term={texto}&limit={n}` en `PersonsController` (`[PermissionResource("Persons")]`, acción de lectura, igual que `GET /Persons`).
+6. `limit`: default 20, mínimo 1, máximo 50 (fuera de rango se ajusta al borde, sin error).
+7. Busca con `ILIKE '%' || @Term || '%'` (convención 6) en `firstname`, `middlename`, `lastname`, `secondlastname`, `commercialname`, `identificationnumber`, el nombre completo concatenado (`CONCAT_WS(' ', firstname, middlename, lastname, secondlastname)`, para que "Norma Osorio" encuentre a la persona) y `customercode`. El texto se recorta (`Trim`) y se escapan `%`, `_` y `\`.
+8. `term` vacío o con menos de 2 caracteres tras el `Trim` → 400 `INVALID_SEARCH_TERM`.
+9. Solo personas **activas y no borradas** de la empresa del token. El cliente solo cuenta si está activo (`isactive = TRUE`) y no borrado.
+10. **Una fila por persona**, aunque coincida por varios campos o tenga un cliente borrado además del vivo. Se arma con un `LEFT JOIN` al cliente vivo de la persona (único por el índice del punto 2), sin `DISTINCT` sobre texto.
+11. Orden: (1) coincidencia exacta de `identificationnumber` o `customercode` (sin distinguir mayúsculas), (2) clientes antes que personas, (3) nombre completo ascendente, (4) `id` (desempate estable).
+12. Consulta Dapper en `GetPersonLookupQuery` (`UseCases/Admin/Persons/Queries/GetPersonLookup/`), con `LIMIT @Limit` (convención 6).
 
 **C. Datos semilla (PostgreSQL)**
-15. `SeedIdentificationTypesAsync` agrega `Pasaporte` y `RNC` al catálogo global, además de `Cedula` (no se renombra: el seed la busca por nombre). Devuelve un diccionario nombre → Id en vez de un único Guid; las personas existentes siguen con `Cedula`.
-16. Nuevo `SeedJoinLookupPersonsAsync(joinCompanyId, idTypes)`: 40 personas nuevas en `JOIN-001` (lista de abajo). Idempotente por `(CompanyId, IdentificationNumber)`, igual que `SeedJoinPersonsAsync`.
-17. Nuevo `SeedJoinCustomersAsync(joinCompanyId)`: 30 de esas 40 se registran como `Customer` **sin usuario** (`UserId = null`), código con `CustomerCodeGenerator` (`C000000001`…), etapa según la lista. Idempotente por `(CompanyId, PersonId)`. Dos de ellos se dejan desactivados (`Deactivate()`) para validar que salen como persona.
-18. Ambos se llaman en el paso 7 de `SeedAsync`, después de `SeedJoinPersonAddressesAndContactsAsync` y antes de `SeedJoinTicketsAsync`. No tocan `SeedMenuAndPermissionsAsync` ni su checksum.
-19. Fechas con `DateTime.UtcNow` (convención 5).
+13. `SeedIdentificationTypesAsync` agrega `Pasaporte` y `RNC` al catálogo global, además de `Cedula` (no se renombra: el seed la busca por nombre). Devuelve un diccionario nombre → Id en vez de un único Guid; las personas existentes siguen con `Cedula`.
+14. Nuevo `SeedJoinLookupPersonsAsync(joinCompanyId, idTypes)`: 40 personas nuevas en `JOIN-001` (lista de abajo). Idempotente por `(CompanyId, IdentificationNumber)`, igual que `SeedJoinPersonsAsync`.
+15. Nuevo `SeedJoinCustomersAsync(joinCompanyId)`: 30 de esas 40 se registran como `Customer` con `UserId` = el usuario `livingstone23@gmail.com` (quien los registra; ya existe en `GetDefaultUserSeeds`, se busca por correo con `IgnoreQueryFilters`; si no existe, se registra un warning y no se siembran clientes), código con `CustomerCodeGenerator` (`C000000001`…), etapa según la lista. Idempotente por `(CompanyId, PersonId)`. Dos de ellos se dejan desactivados (`Deactivate()`) para validar que salen como persona.
+16. Ambos se llaman en el paso 7 de `SeedAsync`, después de `SeedJoinPersonAddressesAndContactsAsync` y antes de `SeedJoinTicketsAsync`. No tocan `SeedMenuAndPermissionsAsync` ni su checksum.
+17. Fechas con `DateTime.UtcNow` (convención 5).
 
 **Out:**
 - Columna nueva en `Ticket` o cambios en los endpoints de tickets.
@@ -141,17 +141,17 @@ Casos que la lista cubre a propósito:
 4. Buscar por documento parcial, por nombre completo ("Norma Osorio") o por código de cliente devuelve la persona.
 5. No devuelve personas de otra empresa ni personas inactivas o borradas.
 6. Una sola consulta SQL, sin N+1 por cliente; `EXPLAIN` sin errores contra la base migrada (convención 10).
-7. `POST /Customers` sin `userId` crea el cliente; un segundo alta de la misma persona responde 409 `CUSTOMER_PERSON_ALREADY_EXISTS`. `GET /Customers` lista clientes con y sin usuario (`userEmail` nulo).
+7. Un segundo `POST /Customers` de la misma persona en la empresa, aunque lo haga otro usuario, responde 409 `CUSTOMER_PERSON_ALREADY_EXISTS`.
 8. La migración aplica sobre una base existente sin pérdida de datos y el seed corre dos veces seguidas sin duplicar personas, clientes ni tipos de identificación.
-9. Tras el seed en una base vacía: 3 tipos de identificación, 40 personas nuevas en `JOIN-001` y 30 filas en `Admin.Customers`, 2 desactivadas.
+9. Tras el seed en una base vacía: 3 tipos de identificación, 40 personas nuevas en `JOIN-001` y 30 filas en `Admin.Customers` (2 desactivadas), todas con `UserId` del usuario `livingstone23@gmail.com`.
 10. Tests de integración (`CustomWebApplicationFactory`, `postgres:17`) para 1–5, 7 y `INVALID_SEARCH_TERM`.
 11. Smoke con Docker (convención 12): `curl` de `GET /Persons/lookup?term=cano`, `?term=Norma Osorio` y `?term=20548796` con el token de `JOIN-001`.
 
 ## Decisiones
 
 - **`GET /Persons/lookup` y no una ruta bajo `Tickets`:** sirve también a FE-22 ("Relacionado con") y cierra su brecha. Exige el mismo permiso que ya pide el buscador actual (`Persons`).
-- **`UserId` opcional en vez de crear 30 usuarios:** un cliente es un registro de negocio; la cuenta de acceso es opcional (portal de clientes). El comentario del índice en `CustomerConfiguration` ya anticipaba un `UserId` nulo. Crear usuarios solo para sembrar clientes ensuciaría `Security.Users` y los roles.
-- **Unicidad por `(CompanyId, PersonId)`:** con `UserId` nulo, el índice anterior permitiría dos clientes de la misma persona (PostgreSQL trata los `NULL` como distintos). Como una persona solo puede ser cliente una vez por empresa, la búsqueda no puede repetir filas.
+- **`UserId` = usuario que registró el cliente** (decisión del usuario, 2026-10-15): no es una cuenta de acceso del cliente, así que no hay que crear usuarios para sembrar clientes ni volverlo opcional.
+- **Unicidad por `(CompanyId, PersonId)`:** como `UserId` es quien registra, el índice anterior permitía que dos usuarios registraran a la misma persona como cliente. Una persona solo puede ser cliente una vez por empresa, y así la búsqueda no puede repetir filas.
 - **`Customers` se queda en el esquema `Admin`:** los esquemas agrupan por módulo (`Admin`, `Messaging`, `Calendars`, `Security`, `Common`), y `Customer` depende de `Person`, que vive en `Admin`. Un esquema propio de una sola tabla obligaría a una migración de `SET SCHEMA`, a reescribir el SQL de Dapper (`admin.customers`) y no aporta aislamiento. Si en el futuro hay un módulo de clientes con varias tablas (contratos, segmentos, portal), se evalúa en su propia spec.
 - **`Cedula` sin tilde:** el seed la busca por nombre; renombrarla rompería bases existentes. Se corrige, si se quiere, desde el CRUD de tipos de identificación.
 

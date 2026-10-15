@@ -90,7 +90,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 50 | `main_postgresql`: pendientes para llevar QA a PostgreSQL (el port de 40–49 pasó a la serie `-post`) | Aprobado | 39 |
 | 52 | Tickets: resumen de la bandeja (`GET /Tickets/summary`) y filtro "sin asignar" | Implementado | 37, 38, 41-post, 43-post |
 | 53 | Tickets: mis capacidades (`/TicketUserCompanies/me`), usuarios asignables e inactividad en los valores por defecto | Implementado | 34, 35, 37, 43-post |
-| 54 | Personas: búsqueda única con marca de cliente (`GET /Persons/lookup`), cliente sin usuario obligatorio y datos semilla (40 personas, 30 clientes) | Borrador | 38, 39, 40-post, 41-post, 43-post |
+| 54 | Personas: búsqueda única con marca de cliente (`GET /Persons/lookup`), un cliente por persona y empresa y datos semilla (40 personas, 30 clientes) | Borrador | 38, 39, 40-post, 41-post, 43-post |
 | 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
 
 ### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)
@@ -181,7 +181,7 @@ Decisión del usuario (2026-10-09): las specs 40–49, 51 y 99 de `main` se copi
 4. **50**: pendientes para llevar QA a PostgreSQL (sin su antigua sección 0), cuando el usuario lo decida.
 5. **52**: propia del fork (no es copia de `main`). Resumen de la bandeja y filtro "sin asignar" que pide FE-16 (brechas 2 y 4 de FE-15). Sin dependencias pendientes: 37, 38, 41-post y 43-post ya están implementadas.
 6. **53**: propia del fork. Capacidades del usuario, usuarios asignables (`CanResolveTicket`) y `MaxDayTicketInactivity` en los DTO de defaults, que piden FE-17, FE-18 (fase B) y FE-19. Sin dependencias pendientes.
-7. **54**: propia del fork. Búsqueda única de personas con marca de cliente que pide FE-27 (y cierra la brecha de FE-22); `Customer.UserId` pasa a opcional y el seed agrega 40 personas y 30 clientes. Sin dependencias pendientes.
+7. **54**: propia del fork. Búsqueda única de personas con marca de cliente que pide FE-27 (y cierra la brecha de FE-22); índice único de `Customers` por `(CompanyId, PersonId)` y el seed agrega 40 personas y 30 clientes registrados por `livingstone23@gmail.com`. Sin dependencias pendientes.
 
 ---
 
