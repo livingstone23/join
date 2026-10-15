@@ -9,7 +9,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 ## Reglas
 
 ### Numeración
-- Una spec nueva toma el **siguiente número libre** (hoy: **55**; la 51 es de `main` —su copia en el fork es `51-post`— y la 52 y la 53 son propias del fork).
+- Una spec nueva toma el **siguiente número libre** (hoy: **56**; la 51 es de `main` —su copia en el fork es `51-post`— y la 52 y la 53 son propias del fork).
 - Los números **no se reutilizan ni se reordenan**. Si una spec se divide, la parte que sale toma un número nuevo y ambas lo dicen en su encabezado (ejemplo: SPEC 99 → SPEC 47).
 - **Excepción autorizada (2026-10-05):** por decisión del usuario se renumeró una sola vez: la 37 (canales `WEB`/`APP`) pasó a **99** y las 38–49 bajaron un número (38→37 … 49→48). Las referencias se actualizaron en ambos repositorios. Una spec citada con su número anterior en un commit o conversación previa a esa fecha debe traducirse con esta tabla.
 - El nombre del archivo es `NN-tema-en-ingles.md` y el título empieza con `# SPEC NN — `.
@@ -90,7 +90,8 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 50 | `main_postgresql`: pendientes para llevar QA a PostgreSQL (el port de 40–49 pasó a la serie `-post`) | Aprobado | 39 |
 | 52 | Tickets: resumen de la bandeja (`GET /Tickets/summary`) y filtro "sin asignar" | Implementado | 37, 38, 41-post, 43-post |
 | 53 | Tickets: mis capacidades (`/TicketUserCompanies/me`), usuarios asignables e inactividad en los valores por defecto | Implementado | 34, 35, 37, 43-post |
-| 54 | Personas: búsqueda única con marca de cliente (`GET /Persons/lookup`), un cliente por persona y empresa y datos semilla (40 personas, 30 clientes) | Borrador | 38, 39, 40-post, 41-post, 43-post |
+| 54 | Personas: búsqueda única con marca de cliente (`GET /Persons/lookup`) y datos semilla (40 personas, 30 clientes) | Borrador | 38, 39, 43-post, 55 |
+| 55 | Clientes: uno por persona y empresa, solo activo/inactivo (sin borrado), activación idempotente e historial de eventos (sale de 54) | Borrador | 38, 39, 40-post, 41-post, 43-post, 45-post |
 | 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
 
 ### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)
@@ -181,7 +182,7 @@ Decisión del usuario (2026-10-09): las specs 40–49, 51 y 99 de `main` se copi
 4. **50**: pendientes para llevar QA a PostgreSQL (sin su antigua sección 0), cuando el usuario lo decida.
 5. **52**: propia del fork (no es copia de `main`). Resumen de la bandeja y filtro "sin asignar" que pide FE-16 (brechas 2 y 4 de FE-15). Sin dependencias pendientes: 37, 38, 41-post y 43-post ya están implementadas.
 6. **53**: propia del fork. Capacidades del usuario, usuarios asignables (`CanResolveTicket`) y `MaxDayTicketInactivity` en los DTO de defaults, que piden FE-17, FE-18 (fase B) y FE-19. Sin dependencias pendientes.
-7. **54**: propia del fork. Búsqueda única de personas con marca de cliente que pide FE-27 (y cierra la brecha de FE-22); índice único de `Customers` por `(CompanyId, PersonId)` y el seed agrega 40 personas y 30 clientes registrados por `livingstone23@gmail.com`. Sin dependencias pendientes.
+7. **55** → **54**: propias del fork. 55 deja un cliente por persona y empresa (sin borrado, activo/inactivo, activación idempotente con `ICustomerActivationService` e historial `CustomerStatusHistory`); 54 agrega `GET /Persons/lookup`, que pide FE-27 (y cierra la brecha de FE-22), y el seed de 40 personas y 30 clientes registrados por `livingstone23@gmail.com`. 54 necesita 55; pueden ir en el mismo cambio.
 
 ---
 
@@ -199,6 +200,8 @@ Decisiones o verificaciones que no tienen spec propia todavía:
 | 46 | Acciones de sincronización con Google (OAuth, envío, webhook, worker). |
 | 44 | Mejoras diferidas del calendario: invitados, calendarios privados, turnos nocturnos, permisos de medio día. |
 | 41 | Al implementarla, incluir las entidades del calendario (44, 45, 46). |
+| 55 | Qué pasa con el cliente cuando se borra su `Person` (hoy no hay cascada; ¿se bloquea el borrado o se desactiva el cliente?). |
+| 55 | Conectar más eventos a `ICustomerActivationService` (alta de ticket, actividad de calendario, ingreso por canal): cada uno en la spec que lo pida, con su `CustomerStatusSource`. |
 | 38 (F0) | Ejecutar `docs/migrations/spec-38-data-audit.sql` contra la base de desarrollo y pegar los conteos en el PR; si hay filas afectadas, decidir si se reasignan. |
 | 38 (D) | Smoke manual: un `SuperAdminCompany` solo ve su empresa y sus módulos, y no puede borrar empresas ni modificar módulos; validar con `join_frontb`. |
 | ~~40-post~~ | ~~`DapperContext.CreateConnection()` siempre crea `SqlConnection`~~ Resuelto (2026-10-09, rama `fix-post-dapper-dateonly-and-dappercontext`): `DapperContext` elige Npgsql o SqlClient según `DatabaseProvider`, igual que `SqlConnectionFactory`, y un handler de Dapper (`DateOnlyCompatibleDateTimeHandler`) lee las columnas `date` (que Npgsql devuelve como `DateOnly`) en propiedades `DateTime`. Caso D.2 de SPEC 40-post ejecutado: cuatro `PUT /Persons` → 200. |
