@@ -30,7 +30,7 @@
    - `DELETE /api/v1/leads/{leadId}/documents/{id}` y `POST .../restore` (SuperAdmin restaura, SPEC 41-post).
 5. `GET/POST/PUT /api/v1/LeadAttachmentSettings` bajo el recurso `LeadSettings` (pestaña "Adjuntos" de la parametrización).
 6. La línea de tiempo de SPEC 61 incluye los documentos de cada contacto.
-7. Seed por empresa de `LeadAttachmentSettings`: PDF, Word, Excel, imagen; 10 MB; 5 por contacto; 200 por día. Se aplica también a empresas existentes en el arranque (como `SeedTicketAttachmentSettingsDefaultsAsync`).
+7. Seed por empresa de `LeadAttachmentSettings`: PDF, Word, Excel, imagen; 10 MB; 5 por contacto; 200 por día. Se aplica a empresas existentes en el arranque (como `SeedTicketAttachmentSettingsDefaultsAsync`) y a las nuevas desde `ICompanyCatalogSeeder.SeedDefaultCatalogsForCompanyAsync`.
 8. El permiso `CanDownload` se siembra para los roles que tienen `Leads`.
 
 **Out of scope:**
@@ -71,4 +71,5 @@
 
 ## Impacto en el frontend
 
-- Pestaña "Documentos" del detalle, zona de adjuntos en el modal de contacto y pestaña "Adjuntos" en Parametrización (dentro de las specs FE del módulo).
+- Specs FE (todas en Borrador, `join_frontb/specs`): **FE-37 (documentos) y FE-33 (pestaña Adjuntos)**. Base común del módulo: FE-29.
+- Pestaña "Documentos" del detalle, zona de adjuntos en el modal de contacto y pestaña "Adjuntos" en Parametrización.

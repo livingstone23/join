@@ -67,4 +67,5 @@
 
 ## Impacto en el frontend
 
+- Specs FE (todas en Borrador, `join_frontb/specs`): **FE-37 (próxima acción) y FE-40 (convertir en lead)**. Base común del módulo: FE-29.
 - Opción "Agendar próxima acción" en el modal de contacto; eventos en la línea de tiempo; acción "Convertir en lead" en Clientes → Personas pendientes.

@@ -42,7 +42,7 @@
 
 **D. Menú, permisos y seed**
 13. `SystemOption` `SalesTeams` (`/customers/sales-teams`, módulo `Customers`). Permisos: SuperAdmin, Admin y Manager con todo; Supervisor lectura.
-14. Seed por empresa de roles: `SUPERVISOR` (Company, reasigna), `LEADER` (Team, líder, reasigna), `COORDINATOR` (Team), `MEMBER` (Own). En desarrollo, `JOIN-001` siembra los tres grupos de la propuesta con sus integrantes (incluido un supervisor en dos grupos).
+14. Seed por empresa de roles (empresas existentes en el arranque y nuevas desde `ICompanyCatalogSeeder.SeedDefaultCatalogsForCompanyAsync`): `SUPERVISOR` "Supervisor comercial" (Company, reasigna), `LEADER` (Team, líder, reasigna), `COORDINATOR` (Team), `MEMBER` (Own). En desarrollo, `JOIN-001` siembra los tres grupos de la propuesta con sus integrantes (incluido un supervisor en dos grupos).
 
 **Out of scope:**
 
@@ -76,6 +76,7 @@
 - **Grupos solo del módulo de clientes** (decisión del usuario).
 - **Varios grupos con uno principal** (decisión del usuario): permite supervisores en varios grupos sin ambigüedad al registrar.
 - **El alcance vive en el rol, no en el usuario** (decisión del usuario): la empresa ajusta qué ve cada rol y todos los que lo tienen cambian a la vez.
+- **Rol de gestión ≠ rol de seguridad:** el rol de gestión `SUPERVISOR` (catálogo `TeamRoles`, alcance de leads dentro del módulo) no es el rol de seguridad `Supervisor` de Identity (permisos por pantalla, SPEC 17). Un usuario puede tener uno sin el otro; la pantalla los muestra con nombres distintos ("Supervisor comercial" para el de gestión) para no confundirlos.
 - **Atribución por el grupo guardado en el lead:** evita contar un cliente dos veces cuando el usuario está en varios grupos.
 
 ## Riesgos
@@ -87,4 +88,5 @@
 
 ## Impacto en el frontend
 
-- Pantalla nueva Clientes → Grupos de trabajo y pestaña "Roles de gestión" en Parametrización. Requiere una spec FE nueva.
+- Specs FE (todas en Borrador, `join_frontb/specs`): **FE-33 (roles de gestión) y FE-34 (grupos)**. Base común del módulo: FE-29.
+- Pantalla nueva Clientes → Grupos de trabajo y pestaña "Roles de gestión" en Parametrización.

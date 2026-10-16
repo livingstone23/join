@@ -48,7 +48,7 @@
 
 **D. Menú, permisos y seed**
 16. `SystemOption` `LeadSettings` (`/customers/lead-settings`, módulo `Customers`). Permisos: SuperAdmin, Admin y Manager con todo; Supervisor solo lectura.
-17. Seed por empresa (`SeedLeadSettingsForCompanyAsync`, idempotente; empresas existentes y nuevas con `POST /Companies`):
+17. Seed por empresa (`SeedLeadSettingsForCompanyAsync`, idempotente; empresas existentes en el arranque y empresas nuevas desde `ICompanyCatalogSeeder.SeedDefaultCatalogsForCompanyAsync`, que ya llama `POST /Companies`):
     - Etapas: `NEW` Nuevo 10 % (Initial), `CONTACTED` Contactado 25 %, `QUALIFIED` Calificado 40 %, `PROPOSAL` Propuesta 60 %, `NEGOTIATION` Negociación 80 %, `WON` Ganado 100 % (Won), `LOST` Perdido 0 % (Lost).
     - Orígenes: `REFERRAL`, `WEB`, `EVENT`, `WA_IN`, `COLD`, `EMAIL_CAMP`, `PENDING` (persona pendiente, SPEC 65), `MIGRATION` (leads creados por la migración de SPEC 63).
     - Motivos: ganado `BEST_PRICE`, `REFERRAL_TRUST`, `FEATURES`; perdido `HIGH_PRICE`, `COMPETITOR`, `NO_BUDGET`; inactivo `POSTPONED`, `NO_ANSWER`, `NO_CAPACITY`.
@@ -98,4 +98,5 @@
 
 ## Impacto en el frontend
 
-- Pantalla nueva Clientes → Parametrización, con pestañas por catálogo y reglas. Requiere una spec FE nueva.
+- Specs FE (todas en Borrador, `join_frontb/specs`): **FE-33**. Base común del módulo: FE-29.
+- Pantalla nueva Clientes → Parametrización, con pestañas por catálogo y reglas.

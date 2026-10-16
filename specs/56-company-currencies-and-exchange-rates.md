@@ -48,7 +48,7 @@
 **D. Menú, permisos y seed (SPEC 43)**
 12. `SystemOption` en el módulo base `Administration`: `Currencies` (`/administration/currencies`, solo SuperAdmin), `CompanyCurrencies` (`/administration/company-currencies`) y `ExchangeRates` (`/administration/exchange-rates`). Permisos sembrados para SuperAdmin, Admin y Manager (lectura y escritura); Supervisor solo lectura de `ExchangeRates`.
 13. Seed del catálogo global: `DOP`, `USD`, `EUR`, `COP`, `MXN`, `PEN`, `CLP`, `ARS`, `GTQ`, `CRC` (código, nombre, símbolo, decimales).
-14. Seed por empresa (`SeedCompanyCurrenciesForCompanyAsync`, idempotente, mismo patrón que `SeedCustomerStagesForCompanyAsync`): `DOP` como base para las empresas existentes y para las que se creen con `POST /Companies`. En desarrollo, `JOIN-001` también activa `USD` y `EUR` con una tasa de ejemplo.
+14. Seed por empresa (`SeedCompanyCurrenciesForCompanyAsync`, idempotente, mismo patrón que `SeedCustomerStagesForCompanyAsync`): `DOP` como base para las empresas existentes y para las nuevas: se llama desde `ICompanyCatalogSeeder.SeedDefaultCatalogsForCompanyAsync`, que ya invoca `CreateCompanyCommandHandler` (`POST /Companies`). En desarrollo, `JOIN-001` también activa `USD` y `EUR` con una tasa de ejemplo.
 
 **Out of scope:**
 
@@ -101,4 +101,5 @@
 
 ## Impacto en el frontend
 
-- Pantallas nuevas: catálogo global de monedas (SuperAdmin), monedas de la empresa (con indicador de base) y tasas. Requiere una spec FE nueva (Administración → Monedas y tasas).
+- Specs FE (todas en Borrador, `join_frontb/specs`): **FE-30**. Base común del módulo: FE-29.
+- Pantallas nuevas: catálogo global de monedas (SuperAdmin), monedas de la empresa (con indicador de base) y tasas.

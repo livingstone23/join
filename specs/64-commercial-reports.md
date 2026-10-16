@@ -76,4 +76,5 @@ Todos los endpoints bajo `GET /api/v1/LeadReports/...` con filtros `from`, `to`,
 
 ## Impacto en el frontend
 
-- Pantalla nueva Clientes → Resumen comercial (tarjetas, embudo, rankings, gráficos de barras y exportación). Requiere una spec FE nueva.
+- Specs FE (todas en Borrador, `join_frontb/specs`): **FE-39**. Base común del módulo: FE-29.
+- Pantalla nueva Clientes → Resumen comercial (tarjetas, embudo, rankings, gráficos de barras y exportación).

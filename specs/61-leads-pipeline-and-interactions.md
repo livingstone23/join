@@ -64,7 +64,7 @@
 31. `POST /api/v1/Leads/{id}/products`, `PUT /{lineId}` (cantidad, precio, descuento, estado), `DELETE /{lineId}`. Precio por defecto = `ReferencePrice` del producto convertido de moneda base a la del lead con la tasa del lead. Producto activo. Solo leads `Open`.
 
 **D. Menú, permisos y seed**
-32. `SystemOption` `Leads` (`/customers/leads`, módulo `Customers`), con `CanRead`, `CanCreate`, `CanUpdate`, `CanDelete` (borrar comentarios y líneas). Permisos sembrados: SuperAdmin, Admin, Manager y Supervisor con todo; UsuarioSimple lectura y actualización.
+32. `SystemOption` `Leads` (`/customers/leads`, módulo `Customers`), con `CanRead`, `CanCreate`, `CanUpdate`, `CanDelete` (borrar comentarios y líneas). Permisos sembrados: SuperAdmin, Admin, Manager y Supervisor con todo; UsuarioSimple lectura, alta y actualización (un integrante registra sus propios leads; lo que ve lo limita su alcance, SPEC 60). `Agent` sin acceso.
 33. Seed de desarrollo en `JOIN-001`: los leads de ejemplo de la propuesta (abiertos, inactivos, uno en USD), con contactos y productos.
 
 **Out of scope:**
@@ -127,4 +127,5 @@
 
 ## Impacto en el frontend
 
-- Pantallas nuevas Clientes → Leads (tabla y por etapa), Nuevo lead y Detalle (línea de tiempo, productos, modales de contacto, inactivar y reactivar). Requiere una o más specs FE nuevas.
+- Specs FE (todas en Borrador, `join_frontb/specs`): **FE-35, FE-36 y FE-37**. Base común del módulo: FE-29.
+- Pantallas nuevas Clientes → Leads (tabla y por etapa), Nuevo lead y Detalle (línea de tiempo, productos, modales de contacto, inactivar y reactivar).

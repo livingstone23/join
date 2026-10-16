@@ -105,4 +105,5 @@
 
 ## Impacto en el frontend
 
+- Specs FE (todas en Borrador, `join_frontb/specs`): **FE-38 (ganar, perder, reabrir), FE-32 (columna Origen) y FE-28**. Base común del módulo: FE-29.
 - Modales "Ganar" y "Perder" y acción "Reabrir" en el detalle del lead; columna "Origen" en Clientes; FE-28 (etapas de cliente) pasa a etapas post-venta (nota "Ajuste por BE-63").

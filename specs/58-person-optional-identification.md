@@ -68,4 +68,5 @@
 
 ## Impacto en el frontend
 
+- Specs FE (todas en Borrador, `join_frontb/specs`): **FE-29 (ajuste de Personas) y FE-27**. Base común del módulo: FE-29.
 - FE-27 (buscador cliente o persona) y el formulario de personas: la identificación puede venir vacía. Se deja la nota "Ajuste por BE-58" en FE-27.

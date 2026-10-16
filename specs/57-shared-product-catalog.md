@@ -79,4 +79,5 @@
 
 ## Impacto en el frontend
 
-- Pantallas nuevas en Administración: Productos y Categorías. Requiere una spec FE nueva.
+- Specs FE (todas en Borrador, `join_frontb/specs`): **FE-31**. Base común del módulo: FE-29.
+- Pantallas nuevas en Administración: Productos y Categorías.
