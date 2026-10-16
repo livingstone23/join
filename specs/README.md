@@ -9,7 +9,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 ## Reglas
 
 ### Numeración
-- Una spec nueva toma el **siguiente número libre** (hoy: **56**; la 51 es de `main` —su copia en el fork es `51-post`— y la 52 y la 53 son propias del fork).
+- Una spec nueva toma el **siguiente número libre** (hoy: **66**; la 51 es de `main` —su copia en el fork es `51-post`— y de la 52 a la 65 son propias del fork).
 - Los números **no se reutilizan ni se reordenan**. Si una spec se divide, la parte que sale toma un número nuevo y ambas lo dicen en su encabezado (ejemplo: SPEC 99 → SPEC 47).
 - **Excepción autorizada (2026-10-05):** por decisión del usuario se renumeró una sola vez: la 37 (canales `WEB`/`APP`) pasó a **99** y las 38–49 bajaron un número (38→37 … 49→48). Las referencias se actualizaron en ambos repositorios. Una spec citada con su número anterior en un commit o conversación previa a esa fecha debe traducirse con esta tabla.
 - El nombre del archivo es `NN-tema-en-ingles.md` y el título empieza con `# SPEC NN — `.
@@ -92,6 +92,16 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 53 | Tickets: mis capacidades (`/TicketUserCompanies/me`), usuarios asignables e inactividad en los valores por defecto | Implementado | 34, 35, 37, 43-post |
 | 54 | Personas: búsqueda única con marca de cliente (`GET /Persons/lookup`) y datos semilla (40 personas, 30 clientes) | Implementado | 38, 39, 43-post, 55 |
 | 55 | Clientes: uno por persona y empresa, solo activo/inactivo (sin borrado), activación idempotente, historial de eventos, catálogo de etapas por empresa (`CustomerStages`, reemplaza el enum `PersonLifecycleStage`) y esquema propio `Customer` (sale de 54) | Implementado | 38, 39, 40-post, 41-post, 43-post, 45-post |
+| 56 | Monedas por empresa: moneda base, monedas paralelas y tasas de cambio fechadas (esquema `Finance`) | Borrador | 39, 41-post, 43-post |
+| 57 | Catálogo compartido de productos y servicios por empresa (esquema `Catalog`) | Borrador | 41-post, 43-post, 56 |
+| 58 | Personas: identificación opcional (única cuando existe; obligatoria para ser cliente) | Borrador | 38, 40-post, 54, 55 |
+| 59 | Parametrización comercial: etapas del lead, orígenes, motivos, tipos de vinculación, tipos de contacto y reglas por empresa | Borrador | 41-post, 43-post, 44-post, 99-post |
+| 60 | Grupos de trabajo: varios por usuario con grupo principal, vigencia y roles de gestión con alcance de visibilidad | Borrador | 28, 43-post, 59 |
+| 61 | Leads: alta, bandeja, detalle, etapas en orden, contactos, comentarios, productos ofrecidos, duplicados, inactivar y reactivar | Borrador | 54, 55, 56, 57, 58, 59, 60 |
+| 62 | Documentos de los leads y sus contactos | Borrador | 36, 49-post, 61 |
+| 63 | Ganar, perder y reabrir leads; conversión a cliente; etapas de cliente post-venta; migración de clientes en LEAD/PROSPECT | Borrador | 54, 55, 58, 59, 61 |
+| 64 | Reportes comerciales: resumen, embudo, ranking de grupos y usuarios, productos, orígenes y contactos | Borrador | 60, 61, 63 |
+| 65 | Leads con calendario y personas pendientes: próxima acción agendada y convertir una persona pendiente en lead | Borrador | 44-post, 45-post, 48-post, 59, 61 |
 | 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
 
 ### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)
@@ -183,6 +193,7 @@ Decisión del usuario (2026-10-09): las specs 40–49, 51 y 99 de `main` se copi
 5. **52**: propia del fork (no es copia de `main`). Resumen de la bandeja y filtro "sin asignar" que pide FE-16 (brechas 2 y 4 de FE-15). Sin dependencias pendientes: 37, 38, 41-post y 43-post ya están implementadas.
 6. **53**: propia del fork. Capacidades del usuario, usuarios asignables (`CanResolveTicket`) y `MaxDayTicketInactivity` en los DTO de defaults, que piden FE-17, FE-18 (fase B) y FE-19. Sin dependencias pendientes.
 7. **55** → **54**: propias del fork. 55 deja un cliente por persona y empresa (sin borrado, activo/inactivo, activación idempotente con `ICustomerActivationService` e historial `CustomerStatusHistory`, catálogo de etapas por empresa `CustomerStages` con su opción de menú `/customers/customer-stages`); 54 agrega `GET /Persons/lookup`, que pide FE-27 (y cierra la brecha de FE-22), y el seed de 40 personas y 30 clientes registrados por `livingstone23@gmail.com`. 54 necesita 55; pueden ir en el mismo cambio.
+8. **56 – 65**: propias del fork. Módulo de clientes al estilo Dynamics 365 (diseño del 2026-10-16, propuesta visual "Clientes JOIN"): el lead es su propia entidad sobre `Admin.Persons` y el cliente se crea al ganar. Orden: **56** (monedas), **57** (productos) y **58** (identificación opcional) son independientes entre sí y van primero; luego **59** (parametrización) → **60** (grupos) → **61** (leads) → **62** (documentos) y **63** (ganar, perder, migración) → **64** (reportes) y **65** (calendario y personas pendientes). 63 cambia el significado de `CustomerStages` (SPEC 55) a etapas post-venta.
 
 ---
 
@@ -201,9 +212,11 @@ Decisiones o verificaciones que no tienen spec propia todavía:
 | 44 | Mejoras diferidas del calendario: invitados, calendarios privados, turnos nocturnos, permisos de medio día. |
 | 41 | Al implementarla, incluir las entidades del calendario (44, 45, 46). |
 | 55 | Conectar más eventos a `ICustomerActivationService` (alta de ticket, actividad de calendario, ingreso por canal): cada uno en la spec que lo pida, con su `CustomerStatusSource`. |
-| 55 | Candidatas a pasar al esquema `Customer`, a analizar al crear el módulo de clientes (decisión del usuario, 2026-10-15: hasta entonces se quedan en `Admin`): `PersonPendingConfirmations` (cola de revisión del menú Clientes) y, si se decide, el agregado `Person` (`Persons` + direcciones, contactos, empleos, perfiles comercial y financiero) con sus catálogos (`Genders`, `IdentificationTypes`, `Industries`, `IncomeRanges`, `TaxRegimes`). Hoy siguen en `Admin`. |
+| 55 | Candidatas a pasar al esquema `Customer`, a analizar al crear el módulo de clientes (decisión del usuario, 2026-10-15: hasta entonces se quedan en `Admin`): `PersonPendingConfirmations` (cola de revisión del menú Clientes) y, si se decide, el agregado `Person` (`Persons` + direcciones, contactos, empleos, perfiles comercial y financiero) con sus catálogos (`Genders`, `IdentificationTypes`, `Industries`, `IncomeRanges`, `TaxRegimes`). Hoy siguen en `Admin`. Revisado al diseñar el módulo de clientes (2026-10-16, SPEC 58 y 65): se quedan en `Admin`; el módulo nuevo usa el esquema `Customer` solo para leads, catálogos comerciales y grupos. |
 | 38 (F0) | Ejecutar `docs/migrations/spec-38-data-audit.sql` contra la base de desarrollo y pegar los conteos en el PR; si hay filas afectadas, decidir si se reasignan. |
 | 38 (D) | Smoke manual: un `SuperAdminCompany` solo ve su empresa y sus módulos, y no puede borrar empresas ni modificar módulos; validar con `join_frontb`. |
 | ~~40-post~~ | ~~`DapperContext.CreateConnection()` siempre crea `SqlConnection`~~ Resuelto (2026-10-09, rama `fix-post-dapper-dateonly-and-dappercontext`): `DapperContext` elige Npgsql o SqlClient según `DatabaseProvider`, igual que `SqlConnectionFactory`, y un handler de Dapper (`DateOnlyCompatibleDateTimeHandler`) lee las columnas `date` (que Npgsql devuelve como `DateOnly`) en propiedades `DateTime`. Caso D.2 de SPEC 40-post ejecutado: cuatro `PUT /Persons` → 200. |
 | ~~41-post~~ | ~~`GetPersonByIdQueryHandler` lee direcciones y contactos como `dynamic`~~ Resuelto (2026-10-09, en `main_postgresql`): se leen con filas tipadas (`AddressRow`, `ContactRow`), que Dapper mapea sin distinguir mayúsculas; `GET /Persons/{id}` con direcciones y contactos responde 200. Test de regresión con columnas en minúsculas. |
+| 59, 61 | Inactivación automática de leads tras N días sin contacto: una tarea programada por módulo (decisión del usuario, 2026-10-16: por ahora la inactivación es manual). Conviene resolverla junto con la de SPEC 44 (Hangfire). |
+| 56, 57, 63 | Módulos futuros (Inventario, Compras, Ventas, Presupuestos): se conectan por `Catalog.Products` (SPEC 57), `Finance` (monedas y tasas, SPEC 56), `Leads` y sus líneas aceptadas (SPEC 61, 63) y `Customers`; "Posible proveedor" (SPEC 59) espera al módulo de Compras para tener destino al ganar. |
 | Proceso | Script de verificación de consistencia de specs (referencias inexistentes, nombres retirados, dependencias de specs pospuestas, specs fuera del índice). |
