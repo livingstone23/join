@@ -53,7 +53,8 @@ public sealed class CustomersAndPersonLookupPostgreSqlTests : IClassFixture<Cust
         var idTypes = await db.IdentificationTypes.IgnoreQueryFilters().Select(t => t.Name).ToListAsync();
         idTypes.Should().Contain(["Cedula", "Pasaporte", "RNC"]);
 
-        var customers = await db.Customers.IgnoreQueryFilters().Where(c => c.CompanyId == joinId).ToListAsync();
+        // SPEC 64 dev data adds a customer won from a lead (owned by the manager): count only the SPEC 54 ones.
+        var customers = await db.Customers.IgnoreQueryFilters().Where(c => c.CompanyId == joinId && c.UserId == registeringUser.Id).ToListAsync();
         // SPEC 63: the 7 lookup persons that were LEAD/PROSPECT customers are open leads instead of customers.
         customers.Should().HaveCount(23);
         customers.Count(c => !c.IsActive).Should().Be(2);

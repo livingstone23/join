@@ -2143,3 +2143,19 @@ curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/lose" -H "Authorization: Bearer $TO
   -d '{ "leadReasonId": "<lost-reason-id>", "competitorName": "Otro CRM" }'
 curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/reopen" -H "Authorization: Bearer $TOKEN"
 ```
+
+## Customers — commercial reports (SPEC 64)
+
+Resource `LeadReports`. Computed on the fly from the leads, in base currency, limited by the user's lead scope (SPEC 60): a member sees their own figures, a leader their team's, a company-wide supervisor everything. Filters: `from`, `to` (inclusive, UTC, up to 366 days; default the current month), `salesTeamId`, `ownerUserId`. A won lead counts for the team stored on the lead (`"Sin grupo"` when it has none).
+
+```bash
+curl -s "$BASE_URL/api/v1/LeadReports/summary?from=2026-10-01&to=2026-10-31" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/LeadReports/funnel" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/LeadReports/by-team?from=2026-10-01&to=2026-10-31" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/LeadReports/ranking?from=2026-10-01&to=2026-10-31&salesTeamId=<team-id>" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/LeadReports/by-product?from=2026-10-01&to=2026-10-31" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/LeadReports/by-source?from=2026-10-01&to=2026-10-31" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/LeadReports/by-contact-type?from=2026-10-01&to=2026-10-31" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/LeadReports/won-leads?from=2026-10-01&to=2026-10-31&pageNumber=1&pageSize=20" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/LeadReports/won-leads?from=2026-10-01&to=2026-10-31&export=true" -H "Authorization: Bearer $TOKEN"   # CanExport, max 10 000 rows
+```

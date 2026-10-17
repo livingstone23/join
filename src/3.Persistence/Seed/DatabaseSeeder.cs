@@ -790,7 +790,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             .Where(p => p.CompanyId == joinCompanyId && p.GcRecord == 0 && p.IsActive)
             .OrderBy(p => p.Created).ThenBy(p => p.Id)
             .Select(p => p.Id)
-            .Take(6)
+            .Take(8)
             .ToListAsync(cancellationToken);
         var users = await _context.ApplicationUsers.IgnoreQueryFilters()
             .Where(u => u.Email != null)
@@ -806,7 +806,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         var products = await _context.Products.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, cancellationToken);
         var teams = await _context.SalesTeams.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken);
         var currencies = await _context.Currencies.IgnoreQueryFilters().Where(c => c.GcRecord == 0).ToDictionaryAsync(c => c.Code, c => c.Id, cancellationToken);
-        if (persons.Count < 6 || !stages.ContainsKey("NEW") || !currencies.ContainsKey("DOP")
+        if (persons.Count < 8 || !stages.ContainsKey("NEW") || !currencies.ContainsKey("DOP")
             || !users.ContainsKey("manager@join.com") || !users.ContainsKey("simpleuser@join.com") || !users.ContainsKey("livingstone23@gmail.com"))
         {
             return;
@@ -918,6 +918,86 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                     CompanyId = joinCompanyId, LeadId = lead.Id, FromStatus = LeadStatus.Open, ToStatus = LeadStatus.Inactive, LeadReasonId = reasonId, UserId = ownerId, At = now
                 });
             }
+        }
+
+        // SPEC 63/64 (development data): one won lead (customer with origin Lead) and one lost lead, so the commercial
+        // reports have closed figures in the current period.
+        foreach (var (closeTopic, isWon) in new[] { ("Licencias y soporte para óptica", true), ("Caja registradora para panadería", false) })
+        {
+            var personId = persons[number];
+            number++;
+            var ownerId = users["manager@join.com"];
+            // The audit interceptor stamps Created with the save time, so the close happens at seed time too.
+            var closedAt = now;
+            var lead = new Lead
+            {
+                CompanyId = joinCompanyId, Code = $"LD-{number:D6}", PersonId = personId, Topic = closeTopic, OwnerUserId = ownerId,
+                SalesTeamId = teams.TryGetValue("Equipo Capital", out var capital) ? capital : null,
+                LeadStageId = stages[isWon ? "WON" : "LOST"].Id, LeadSourceId = sources["REFERRAL"], RelationshipTypeId = relationships["PROSPECT_CUSTOMER"],
+                CurrencyId = currencies["DOP"], ExchangeRate = 1m, ExchangeRateDate = today, Status = isWon ? LeadStatus.Won : LeadStatus.Lost,
+                LeadReasonId = reasons[isWon ? "BEST_PRICE" : "HIGH_PRICE"], ClosedAt = closedAt
+            };
+            _context.Leads.Add(lead);
+            var contact = new LeadInteraction
+            {
+                CompanyId = joinCompanyId, LeadId = lead.Id, ContactTypeCompanyId = contactTypes["ONLINE_MEETING"], OccurredAt = closedAt.AddHours(-1),
+                DurationMinutes = 45, UserId = ownerId, Outcome = InteractionOutcome.ProposalRequested, Summary = "Revisión de la propuesta."
+            };
+            _context.LeadInteractions.Add(contact);
+            lead.LastInteractionAt = contact.OccurredAt;
+
+            if (isWon && products.TryGetValue("CRM-USR", out var crm))
+            {
+                var line = new LeadProduct
+                {
+                    CompanyId = joinCompanyId, LeadId = lead.Id, ProductId = crm.Id, Quantity = 10, UnitPrice = crm.ReferencePrice,
+                    Status = LeadProductStatus.Accepted, OfferedInInteractionId = contact.Id
+                };
+                line.Recalculate();
+                _context.LeadProducts.Add(line);
+                lead.EstimatedValue = line.LineTotal;
+                lead.WonValue = line.LineTotal;
+                lead.EstimatedValueBase = line.LineTotal;
+                lead.WonValueBase = line.LineTotal;
+                lead.WonExchangeRate = 1m;
+
+                var existing = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.CompanyId == joinCompanyId && c.PersonId == personId, cancellationToken);
+                var defaultStageId = await _context.CustomerStages.IgnoreQueryFilters()
+                    .Where(st => st.CompanyId == joinCompanyId && st.GcRecord == 0 && st.IsDefault).Select(st => st.Id).FirstAsync(cancellationToken);
+                Customer customer;
+                CustomerStatusAction action;
+                if (existing is null)
+                {
+                    var lastSequence = (await _context.Customers.IgnoreQueryFilters().Where(c => c.CompanyId == joinCompanyId).Select(c => c.CustomerCode).ToListAsync(cancellationToken))
+                        .Select(CustomerCodeGenerator.TryParseSequence).Where(n => n.HasValue).Select(n => n!.Value).DefaultIfEmpty(0).Max();
+                    customer = Customer.Create(joinCompanyId, personId, ownerId, CustomerCodeGenerator.Format(lastSequence + 1), defaultStageId);
+                    _context.Customers.Add(customer);
+                    action = CustomerStatusAction.Created;
+                }
+                else
+                {
+                    customer = existing;
+                    action = customer.Reactivate() ? CustomerStatusAction.Activated : CustomerStatusAction.Confirmed;
+                }
+
+                _context.CustomerStatusHistory.Add(CustomerStatusHistory.Create(joinCompanyId, customer.Id, action, CustomerStatusSource.Lead, ownerId, lead.Id, occurredAtUtc: closedAt));
+                lead.CustomerId = customer.Id;
+            }
+
+            _context.LeadStageHistory.Add(new LeadStageHistory { CompanyId = joinCompanyId, LeadId = lead.Id, ToStageId = stages["NEW"].Id, UserId = ownerId, ChangedAt = closedAt.AddHours(-2) });
+            _context.LeadStageHistory.Add(new LeadStageHistory
+            {
+                CompanyId = joinCompanyId, LeadId = lead.Id, FromStageId = stages["NEW"].Id, ToStageId = lead.LeadStageId, UserId = ownerId, ChangedAt = closedAt
+            });
+            _context.LeadOwnershipHistory.Add(new LeadOwnershipHistory
+            {
+                CompanyId = joinCompanyId, LeadId = lead.Id, ToUserId = ownerId, ToTeamId = lead.SalesTeamId, Cause = LeadOwnershipCause.Created, UserId = ownerId, At = closedAt.AddHours(-2)
+            });
+            _context.LeadStatusHistory.Add(new LeadStatusHistory { CompanyId = joinCompanyId, LeadId = lead.Id, ToStatus = LeadStatus.Open, UserId = ownerId, At = closedAt.AddHours(-2) });
+            _context.LeadStatusHistory.Add(new LeadStatusHistory
+            {
+                CompanyId = joinCompanyId, LeadId = lead.Id, FromStatus = LeadStatus.Open, ToStatus = lead.Status, LeadReasonId = lead.LeadReasonId, UserId = ownerId, At = closedAt
+            });
         }
 
         // SPEC 63 item 8: the lookup persons that were funnel customers (LEAD/PROSPECT) are open leads instead.
@@ -4468,6 +4548,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // SPEC 59: one option and one permission resource for every commercial catalog and the company rules.
         // SPEC 61: leads (CanDelete removes comments and offered lines).
         new("Leads", "/customers/leads", "@Icons.Material.Filled.TrendingUp", "Customers", "CustomersMenu", "Leads", true, true, true, true, CanDownload: true, IsVisibleMenu: true, OrderMenu: 14),
+        // SPEC 64: commercial reports (read and export only).
+        new("LeadReports", "/customers/sales-summary", "@Icons.Material.Filled.Insights", "Customers", "CustomersMenu", "LeadReports", true, false, false, false, CanExport: true, IsVisibleMenu: true, OrderMenu: 13),
         // SPEC 60: sales teams of the customers module.
         new("SalesTeams", "/customers/sales-teams", "@Icons.Material.Filled.Groups", "Customers", "CustomersMenu", "SalesTeams", true, true, true, true, IsVisibleMenu: true, OrderMenu: 18),
         new("LeadSettings", "/customers/lead-settings", "@Icons.Material.Filled.Tune", "Customers", "CustomersMenu", "LeadSettings", true, true, true, true, IsVisibleMenu: true, OrderMenu: 17),
@@ -4548,6 +4630,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("SuperAdmin", "LeadSettings", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "SalesTeams", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Leads", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "LeadReports", true, false, false, false, CanExport: true),
         new("SuperAdmin", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
 
@@ -4593,6 +4676,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "SalesTeams", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         // SPEC 61: Manager and Supervisor work every lead their scope covers.
         new("Manager", "Leads", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        // SPEC 64: commercial reports with export.
+        new("Manager", "LeadReports", true, false, false, false, CanExport: true),
 
         new("Manager", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "TicketManagement", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -4636,6 +4721,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "LeadSettings", true, false, false, false),
         new("Supervisor", "SalesTeams", true, false, false, false),
         new("Supervisor", "Leads", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Supervisor", "LeadReports", true, false, false, false, CanExport: true),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Companies", true, true, true, false),
         new("Supervisor", "TicketManagement", true, true, true, true),
@@ -4714,6 +4800,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("UsuarioSimple", "ActivityConfirmation", false, false, true, false),
         // SPEC 61: a member registers and works their own leads (the scope of SPEC 60 limits what they see).
         new("UsuarioSimple", "Leads", true, true, true, false, CanDownload: true),
+        // SPEC 64: a member reads the reports (its own figures, by scope) and does not export.
+        new("UsuarioSimple", "LeadReports", true, false, false, false),
 
         // SPEC 45 — channel agent (CalendarChannelIntake, no CanDelete) and pending-persons inbox (read + update).
         // Admin and SuperAdminCompany get full access through PrivilegedRoleNames; the agent gets nothing else.

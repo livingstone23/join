@@ -41,7 +41,15 @@ public sealed record LeadAccess(Guid UserId, bool IsSuperAdmin, LeadAccessScope 
     /// SQL condition with the same visibility for a Dapper query over <paramref name="alias"/> (empty when everything
     /// is visible). Adds <c>ScopeUserId</c> and <c>ScopeTeamIds</c> to <paramref name="parameters"/>.
     /// </summary>
-    public string SqlFilter(string alias, DynamicParameters parameters)
+    public string SqlFilter(string alias, DynamicParameters parameters) => Filter(alias, parameters, includeInactive: true);
+
+    /// <summary>
+    /// Scope condition for the commercial reports (SPEC 64 rule 4): only what the scope covers, without the "inactive leads
+    /// are visible to everyone" rule of the inbox.
+    /// </summary>
+    public string ReportFilter(string alias, DynamicParameters parameters) => Filter(alias, parameters, includeInactive: false);
+
+    private string Filter(string alias, DynamicParameters parameters, bool includeInactive)
     {
         if (Scope.IsCompanyWide)
         {
@@ -50,6 +58,7 @@ public sealed record LeadAccess(Guid UserId, bool IsSuperAdmin, LeadAccessScope 
 
         parameters.Add("ScopeUserId", UserId);
         parameters.Add("ScopeTeamIds", Scope.TeamIds.ToArray());
-        return $"AND ({alias}.Status = {(int)LeadStatus.Inactive} OR {alias}.OwnerUserId = @ScopeUserId OR {alias}.SalesTeamId = ANY(@ScopeTeamIds))";
+        var inactive = includeInactive ? $"{alias}.Status = {(int)LeadStatus.Inactive} OR " : string.Empty;
+        return $"AND ({inactive}{alias}.OwnerUserId = @ScopeUserId OR {alias}.SalesTeamId = ANY(@ScopeTeamIds))";
     }
 }

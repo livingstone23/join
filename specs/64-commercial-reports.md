@@ -63,6 +63,26 @@ Todos los endpoints bajo `GET /api/v1/LeadReports/...` con filtros `from`, `to`,
 6. `export=true` sin `CanExport` responde 403.
 7. Unit tests de las definiciones (conversión, ponderado, días al cierre); integración para 1–6; `EXPLAIN` de cada query.
 
+## Registro de implementación (2026-10-17)
+
+Rama `spec-64-commercial-reports` (desde `spec-63-lead-win-loss-and-customer-conversion`). Sin migración: los reportes leen las tablas de SPEC 61 y 63.
+
+- **Application:**
+  - `LeadReportContext` valida el período (`REPORT_PERIOD_INVALID`: `to` anterior a `from` o más de 366 días; sin fechas, el mes en curso hasta hoy) y el grupo (`INVALID_SALES_TEAM` si es de otra empresa).
+  - Arma el `WHERE` común: empresa, filas vivas, filtros de grupo y dueño, y el alcance de SPEC 60 con `LeadAccess.ReportFilter`. Es el mismo alcance de la bandeja, pero sin la regla "los inactivos los ve toda la empresa" (regla 4).
+  - `LeadReportMath` reúne las definiciones de la regla 5: conversión entera, ponderado = valor base × probabilidad, y días al cierre con un decimal.
+  - Ocho queries Dapper: `summary`, `funnel` (foto actual de las etapas abiertas), `by-team` (con "Sin grupo"), `ranking` (grupos donde ganó, rol vigente, tipo de contacto más usado y producto principal), `by-product` (líneas aceptadas convertidas con `WonExchangeRate`), `by-source`, `by-contact-type` (con promedio por lead ganado) y `won-leads` (paginado; con `Export`, hasta 10 000 filas).
+  - Los montos ganados suman el `WonValueBase` guardado (criterio 5).
+- **WebApi:** `LeadReportsController` (recurso `LeadReports`). Con `export=true`, `won-leads` comprueba `CanExport` con `IPermissionService` y responde 403 si falta (el SuperAdmin pasa siempre).
+- **Seed:**
+  - Opción `LeadReports` (`/customers/sales-summary`, lectura y exportación). Permisos: SuperAdmin, Manager y Supervisor con lectura y exportación; UsuarioSimple solo lectura.
+  - En `JOIN-001` se suman un lead ganado (con su cliente de origen `Lead`) y uno perdido, para que los reportes de desarrollo tengan cifras de cierre (criterio 1).
+- **Tests ajustados:** el test del seed de SPEC 54 cuenta solo los clientes que registra ese seed (el cliente del lead ganado es del manager).
+- **Verificación:**
+  - Build Release sin errores.
+  - Unit tests: 3401 OK, cobertura de líneas 94,46 %.
+  - Integración: 326/326 OK, 6 nuevas (criterios 1–6 y `EXPLAIN` de las ocho queries).
+
 ## Decisiones
 
 - **Reportes calculados al vuelo desde los leads** (sin tablas de resumen): el volumen por empresa lo permite y evita datos desincronizados.

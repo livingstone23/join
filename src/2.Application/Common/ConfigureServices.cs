@@ -125,6 +125,8 @@ public static class ConfigureServices
         services.AddScoped<JOIN.Application.UseCases.Customers.Leads.Common.LeadReferenceValidator>();
         services.AddScoped<JOIN.Application.UseCases.Customers.Leads.Common.LeadWorkRules>();
         services.AddScoped<IBaseCurrencyAmountSource, JOIN.Application.UseCases.Customers.Leads.Common.LeadsAmountSource>();
+        // SPEC 64 — commercial reports: filters, period and report scope.
+        services.AddScoped<JOIN.Application.UseCases.Customers.LeadReports.LeadReportContext>();
         services.AddScoped<IAuthenticatedSessionIssuer, AuthenticatedSessionIssuer>();
         services.AddScoped<IMfaLoginChallengeIssuer, MfaLoginChallengeIssuer>();
         services.AddScoped<PersonAddressDefaultCoordinator>();
