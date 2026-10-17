@@ -1,6 +1,6 @@
 # SPEC 58 — Personas: identificación opcional
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 38 (filtros globales), SPEC 40-post (índices únicos filtrados), SPEC 54 (búsqueda única de personas), SPEC 55 (activación de clientes). Rama de trabajo: `spec-58-person-optional-identification`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-16
 > **Objective:** Que una persona se pueda registrar sin tipo ni número de identificación (un lead suele llegar solo con nombre, teléfono o correo), sin perder la garantía de que una identificación no se repite dentro de la empresa ni de que todo cliente tiene identificación.

@@ -1,6 +1,6 @@
 # SPEC 57 — Catálogo compartido de productos y servicios por empresa
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 41-post (borrado lógico, restauración y bloqueo por uso), SPEC 43-post (módulos, menú y rutas), **SPEC 56** (moneda base de la empresa). Rama de trabajo: `spec-57-shared-product-catalog`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-16
 > **Objective:** Que cada empresa defina los productos y servicios que ofrece, en un catálogo que hoy usa el módulo de clientes (productos ofrecidos en un lead, SPEC 61) y mañana reutilizarán inventario, compras, ventas y presupuestos.
