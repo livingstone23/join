@@ -3876,6 +3876,64 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("leads", "customer");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadAttachmentSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AllowedDocumentTypes")
+                        .HasColumnType("integer")
+                        .HasColumnName("alloweddocumenttypes");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<long>("MaxFileSizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("maxfilesizebytes");
+
+                    b.Property<int?>("MaxFilesPerDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("maxfilesperday");
+
+                    b.Property<int>("MaxFilesPerInteraction")
+                        .HasColumnType("integer")
+                        .HasColumnName("maxfilesperinteraction");
+
+                    b.HasKey("Id")
+                        .HasName("pk_leadattachmentsettings");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_leadattachmentsettings_company")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("leadattachmentsettings", "customer");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadComment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3998,6 +4056,103 @@ namespace JOIN.Persistence.Migrations
                         .HasFilter("\"gcrecord\" = 0");
 
                     b.ToTable("leadcompanysettings", "customer");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("contenttype");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("DocumentType")
+                        .HasColumnType("integer")
+                        .HasColumnName("documenttype");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<Guid>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("leadid");
+
+                    b.Property<Guid?>("LeadInteractionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("leadinteractionid");
+
+                    b.Property<string>("NewName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("newname");
+
+                    b.Property<string>("OriginalName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("originalname");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("path");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sizebytes");
+
+                    b.Property<int>("StorageProvider")
+                        .HasColumnType("integer")
+                        .HasColumnName("storageprovider");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("uploadedbyuserid");
+
+                    b.HasKey("Id")
+                        .HasName("pk_leaddocuments");
+
+                    b.HasIndex("LeadInteractionId")
+                        .HasDatabaseName("ix_leaddocuments_interaction");
+
+                    b.HasIndex("UploadedByUserId")
+                        .HasDatabaseName("ix_leaddocuments_uploadedbyuserid");
+
+                    b.HasIndex("CompanyId", "Created")
+                        .HasDatabaseName("ix_leaddocuments_company_created");
+
+                    b.HasIndex("LeadId", "Created")
+                        .HasDatabaseName("ix_leaddocuments_lead_created");
+
+                    b.ToTable("leaddocuments", "customer");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadInteraction", b =>
@@ -8436,6 +8591,18 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Company");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadAttachmentSettings", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_leadattachmentsettings_companies_companyid");
+
+                    b.Navigation("Company");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadComment", b =>
                 {
                     b.HasOne("JOIN.Domain.Common.Company", "Company")
@@ -8469,6 +8636,38 @@ namespace JOIN.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_leadcompanysettings_companies_companyid");
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadDocument", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_leaddocuments_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Customers.Leads.Lead", null)
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_leaddocuments_leads_leadid");
+
+                    b.HasOne("JOIN.Domain.Customers.Leads.LeadInteraction", null)
+                        .WithMany()
+                        .HasForeignKey("LeadInteractionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_leaddocuments_leadinteractions_leadinteractionid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_leaddocuments_users_uploadedbyuserid");
 
                     b.Navigation("Company");
                 });

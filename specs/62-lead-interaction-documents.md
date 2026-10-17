@@ -59,6 +59,30 @@
 5. Borrar y restaurar conserva el archivo físico.
 6. Unit tests de validaciones y handlers; integración con el proveedor local para 1–5.
 
+## Registro de implementación (2026-10-17)
+
+Rama `spec-62-lead-interaction-documents` (desde `spec-61-leads-pipeline-and-interactions`, para encadenar las migraciones).
+
+- **Dominio y persistencia:**
+  - `LeadDocument` (mismos campos de almacenamiento que `TicketDocument`, más `UploadedByUserId`) y `LeadAttachmentSettings`, con índice único filtrado por empresa.
+  - Migración `Spec62LeadInteractionDocuments`: solo crea tablas e índices.
+- **Application:**
+  - `UploadLeadDocumentCommand` aplica, en este orden: lead visible, lead abierto (`LEAD_NOT_OPEN`), contacto del lead (`INVALID_LEAD_INTERACTION`), límites configurados, tipo, tamaño, máximo por contacto y máximo por día por empresa.
+  - El tipo se infiere con la misma tabla de extensiones que los tickets (`UploadTicketDocumentCommandHandler.TryMapExtension`); una extensión desconocida responde `LEAD_DOCUMENT_TYPE_NOT_ALLOWED`.
+  - El archivo se guarda con `IFileStorageResolver.Current` bajo `leads/{empresa}/{lead}/…`.
+  - Lista y descarga con Dapper, aplicando el alcance de SPEC 60. La descarga abre el proveedor de la fila; `STORAGE_PROVIDER_NOT_CONFIGURED` responde 503, como en tickets.
+  - Borrado lógico (el archivo se conserva) y restauración solo para SuperAdmin con `SoftDeleteRestorer`.
+  - `LeadAttachmentSettings`: `GET` (fila de la empresa o `LEAD_ATTACHMENT_SETTINGS_NOT_CONFIGURED`), `POST` (crea; 409 si ya existe) y `PUT` (actualiza la fila de la empresa del token).
+  - La línea de tiempo de SPEC 61 suma el tipo `Document`, con `RefId` = contacto.
+- **WebApi:** `LeadDocumentsController` (`/leads/{leadId}/documents`, recurso `Leads`; subir con `CanUpdate`, descargar con `CanDownload`) y `LeadAttachmentSettingsController` (recurso `LeadSettings`).
+- **Seed:**
+  - `SeedLeadAttachmentSettingsForCompanyAsync` (PDF, Word, Excel e imagen; 10 MB; 5 por contacto; 200 por día). Se aplica a las empresas nuevas, en `SeedAsync` y, sin migraciones pendientes, desde `Program.cs` con `SeedLeadAttachmentSettingsDefaultsAsync`.
+  - `CanDownload` en la opción `Leads` y para los roles con `Leads` (UsuarioSimple incluido).
+- **Verificación:**
+  - Build Release sin errores.
+  - Unit tests: 3383 OK, cobertura de líneas 94,39 %.
+  - Integración: 312/312 OK, 5 nuevas (criterios 1–5 y límites por defecto).
+
 ## Decisiones
 
 - **Tabla propia en vez de generalizar `TicketDocument`:** los tickets y los leads tienen ciclos de vida y permisos distintos; se reutiliza el almacenamiento, no la tabla.

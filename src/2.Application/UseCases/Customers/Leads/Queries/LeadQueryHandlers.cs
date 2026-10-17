@@ -355,6 +355,11 @@ public sealed class GetLeadTimelineQueryHandler(ISqlConnectionFactory connection
                 INNER JOIN security.users u ON u.Id = c.UserId
                 WHERE c.LeadId = @LeadId AND c.GcRecord = 0
                 UNION ALL
+                SELECT 'Document', d.Id, d.Created, d.UploadedByUserId, CONCAT(u.FirstName, ' ', u.LastName), d.OriginalName, d.ContentType, d.LeadInteractionId
+                FROM customer.leaddocuments d
+                INNER JOIN security.users u ON u.Id = d.UploadedByUserId
+                WHERE d.LeadId = @LeadId AND d.GcRecord = 0
+                UNION ALL
                 SELECT 'Stage', h.Id, h.ChangedAt, h.UserId, CONCAT(u.FirstName, ' ', u.LastName),
                        CONCAT(COALESCE(fs.Name, ''), ' → ', ts.Name), NULL, h.ToStageId
                 FROM customer.leadstagehistory h

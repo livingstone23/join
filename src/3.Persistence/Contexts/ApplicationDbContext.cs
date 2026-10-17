@@ -141,6 +141,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<LeadInteraction> LeadInteractions => Set<LeadInteraction>();
     public DbSet<LeadComment> LeadComments => Set<LeadComment>();
     public DbSet<LeadProduct> LeadProducts => Set<LeadProduct>();
+    public DbSet<LeadDocument> LeadDocuments => Set<LeadDocument>();
+    public DbSet<LeadAttachmentSettings> LeadAttachmentSettings => Set<LeadAttachmentSettings>();
 
     // --- CATALOG MODULE (SPEC 57) ---
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
@@ -319,6 +321,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<LeadInteraction>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<LeadComment>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<LeadProduct>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<LeadDocument>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<LeadAttachmentSettings>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
         // Catalog (SPEC 57): the company's products, services and categories.
         builder.Entity<ProductCategory>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);

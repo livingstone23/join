@@ -158,7 +158,7 @@ public sealed record LeadCommentDto
 }
 
 /// <summary>
-/// One entry of the lead timeline. <c>Kind</c>: <c>Interaction</c>, <c>Comment</c>, <c>Stage</c>, <c>Ownership</c> or
+/// One entry of the lead timeline. <c>Kind</c>: <c>Interaction</c>, <c>Comment</c>, <c>Document</c> (SPEC 62), <c>Stage</c>, <c>Ownership</c> or
 /// <c>Status</c>.
 /// </summary>
 public sealed record LeadTimelineItemDto
@@ -205,4 +205,36 @@ public sealed record LeadCatalogsDto
     public IReadOnlyList<RelationshipTypeDto> RelationshipTypes { get; init; } = [];
     public IReadOnlyList<ContactTypeCompanyDto> ContactTypes { get; init; } = [];
     public IReadOnlyList<LeadCurrencyOptionDto> Currencies { get; init; } = [];
+}
+
+/// <summary>A document of a lead (SPEC 62). <c>DocumentType</c>: Pdf, Word, Excel, Text, Image, Other.</summary>
+public sealed record LeadDocumentDto : JOIN.Application.DTO.Common.SoftDeletableDto
+{
+    public Guid Id { get; init; }
+    public Guid LeadId { get; init; }
+    public Guid? LeadInteractionId { get; init; }
+    public string? ContactTypeName { get; init; }
+    public DateTime? InteractionOccurredAt { get; init; }
+    public string DocumentType { get; init; } = string.Empty;
+    public string OriginalName { get; init; } = string.Empty;
+    public string ContentType { get; init; } = string.Empty;
+    public long SizeBytes { get; init; }
+    public Guid UploadedByUserId { get; init; }
+    public string? UploadedByUserName { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+
+/// <summary>
+/// Attachment limits of the company for leads (SPEC 62). <c>AllowedDocumentTypes</c> is the <c>DocumentType</c> flags
+/// value (Pdf 1, Word 2, Excel 4, Text 8, Image 16, Other 32); <c>AllowedDocumentTypeNames</c> lists them.
+/// </summary>
+public sealed record LeadAttachmentSettingsDto
+{
+    public Guid Id { get; init; }
+    public Guid CompanyId { get; init; }
+    public int AllowedDocumentTypes { get; init; }
+    public IReadOnlyList<string> AllowedDocumentTypeNames { get; init; } = [];
+    public long MaxFileSizeBytes { get; init; }
+    public int MaxFilesPerInteraction { get; init; }
+    public int? MaxFilesPerDay { get; init; }
 }

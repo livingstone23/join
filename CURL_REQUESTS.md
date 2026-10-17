@@ -2107,3 +2107,23 @@ curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/reassign" -H "Authorization: Bearer
 curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/inactivate" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{ "leadReasonId": "<inactive-reason-id>" }'
 curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/reactivate" -H "Authorization: Bearer $TOKEN"
 ```
+
+## Customers — lead documents (SPEC 62)
+
+Files on a lead and, optionally, on one of its contacts, stored with the configured provider (SPEC 49-post). Only open
+leads accept new files; inactive, won and lost leads list and download them. Limits per company in
+`/LeadAttachmentSettings` (`LeadSettings` resource); `allowedDocumentTypes` is a flags value (Pdf 1, Word 2, Excel 4,
+Text 8, Image 16, Other 32).
+
+```bash
+curl -s -X POST "$BASE_URL/api/v1/leads/<lead-id>/documents" -H "Authorization: Bearer $TOKEN" \
+  -F "file=@Propuesta.pdf" -F "leadInteractionId=<interaction-id>"
+curl -s "$BASE_URL/api/v1/leads/<lead-id>/documents?leadInteractionId=<interaction-id>" -H "Authorization: Bearer $TOKEN"
+curl -s -OJ "$BASE_URL/api/v1/leads/<lead-id>/documents/<id>/download" -H "Authorization: Bearer $TOKEN"   # CanDownload
+curl -s -X DELETE "$BASE_URL/api/v1/leads/<lead-id>/documents/<id>" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/leads/<lead-id>/documents/<id>/restore" -H "Authorization: Bearer $TOKEN"   # SuperAdmin
+
+curl -s "$BASE_URL/api/v1/LeadAttachmentSettings" -H "Authorization: Bearer $TOKEN"
+curl -s -X PUT "$BASE_URL/api/v1/LeadAttachmentSettings" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "allowedDocumentTypes": 23, "maxFileSizeBytes": 10485760, "maxFilesPerInteraction": 5, "maxFilesPerDay": 200 }'
+```

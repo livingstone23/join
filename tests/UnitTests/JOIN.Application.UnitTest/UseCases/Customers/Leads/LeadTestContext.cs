@@ -55,6 +55,7 @@ internal sealed class LeadTestContext : IDisposable
     public ServiceProvider Services { get; }
     public FakeRates Rates { get; } = new();
     public FakeScopes Scopes { get; } = new();
+    public FakeStorage Storage { get; } = new();
 
     public Guid ActingCompanyId { get; set; }
     public string? ActingUserId { get; set; }
@@ -87,6 +88,7 @@ internal sealed class LeadTestContext : IDisposable
         services.AddSingleton(UnitOfWork.PersonAddresses);
         services.RemoveAll<IExchangeRateResolver>();
         services.AddSingleton<IExchangeRateResolver>(Rates);
+        services.AddSingleton<IFileStorageResolver>(Storage);
         services.RemoveAll<ILeadAccessScopeResolver>();
         services.AddSingleton<ILeadAccessScopeResolver>(Scopes);
         Services = services.BuildServiceProvider();
@@ -226,6 +228,30 @@ internal sealed class LeadTestContext : IDisposable
 
         public Task<ExchangeRateResolution?> ResolveAsync(Guid companyId, Guid currencyId, DateOnly date, CancellationToken cancellationToken = default) =>
             Task.FromResult(_rates.TryGetValue(currencyId, out var rate) ? rate : null);
+    }
+
+    /// <summary>In-memory storage acting as the configured provider (Local).</summary>
+    internal sealed class FakeStorage : IFileStorageResolver, IFileStorageService
+    {
+        public Dictionary<string, byte[]> Files { get; } = [];
+        public bool Missing { get; set; }
+
+        public IFileStorageService Current => this;
+        public IFileStorageService? Resolve(StorageProviderKind kind) => kind == StorageProviderKind.Local ? this : null;
+        public StorageProviderKind Kind => StorageProviderKind.Local;
+
+        public async Task<FileStorageSaveResult> SaveAsync(Stream content, string storageKey, string contentType, CancellationToken cancellationToken)
+        {
+            using var memory = new MemoryStream();
+            await content.CopyToAsync(memory, cancellationToken);
+            Files[storageKey] = memory.ToArray();
+            return new FileStorageSaveResult(storageKey, memory.Length);
+        }
+
+        public Task<Stream?> OpenReadAsync(string storageKey, CancellationToken cancellationToken) =>
+            Task.FromResult<Stream?>(!Missing && Files.TryGetValue(storageKey, out var bytes) ? new MemoryStream(bytes) : null);
+
+        public Task<bool> DeleteAsync(string storageKey, CancellationToken cancellationToken) => Task.FromResult(Files.Remove(storageKey));
     }
 
     /// <summary>Scope per user; default: own leads only.</summary>

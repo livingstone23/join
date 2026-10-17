@@ -33,6 +33,18 @@ public static class LeadErrorCodes
     public const string CommentNotFound = "LEAD_COMMENT_NOT_FOUND";
     public const string ProductLineNotFound = "LEAD_PRODUCT_NOT_FOUND";
 
+    public const string AttachmentSettingsNotConfigured = "LEAD_ATTACHMENT_SETTINGS_NOT_CONFIGURED";
+    public const string AttachmentSettingsAlreadyExist = "DUPLICATE_KEY";
+    public const string DocumentTypeNotAllowed = "LEAD_DOCUMENT_TYPE_NOT_ALLOWED";
+    public const string DocumentTooLarge = "LEAD_DOCUMENT_TOO_LARGE";
+    public const string DocumentLimitPerInteraction = "LEAD_DOCUMENT_LIMIT_PER_INTERACTION";
+    public const string DocumentLimitPerDay = "LEAD_DOCUMENT_LIMIT_PER_DAY";
+    public const string DocumentNotFound = "LEAD_DOCUMENT_NOT_FOUND";
+    public const string InvalidLeadInteraction = "INVALID_LEAD_INTERACTION";
+    public const string StorageProviderNotConfigured = "STORAGE_PROVIDER_NOT_CONFIGURED";
+    public const string FileNotFoundInStorage = "FILE_NOT_FOUND_IN_STORAGE";
+    public const string SuperAdminRequired = "SUPERADMIN_REQUIRED";
+
     public const string LeadStageInUse = "LEAD_STAGE_IN_USE";
     public const string LeadSourceInUse = "LEAD_SOURCE_IN_USE";
     public const string LeadReasonInUse = "LEAD_REASON_IN_USE";

@@ -27,7 +27,7 @@ public sealed record GetLeadBoardQuery(Guid? SalesTeamId = null, Guid? OwnerUser
 /// <summary><c>GET /Leads/{id}</c> (SPEC 61 C.18). Out of scope → <c>LEAD_NOT_FOUND</c>.</summary>
 public sealed record GetLeadByIdQuery(Guid Id) : IRequest<Response<LeadDetailDto>>;
 
-/// <summary><c>GET /Leads/{id}/timeline</c> (SPEC 61 C.19): contacts, comments, stage, owner and status changes, newest first.</summary>
+/// <summary><c>GET /Leads/{id}/timeline</c> (SPEC 61 C.19): contacts, comments, documents (SPEC 62, <c>RefId</c> = contact), stage, owner and status changes, newest first.</summary>
 public sealed record GetLeadTimelineQuery(Guid Id, int? Limit = null) : IRequest<Response<IReadOnlyList<LeadTimelineItemDto>>>;
 
 /// <summary><c>GET /Leads/{id}/interactions</c>: the contacts of a lead, newest first.</summary>

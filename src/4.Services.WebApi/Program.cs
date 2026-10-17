@@ -233,6 +233,8 @@ using (var scope = app.Services.CreateScope())
             // SPEC 49-post: existing databases also get the new attachment defaults
             // (only rows still holding the previous seed value are changed).
             await seeder.SeedTicketAttachmentSettingsDefaultsAsync();
+            // SPEC 62: every company gets its lead attachment limits (missing rows only).
+            await seeder.SeedLeadAttachmentSettingsDefaultsAsync();
 
             if (app.Environment.IsDevelopment())
             {

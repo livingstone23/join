@@ -23,6 +23,8 @@ public static class CommercialResponseResults
         _ when Conflicts.Contains(message) => StatusCodes.Status409Conflict,
         // A missing rate for the lead's currency is a request problem (SPEC 61 errors table), not a missing resource.
         "EXCHANGE_RATE_NOT_FOUND" => StatusCodes.Status400BadRequest,
+        // SPEC 49-post: the row asks for a provider this environment no longer has (recoverable by ops).
+        "STORAGE_PROVIDER_NOT_CONFIGURED" => StatusCodes.Status503ServiceUnavailable,
         _ when message.EndsWith("_NOT_FOUND", StringComparison.Ordinal) => StatusCodes.Status404NotFound,
         _ when message.EndsWith("_IN_USE", StringComparison.Ordinal) => StatusCodes.Status409Conflict,
         _ => StatusCodes.Status400BadRequest

@@ -96,6 +96,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         await SeedLeadSettingsForCompanyAsync(companyId, cancellationToken);
         // SPEC 60: the four management roles.
         await SeedTeamRolesForCompanyAsync(companyId, cancellationToken);
+        // SPEC 62: lead attachment limits.
+        await SeedLeadAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
     }
 
     /// <summary>
@@ -922,6 +924,41 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     }
 
     /// <summary>
+    /// SPEC 62 item 7: default lead attachment limits of a company (PDF, Word, Excel, image; 10 MB; 5 per contact; 200 per
+    /// day). Idempotent: a company that already has a live row keeps it.
+    /// </summary>
+    public async Task SeedLeadAttachmentSettingsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        if (await _context.LeadAttachmentSettings.IgnoreQueryFilters().AnyAsync(s => s.CompanyId == companyId && s.GcRecord == 0, cancellationToken))
+        {
+            return;
+        }
+
+        _context.LeadAttachmentSettings.Add(new LeadAttachmentSettings
+        {
+            CompanyId = companyId,
+            AllowedDocumentTypes = LeadAttachmentSettings.DefaultAllowedTypes,
+            MaxFileSizeBytes = LeadAttachmentSettings.DefaultMaxFileSizeBytes,
+            MaxFilesPerInteraction = LeadAttachmentSettings.DefaultMaxFilesPerInteraction,
+            MaxFilesPerDay = LeadAttachmentSettings.DefaultMaxFilesPerDay
+        });
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// SPEC 62 item 7: applies <see cref="SeedLeadAttachmentSettingsForCompanyAsync"/> to every live company on a database
+    /// with no pending migrations (same hook as <see cref="SeedTicketAttachmentSettingsDefaultsAsync"/>).
+    /// </summary>
+    public async Task SeedLeadAttachmentSettingsDefaultsAsync(CancellationToken cancellationToken = default)
+    {
+        var companyIds = await _context.Companies.IgnoreQueryFilters().Where(c => c.GcRecord == 0).Select(c => c.Id).ToListAsync(cancellationToken);
+        foreach (var companyId in companyIds)
+        {
+            await SeedLeadAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
+        }
+    }
+
+    /// <summary>
     /// SPEC 59 §17: applies <see cref="SeedLeadSettingsForCompanyAsync"/> to every live company.
     /// </summary>
     private async Task SeedLeadSettingsForAllCompaniesAsync(CancellationToken cancellationToken = default)
@@ -936,6 +973,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         {
             await SeedLeadSettingsForCompanyAsync(companyId, cancellationToken);
             await SeedTeamRolesForCompanyAsync(companyId, cancellationToken);
+            await SeedLeadAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
         }
     }
 
@@ -4252,7 +4290,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("CustomerStages", "/customers/customer-stages", "@Icons.Material.Filled.Timeline", "Customers", "CustomersMenu", "CustomerStages", true, true, true, true, IsVisibleMenu: true, OrderMenu: 16),
         // SPEC 59: one option and one permission resource for every commercial catalog and the company rules.
         // SPEC 61: leads (CanDelete removes comments and offered lines).
-        new("Leads", "/customers/leads", "@Icons.Material.Filled.TrendingUp", "Customers", "CustomersMenu", "Leads", true, true, true, true, IsVisibleMenu: true, OrderMenu: 14),
+        new("Leads", "/customers/leads", "@Icons.Material.Filled.TrendingUp", "Customers", "CustomersMenu", "Leads", true, true, true, true, CanDownload: true, IsVisibleMenu: true, OrderMenu: 14),
         // SPEC 60: sales teams of the customers module.
         new("SalesTeams", "/customers/sales-teams", "@Icons.Material.Filled.Groups", "Customers", "CustomersMenu", "SalesTeams", true, true, true, true, IsVisibleMenu: true, OrderMenu: 18),
         new("LeadSettings", "/customers/lead-settings", "@Icons.Material.Filled.Tune", "Customers", "CustomersMenu", "LeadSettings", true, true, true, true, IsVisibleMenu: true, OrderMenu: 17),
@@ -4498,7 +4536,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("UsuarioSimple", "MyCalendar", true, true, true, true),
         new("UsuarioSimple", "ActivityConfirmation", false, false, true, false),
         // SPEC 61: a member registers and works their own leads (the scope of SPEC 60 limits what they see).
-        new("UsuarioSimple", "Leads", true, true, true, false),
+        new("UsuarioSimple", "Leads", true, true, true, false, CanDownload: true),
 
         // SPEC 45 — channel agent (CalendarChannelIntake, no CanDelete) and pending-persons inbox (read + update).
         // Admin and SuperAdminCompany get full access through PrivilegedRoleNames; the agent gets nothing else.
