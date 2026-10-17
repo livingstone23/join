@@ -1960,3 +1960,29 @@ curl -s -X POST "$BASE_URL/api/v1/ExchangeRates" \
 # Rate that applies on a date (the latest on or before it; the base returns 1)
 curl -s "$BASE_URL/api/v1/ExchangeRates/resolve?currencyId=<usd-id>&date=2026-10-17" -H "Authorization: Bearer $TOKEN"
 ```
+
+## Catalog — products, services and categories (SPEC 57)
+
+Per-company catalog shared by the customer module (offered products in a lead) and future inventory, purchases,
+sales and quotes. `code` is normalized (upper-case, no spaces) and unique among the company's live products;
+`referencePrice` is in the company's base currency (`baseCurrencyCode` in the response). A product with a price
+locks the base currency (SPEC 56, `409 BASE_CURRENCY_IN_USE`). `kind`: 1 Product, 2 Service.
+
+```bash
+# List (search on code/name, kind, category, active)
+curl -s "$BASE_URL/api/v1/Products?search=lic&kind=2&isActive=true" -H "Authorization: Bearer $TOKEN"
+
+# Lookup for search boxes: up to 20 active products
+curl -s "$BASE_URL/api/v1/Products/lookup?search=lic" -H "Authorization: Bearer $TOKEN"
+
+# Create
+curl -s -X POST "$BASE_URL/api/v1/Products" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "code": "crm-usr", "name": "Licencia JOIN CRM · usuario/mes", "kind": 2, "productCategoryId": "<category-id>", "referencePrice": 1450 }'
+
+# Categories (tree built by the front from parentId); 409 PRODUCT_CATEGORY_IN_USE while products or children exist
+curl -s "$BASE_URL/api/v1/ProductCategories" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/ProductCategories" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "name": "Licencias", "parentId": "<software-category-id>" }'
+```

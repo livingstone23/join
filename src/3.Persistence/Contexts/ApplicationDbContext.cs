@@ -6,6 +6,7 @@ using JOIN.Application.Interface;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Audit;
 using JOIN.Domain.Calendars;
+using JOIN.Domain.Catalog;
 using JOIN.Domain.Common;
 using JOIN.Domain.Customers;
 using JOIN.Domain.Finance;
@@ -119,6 +120,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<TicketInboundChannel> TicketInboundChannels => Set<TicketInboundChannel>();
 
 
+
+    // --- CATALOG MODULE (SPEC 57) ---
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
+    public DbSet<Product> Products => Set<Product>();
 
     // --- FINANCE MODULE (SPEC 56) ---
     public DbSet<Currency> Currencies => Set<Currency>();
@@ -275,6 +280,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<Customer>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<CustomerStage>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<CustomerStatusHistory>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+
+        // Catalog (SPEC 57): the company's products, services and categories.
+        builder.Entity<ProductCategory>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<Product>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
         // Finance (SPEC 56): the company's currencies and dated exchange rates.
         builder.Entity<CompanyCurrency>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);

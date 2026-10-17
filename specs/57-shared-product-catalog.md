@@ -65,6 +65,29 @@
 6. Una categoría no puede ser su propia ancestra; borrar una categoría en uso responde 409.
 7. Unit tests de handlers y validadores; integración para 1–3, 5 y 6; `EXPLAIN` del SQL nuevo.
 
+## Registro de implementación (2026-10-17)
+
+Rama `spec-57-shared-product-catalog` (desde `spec-56-company-currencies-and-exchange-rates`, porque usa la moneda base y su guard).
+
+- **Dominio y persistencia:**
+  - `JOIN.Domain.Catalog`: `Product`, `ProductCategory` y `ProductKind`, en el esquema `catalog`.
+  - Índices `UX_Products_Company_Code` y `UX_ProductCategories_Company_Parent_Name`; este último con `NULLS NOT DISTINCT`, así que dos categorías raíz con el mismo nombre chocan también en la base.
+  - Filtros globales de tenant.
+  - Migración `Spec57SharedProductCatalog`: solo crea tablas e índices.
+- **Application:**
+  - Comandos, validadores y queries de productos (lista, detalle y `lookup`) y categorías (con detección de ciclos y bloqueo por uso con detalle `"Active Products: N"` / `"Active ProductCategories: N"`).
+  - `ProductReferencePriceAmountSource` registrada como `IBaseCurrencyAmountSource`: la moneda base queda fija en cuanto un producto vivo tiene precio.
+  - `PRODUCT_IN_USE` queda definido para que SPEC 61 lo use con `LeadProducts`.
+- **WebApi:** `ProductsController` (`GET /lookup` antes de `/{id}`), `ProductCategoriesController` y `CatalogResponseResults`.
+- **Seed:**
+  - Opciones `Products` y `ProductCategories` en `Administration`; permisos para SuperAdmin y Manager, y solo lectura para Supervisor.
+  - En `JOIN-001`, 4 categorías y los 6 productos de la propuesta (`MNT-PRE` inactivo).
+- **Nota:** `PRODUCT_CATEGORY_NOT_FOUND` también responde 404 cuando la categoría enviada en el cuerpo de un producto no existe, como dice la tabla de errores.
+- **Verificación:**
+  - Build Release sin errores.
+  - Unit tests: 3307 OK, cobertura de líneas 94,85 %.
+  - Integración: 277/277 OK (6 nuevas: código único por empresa y normalizado, `lookup`, bloqueo de la moneda base por precio, categorías con ciclos, nombres repetidos y uso, índice en la base y `EXPLAIN`).
+
 ## Decisiones
 
 - **Esquema `Catalog` y menú en `Administration`** (valor por defecto aceptado por el usuario): el catálogo lo comparten varios módulos; ponerlo dentro de Clientes obligaría a moverlo cuando llegue Inventario.

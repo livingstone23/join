@@ -11,6 +11,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 
 namespace JOIN.Application.UnitTest.UseCases.Finance;
@@ -62,6 +63,8 @@ internal sealed class FinanceTestContext : IDisposable
         services.AddSingleton(new Mock<ICompanyCatalogSeeder>().Object);
         services.AddSingleton(new Mock<IDatabaseErrorClassifier>().Object);
         services.AddSingleton(connectionFactory.Object);
+        // Only the switchable source: the real ones (SPEC 57 products) query with Dapper, not available here.
+        services.RemoveAll<IBaseCurrencyAmountSource>();
         services.AddSingleton<IBaseCurrencyAmountSource>(AmountSource);
         Services = services.BuildServiceProvider();
     }
@@ -88,6 +91,15 @@ internal sealed class FinanceTestContext : IDisposable
     {
         Db.ChangeTracker.Clear();
         return await Db.CompanyCurrencies.IgnoreQueryFilters().Where(c => c.CompanyId == CompanyId).ToListAsync();
+    }
+
+    /// <summary>Removes the company's base currency (to test <c>BASE_CURRENCY_REQUIRED</c>).</summary>
+    public async Task RemoveBaseCurrencyAsync()
+    {
+        var row = await Db.CompanyCurrencies.IgnoreQueryFilters().SingleAsync(c => c.Id == DopCompanyCurrencyId);
+        row.MarkAsDeleted();
+        await Db.SaveChangesAsync();
+        Db.ChangeTracker.Clear();
     }
 
     public async Task<Guid> AddCompanyCurrencyAsync(string code, bool isBase = false, bool isActive = true)

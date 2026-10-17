@@ -6,6 +6,7 @@ using JOIN.Application.Interface;
 using JOIN.Domain.Admin;
 using JOIN.Domain.Calendars;
 using JOIN.Domain.Calendars.Enums;
+using JOIN.Domain.Catalog;
 using JOIN.Domain.Common;
 using JOIN.Domain.Customers;
 using JOIN.Application.Services.Customers;
@@ -283,6 +284,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedCurrenciesAsync();
             await SeedCompanyCurrenciesForAllCompaniesAsync();
             await SeedJoinParallelCurrenciesAsync(joinCompanyId);
+            // SPEC 57: sample categories and products of the commercial proposal in JOIN-001 (development data).
+            await SeedJoinProductCatalogAsync(joinCompanyId);
 
             // 7. Entidades operacionales (Clientes)
             await SeedJoinPersonsAsync(joinCompanyId, idTypeId);
@@ -647,6 +650,65 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                     CreatedBy = "System_Seeder"
                 });
             }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// SPEC 57 D.9 (development data): the categories and the six products of the commercial proposal in JOIN-001,
+    /// idempotent by category name and product code among live rows. Prices are in the company's base currency (DOP).
+    /// </summary>
+    private async Task SeedJoinProductCatalogAsync(Guid joinCompanyId, CancellationToken cancellationToken = default)
+    {
+        string[] categoryNames = ["Software", "Servicios profesionales", "Soporte", "Equipos"];
+        var categories = await _context.ProductCategories
+            .IgnoreQueryFilters()
+            .Where(c => c.CompanyId == joinCompanyId && c.GcRecord == 0 && c.ParentId == null)
+            .ToListAsync(cancellationToken);
+
+        for (var i = 0; i < categoryNames.Length; i++)
+        {
+            if (categories.All(c => c.Name != categoryNames[i]))
+            {
+                var category = new ProductCategory { CompanyId = joinCompanyId, Name = categoryNames[i], SortOrder = i + 1, IsActive = true, CreatedBy = "System_Seeder" };
+                _context.ProductCategories.Add(category);
+                categories.Add(category);
+            }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+        Guid CategoryId(string name) => categories.First(c => c.Name == name).Id;
+
+        (string Code, string Name, ProductKind Kind, string Category, decimal Price, bool IsActive)[] products =
+        [
+            ("CRM-USR", "Licencia JOIN CRM · usuario/mes", ProductKind.Service, "Software", 1450m, true),
+            ("IMP-BAS", "Implementación básica", ProductKind.Service, "Servicios profesionales", 85000m, true),
+            ("CAP-HR", "Capacitación (hora)", ProductKind.Service, "Servicios profesionales", 3200m, true),
+            ("SOP-12", "Soporte premium 12 meses", ProductKind.Service, "Soporte", 120000m, true),
+            ("POS-01", "Terminal punto de venta", ProductKind.Product, "Equipos", 38500m, true),
+            ("MNT-PRE", "Mantenimiento preventivo", ProductKind.Service, "Soporte", 18000m, false)
+        ];
+
+        var liveCodes = await _context.Products
+            .IgnoreQueryFilters()
+            .Where(p => p.CompanyId == joinCompanyId && p.GcRecord == 0)
+            .Select(p => p.Code)
+            .ToListAsync(cancellationToken);
+
+        foreach (var product in products.Where(p => !liveCodes.Contains(p.Code)))
+        {
+            _context.Products.Add(new Product
+            {
+                CompanyId = joinCompanyId,
+                Code = product.Code,
+                Name = product.Name,
+                Kind = product.Kind,
+                ProductCategoryId = CategoryId(product.Category),
+                ReferencePrice = product.Price,
+                IsActive = product.IsActive,
+                CreatedBy = "System_Seeder"
+            });
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -3714,6 +3776,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Currencies", "/administration/currencies", "@Icons.Material.Filled.CurrencyExchange", "Administration", "Administration", "Currencies", true, true, true, true),
         new("CompanyCurrencies", "/administration/company-currencies", "@Icons.Material.Filled.Payments", "Administration", "Administration", "CompanyCurrencies", true, true, true, true),
         new("ExchangeRates", "/administration/exchange-rates", "@Icons.Material.Filled.TrendingUp", "Administration", "Administration", "ExchangeRates", true, true, true, true),
+        // SPEC 57 — shared product and service catalog.
+        new("Products", "/administration/products", "@Icons.Material.Filled.Inventory2", "Administration", "Administration", "Products", true, true, true, true),
+        new("ProductCategories", "/administration/product-categories", "@Icons.Material.Filled.Category", "Administration", "Administration", "ProductCategories", true, true, true, true),
 
 
         new("Genders", "/administration/genders", "@Icons.Material.Filled.Factory", "Administration", "Administration", "Genders", true, true, true, true),
@@ -3801,6 +3866,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("SuperAdmin", "Currencies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "CompanyCurrencies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "ExchangeRates", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "Products", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "ProductCategories", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
 
@@ -3837,6 +3904,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // SPEC 56: Manager runs the company's currencies and rates; the global catalog stays SuperAdmin-only.
         new("Manager", "CompanyCurrencies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "ExchangeRates", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        // SPEC 57: Manager maintains the product catalog; Supervisor reads it.
+        new("Manager", "Products", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "ProductCategories", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
         new("Manager", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "TicketManagement", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -3875,6 +3945,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "Customers", true, true, true, false),
         // SPEC 56: Supervisor reads the exchange rates.
         new("Supervisor", "ExchangeRates", true, false, false, false),
+        new("Supervisor", "Products", true, false, false, false),
+        new("Supervisor", "ProductCategories", true, false, false, false),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Companies", true, true, true, false),
         new("Supervisor", "TicketManagement", true, true, true, true),

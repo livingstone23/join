@@ -22,6 +22,7 @@ using JOIN.Application.Mappings;
 using JOIN.Application.Services.Customers;
 using JOIN.Application.Interface.Finance;
 using JOIN.Application.Services.Finance;
+using JOIN.Application.Services.Catalog;
 using JOIN.Application.UseCases.Finance.CompanyCurrencies;
 using JOIN.Application.UseCases.Customers.CustomerStages;
 using JOIN.Application.Mappings.Security;
@@ -101,6 +102,8 @@ public static class ConfigureServices
         services.AddScoped<CompanyBaseCurrencyChangeGuard>();
         services.AddScoped<IExchangeRateResolver, ExchangeRateResolver>();
         services.AddSingleton<IMoneyConverter, MoneyConverter>();
+        // SPEC 57 — product reference prices lock the base currency (SPEC 56 rule 6).
+        services.AddScoped<IBaseCurrencyAmountSource, ProductReferencePriceAmountSource>();
         services.AddScoped<IAuthenticatedSessionIssuer, AuthenticatedSessionIssuer>();
         services.AddScoped<IMfaLoginChallengeIssuer, MfaLoginChallengeIssuer>();
         services.AddScoped<PersonAddressDefaultCoordinator>();
