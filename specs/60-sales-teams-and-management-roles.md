@@ -1,6 +1,6 @@
 # SPEC 60 — Grupos de trabajo: varios por usuario, grupo principal, vigencia y roles de gestión con alcance
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 28 (membresía de usuarios en empresas, `UserCompanies`), SPEC 43-post (módulos, menú y rutas), **SPEC 59** (parametrización comercial). Rama de trabajo: `spec-60-sales-teams-and-management-roles`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-16
 > **Objective:** Que cada empresa forme grupos de trabajo con usuarios del sistema, asigne a cada integrante un rol de gestión (líder, coordinador, supervisor, integrante) que define qué leads puede ver, y conserve la historia de quién estuvo en qué grupo y cuándo, para medir resultados por grupo y período.

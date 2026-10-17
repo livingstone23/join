@@ -1,6 +1,6 @@
 # SPEC 59 — Parametrización comercial: etapas, orígenes, motivos, vinculación, tipos de contacto y reglas por empresa
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 41-post (borrado lógico y bloqueo por uso), SPEC 43-post (módulos, menú y rutas), SPEC 44-post (patrón maestro global + versión por empresa de `CalendarActivity`), SPEC 99-post (`CommunicationChannel.Code`). Rama de trabajo: `spec-59-commercial-settings-catalogs`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-16
 > **Objective:** Que cada empresa configure cómo trabaja sus leads: las etapas del embudo con su probabilidad, los orígenes ("razones de registro"), los motivos para ganar, perder o dejar inactivo, los tipos de vinculación esperada, los tipos de contacto y las reglas del módulo (duplicados, identificación del cliente, código).
