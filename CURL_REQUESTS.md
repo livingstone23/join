@@ -2038,3 +2038,35 @@ curl -s -X PUT "$BASE_URL/api/v1/LeadCompanySettings" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{ "duplicateOpenLeadPolicy": 1, "requireIdentificationForCustomer": true, "codePrefix": "LD-", "codeSequenceLength": 6 }'
 ```
+
+## Customers — sales teams and management roles (SPEC 60)
+
+A user can be in several teams; one current membership is the primary (proposed when creating a lead). A leave never
+deletes the row: `close` sets `validTo` (default today). One leader per team: naming another leader moves the previous
+one to `MEMBER`. Management roles (`/TeamRoles`, `LeadSettings` resource) carry the lead scope: `leadScope` 1 Own,
+2 Team, 3 Company. Removing a user from a company (`DELETE /Users/{id}/companies/{companyId}`) closes their open
+memberships there.
+
+```bash
+curl -s "$BASE_URL/api/v1/TeamRoles" -H "Authorization: Bearer $TOKEN"
+curl -s -X PUT "$BASE_URL/api/v1/TeamRoles/<supervisor-role-id>" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "code": "SUPERVISOR", "name": "Supervisor comercial", "leadScope": 2, "canReassign": true, "sortOrder": 1 }'
+
+curl -s -X POST "$BASE_URL/api/v1/SalesTeams" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "name": "Equipo Capital", "description": "Ventas Santo Domingo" }'
+curl -s "$BASE_URL/api/v1/SalesTeams/<team-id>" -H "Authorization: Bearer $TOKEN"   # members, current and historical
+
+curl -s -X POST "$BASE_URL/api/v1/SalesTeams/<team-id>/members" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "userId": "<user-id>", "teamRoleId": "<leader-role-id>", "validFrom": "2026-10-01", "isPrimary": true }'
+curl -s -X PUT "$BASE_URL/api/v1/SalesTeams/<team-id>/members/<member-id>" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "teamRoleId": "<member-role-id>", "isPrimary": true }'
+curl -s -X POST "$BASE_URL/api/v1/SalesTeams/<team-id>/members/<member-id>/close" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{ "validTo": "2026-10-31" }'
+
+# Current memberships of the token's user (Leads permission; used by the new-lead form)
+curl -s "$BASE_URL/api/v1/SalesTeams/me" -H "Authorization: Bearer $TOKEN"
+```

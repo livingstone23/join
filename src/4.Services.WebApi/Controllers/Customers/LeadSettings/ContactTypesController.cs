@@ -28,13 +28,13 @@ public class ContactTypesController(IMediator mediator) : ControllerBase
         [FromQuery] bool? includeInactive = null,
         [FromQuery] bool? includeDeleted = null,
         CancellationToken cancellationToken = default) =>
-        this.ToLeadSettingsResult(await mediator.Send(new GetContactTypesQuery(includeInactive, includeDeleted), cancellationToken));
+        this.ToCommercialResult(await mediator.Send(new GetContactTypesQuery(includeInactive, includeDeleted), cancellationToken));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(Response<ContactTypeDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default) =>
-        this.ToLeadSettingsResult(await mediator.Send(new GetContactTypeByIdQuery(id, includeDeleted), cancellationToken));
+        this.ToCommercialResult(await mediator.Send(new GetContactTypeByIdQuery(id, includeDeleted), cancellationToken));
 
     /// <summary>Adds a master type; every live company receives it inactive.</summary>
     [HttpPost]
@@ -42,7 +42,7 @@ public class ContactTypesController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateContactTypeCommand command, CancellationToken cancellationToken = default) =>
-        this.ToLeadSettingsCreated(await mediator.Send(command, cancellationToken));
+        this.ToCommercialCreated(await mediator.Send(command, cancellationToken));
 
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(Response<ContactTypeDto>), StatusCodes.Status200OK)]
@@ -56,7 +56,7 @@ public class ContactTypesController(IMediator mediator) : ControllerBase
             return BadRequest(Response<ContactTypeDto>.Error("INVALID_CONTACT_TYPE_ID", ["Route id and payload id must match."]));
         }
 
-        return this.ToLeadSettingsResult(await mediator.Send(command with { Id = id }, cancellationToken));
+        return this.ToCommercialResult(await mediator.Send(command with { Id = id }, cancellationToken));
     }
 
     [HttpDelete("{id:guid}")]
@@ -64,5 +64,5 @@ public class ContactTypesController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default) =>
-        this.ToLeadSettingsResult(await mediator.Send(new DeleteContactTypeCommand(id), cancellationToken));
+        this.ToCommercialResult(await mediator.Send(new DeleteContactTypeCommand(id), cancellationToken));
 }

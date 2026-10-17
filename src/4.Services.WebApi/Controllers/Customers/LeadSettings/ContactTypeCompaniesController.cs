@@ -26,7 +26,7 @@ public class ContactTypeCompaniesController(IMediator mediator) : ControllerBase
         [FromQuery] bool? includeInactive = null,
         [FromQuery] Guid? companyId = null,
         CancellationToken cancellationToken = default) =>
-        this.ToLeadSettingsResult(await mediator.Send(new GetContactTypeCompaniesQuery(includeInactive, companyId), cancellationToken));
+        this.ToCommercialResult(await mediator.Send(new GetContactTypeCompaniesQuery(includeInactive, companyId), cancellationToken));
 
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(Response<ContactTypeCompanyDto>), StatusCodes.Status200OK)]
@@ -39,6 +39,6 @@ public class ContactTypeCompaniesController(IMediator mediator) : ControllerBase
             return BadRequest(Response<ContactTypeCompanyDto>.Error("INVALID_CONTACT_TYPE_ID", ["Route id and payload id must match."]));
         }
 
-        return this.ToLeadSettingsResult(await mediator.Send(command with { Id = id }, cancellationToken));
+        return this.ToCommercialResult(await mediator.Send(command with { Id = id }, cancellationToken));
     }
 }

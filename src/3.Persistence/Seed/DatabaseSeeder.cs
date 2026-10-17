@@ -10,6 +10,7 @@ using JOIN.Domain.Catalog;
 using JOIN.Domain.Common;
 using JOIN.Domain.Customers;
 using JOIN.Domain.Customers.Leads;
+using JOIN.Domain.Customers.Teams;
 using ContactType = JOIN.Domain.Enums.ContactType;
 using MasterContactType = JOIN.Domain.Customers.Leads.ContactType;
 using JOIN.Application.Services.Customers;
@@ -93,6 +94,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // SPEC 59: commercial settings (stages, sources, reasons, relationship types, contact types and rules).
         await SeedContactTypesAsync(cancellationToken);
         await SeedLeadSettingsForCompanyAsync(companyId, cancellationToken);
+        // SPEC 60: the four management roles.
+        await SeedTeamRolesForCompanyAsync(companyId, cancellationToken);
     }
 
     /// <summary>
@@ -295,6 +298,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             // SPEC 59: global contact types and the commercial settings of every live company.
             await SeedContactTypesAsync();
             await SeedLeadSettingsForAllCompaniesAsync();
+            // SPEC 60: development sales teams of JOIN-001 (the roles are seeded with the lead settings above).
+            await SeedJoinSalesTeamsAsync(joinCompanyId);
 
             // 7. Entidades operacionales (Clientes)
             await SeedJoinPersonsAsync(joinCompanyId, idTypeId);
@@ -667,6 +672,105 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     }
 
     /// <summary>
+    /// SPEC 60 D.14: the four management roles of a company, idempotent by code or name among live rows.
+    /// </summary>
+    public async Task SeedTeamRolesForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        (string Code, string Name, LeadScope Scope, bool IsLeader, bool CanReassign)[] seeds =
+        [
+            (TeamRole.Codes.Supervisor, "Supervisor comercial", LeadScope.Company, false, true),
+            (TeamRole.Codes.Leader, "Líder de grupo", LeadScope.Team, true, true),
+            (TeamRole.Codes.Coordinator, "Coordinador", LeadScope.Team, false, false),
+            (TeamRole.Codes.Member, "Integrante", LeadScope.Own, false, false)
+        ];
+
+        var live = await _context.TeamRoles.IgnoreQueryFilters()
+            .Where(r => r.CompanyId == companyId && r.GcRecord == 0).ToListAsync(cancellationToken);
+        var order = 0;
+        var inserted = 0;
+        foreach (var seed in seeds)
+        {
+            order++;
+            if (live.Any(r => r.Code == seed.Code || r.Name == seed.Name))
+            {
+                continue;
+            }
+
+            _context.TeamRoles.Add(new TeamRole
+            {
+                CompanyId = companyId, Code = seed.Code, Name = seed.Name, LeadScope = seed.Scope, IsLeader = seed.IsLeader, CanReassign = seed.CanReassign, SortOrder = order
+            });
+            inserted++;
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// SPEC 60 D.14 (development data): the three teams of the proposal in JOIN-001 with the seeded users, including
+    /// the commercial supervisor in two teams. Only users bound to JOIN-001 are used; a team that already exists is
+    /// left alone.
+    /// </summary>
+    private async Task SeedJoinSalesTeamsAsync(Guid joinCompanyId, CancellationToken cancellationToken = default)
+    {
+        var roles = await _context.TeamRoles.IgnoreQueryFilters()
+            .Where(r => r.CompanyId == joinCompanyId && r.GcRecord == 0)
+            .ToDictionaryAsync(r => r.Code, cancellationToken);
+        if (!roles.ContainsKey(TeamRole.Codes.Member))
+        {
+            return;
+        }
+
+        var memberIds = await _context.UserCompanies.IgnoreQueryFilters()
+            .Where(uc => uc.CompanyId == joinCompanyId && uc.GcRecord == 0)
+            .Select(uc => uc.UserId)
+            .ToListAsync(cancellationToken);
+        var users = await _context.ApplicationUsers.IgnoreQueryFilters()
+            .Where(u => memberIds.Contains(u.Id) && u.Email != null)
+            .ToDictionaryAsync(u => u.Email!, u => u.Id, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        (string Name, string Description, (string Email, string Role, bool Primary)[] Members)[] teams =
+        [
+            ("Equipo Capital", "Ventas Santo Domingo", [("supervisor@join.com", TeamRole.Codes.Supervisor, true), ("manager@join.com", TeamRole.Codes.Leader, true), ("simpleuser@join.com", TeamRole.Codes.Member, true)]),
+            ("Equipo Norte", "Santiago y Cibao", [("supervisor@join.com", TeamRole.Codes.Supervisor, false), ("livingstone23@gmail.com", TeamRole.Codes.Leader, true)]),
+            ("Cuentas Corporativas", "Grandes cuentas y hotelería", [("lcano@join.com", TeamRole.Codes.Leader, true)])
+        ];
+
+        var existing = await _context.SalesTeams.IgnoreQueryFilters()
+            .Where(t => t.CompanyId == joinCompanyId && t.GcRecord == 0)
+            .Select(t => t.Name)
+            .ToListAsync(cancellationToken);
+        var validFrom = new DateOnly(2026, 3, 1);
+        foreach (var (name, description, members) in teams)
+        {
+            if (existing.Contains(name))
+            {
+                continue;
+            }
+
+            var team = new SalesTeam { CompanyId = joinCompanyId, Name = name, Description = description };
+            _context.SalesTeams.Add(team);
+            foreach (var (email, role, primary) in members)
+            {
+                if (!users.TryGetValue(email, out var userId))
+                {
+                    continue;
+                }
+
+                _context.SalesTeamMembers.Add(new SalesTeamMember
+                {
+                    CompanyId = joinCompanyId, SalesTeamId = team.Id, UserId = userId, TeamRoleId = roles[role].Id, IsPrimary = primary, ValidFrom = validFrom
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// SPEC 59 §17: applies <see cref="SeedLeadSettingsForCompanyAsync"/> to every live company.
     /// </summary>
     private async Task SeedLeadSettingsForAllCompaniesAsync(CancellationToken cancellationToken = default)
@@ -680,6 +784,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         foreach (var companyId in companyIds)
         {
             await SeedLeadSettingsForCompanyAsync(companyId, cancellationToken);
+            await SeedTeamRolesForCompanyAsync(companyId, cancellationToken);
         }
     }
 
@@ -3995,6 +4100,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // SPEC 55 — per-company customer stage catalog.
         new("CustomerStages", "/customers/customer-stages", "@Icons.Material.Filled.Timeline", "Customers", "CustomersMenu", "CustomerStages", true, true, true, true, IsVisibleMenu: true, OrderMenu: 16),
         // SPEC 59: one option and one permission resource for every commercial catalog and the company rules.
+        // SPEC 60: sales teams of the customers module.
+        new("SalesTeams", "/customers/sales-teams", "@Icons.Material.Filled.Groups", "Customers", "CustomersMenu", "SalesTeams", true, true, true, true, IsVisibleMenu: true, OrderMenu: 18),
         new("LeadSettings", "/customers/lead-settings", "@Icons.Material.Filled.Tune", "Customers", "CustomersMenu", "LeadSettings", true, true, true, true, IsVisibleMenu: true, OrderMenu: 17),
 
 
@@ -4071,6 +4178,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("SuperAdmin", "Products", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "ProductCategories", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "LeadSettings", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "SalesTeams", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
 
@@ -4112,6 +4220,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "ProductCategories", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         // SPEC 59: Manager configures the commercial settings; Supervisor reads them.
         new("Manager", "LeadSettings", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        // SPEC 60: Manager runs the sales teams; Supervisor reads them.
+        new("Manager", "SalesTeams", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
         new("Manager", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "TicketManagement", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -4153,6 +4263,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "Products", true, false, false, false),
         new("Supervisor", "ProductCategories", true, false, false, false),
         new("Supervisor", "LeadSettings", true, false, false, false),
+        new("Supervisor", "SalesTeams", true, false, false, false),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Companies", true, true, true, false),
         new("Supervisor", "TicketManagement", true, true, true, true),

@@ -71,6 +71,34 @@
 7. `GET /SalesTeams/me` devuelve solo las membresías vigentes del usuario del token.
 8. Unit tests de coordinadores y del resolver; integración para 1–7; `EXPLAIN` del SQL nuevo.
 
+## Registro de implementación (2026-10-17)
+
+Rama `spec-60-sales-teams-and-management-roles` (desde `spec-59-commercial-settings-catalogs`, para encadenar las migraciones).
+
+- **Dominio y persistencia:**
+  - `JOIN.Domain.Customers.Teams`: `TeamRole` (usa el catálogo común de SPEC 59), `SalesTeam`, `SalesTeamMember` y `LeadScope`.
+  - Índices `UX_SalesTeamMembers_Team_User_Open` (`"validto" IS NULL AND "gcrecord" = 0`) y `UX_SalesTeamMembers_Company_User_Primary` (`"isprimary" = TRUE AND "validto" IS NULL AND "gcrecord" = 0`), más los únicos de nombre y código.
+  - Migración `Spec60SalesTeamsAndManagementRoles`: solo crea tablas e índices.
+- **Application:**
+  - `SalesTeamMemberPrimaryCoordinator`: la primera membresía abierta queda como principal; marcar otra desmarca la anterior (se guarda primero para no chocar con el índice, dentro de la transacción); al cerrar la principal pasa a la abierta más antigua. `IsPrimary = false` sobre la principal se ignora: el principal se mueve marcando otra.
+  - `SalesTeamLeaderCoordinator`: nombrar líder a un integrante pasa al anterior al rol `MEMBER` (o, si no existe, al primer rol activo que no es de líder).
+  - `ISalesTeamMembershipCloser`: `RemoveUserCompanyCommandHandler` (SPEC 28) cierra con la fecha del día las membresías abiertas del usuario en esa empresa, en la misma transacción (regla 6).
+  - `ILeadAccessScopeResolver` (Dapper): une el alcance de las membresías vigentes (`ValidFrom <= hoy` y `ValidTo` nulo o `>= hoy`); devuelve `IsCompanyWide`, `TeamIds`, `CanReassignTeamIds`, `CanReassignCompanyWide` y los helpers `Covers` / `CanReassign`. El SuperAdmin lo resuelve quien lo usa (SPEC 61).
+  - Bloqueos `TEAM_ROLE_IN_USE` y `SALES_TEAM_IN_USE` con detalle `"Active SalesTeamMembers: N"` (membresías vigentes).
+- **WebApi:**
+  - `SalesTeamsController` (recurso `SalesTeams`), con `/{id}/members`, `PUT /{memberId}` y `POST /{memberId}/close` (`CanUpdate`, cuerpo opcional).
+  - `GET /SalesTeams/me` con `[PermissionResource("Leads")]`: hasta que SPEC 61 siembre la opción `Leads`, solo el SuperAdmin lo pasa.
+  - `TeamRolesController` (recurso `LeadSettings`).
+  - `CommercialResponseResults` reemplaza al mapeo de SPEC 59 y sirve a los tres specs.
+- **Seed:**
+  - Opción `SalesTeams` (`/customers/sales-teams`); permisos para SuperAdmin y Manager, y solo lectura para Supervisor.
+  - Roles por empresa (`SUPERVISOR` "Supervisor comercial", `LEADER`, `COORDINATOR`, `MEMBER`).
+  - En `JOIN-001`, los tres grupos de la propuesta (Equipo Capital, Equipo Norte, Cuentas Corporativas) con los usuarios sembrados: `supervisor@join.com` como supervisor comercial en Capital (principal) y Norte. No se crean usuarios nuevos para los nombres de la propuesta.
+- **Verificación:**
+  - Build Release sin errores.
+  - Unit tests: 3346 OK, cobertura de líneas 94,34 %.
+  - Integración: 296/296 OK (8 nuevas: roles sembrados, principal en una transacción y traspaso al cerrar, un líder por grupo, resolver con los cinco casos y cambio de alcance, `/me`, cierre al desvincular, permisos y seed de `JOIN-001`, `EXPLAIN`).
+
 ## Decisiones
 
 - **Grupos solo del módulo de clientes** (decisión del usuario).

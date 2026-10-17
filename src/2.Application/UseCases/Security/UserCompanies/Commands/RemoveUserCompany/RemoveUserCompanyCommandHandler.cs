@@ -1,6 +1,7 @@
 using Dapper;
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
+using JOIN.Application.Interface.Customers;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Domain.Audit;
@@ -23,7 +24,8 @@ public sealed class RemoveUserCompanyCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
     IPermissionService permissionService,
-    IAuditLogger auditLogger)
+    IAuditLogger auditLogger,
+    ISalesTeamMembershipCloser salesTeamMembershipCloser)
     : IRequestHandler<RemoveUserCompanyCommand, Response<bool>>
 {
     // Loads every active + soft-deleted UserRoleCompany row for the pair so the
@@ -119,6 +121,9 @@ public sealed class RemoveUserCompanyCommandHandler(
                 await roleRepository.UpdateAsync(roleEntity);
             }
         }
+
+        // SPEC 60 rule 6: the user's open sales team memberships in this company close today.
+        await salesTeamMembershipCloser.CloseAllForUserAsync(request.CompanyId, request.UserId, cancellationToken);
 
         // Single atomic flush inside the open TransactionBehavior scope.
         await unitOfWork.SaveChangesAsync(cancellationToken);

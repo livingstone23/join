@@ -29,7 +29,7 @@ public class LeadReasonsController(IMediator mediator) : ControllerBase
         [FromQuery] int? usedFor = null,
         [FromQuery] Guid? companyId = null,
         CancellationToken cancellationToken = default) =>
-        this.ToLeadSettingsResult(await mediator.Send(new GetLeadReasonsQuery(includeInactive, includeDeleted, companyId, usedFor), cancellationToken));
+        this.ToCommercialResult(await mediator.Send(new GetLeadReasonsQuery(includeInactive, includeDeleted, companyId, usedFor), cancellationToken));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(Response<LeadReasonDto>), StatusCodes.Status200OK)]
@@ -39,14 +39,14 @@ public class LeadReasonsController(IMediator mediator) : ControllerBase
         [FromQuery] bool? includeDeleted = null,
         [FromQuery] Guid? companyId = null,
         CancellationToken cancellationToken = default) =>
-        this.ToLeadSettingsResult(await mediator.Send(new GetLeadReasonByIdQuery(id, includeDeleted, companyId), cancellationToken));
+        this.ToCommercialResult(await mediator.Send(new GetLeadReasonByIdQuery(id, includeDeleted, companyId), cancellationToken));
 
     [HttpPost]
     [ProducesResponseType(typeof(Response<LeadReasonDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateLeadReasonCommand command, CancellationToken cancellationToken = default) =>
-        this.ToLeadSettingsCreated(await mediator.Send(command, cancellationToken));
+        this.ToCommercialCreated(await mediator.Send(command, cancellationToken));
 
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(Response<LeadReasonDto>), StatusCodes.Status200OK)]
@@ -60,7 +60,7 @@ public class LeadReasonsController(IMediator mediator) : ControllerBase
             return BadRequest(Response<LeadReasonDto>.Error("INVALID_LEAD_REASON_ID", ["Route id and payload id must match."]));
         }
 
-        return this.ToLeadSettingsResult(await mediator.Send(command with { Id = id }, cancellationToken));
+        return this.ToCommercialResult(await mediator.Send(command with { Id = id }, cancellationToken));
     }
 
     [HttpDelete("{id:guid}")]
@@ -69,7 +69,7 @@ public class LeadReasonsController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default) =>
-        this.ToLeadSettingsResult(await mediator.Send(new DeleteLeadReasonCommand(id), cancellationToken));
+        this.ToCommercialResult(await mediator.Send(new DeleteLeadReasonCommand(id), cancellationToken));
 
     /// <summary>Restores a logically deleted row (SPEC 41-post). Restricted to the SuperAdmin role.</summary>
     [HttpPost("{id:guid}/restore")]

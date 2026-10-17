@@ -1,5 +1,6 @@
 using FluentAssertions;
 using JOIN.Application.Interface;
+using JOIN.Application.Interface.Customers;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Security;
 using JOIN.Application.UseCases.Security.UserCompanies.Commands.RemoveUserCompany;
@@ -131,6 +132,7 @@ public sealed class RemoveUserCompanyCommandHandlerTests
         ctx.PermissionServiceMock.Verify(
             x => x.InvalidateUserCacheAsync(companyId, userId, It.IsAny<CancellationToken>()),
             Times.Once);
+        ctx.MembershipCloserMock.Verify(x => x.CloseAllForUserAsync(companyId, userId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private sealed class Context
@@ -141,6 +143,7 @@ public sealed class RemoveUserCompanyCommandHandlerTests
         public Mock<ICurrentUserService> CurrentUserServiceMock { get; } = new();
         public Mock<IPermissionService> PermissionServiceMock { get; } = new();
         public Mock<IAuditLogger> AuditLoggerMock { get; } = new();
+        public Mock<ISalesTeamMembershipCloser> MembershipCloserMock { get; } = new();
 
         public Context()
         {
@@ -158,6 +161,7 @@ public sealed class RemoveUserCompanyCommandHandlerTests
             UnitOfWorkMock.Object,
             CurrentUserServiceMock.Object,
             PermissionServiceMock.Object,
-            AuditLoggerMock.Object);
+            AuditLoggerMock.Object,
+            MembershipCloserMock.Object);
     }
 }

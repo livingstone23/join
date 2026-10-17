@@ -23,12 +23,12 @@ public class LeadCompanySettingsController(IMediator mediator) : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(Response<LeadCompanySettingsDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Get([FromQuery] Guid? companyId = null, CancellationToken cancellationToken = default) =>
-        this.ToLeadSettingsResult(await mediator.Send(new GetLeadCompanySettingsQuery(companyId), cancellationToken));
+        this.ToCommercialResult(await mediator.Send(new GetLeadCompanySettingsQuery(companyId), cancellationToken));
 
     /// <summary>Creates or updates the company's row.</summary>
     [HttpPut]
     [ProducesResponseType(typeof(Response<LeadCompanySettingsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Save([FromBody] SaveLeadCompanySettingsCommand command, CancellationToken cancellationToken = default) =>
-        this.ToLeadSettingsResult(await mediator.Send(command, cancellationToken));
+        this.ToCommercialResult(await mediator.Send(command, cancellationToken));
 }

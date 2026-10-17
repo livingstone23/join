@@ -26,6 +26,7 @@ using JOIN.Application.Services.Catalog;
 using JOIN.Application.UseCases.Finance.CompanyCurrencies;
 using JOIN.Application.UseCases.Customers.CustomerStages;
 using JOIN.Application.UseCases.Customers.LeadSettings.LeadStages;
+using JOIN.Application.UseCases.Customers.SalesTeams;
 using JOIN.Application.Mappings.Security;
 using JOIN.Application.Mappings.Security.RoleSystemOption;
 using JOIN.Application.Mappings.Security.SystemOption;
@@ -108,6 +109,12 @@ public static class ConfigureServices
         // SPEC 59 — commercial settings: company rules and the lead stage kinds.
         services.AddScoped<ILeadCompanySettingsProvider, LeadCompanySettingsProvider>();
         services.AddScoped<LeadStageKindCoordinator>();
+        // SPEC 60 — sales teams: primary membership, one leader per team, lead scope and closing on company leave.
+        services.AddScoped<SalesTeamMemberPrimaryCoordinator>();
+        services.AddScoped<SalesTeamLeaderCoordinator>();
+        services.AddScoped<JOIN.Application.UseCases.Customers.SalesTeams.Members.Commands.SalesTeamMemberContext>();
+        services.AddScoped<ISalesTeamMembershipCloser, SalesTeamMembershipCloser>();
+        services.AddScoped<ILeadAccessScopeResolver, LeadAccessScopeResolver>();
         services.AddScoped<IAuthenticatedSessionIssuer, AuthenticatedSessionIssuer>();
         services.AddScoped<IMfaLoginChallengeIssuer, MfaLoginChallengeIssuer>();
         services.AddScoped<PersonAddressDefaultCoordinator>();

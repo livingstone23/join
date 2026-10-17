@@ -10,6 +10,7 @@ using JOIN.Domain.Catalog;
 using JOIN.Domain.Common;
 using JOIN.Domain.Customers;
 using JOIN.Domain.Customers.Leads;
+using JOIN.Domain.Customers.Teams;
 using JOIN.Domain.Finance;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
@@ -130,6 +131,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<ContactType> ContactTypes => Set<ContactType>();
     public DbSet<ContactTypeCompany> ContactTypeCompanies => Set<ContactTypeCompany>();
     public DbSet<LeadCompanySettings> LeadCompanySettings => Set<LeadCompanySettings>();
+    public DbSet<TeamRole> TeamRoles => Set<TeamRole>();
+    public DbSet<SalesTeam> SalesTeams => Set<SalesTeam>();
+    public DbSet<SalesTeamMember> SalesTeamMembers => Set<SalesTeamMember>();
 
     // --- CATALOG MODULE (SPEC 57) ---
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
@@ -298,6 +302,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<RelationshipType>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<ContactTypeCompany>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<LeadCompanySettings>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<TeamRole>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<SalesTeam>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<SalesTeamMember>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
         // Catalog (SPEC 57): the company's products, services and categories.
         builder.Entity<ProductCategory>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
