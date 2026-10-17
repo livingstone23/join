@@ -309,6 +309,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedJoinLookupPersonsAsync(joinCompanyId, idTypes);
             await SeedJoinCustomersAsync(joinCompanyId);
             await SeedJoinTicketsAsync(joinCompanyId);
+            // SPEC 61: sample leads of the proposal (open, inactive, one in USD) with contacts and products.
+            await SeedJoinLeadsAsync(joinCompanyId);
 
             // Guardado final para asegurar consistencia
             await _context.SaveChangesAsync();
@@ -763,6 +765,155 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 _context.SalesTeamMembers.Add(new SalesTeamMember
                 {
                     CompanyId = joinCompanyId, SalesTeamId = team.Id, UserId = userId, TeamRoleId = roles[role].Id, IsPrimary = primary, ValidFrom = validFrom
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// SPEC 61 D.33 (development data): sample leads of JOIN-001 on the seeded persons, users, teams and products —
+    /// open leads in several stages, one in USD and one inactive — with their first contact, lines and histories.
+    /// Skipped when the company already has leads.
+    /// </summary>
+    private async Task SeedJoinLeadsAsync(Guid joinCompanyId, CancellationToken cancellationToken = default)
+    {
+        if (await _context.Leads.IgnoreQueryFilters().AnyAsync(l => l.CompanyId == joinCompanyId, cancellationToken))
+        {
+            return;
+        }
+
+        var persons = await _context.Persons.IgnoreQueryFilters()
+            .Where(p => p.CompanyId == joinCompanyId && p.GcRecord == 0 && p.IsActive)
+            .OrderBy(p => p.Created).ThenBy(p => p.Id)
+            .Select(p => p.Id)
+            .Take(6)
+            .ToListAsync(cancellationToken);
+        var users = await _context.ApplicationUsers.IgnoreQueryFilters()
+            .Where(u => u.Email != null)
+            .ToDictionaryAsync(u => u.Email!, u => u.Id, StringComparer.OrdinalIgnoreCase, cancellationToken);
+        var stages = await _context.LeadStages.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, cancellationToken);
+        var sources = await _context.LeadSources.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken);
+        var relationships = await _context.RelationshipTypes.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken);
+        var reasons = await _context.LeadReasons.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken);
+        var contactTypes = await (from c in _context.ContactTypeCompanies.IgnoreQueryFilters()
+                                  join t in _context.ContactTypes.IgnoreQueryFilters() on c.ContactTypeId equals t.Id
+                                  where c.CompanyId == joinCompanyId && c.GcRecord == 0
+                                  select new { t.Code, c.Id }).ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken);
+        var products = await _context.Products.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, cancellationToken);
+        var teams = await _context.SalesTeams.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken);
+        var currencies = await _context.Currencies.IgnoreQueryFilters().Where(c => c.GcRecord == 0).ToDictionaryAsync(c => c.Code, c => c.Id, cancellationToken);
+        if (persons.Count < 6 || !stages.ContainsKey("NEW") || !currencies.ContainsKey("DOP")
+            || !users.ContainsKey("manager@join.com") || !users.ContainsKey("simpleuser@join.com") || !users.ContainsKey("livingstone23@gmail.com"))
+        {
+            return;
+        }
+
+        var usdRate = await _context.ExchangeRates.IgnoreQueryFilters()
+            .Where(r => r.CompanyId == joinCompanyId && r.CurrencyId == currencies["USD"] && r.GcRecord == 0)
+            .OrderByDescending(r => r.RateDate)
+            .Select(r => (decimal?)r.Rate)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        (string Topic, string Owner, string Team, string Stage, string Source, string Relationship, string Currency, decimal Manual,
+            (string Code, decimal Qty)[] Lines, (string Type, int? Minutes, string Summary) Contact, string? InactiveReason)[] seeds =
+        [
+            ("Punto de venta para 3 sucursales", "manager@join.com", "Equipo Capital", "NEW", "REFERRAL", "PROSPECT_CUSTOMER", "DOP", 0m,
+                [("POS-01", 3m), ("IMP-BAS", 1m)], ("CALL", 15, "Primer contacto: necesitan POS para tres sucursales."), null),
+            ("CRM para admisiones y cobros", "simpleuser@join.com", "Equipo Capital", "NEGOTIATION", "EVENT", "PROSPECT_CUSTOMER", "DOP", 0m,
+                [("CRM-USR", 25m), ("CAP-HR", 1m)], ("VISIT", 60, "Visita al colegio; revisamos el flujo de admisiones."), null),
+            ("Reventa de licencias en la zona este", "manager@join.com", "Equipo Capital", "QUALIFIED", "WEB", "DISTRIBUTOR", "DOP", 158000m,
+                [], ("EMAIL", null, "Enviada la propuesta de distribución."), null),
+            ("Licencias para consultorio", "simpleuser@join.com", "Equipo Capital", "CONTACTED", "WA_IN", "PROSPECT_CUSTOMER", "DOP", 30000m,
+                [], ("WHATSAPP", null, "Pidió precios por WhatsApp."), null),
+            ("Licencias y soporte", "livingstone23@gmail.com", "Equipo Norte", "PROPOSAL", "REFERRAL", "PROSPECT_CUSTOMER", usdRate is null ? "DOP" : "USD", 0m,
+                [("CRM-USR", 10m), ("SOP-12", 1m)], ("ONLINE_MEETING", 45, "Reunión online con la gerencia."), null),
+            ("Caja registradora", "livingstone23@gmail.com", "Equipo Norte", "CONTACTED", "COLD", "PROSPECT_CUSTOMER", "DOP", 25000m,
+                [], ("CALL", 10, "No contestan desde hace dos semanas."), "NO_ANSWER")
+        ];
+
+        var now = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
+        var number = 0;
+        foreach (var seed in seeds)
+        {
+            var personId = persons[number];
+            number++;
+            var ownerId = users[seed.Owner];
+            var rate = seed.Currency == "USD" ? usdRate!.Value : 1m;
+            var lead = new Lead
+            {
+                CompanyId = joinCompanyId,
+                Code = $"LD-{number:D6}",
+                PersonId = personId,
+                Topic = seed.Topic,
+                OwnerUserId = ownerId,
+                SalesTeamId = teams.TryGetValue(seed.Team, out var teamId) ? teamId : null,
+                LeadStageId = stages[seed.Stage].Id,
+                LeadSourceId = sources[seed.Source],
+                RelationshipTypeId = relationships[seed.Relationship],
+                CurrencyId = currencies[seed.Currency],
+                ExchangeRate = rate,
+                ExchangeRateDate = today,
+                EstimatedCloseDate = today.AddDays(30)
+            };
+            _context.Leads.Add(lead);
+
+            var contactAt = now.AddDays(-number);
+            var interaction = new LeadInteraction
+            {
+                CompanyId = joinCompanyId, LeadId = lead.Id, ContactTypeCompanyId = contactTypes[seed.Contact.Type], OccurredAt = contactAt,
+                DurationMinutes = seed.Contact.Minutes, UserId = ownerId, Outcome = InteractionOutcome.Interested, Summary = seed.Contact.Summary
+            };
+            _context.LeadInteractions.Add(interaction);
+            lead.LastInteractionAt = contactAt;
+
+            var total = 0m;
+            foreach (var (code, qty) in seed.Lines)
+            {
+                if (!products.TryGetValue(code, out var product))
+                {
+                    continue;
+                }
+
+                var line = new LeadProduct
+                {
+                    CompanyId = joinCompanyId, LeadId = lead.Id, ProductId = product.Id, Quantity = qty,
+                    UnitPrice = Math.Round(product.ReferencePrice / rate, 2, MidpointRounding.AwayFromZero), OfferedInInteractionId = interaction.Id
+                };
+                line.Recalculate();
+                total += line.LineTotal;
+                _context.LeadProducts.Add(line);
+            }
+
+            lead.EstimatedValue = seed.Lines.Length > 0 ? total : seed.Manual;
+            lead.EstimatedValueBase = Math.Round(lead.EstimatedValue * rate, 2, MidpointRounding.AwayFromZero);
+
+            var createdAt = contactAt.AddHours(-1);
+            _context.LeadStageHistory.Add(new LeadStageHistory { CompanyId = joinCompanyId, LeadId = lead.Id, ToStageId = stages["NEW"].Id, UserId = ownerId, ChangedAt = createdAt });
+            if (seed.Stage != "NEW")
+            {
+                _context.LeadStageHistory.Add(new LeadStageHistory
+                {
+                    CompanyId = joinCompanyId, LeadId = lead.Id, FromStageId = stages["NEW"].Id, ToStageId = lead.LeadStageId, UserId = ownerId, ChangedAt = contactAt
+                });
+            }
+
+            _context.LeadOwnershipHistory.Add(new LeadOwnershipHistory
+            {
+                CompanyId = joinCompanyId, LeadId = lead.Id, ToUserId = ownerId, ToTeamId = lead.SalesTeamId, Cause = LeadOwnershipCause.Created, UserId = ownerId, At = createdAt
+            });
+            _context.LeadStatusHistory.Add(new LeadStatusHistory { CompanyId = joinCompanyId, LeadId = lead.Id, ToStatus = LeadStatus.Open, UserId = ownerId, At = createdAt });
+
+            if (seed.InactiveReason is { } reasonCode && reasons.TryGetValue(reasonCode, out var reasonId))
+            {
+                lead.Status = LeadStatus.Inactive;
+                lead.LeadReasonId = reasonId;
+                lead.InactivatedAt = now;
+                _context.LeadStatusHistory.Add(new LeadStatusHistory
+                {
+                    CompanyId = joinCompanyId, LeadId = lead.Id, FromStatus = LeadStatus.Open, ToStatus = LeadStatus.Inactive, LeadReasonId = reasonId, UserId = ownerId, At = now
                 });
             }
         }
@@ -4100,6 +4251,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // SPEC 55 — per-company customer stage catalog.
         new("CustomerStages", "/customers/customer-stages", "@Icons.Material.Filled.Timeline", "Customers", "CustomersMenu", "CustomerStages", true, true, true, true, IsVisibleMenu: true, OrderMenu: 16),
         // SPEC 59: one option and one permission resource for every commercial catalog and the company rules.
+        // SPEC 61: leads (CanDelete removes comments and offered lines).
+        new("Leads", "/customers/leads", "@Icons.Material.Filled.TrendingUp", "Customers", "CustomersMenu", "Leads", true, true, true, true, IsVisibleMenu: true, OrderMenu: 14),
         // SPEC 60: sales teams of the customers module.
         new("SalesTeams", "/customers/sales-teams", "@Icons.Material.Filled.Groups", "Customers", "CustomersMenu", "SalesTeams", true, true, true, true, IsVisibleMenu: true, OrderMenu: 18),
         new("LeadSettings", "/customers/lead-settings", "@Icons.Material.Filled.Tune", "Customers", "CustomersMenu", "LeadSettings", true, true, true, true, IsVisibleMenu: true, OrderMenu: 17),
@@ -4179,6 +4332,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("SuperAdmin", "ProductCategories", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "LeadSettings", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "SalesTeams", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "Leads", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
 
@@ -4222,6 +4376,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "LeadSettings", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         // SPEC 60: Manager runs the sales teams; Supervisor reads them.
         new("Manager", "SalesTeams", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        // SPEC 61: Manager and Supervisor work every lead their scope covers.
+        new("Manager", "Leads", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
         new("Manager", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "TicketManagement", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -4264,6 +4420,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "ProductCategories", true, false, false, false),
         new("Supervisor", "LeadSettings", true, false, false, false),
         new("Supervisor", "SalesTeams", true, false, false, false),
+        new("Supervisor", "Leads", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Companies", true, true, true, false),
         new("Supervisor", "TicketManagement", true, true, true, true),
@@ -4340,6 +4497,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Coordinador", "ActivityConfirmation", false, false, true, false),
         new("UsuarioSimple", "MyCalendar", true, true, true, true),
         new("UsuarioSimple", "ActivityConfirmation", false, false, true, false),
+        // SPEC 61: a member registers and works their own leads (the scope of SPEC 60 limits what they see).
+        new("UsuarioSimple", "Leads", true, true, true, false),
 
         // SPEC 45 — channel agent (CalendarChannelIntake, no CanDelete) and pending-persons inbox (read + update).
         // Admin and SuperAdminCompany get full access through PrivilegedRoleNames; the agent gets nothing else.

@@ -13,6 +13,7 @@ using JOIN.Domain.Security;
 using JOIN.IntegrationTests.Security;
 using JOIN.Persistence.Contexts;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JOIN.IntegrationTests.Customers;
@@ -59,6 +60,9 @@ internal static class CommercialTestHelpers
             userId = user.Id;
             db.UserCompanies.Add(new UserCompany { UserId = user.Id, CompanyId = companyId, IsDefault = true, CreatedBy = "commercial-tests" });
             (await users.AddToRoleAsync(user, role)).Succeeded.Should().BeTrue();
+            // Screen permissions are resolved per company (SPEC 28).
+            var roleId = await db.Roles.Where(r => r.Name == role).Select(r => r.Id).SingleAsync();
+            db.UserRoleCompanies.Add(new UserRoleCompany { UserId = user.Id, RoleId = roleId, CompanyId = companyId, CreatedBy = "commercial-tests" });
             await db.SaveChangesAsync();
         }
 
@@ -68,6 +72,23 @@ internal static class CommercialTestHelpers
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", payload.Token);
         return (client, userId);
+    }
+
+    /// <summary>
+    /// Grants <paramref name="roleName"/> the flags on <paramref name="optionName"/> in <paramref name="companyId"/>: only
+    /// JOIN-001 gets seeded permissions (pending item 43 A3), so tests with non-SuperAdmin users add theirs.
+    /// </summary>
+    internal static async Task GrantAsync(CustomWebApplicationFactory factory, Guid companyId, string roleName, string optionName, bool read = true, bool create = true, bool update = true, bool delete = true)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var roleId = await db.Roles.Where(r => r.Name == roleName).Select(r => r.Id).SingleAsync();
+        var optionId = await db.SystemOptions.IgnoreQueryFilters().Where(o => o.Name == optionName && o.GcRecord == 0).Select(o => o.Id).SingleAsync();
+        db.RoleSystemOptions.Add(new RoleSystemOption
+        {
+            RoleId = roleId, SystemOptionId = optionId, CompanyId = companyId, CanRead = read, CanCreate = create, CanUpdate = update, CanDelete = delete, CreatedBy = "commercial-tests"
+        });
+        await db.SaveChangesAsync();
     }
 
     internal static JsonElement Data(string body)

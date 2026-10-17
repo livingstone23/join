@@ -134,6 +134,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<TeamRole> TeamRoles => Set<TeamRole>();
     public DbSet<SalesTeam> SalesTeams => Set<SalesTeam>();
     public DbSet<SalesTeamMember> SalesTeamMembers => Set<SalesTeamMember>();
+    public DbSet<Lead> Leads => Set<Lead>();
+    public DbSet<LeadStageHistory> LeadStageHistory => Set<LeadStageHistory>();
+    public DbSet<LeadOwnershipHistory> LeadOwnershipHistory => Set<LeadOwnershipHistory>();
+    public DbSet<LeadStatusHistory> LeadStatusHistory => Set<LeadStatusHistory>();
+    public DbSet<LeadInteraction> LeadInteractions => Set<LeadInteraction>();
+    public DbSet<LeadComment> LeadComments => Set<LeadComment>();
+    public DbSet<LeadProduct> LeadProducts => Set<LeadProduct>();
 
     // --- CATALOG MODULE (SPEC 57) ---
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
@@ -305,6 +312,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<TeamRole>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<SalesTeam>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<SalesTeamMember>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<Lead>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<LeadStageHistory>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<LeadOwnershipHistory>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<LeadStatusHistory>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<LeadInteraction>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<LeadComment>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<LeadProduct>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
         // Catalog (SPEC 57): the company's products, services and categories.
         builder.Entity<ProductCategory>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);

@@ -115,6 +115,16 @@ public static class ConfigureServices
         services.AddScoped<JOIN.Application.UseCases.Customers.SalesTeams.Members.Commands.SalesTeamMemberContext>();
         services.AddScoped<ISalesTeamMembershipCloser, SalesTeamMembershipCloser>();
         services.AddScoped<ILeadAccessScopeResolver, LeadAccessScopeResolver>();
+        // SPEC 61 — leads: access, code, stage moves, value in base currency, owners and lead amounts lock the base currency.
+        services.AddScoped<JOIN.Application.UseCases.Customers.Leads.Common.LeadAccessGuard>();
+        services.AddScoped<JOIN.Application.UseCases.Customers.Leads.Common.LeadCommandContext>();
+        services.AddScoped<JOIN.Application.UseCases.Customers.Leads.Common.LeadCodeGenerator>();
+        services.AddScoped<JOIN.Application.UseCases.Customers.Leads.Common.LeadStageAdvanceCoordinator>();
+        services.AddScoped<JOIN.Application.UseCases.Customers.Leads.Common.LeadValueCalculator>();
+        services.AddScoped<JOIN.Application.UseCases.Customers.Leads.Common.LeadOwnerRules>();
+        services.AddScoped<JOIN.Application.UseCases.Customers.Leads.Common.LeadReferenceValidator>();
+        services.AddScoped<JOIN.Application.UseCases.Customers.Leads.Common.LeadWorkRules>();
+        services.AddScoped<IBaseCurrencyAmountSource, JOIN.Application.UseCases.Customers.Leads.Common.LeadsAmountSource>();
         services.AddScoped<IAuthenticatedSessionIssuer, AuthenticatedSessionIssuer>();
         services.AddScoped<IMfaLoginChallengeIssuer, MfaLoginChallengeIssuer>();
         services.AddScoped<PersonAddressDefaultCoordinator>();

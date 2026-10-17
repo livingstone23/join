@@ -110,6 +110,43 @@
 13. Con leads con monto, cambiar la moneda base responde 409 `BASE_CURRENCY_IN_USE`.
 14. Unit tests de handlers, validadores, coordinadores, guard y calculadora; integración (`CustomWebApplicationFactory`, `postgres:17`) para 1–13; `EXPLAIN` de la bandeja, el tablero y la línea de tiempo.
 
+## Registro de implementación (2026-10-17)
+
+Rama `spec-61-leads-pipeline-and-interactions` (desde `spec-60-sales-teams-and-management-roles`, para encadenar las migraciones).
+
+- **Dominio y persistencia:**
+  - `Lead`, `LeadStageHistory`, `LeadOwnershipHistory`, `LeadStatusHistory`, `LeadInteraction`, `LeadComment` y `LeadProduct` (con `LineTotal` redondeado a 2 decimales), más sus enums, en el esquema `customer`.
+  - Índices del punto 1 (`UX_Leads_Company_Code` filtrado y los cuatro de bandeja, tablero, dueño y persona) y los de las tablas hijas.
+  - Migración `Spec61LeadsPipelineAndInteractions`: solo crea tablas e índices.
+  - `IUnitOfWork.AcquireLeadCodeLockAsync` (`pg_advisory_xact_lock`) para la secuencia del código.
+- **Application:**
+  - `LeadCodeGenerator`: prefijo y largo de `LeadCompanySettings`. Un prefijo nuevo empieza su propia secuencia.
+  - `LeadAccessGuard`: SuperAdmin ve todo; si no, aplica el alcance de SPEC 60 más los inactivos. Lo usan los comandos y el filtro SQL de las lecturas (`ANY(@ScopeTeamIds)`).
+  - `LeadStageAdvanceCoordinator`: siguiente etapa activa (`Initial`/`Open`) por `SortOrder` o una anterior; `Won` y `Lost` no se alcanzan.
+  - `LeadValueCalculator`: suma de líneas no rechazadas o valor manual, tasa del día y `EstimatedValueBase` con `IMoneyConverter`. La tasa solo se vuelve a tomar cuando cambian los montos (líneas, moneda o valor manual).
+  - `LeadOwnerRules`: dueño activo en la empresa y grupo de la regla 4 (solo cuentan grupos activos con membresía vigente).
+  - Alta con `PersonId` o `NewPerson`. La persona nueva se crea con el handler de `CreatePerson` (mismo validador: una persona física necesita género) y su correo y teléfono como contactos.
+  - Duplicados según la política de la empresa.
+  - `LeadsAmountSource` bloquea el cambio de moneda base.
+  - Bloqueos por uso: `PRODUCT_IN_USE` (`"Active LeadProducts: N"`); `LEAD_STAGE/SOURCE/REASON_IN_USE` y `RELATIONSHIP_TYPE_IN_USE` (`"Active Leads: N"`); `CONTACT_TYPE_IN_USE` (`"Active LeadInteractions: N"`, en el maestro); y la persona con leads (como dueña o referidora) en `PersonCascadeCoordinator`.
+- **WebApi:**
+  - `LeadsController` con todos los endpoints de la sección C. Contactos, comentarios, líneas, reasignar, inactivar y reactivar usan `CanUpdate`; borrar comentarios y líneas usa `CanDelete`.
+  - `GET /Leads?status=0` lista todos los estados.
+  - `GET /Leads/{id}/interactions` devuelve los contactos del lead.
+- **Seed:**
+  - Opción `Leads` (`/customers/leads`). Permisos: SuperAdmin, Manager y Supervisor con todo; UsuarioSimple con lectura, alta y actualización; `Agent` sin acceso.
+  - En `JOIN-001`, seis leads de ejemplo sobre las personas, usuarios, grupos y productos sembrados: cinco abiertos en distintas etapas (uno en USD) y uno inactivo, con su contacto, líneas e historiales.
+- **Notas para la revisión:**
+  - Contacto sin duración cuando el tipo la pide: `400 LEAD_INTERACTION_DURATION_REQUIRED` (la spec pide 400 sin nombrar el código).
+  - Proyecto o área inexistente: `400 INVALID_REFERENCE`.
+  - Contacto, comentario o línea inexistente: `LEAD_INTERACTION_NOT_FOUND`, `LEAD_COMMENT_NOT_FOUND` y `LEAD_PRODUCT_NOT_FOUND` (404).
+  - Reasignar exige un lead abierto (`LEAD_NOT_OPEN`).
+  - Comentar se permite en cualquier estado si el lead es visible.
+- **Verificación:**
+  - Build Release sin errores.
+  - Unit tests: 3376 OK, cobertura de líneas 94,36 %.
+  - Integración: 307/307 OK. Son 11 nuevas (criterios 1–13 y `EXPLAIN` de bandeja, tablero y línea de tiempo).
+
 ## Decisiones
 
 - **Etapas en orden con cierre anticipado** (decisión del usuario): ordena el trabajo sin impedir cerrar cuando el cliente ya decidió.

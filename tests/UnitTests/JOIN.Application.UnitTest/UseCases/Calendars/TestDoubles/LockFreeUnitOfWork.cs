@@ -59,5 +59,14 @@ internal sealed class LockFreeUnitOfWork(UnitOfWork inner) : IUnitOfWork
         return Task.CompletedTask;
     }
 
+    /// <summary> Lead code lock requests (SPEC 61). </summary>
+    public int LeadCodeLockRequests { get; private set; }
+
+    public Task AcquireLeadCodeLockAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        LeadCodeLockRequests++;
+        return Task.CompletedTask;
+    }
+
     public void Dispose() => inner.Dispose();
 }

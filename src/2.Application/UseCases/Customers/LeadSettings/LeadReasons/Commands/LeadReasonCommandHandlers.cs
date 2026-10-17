@@ -44,11 +44,19 @@ public sealed class UpdateLeadReasonCommandHandler(IUnitOfWork unitOfWork, ICurr
     protected override void ApplyExtra(UpdateLeadReasonCommand command, LeadReason entity) => entity.UsedFor = (LeadReasonUsage)command.UsedFor;
 }
 
-/// <summary>Handles <see cref="DeleteLeadReasonCommand"/>.</summary>
+/// <summary>Handles <see cref="DeleteLeadReasonCommand"/>: not while a live lead uses it (SPEC 61 B.14).</summary>
 public sealed class DeleteLeadReasonCommandHandler(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
     : CommercialCatalogDeleteHandler<DeleteLeadReasonCommand, LeadReason, LeadReasonDto>(unitOfWork, currentUserService, LeadReasonRules.Instance)
 {
+    private readonly IUnitOfWork _unitOfWork = unitOfWork;
+
     protected override Guid IdOf(DeleteLeadReasonCommand command) => command.Id;
+
+    protected override async Task<Response<Guid>?> ValidateAsync(LeadReason entity, CancellationToken cancellationToken)
+    {
+        var check = await new ActiveDependentsCheck(_unitOfWork).CountAsync<Lead>(l => l.GcRecord == 0 && l.LeadReasonId == entity.Id, "Leads");
+        return check.HasDependents ? Response<Guid>.Error(LeadErrorCodes.LeadReasonInUse, [.. check.Details]) : null;
+    }
 }
 
 /// <summary>Handles <see cref="RestoreLeadReasonCommand"/> with <see cref="SoftDeleteRestorer"/> (SPEC 41-post).</summary>

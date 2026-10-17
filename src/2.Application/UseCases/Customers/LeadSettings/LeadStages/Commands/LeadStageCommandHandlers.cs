@@ -62,10 +62,21 @@ public sealed class UpdateLeadStageCommandHandler(IUnitOfWork unitOfWork, ICurre
 public sealed class DeleteLeadStageCommandHandler(IUnitOfWork unitOfWork, ICurrentUserService currentUserService, LeadStageKindCoordinator kinds)
     : CommercialCatalogDeleteHandler<DeleteLeadStageCommand, LeadStage, LeadStageDto>(unitOfWork, currentUserService, LeadStageRules.Instance)
 {
+    private readonly IUnitOfWork _unitOfWork = unitOfWork;
+
     protected override Guid IdOf(DeleteLeadStageCommand command) => command.Id;
 
-    protected override Task<Response<Guid>?> ValidateAsync(LeadStage entity, CancellationToken cancellationToken) =>
-        Task.FromResult(kinds.ValidateDelete<Guid>(entity));
+    protected override async Task<Response<Guid>?> ValidateAsync(LeadStage entity, CancellationToken cancellationToken)
+    {
+        if (kinds.ValidateDelete<Guid>(entity) is { } kindError)
+        {
+            return kindError;
+        }
+
+        // SPEC 61 B.14: a stage used by a live lead stays.
+        var check = await new ActiveDependentsCheck(_unitOfWork).CountAsync<Lead>(l => l.GcRecord == 0 && l.LeadStageId == entity.Id, "Leads");
+        return check.HasDependents ? Response<Guid>.Error(LeadErrorCodes.LeadStageInUse, [.. check.Details]) : null;
+    }
 }
 
 /// <summary>

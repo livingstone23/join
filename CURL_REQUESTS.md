@@ -2070,3 +2070,40 @@ curl -s -X POST "$BASE_URL/api/v1/SalesTeams/<team-id>/members/<member-id>/close
 # Current memberships of the token's user (Leads permission; used by the new-lead form)
 curl -s "$BASE_URL/api/v1/SalesTeams/me" -H "Authorization: Bearer $TOKEN"
 ```
+
+## Customers — leads (SPEC 61)
+
+Resource `Leads`. Each user sees the leads their management role covers (SPEC 60) plus every inactive lead; out of
+scope the detail answers 404. Lead `status`: 1 Open, 2 Inactive, 3 Won, 4 Lost. Stages move one at a time forward
+(or back to any earlier one). The lead stores its currency, the rate of the day and the value in base currency.
+
+```bash
+# Catalogs and products for the forms (no LeadSettings permission needed)
+curl -s "$BASE_URL/api/v1/Leads/catalogs" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/Leads/products-lookup?search=crm" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/Leads/duplicates?personId=<person-id>" -H "Authorization: Bearer $TOKEN"
+
+# Create with a new person (identification optional), first contact and products
+curl -s -X POST "$BASE_URL/api/v1/Leads" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "newPerson": { "personType": 2, "firstName": "Ferretería", "lastName": "El Puente", "commercialName": "Ferretería El Puente", "phone": "809-555-0101" },
+        "topic": "Punto de venta para 3 sucursales", "relationshipTypeId": "<id>", "leadSourceId": "<id>",
+        "productLines": [ { "productId": "<id>", "quantity": 3 } ],
+        "firstInteraction": { "contactTypeCompanyId": "<call-id>", "durationMinutes": 15, "summary": "Primer contacto", "outcome": 1 } }'
+
+# Inbox (status 0 = all), board and detail
+curl -s "$BASE_URL/api/v1/Leads?status=1&search=puente&pageNumber=1&pageSize=20" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/Leads/board?salesTeamId=<team-id>" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/Leads/<id>" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/Leads/<id>/timeline" -H "Authorization: Bearer $TOKEN"
+
+# Work the lead
+curl -s -X PUT "$BASE_URL/api/v1/Leads/<id>/stage" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{ "leadStageId": "<next-stage-id>" }'
+curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/interactions" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "contactTypeCompanyId": "<id>", "direction": 1, "durationMinutes": 30, "outcome": 2, "summary": "Pidió propuesta" }'
+curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/comments" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{ "body": "Enviar demo" }'
+curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/products" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{ "productId": "<id>", "quantity": 2, "discountPercent": 10 }'
+curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/reassign" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{ "newOwnerUserId": "<user-id>", "notes": "vacaciones" }'
+curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/inactivate" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{ "leadReasonId": "<inactive-reason-id>" }'
+curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/reactivate" -H "Authorization: Bearer $TOKEN"
+```

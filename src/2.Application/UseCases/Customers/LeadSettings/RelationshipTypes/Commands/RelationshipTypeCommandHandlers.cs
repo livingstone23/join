@@ -44,11 +44,19 @@ public sealed class UpdateRelationshipTypeCommandHandler(IUnitOfWork unitOfWork,
     protected override void ApplyExtra(UpdateRelationshipTypeCommand command, RelationshipType entity) => entity.OnWin = (RelationshipOnWin)command.OnWin;
 }
 
-/// <summary>Handles <see cref="DeleteRelationshipTypeCommand"/>.</summary>
+/// <summary>Handles <see cref="DeleteRelationshipTypeCommand"/>: not while a live lead uses it (SPEC 61 B.14).</summary>
 public sealed class DeleteRelationshipTypeCommandHandler(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
     : CommercialCatalogDeleteHandler<DeleteRelationshipTypeCommand, RelationshipType, RelationshipTypeDto>(unitOfWork, currentUserService, RelationshipTypeRules.Instance)
 {
+    private readonly IUnitOfWork _unitOfWork = unitOfWork;
+
     protected override Guid IdOf(DeleteRelationshipTypeCommand command) => command.Id;
+
+    protected override async Task<Response<Guid>?> ValidateAsync(RelationshipType entity, CancellationToken cancellationToken)
+    {
+        var check = await new ActiveDependentsCheck(_unitOfWork).CountAsync<Lead>(l => l.GcRecord == 0 && l.RelationshipTypeId == entity.Id, "Leads");
+        return check.HasDependents ? Response<Guid>.Error(LeadErrorCodes.RelationshipTypeInUse, [.. check.Details]) : null;
+    }
 }
 
 /// <summary>Handles <see cref="RestoreRelationshipTypeCommand"/> with <see cref="SoftDeleteRestorer"/> (SPEC 41-post).</summary>

@@ -113,6 +113,14 @@ public sealed class DeleteProductCommandHandler(
             return Response<Guid>.Error(CatalogErrorCodes.ProductNotFound, ["Product not found."]);
         }
 
+        // SPEC 61 B.14: a product offered in a live lead line is deactivated, not deleted.
+        var check = await new ActiveDependentsCheck(unitOfWork).CountAsync<JOIN.Domain.Customers.Leads.LeadProduct>(
+            l => l.GcRecord == 0 && l.ProductId == entity.Id, "LeadProducts");
+        if (check.HasDependents)
+        {
+            return Response<Guid>.Error(CatalogErrorCodes.ProductInUse, [.. check.Details]);
+        }
+
         entity.MarkAsDeleted();
         await repository.UpdateAsync(entity);
         await unitOfWork.SaveChangesAsync(cancellationToken);

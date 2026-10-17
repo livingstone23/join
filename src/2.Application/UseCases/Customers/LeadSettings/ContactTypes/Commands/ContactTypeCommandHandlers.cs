@@ -140,6 +140,16 @@ public sealed class DeleteContactTypeCommandHandler(IUnitOfWork unitOfWork, ICur
             return Response<Guid>.Error(LeadSettingsErrorCodes.ContactTypeNotFound, ["The contact type was not found."]);
         }
 
+        // SPEC 61 B.14: a type used by a live contact of any company stays.
+        var copies = (await unitOfWork.GetRepository<ContactTypeCompany>().GetAllIncludingDeletedAsync(c => c.ContactTypeId == entity.Id))
+            .Select(c => c.Id)
+            .ToList();
+        var check = await new ActiveDependentsCheck(unitOfWork).CountAsync<LeadInteraction>(i => i.GcRecord == 0 && copies.Contains(i.ContactTypeCompanyId), "LeadInteractions");
+        if (check.HasDependents)
+        {
+            return Response<Guid>.Error(LeadErrorCodes.ContactTypeInUse, [.. check.Details]);
+        }
+
         entity.MarkAsDeleted();
         await repository.UpdateAsync(entity);
         await unitOfWork.SaveChangesAsync(cancellationToken);

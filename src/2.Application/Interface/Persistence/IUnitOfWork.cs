@@ -64,4 +64,12 @@ public interface IUnitOfWork : IDisposable
     /// </summary>
     Task AcquireCustomerPersonLockAsync(Guid companyId, Guid personId, CancellationToken cancellationToken = default);
 
+    // --- 7. Lead code lock (SPEC 61) ---
+
+    /// <summary>
+    /// Takes a transaction-scoped lock on the company's lead code sequence so two concurrent creates cannot take the
+    /// same <c>LD-</c> number (PostgreSQL <c>pg_advisory_xact_lock</c>). Must run inside the command's transaction.
+    /// </summary>
+    Task AcquireLeadCodeLockAsync(Guid companyId, CancellationToken cancellationToken = default);
+
 }

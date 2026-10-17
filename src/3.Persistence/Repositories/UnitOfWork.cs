@@ -192,6 +192,15 @@ public class UnitOfWork : IUnitOfWork
             cancellationToken);
     }
 
+    // --- 7. LEAD CODE LOCK (SPEC 61) ---
+    public async Task AcquireLeadCodeLockAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        var key = $"lead-code:{companyId}";
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))",
+            cancellationToken);
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

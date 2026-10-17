@@ -44,11 +44,19 @@ public sealed class UpdateLeadSourceCommandHandler(IUnitOfWork unitOfWork, ICurr
     protected override void ApplyExtra(UpdateLeadSourceCommand command, LeadSource entity) => entity.Description = string.IsNullOrWhiteSpace(command.Description) ? null : command.Description.Trim();
 }
 
-/// <summary>Handles <see cref="DeleteLeadSourceCommand"/>.</summary>
+/// <summary>Handles <see cref="DeleteLeadSourceCommand"/>: not while a live lead uses it (SPEC 61 B.14).</summary>
 public sealed class DeleteLeadSourceCommandHandler(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
     : CommercialCatalogDeleteHandler<DeleteLeadSourceCommand, LeadSource, LeadSourceDto>(unitOfWork, currentUserService, LeadSourceRules.Instance)
 {
+    private readonly IUnitOfWork _unitOfWork = unitOfWork;
+
     protected override Guid IdOf(DeleteLeadSourceCommand command) => command.Id;
+
+    protected override async Task<Response<Guid>?> ValidateAsync(LeadSource entity, CancellationToken cancellationToken)
+    {
+        var check = await new ActiveDependentsCheck(_unitOfWork).CountAsync<Lead>(l => l.GcRecord == 0 && l.LeadSourceId == entity.Id, "Leads");
+        return check.HasDependents ? Response<Guid>.Error(LeadErrorCodes.LeadSourceInUse, [.. check.Details]) : null;
+    }
 }
 
 /// <summary>Handles <see cref="RestoreLeadSourceCommand"/> with <see cref="SoftDeleteRestorer"/> (SPEC 41-post).</summary>

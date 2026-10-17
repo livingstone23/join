@@ -33,6 +33,8 @@ public sealed class PersonCascadeCoordinator(IUnitOfWork unitOfWork, SoftDeleteR
         await references.CountAsync<Customer>(c => c.GcRecord == 0 && c.PersonId == personId, "customers");
         await references.CountAsync<Ticket>(t => t.GcRecord == 0 && t.PersonId == personId, "tickets");
         await references.CountAsync<UserPerson>(u => u.GcRecord == 0 && u.PersonId == personId, "user persons");
+        // SPEC 61 B.15: leads have a life of their own; the person keeps them (as owner or referrer).
+        await references.CountAsync<JOIN.Domain.Customers.Leads.Lead>(l => l.GcRecord == 0 && (l.PersonId == personId || l.ReferredByPersonId == personId), "Leads");
         return references.Details;
     }
 
