@@ -1986,3 +1986,17 @@ curl -s -X POST "$BASE_URL/api/v1/ProductCategories" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{ "name": "Licencias", "parentId": "<software-category-id>" }'
 ```
+
+## Persons — optional identification (SPEC 58)
+
+`identificationTypeId` and `identificationNumber` are optional on `POST/PUT /Persons`, but they come together
+(only one of them → 400). When present, the pair is unique among the company's live persons (409). A person without
+identification cannot become a customer: `POST /Customers` and `POST /Customers/{id}/activate` answer
+`400 PERSON_IDENTIFICATION_REQUIRED` until the identification is completed.
+
+```bash
+# A lead that arrives with only a name
+curl -s -X POST "$BASE_URL/api/v1/Persons" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "personType": 2, "firstName": "Ferretería", "lastName": "El Puente", "commercialName": "Ferretería El Puente" }'
+```

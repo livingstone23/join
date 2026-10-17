@@ -54,6 +54,33 @@
 5. La migración no modifica ninguna fila existente.
 6. Unit tests de validadores y del servicio de activación; integración para 1–4; `EXPLAIN` de las queries que cambian de `INNER` a `LEFT JOIN`.
 
+## Registro de implementación (2026-10-17)
+
+Rama `spec-58-person-optional-identification` (desde `spec-57-shared-product-catalog`, para encadenar las migraciones).
+
+- **Dominio:**
+  - `Person.IdentificationTypeId` pasa a `Guid?`, `IdentificationNumber` a `string?` y la navegación a opcional.
+  - Nuevo `Person.HasIdentification` (true cuando están los dos campos).
+- **Persistencia:**
+  - Columnas nulas y FK opcional.
+  - El índice `UX_Persons_Company_IdType_IdNumber` se recrea con filtro `"identificationnumber" IS NOT NULL AND "gcrecord" = 0`.
+  - Migración `Spec58PersonOptionalIdentification`: solo cambia nulabilidad e índice, sin sentencias de datos (criterio 5).
+- **Application:**
+  - Validadores de alta y edición con la regla "los dos o ninguno" y el mensaje de la spec.
+  - Los handlers solo validan el tipo y los duplicados cuando hay identificación; `PersonIdentification.Normalize` recorta el número y limpia los dos campos si falta uno.
+  - Restaurar una persona solo controla el tipo y el duplicado cuando tiene identificación.
+  - Comandos y DTOs (`CreatePersonDto`, `PersonDto`, `PersonListItemDto`, `PersonLookupItemDto`) con identificación nula.
+  - `EnsureActiveAsync` responde `PERSON_IDENTIFICATION_REQUIRED` (regla 4; SPEC 59 la vuelve configurable).
+- **Queries:** las de personas (lista, detalle y lookup) ya usaban `LEFT JOIN` con `identificationtypes`. Las de clientes y personas pendientes no unen con esa tabla, así que no hizo falta cambiarlas. `IntakeRequesterResolver` no cambia.
+- **Tests:**
+  - Se actualizaron 4 pruebas de validadores que afirmaban la regla anterior ("es obligatoria").
+  - Unitarias nuevas: alta sin identificación (no consulta tipo ni duplicados), normalización y cliente que exige identificación.
+  - Integración: criterios 1–4 y `EXPLAIN` del `LEFT JOIN`.
+- **Verificación:**
+  - Build Release sin errores.
+  - Unit tests: 3312 OK, cobertura de líneas 94,86 %.
+  - Integración: 281/281 OK.
+
 ## Decisiones
 
 - **Opcional en la persona, obligatoria en el cliente** (decisión del usuario): registrar rápido no debe frenarse, pero un cliente sí necesita identificación (facturación futura).

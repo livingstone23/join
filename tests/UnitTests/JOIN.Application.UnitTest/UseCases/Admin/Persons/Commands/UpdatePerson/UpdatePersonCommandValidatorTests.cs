@@ -184,15 +184,22 @@ public sealed class UpdatePersonCommandValidatorTests
     /// Verifies that an empty Guid for identification type triggers the required error.
     /// </summary>
     [Fact]
-    public void Validate_WhenIdentificationTypeIdIsEmpty_ShouldReturnIdentificationTypeRequiredError()
+    public void Validate_WhenOnlyTheNumberIsSent_ShouldRequireBothIdentificationFields()
     {
+        // SPEC 58: identification is optional, but type and number come together.
         var command = CreateValidCommand() with { IdentificationTypeId = Guid.Empty };
 
         var result = _validator.Validate(command);
 
-        result.Errors.Should().Contain(x =>
-            x.PropertyName == nameof(UpdatePersonCommand.IdentificationTypeId) &&
-            x.ErrorMessage == "Identification type is required.");
+        result.Errors.Should().Contain(x => x.ErrorMessage == "IdentificationTypeId and IdentificationNumber must be provided together.");
+    }
+
+    [Fact]
+    public void Validate_WhenNoIdentificationIsSent_ShouldBeValid()
+    {
+        var command = CreateValidCommand() with { IdentificationTypeId = null, IdentificationNumber = null };
+
+        _validator.Validate(command).IsValid.Should().BeTrue();
     }
 
     // ──────────────────────────────────────────────
@@ -203,15 +210,13 @@ public sealed class UpdatePersonCommandValidatorTests
     /// Verifies that an empty identification number triggers the required error.
     /// </summary>
     [Fact]
-    public void Validate_WhenIdentificationNumberIsEmpty_ShouldReturnIdentificationNumberRequiredError()
+    public void Validate_WhenOnlyTheTypeIsSent_ShouldRequireBothIdentificationFields()
     {
         var command = CreateValidCommand() with { IdentificationNumber = string.Empty };
 
         var result = _validator.Validate(command);
 
-        result.Errors.Should().Contain(x =>
-            x.PropertyName == nameof(UpdatePersonCommand.IdentificationNumber) &&
-            x.ErrorMessage == "Identification number is required.");
+        result.Errors.Should().Contain(x => x.ErrorMessage == "IdentificationTypeId and IdentificationNumber must be provided together.");
     }
 
     /// <summary>

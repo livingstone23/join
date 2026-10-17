@@ -58,13 +58,19 @@ public class Person : BaseTenantEntity
 
     /// <summary>
     /// Gets or sets the foreign key for the identification document type (DNI, RUC, Passport).
+    /// Optional (SPEC 58): a lead may arrive with only a name, phone or email. Set together with
+    /// <see cref="IdentificationNumber"/> or not at all.
     /// </summary>
-    public Guid IdentificationTypeId { get; set; }
+    public Guid? IdentificationTypeId { get; set; }
 
     /// <summary>
-    /// Gets or sets the unique identification number (ID Card, Tax ID).
+    /// Gets or sets the identification number (ID Card, Tax ID). Optional (SPEC 58); unique within the company
+    /// among live persons when present. A person must have it to become a customer.
     /// </summary>
-    public string IdentificationNumber { get; set; } = string.Empty;
+    public string? IdentificationNumber { get; set; }
+
+    /// <summary><c>true</c> when the person has both identification fields (SPEC 58).</summary>
+    public bool HasIdentification => IdentificationTypeId.HasValue && !string.IsNullOrWhiteSpace(IdentificationNumber);
 
 
     /// <summary>
@@ -85,7 +91,7 @@ public class Person : BaseTenantEntity
     /// <summary>
     /// Reference to the specific Identification Type catalog entry.
     /// </summary>
-    public virtual IdentificationType IdentificationType { get; set; } = null!;
+    public virtual IdentificationType? IdentificationType { get; set; }
 
     /// <summary>
     /// Collection of physical or billing addresses associated with the person.

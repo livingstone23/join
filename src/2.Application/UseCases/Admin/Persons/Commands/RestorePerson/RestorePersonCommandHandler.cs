@@ -33,9 +33,10 @@ public sealed class RestorePersonCommandHandler(
             request.Id,
             request.CompanyId,
             isParentDeleted: async (entity, _) =>
-                await restorer.IsParentDeletedAsync<IdentificationType>(entity.IdentificationTypeId)
+                (entity.IdentificationTypeId is { } identificationTypeId && await restorer.IsParentDeletedAsync<IdentificationType>(identificationTypeId))
                 || (entity.GenderId is { } genderId && await restorer.IsParentDeletedAsync<Gender>(genderId)),
-            activeDuplicateExists: (entity, _) => restorer.AnyAsync<Person>(
+            // SPEC 58: only a person with an identification can collide with a live one.
+            activeDuplicateExists: async (entity, _) => entity.IdentificationNumber is not null && await restorer.AnyAsync<Person>(
                 x => x.GcRecord == 0 && x.Id != entity.Id && x.CompanyId == entity.CompanyId && x.IdentificationTypeId == entity.IdentificationTypeId && x.IdentificationNumber == entity.IdentificationNumber),
             // SPEC 41 (decision 2026-10-08): bring back the children deleted in the same cascade.
             restoreCascade: (entity, stamp, _) => cascadeCoordinator.RestoreChildrenAsync(entity.Id, stamp),

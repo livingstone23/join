@@ -60,9 +60,10 @@ public class CreatePersonCommandHandler(
             return response;
         }
 
+        // SPEC 58: identification is optional; when present, the type must exist.
         var identificationTypeRepository = _unitOfWork.GetRepository<IdentificationType>();
-        var identificationType = await identificationTypeRepository.GetAsync(request.IdentificationTypeId);
-        if (identificationType is null)
+        if (request.IdentificationTypeId is { } identificationTypeId
+            && await identificationTypeRepository.GetAsync(identificationTypeId) is null)
         {
             response.IsSuccess = false;
             response.Message = "The provided identification type does not exist or is inactive.";
@@ -168,9 +169,10 @@ public class CreatePersonCommandHandler(
             }
         }
 
-        var customerAlreadyExists = await _unitOfWork.Persons.ExistsByCompanyAndIdentificationAsync(
-            currentUserService.CompanyId,
-            request.IdentificationNumber);
+        var customerAlreadyExists = !string.IsNullOrWhiteSpace(request.IdentificationNumber)
+            && await _unitOfWork.Persons.ExistsByCompanyAndIdentificationAsync(
+                currentUserService.CompanyId,
+                request.IdentificationNumber.Trim());
 
         if (customerAlreadyExists)
         {
@@ -182,6 +184,7 @@ public class CreatePersonCommandHandler(
         // 1. Map command payload to aggregate root (contacts are attached separately via domain factory).
         var customerEntity = _customerMapper.ToEntity(request);
         customerEntity.CompanyId = currentUserService.CompanyId;
+        PersonIdentification.Normalize(customerEntity);
 
         if (request.PersonType == PersonType.Legal)
         {

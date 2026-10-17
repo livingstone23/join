@@ -8,6 +8,8 @@ public static class CustomerErrorCodes
     public const string CompanyRequired = "COMPANY_REQUIRED";
     public const string UserRequired = "USER_REQUIRED";
     public const string InvalidPerson = "INVALID_PERSON";
+    /// <summary>SPEC 58: a person without identification cannot become (or be activated as) a customer.</summary>
+    public const string PersonIdentificationRequired = "PERSON_IDENTIFICATION_REQUIRED";
     public const string InvalidCustomerStage = "INVALID_CUSTOMER_STAGE";
     public const string CustomerNotFound = "CUSTOMER_NOT_FOUND";
     public const string CustomerStageNotFound = "CUSTOMER_STAGE_NOT_FOUND";

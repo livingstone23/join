@@ -493,12 +493,11 @@ namespace JOIN.Persistence.Migrations
                         .HasColumnName("genderid");
 
                     b.Property<string>("IdentificationNumber")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("identificationnumber");
 
-                    b.Property<Guid>("IdentificationTypeId")
+                    b.Property<Guid?>("IdentificationTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("identificationtypeid");
 
@@ -547,7 +546,7 @@ namespace JOIN.Persistence.Migrations
                     b.HasIndex("CompanyId", "IdentificationTypeId", "IdentificationNumber")
                         .IsUnique()
                         .HasDatabaseName("ux_persons_company_idtype_idnumber")
-                        .HasFilter("\"gcrecord\" = 0");
+                        .HasFilter("\"identificationnumber\" IS NOT NULL AND \"gcrecord\" = 0");
 
                     b.ToTable("persons", "admin");
                 });
@@ -6086,7 +6085,6 @@ namespace JOIN.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("IdentificationTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_persons_identificationtypes_identificationtypeid");
 
                     b.Navigation("Company");

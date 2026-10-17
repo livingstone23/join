@@ -1387,8 +1387,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         var identificationNumbers = customerSeeds.Select(s => s.IdentificationNumber).ToList();
         var personsByIdNumber = await _context.Persons
             .IgnoreQueryFilters()
-            .Where(p => p.CompanyId == companyId && p.GcRecord == 0 && identificationNumbers.Contains(p.IdentificationNumber))
-            .ToDictionaryAsync(p => p.IdentificationNumber, p => p.Id);
+            .Where(p => p.CompanyId == companyId && p.GcRecord == 0 && p.IdentificationNumber != null && identificationNumbers.Contains(p.IdentificationNumber))
+            .ToDictionaryAsync(p => p.IdentificationNumber!, p => p.Id);
 
         var existingCustomers = await _context.Customers
             .IgnoreQueryFilters()
@@ -1492,8 +1492,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var customersByIdNumber = await _context.Persons
             .IgnoreQueryFilters()
-            .Where(c => c.CompanyId == companyId && identificationNumbers.Contains(c.IdentificationNumber))
-            .ToDictionaryAsync(c => c.IdentificationNumber, c => c);
+            .Where(c => c.CompanyId == companyId && c.IdentificationNumber != null && identificationNumbers.Contains(c.IdentificationNumber))
+            .ToDictionaryAsync(c => c.IdentificationNumber!, c => c);
 
         var country = await _context.Countries
             .IgnoreQueryFilters()

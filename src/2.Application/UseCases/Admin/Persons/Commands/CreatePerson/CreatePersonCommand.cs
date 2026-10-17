@@ -55,12 +55,12 @@ public record CreatePersonCommand : ITransactionalCommand<Response<Guid>>
 	/// <summary>
 	/// Gets or sets the foreign key for the identification document type.
 	/// </summary>
-	public Guid IdentificationTypeId { get; init; }
+	public Guid? IdentificationTypeId { get; init; }
 
 	/// <summary>
 	/// Gets or sets the unique identification number (ID Card, Tax ID).
 	/// </summary>
-	public string IdentificationNumber { get; init; } = string.Empty;
+	public string? IdentificationNumber { get; init; }
 
 	/// <summary>
 	/// Gets or sets the optional list of addresses to create together with the customer.

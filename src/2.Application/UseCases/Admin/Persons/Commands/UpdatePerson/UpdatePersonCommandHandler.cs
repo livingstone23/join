@@ -65,20 +65,23 @@ public class UpdatePersonCommandHandler(
             return Response<Guid>.Error("CUSTOMER_NOT_FOUND", ["Person not found for the current company."]);
         }
 
+        // SPEC 58: identification is optional; when present, the type must exist and the pair must be free.
         var identificationTypeRepository = _unitOfWork.GetRepository<IdentificationType>();
-        var identificationType = await identificationTypeRepository.GetAsync(request.IdentificationTypeId);
-        if (identificationType is null)
+        if (request.IdentificationTypeId is { } identificationTypeId
+            && await identificationTypeRepository.GetAsync(identificationTypeId) is null)
         {
             return Response<Guid>.Error(
                 "INVALID_IDENTIFICATION_TYPE",
                 ["Invalid IdentificationTypeId."]);
         }
 
-        var duplicatedIdentification = await _unitOfWork.Persons.ExistsByCompanyAndIdentificationExceptIdAsync(
-            currentUserService.CompanyId,
-            request.Id,
-            request.IdentificationTypeId,
-            request.IdentificationNumber);
+        var duplicatedIdentification = request.IdentificationTypeId is { } typeId
+            && !string.IsNullOrWhiteSpace(request.IdentificationNumber)
+            && await _unitOfWork.Persons.ExistsByCompanyAndIdentificationExceptIdAsync(
+                currentUserService.CompanyId,
+                request.Id,
+                typeId,
+                request.IdentificationNumber.Trim());
 
         if (duplicatedIdentification)
         {
@@ -171,6 +174,7 @@ public class UpdatePersonCommandHandler(
         }
 
         _customerMapper.ApplyUpdate(request, customerEntity);
+        PersonIdentification.Normalize(customerEntity);
 
         if (request.PersonType == PersonType.Legal)
         {

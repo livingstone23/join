@@ -42,7 +42,7 @@ public sealed class CreatePersonCommandHandlerTests
             .ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
 
         context.IdentificationTypeRepositoryMock
-            .Setup(x => x.GetAsync(request.IdentificationTypeId))
+            .Setup(x => x.GetAsync(request.IdentificationTypeId!.Value))
             .ReturnsAsync(new IdentificationType { Name = "Passport" });
 
         context.GenderRepositoryMock
@@ -166,7 +166,7 @@ public sealed class CreatePersonCommandHandlerTests
             .ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
 
         context.IdentificationTypeRepositoryMock
-            .Setup(x => x.GetAsync(request.IdentificationTypeId))
+            .Setup(x => x.GetAsync(request.IdentificationTypeId!.Value))
             .ReturnsAsync((IdentificationType?)null);
 
         var handler = context.CreateHandler();
@@ -203,7 +203,7 @@ public sealed class CreatePersonCommandHandlerTests
             .ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
 
         context.IdentificationTypeRepositoryMock
-            .Setup(x => x.GetAsync(request.IdentificationTypeId))
+            .Setup(x => x.GetAsync(request.IdentificationTypeId!.Value))
             .ReturnsAsync(new IdentificationType { Name = "Passport" });
 
         context.GenderRepositoryMock
@@ -271,7 +271,7 @@ public sealed class CreatePersonCommandHandlerTests
             .ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
 
         context.IdentificationTypeRepositoryMock
-            .Setup(x => x.GetAsync(request.IdentificationTypeId))
+            .Setup(x => x.GetAsync(request.IdentificationTypeId!.Value))
             .ReturnsAsync(new IdentificationType { Name = "Passport" });
 
         context.GenderRepositoryMock
@@ -314,7 +314,7 @@ public sealed class CreatePersonCommandHandlerTests
             .ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
 
         context.IdentificationTypeRepositoryMock
-            .Setup(x => x.GetAsync(request.IdentificationTypeId))
+            .Setup(x => x.GetAsync(request.IdentificationTypeId!.Value))
             .ReturnsAsync(new IdentificationType { Name = "Passport" });
 
         context.GenderRepositoryMock
@@ -358,7 +358,7 @@ public sealed class CreatePersonCommandHandlerTests
             .ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
 
         context.IdentificationTypeRepositoryMock
-            .Setup(x => x.GetAsync(request.IdentificationTypeId))
+            .Setup(x => x.GetAsync(request.IdentificationTypeId!.Value))
             .ReturnsAsync(new IdentificationType { Name = "Passport" });
 
         context.GenderRepositoryMock
@@ -399,6 +399,32 @@ public sealed class CreatePersonCommandHandlerTests
     /// Creates a valid command payload that can be customized per scenario.
     /// This keeps the arrange section focused on the branch under test.
     /// </summary>
+    /// <summary>
+    /// SPEC 58: a person can be created without identification; neither the type nor the duplicate check runs.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenIdentificationIsMissing_ShouldCreateThePersonWithoutIt()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var request = CreateValidCommand(includeAddresses: false, includeContacts: false) with { IdentificationTypeId = null, IdentificationNumber = null };
+        var customerEntity = CreateMappedPerson(request, companyId);
+        var context = CreateContext(companyId);
+
+        context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
+        context.GenderRepositoryMock.Setup(x => x.GetAsync(request.GenderId!.Value)).ReturnsAsync(Gender.Create(companyId, "M", "Masculino"));
+        context.MapperMock.Setup(x => x.ToEntity(request)).Returns(customerEntity);
+        context.PersonsRepositoryMock.Setup(x => x.InsertAsync(customerEntity)).ReturnsAsync(true);
+        context.UnitOfWorkMock.Setup(x => x.SaveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var response = await context.CreateHandler().Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue(response.Message);
+        customerEntity.IdentificationTypeId.Should().BeNull();
+        customerEntity.IdentificationNumber.Should().BeNull();
+        context.IdentificationTypeRepositoryMock.Verify(x => x.GetAsync(It.IsAny<Guid>()), Times.Never);
+        context.PersonsRepositoryMock.Verify(x => x.ExistsByCompanyAndIdentificationAsync(It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
+    }
+
     private CreatePersonCommand CreateValidCommand(
         bool includeAddresses = true,
         bool includeContacts = true,

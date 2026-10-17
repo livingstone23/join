@@ -13,9 +13,9 @@ public sealed record PersonLookupItemDto
     /// <summary>First, middle and last names; for a legal person, its commercial name when it has one.</summary>
     public string FullName { get; init; } = string.Empty;
     public string? CommercialName { get; init; }
-    public Guid IdentificationTypeId { get; init; }
+    public Guid? IdentificationTypeId { get; init; }
     public string? IdentificationTypeName { get; init; }
-    public string IdentificationNumber { get; init; } = string.Empty;
+    public string? IdentificationNumber { get; init; }
     /// <summary>The person has a customer in the company, active or inactive.</summary>
     public bool IsCustomer { get; init; }
     /// <summary><see cref="IsCustomer"/> and the customer is active.</summary>

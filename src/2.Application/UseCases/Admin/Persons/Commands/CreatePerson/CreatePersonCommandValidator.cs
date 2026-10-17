@@ -38,9 +38,14 @@ public class CreatePersonCommandValidator : AbstractValidator<CreatePersonComman
             .MaximumLength(200).WithMessage("Commercial name cannot exceed 200 characters.")
             .When(x => !string.IsNullOrWhiteSpace(x.CommercialName));
 
+        // SPEC 58: identification is optional, but both fields come together or not at all.
         RuleFor(x => x.IdentificationNumber)
-            .NotEmpty().WithMessage("Identification number is required.")
             .MaximumLength(50).WithMessage("Identification number cannot exceed 50 characters.");
+
+        RuleFor(x => x)
+            .Must(x => (x.IdentificationTypeId is { } typeId && typeId != Guid.Empty) == !string.IsNullOrWhiteSpace(x.IdentificationNumber))
+            .WithName("Identification")
+            .WithMessage("IdentificationTypeId and IdentificationNumber must be provided together.");
 
         RuleFor(x => x.PersonType)
             .IsInEnum().WithMessage("Person type must be a valid value.")
@@ -59,8 +64,6 @@ public class CreatePersonCommandValidator : AbstractValidator<CreatePersonComman
                 .Null().WithMessage("Gender id must not be provided for legal persons.");
         });
 
-        RuleFor(x => x.IdentificationTypeId)
-            .NotEmpty().WithMessage("Identification type is required.");
 
         RuleFor(x => x.Addresses)
             .Must(addresses => addresses is null || addresses.Count(a => a.IsDefault) <= 1)

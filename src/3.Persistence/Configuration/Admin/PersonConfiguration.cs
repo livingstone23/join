@@ -44,7 +44,8 @@ public class PersonConfiguration : IEntityTypeConfiguration<Person>
         builder.Property(c => c.LastName).HasMaxLength(100).IsRequired(false); // Can be null for Legal entities
         builder.Property(c => c.SecondLastName).HasMaxLength(100).IsRequired(false);
         builder.Property(c => c.CommercialName).HasMaxLength(200).IsRequired(false);
-        builder.Property(c => c.IdentificationNumber).IsRequired().HasMaxLength(50);
+        // SPEC 58: optional; both identification fields come together or not at all (validated in Application).
+        builder.Property(c => c.IdentificationNumber).IsRequired(false).HasMaxLength(50);
 
         // State & Soft Delete Flags
         builder.Property(c => c.IsActive)
@@ -57,11 +58,11 @@ public class PersonConfiguration : IEntityTypeConfiguration<Person>
 
         // --- Indexes & Unique Constraints ---
 
-        // CRITICAL: Unique index ensuring a customer's identification is unique within a company.
-        // GcRecord is included so logically deleted persons don't block new registrations with the same ID.
+        // CRITICAL: Unique index ensuring a person's identification is unique within a company.
+        // Only live rows with a number (SPEC 58): Npgsql does not add the IS NOT NULL filter on its own.
         builder.HasIndex(c => new { c.CompanyId, c.IdentificationTypeId, c.IdentificationNumber })
             .IsUnique()
-            .HasFilter("\"gcrecord\" = 0")
+            .HasFilter("\"identificationnumber\" IS NOT NULL AND \"gcrecord\" = 0")
             .HasDatabaseName("UX_Persons_Company_IdType_IdNumber");
 
         // --- Relationships (Many-to-One) ---
@@ -72,11 +73,12 @@ public class PersonConfiguration : IEntityTypeConfiguration<Person>
             .HasForeignKey(c => c.CompanyId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Required relationship with IdentificationType
+        // Optional relationship with IdentificationType (SPEC 58)
         builder.HasOne(c => c.IdentificationType)
             .WithMany()
             .HasForeignKey(c => c.IdentificationTypeId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
 
         // Optional relationship with Gender (Nullable FK)
         builder.HasOne(c => c.Gender)

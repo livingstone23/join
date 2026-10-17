@@ -57,15 +57,15 @@ public sealed class UpdatePersonCommandHandlerTests
             .ReturnsAsync(customer);
 
         context.IdentificationTypeRepositoryMock
-            .Setup(x => x.GetAsync(request.IdentificationTypeId))
+            .Setup(x => x.GetAsync(request.IdentificationTypeId!.Value))
             .ReturnsAsync(new IdentificationType { Name = "Passport" });
 
         context.PersonsRepositoryMock
             .Setup(x => x.ExistsByCompanyAndIdentificationExceptIdAsync(
                 companyId,
                 customerId,
-                request.IdentificationTypeId,
-                request.IdentificationNumber))
+                request.IdentificationTypeId!.Value,
+                request.IdentificationNumber!))
             .ReturnsAsync(false);
 
         SetupValidAddressReferences(context, request);
@@ -278,15 +278,15 @@ public sealed class UpdatePersonCommandHandlerTests
             .ReturnsAsync(customer);
 
         context.IdentificationTypeRepositoryMock
-            .Setup(x => x.GetAsync(request.IdentificationTypeId))
+            .Setup(x => x.GetAsync(request.IdentificationTypeId!.Value))
             .ReturnsAsync(new IdentificationType { Name = "Passport" });
 
         context.PersonsRepositoryMock
             .Setup(x => x.ExistsByCompanyAndIdentificationExceptIdAsync(
                 companyId,
                 customerId,
-                request.IdentificationTypeId,
-                request.IdentificationNumber))
+                request.IdentificationTypeId!.Value,
+                request.IdentificationNumber!))
             .ReturnsAsync(true);
 
         var handler = context.CreateHandler();
@@ -326,15 +326,15 @@ public sealed class UpdatePersonCommandHandlerTests
             .ReturnsAsync(customer);
 
         context.IdentificationTypeRepositoryMock
-            .Setup(x => x.GetAsync(request.IdentificationTypeId))
+            .Setup(x => x.GetAsync(request.IdentificationTypeId!.Value))
             .ReturnsAsync(new IdentificationType { Name = "Passport" });
 
         context.PersonsRepositoryMock
             .Setup(x => x.ExistsByCompanyAndIdentificationExceptIdAsync(
                 companyId,
                 customerId,
-                request.IdentificationTypeId,
-                request.IdentificationNumber))
+                request.IdentificationTypeId!.Value,
+                request.IdentificationNumber!))
             .ReturnsAsync(false);
 
         SetupValidAddressReferences(context, request);
@@ -514,9 +514,9 @@ public sealed class UpdatePersonCommandHandlerTests
 
         context.CompanyRepositoryMock.Setup(x => x.GetAsync(companyId)).ReturnsAsync(new Company { Name = "JOIN", TaxId = "RUC" });
         context.PersonsRepositoryMock.Setup(x => x.GetForUpdateAsync(personId, companyId)).ReturnsAsync(person);
-        context.IdentificationTypeRepositoryMock.Setup(x => x.GetAsync(request.IdentificationTypeId)).ReturnsAsync(new IdentificationType { Name = "Passport" });
+        context.IdentificationTypeRepositoryMock.Setup(x => x.GetAsync(request.IdentificationTypeId!.Value)).ReturnsAsync(new IdentificationType { Name = "Passport" });
         context.PersonsRepositoryMock
-            .Setup(x => x.ExistsByCompanyAndIdentificationExceptIdAsync(companyId, personId, request.IdentificationTypeId, request.IdentificationNumber))
+            .Setup(x => x.ExistsByCompanyAndIdentificationExceptIdAsync(companyId, personId, request.IdentificationTypeId!.Value, request.IdentificationNumber!))
             .ReturnsAsync(false);
         SetupValidGenderReference(context, companyId, request.GenderId!.Value);
         context.UnitOfWorkMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);

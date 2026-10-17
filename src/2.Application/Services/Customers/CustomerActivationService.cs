@@ -36,6 +36,14 @@ public sealed class CustomerActivationService(
                 ["The person does not exist, is inactive or deleted in the current company."]);
         }
 
+        // SPEC 58 rule 4: every customer has an identification (SPEC 59 makes it configurable per company).
+        if (!person.HasIdentification)
+        {
+            return Response<CustomerActivationResult>.Error(
+                CustomerErrorCodes.PersonIdentificationRequired,
+                ["The person needs an identification type and number before becoming a customer."]);
+        }
+
         var customer = await unitOfWork.Customers.GetByPersonAsync(companyId, personId, cancellationToken);
 
         if (customer is null)

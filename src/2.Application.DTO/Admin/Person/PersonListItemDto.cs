@@ -80,7 +80,7 @@ public record PersonListItemDto : SoftDeletableDto
     /// <summary>
     /// Gets the identification type identifier.
     /// </summary>
-    public Guid IdentificationTypeId { get; init; }
+    public Guid? IdentificationTypeId { get; init; }
 
     /// <summary>
     /// Gets the identification type name.
@@ -90,5 +90,5 @@ public record PersonListItemDto : SoftDeletableDto
     /// <summary>
     /// Gets the identification number.
     /// </summary>
-    public string IdentificationNumber { get; init; } = string.Empty;
+    public string? IdentificationNumber { get; init; }
 }
