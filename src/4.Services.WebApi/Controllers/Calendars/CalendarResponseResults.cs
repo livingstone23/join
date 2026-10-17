@@ -31,7 +31,10 @@ public static class CalendarResponseResults
         CalendarErrorCodes.CalendarIsDefault,
         CalendarErrorCodes.CalendarHasActiveEvents,
         CalendarErrorCodes.UserHoursOutOfCompanyRange,
-        CalendarErrorCodes.IntakeContactBelongsToOtherPerson
+        CalendarErrorCodes.IntakeContactBelongsToOtherPerson,
+        // SPEC 65: converting a pending that is no longer pending, or a duplicate open lead under the Block policy.
+        "PERSON_PENDING_NOT_PENDING",
+        "LEAD_DUPLICATE_OPEN"
     ];
 
     private static readonly HashSet<string> Unprocessable =

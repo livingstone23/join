@@ -110,6 +110,7 @@ public class LeadInteractionConfiguration : IEntityTypeConfiguration<LeadInterac
         builder.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Lead>().WithMany().HasForeignKey(x => x.LeadId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ContactTypeCompany>().WithMany().HasForeignKey(x => x.ContactTypeCompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<JOIN.Domain.Calendars.CalendarEvent>().WithMany().HasForeignKey(x => x.NextActionEventId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.CompanyId, x.LeadId, x.OccurredAt }).HasDatabaseName("IX_LeadInteractions_Company_Lead_OccurredAt");
     }
 }

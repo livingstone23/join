@@ -55,6 +55,38 @@
 5. Convertir dos veces la misma pendiente responde 409.
 6. Unit tests de los comandos; integración para 1–5 (con `ModuleEnforcementPostgreSqlWebApplicationFactory` para 2).
 
+## Registro de implementación (2026-10-17)
+
+Rama `spec-65-leads-calendar-and-pending-persons` (desde `spec-64-commercial-reports`, para encadenar las migraciones).
+
+- **Dominio y persistencia:**
+  - `CalendarEvent.LeadId` (FK opcional e índice `IX_CalendarEvents_Company_Lead` filtrado por `"leadid" IS NOT NULL AND "gcrecord" = 0`).
+  - `ContactTypeCompany.CalendarActivityCompanyId`, `LeadInteraction.NextActionEventId` y `PersonPendingConfirmation.LeadId`.
+  - Estado `PersonPendingConfirmationStatus.ConvertedToLead = 5`.
+  - Migración `Spec65LeadsCalendarAndPendingPersons`: cuatro columnas nulas, índices y FK.
+- **Application:**
+  - `LeadNextActionScheduler`:
+    - Comprueba el módulo Calendario con `IPermissionService.GetModuleAccessAsync` sobre el recurso `Calendar` (opción "MyCalendar"), solo si `Modules:EnforceCompanyModules` está activo.
+    - El SuperAdmin no se bloquea, igual que en el filtro de SPEC 48-post.
+    - Exige un tipo de contacto que agende eventos y tenga actividad; si no, `CONTACT_TYPE_NOT_SCHEDULABLE`.
+    - Crea el evento con `CalendarEventCommandProcessor.CreateAsync` en el calendario del dueño del lead, con las mismas validaciones de SPEC 44-post y `CustomerId` si el lead lo tiene; luego le pone `LeadId`.
+  - `POST /Leads/{id}/interactions` acepta `nextAction`. Si agendar falla, el contacto no se registra (todo es una transacción).
+  - `GET /Leads/{id}/events` lista los eventos del lead. La línea de tiempo suma el tipo `Event` (código de estado del calendario en `Detail`).
+  - `ConvertPersonPendingToLeadCommand`:
+    - Pendiente en estado `Pending`; si ya está resuelta, `PERSON_PENDING_NOT_PENDING` (409).
+    - Exige un origen `PENDING` activo y crea el lead con el handler de `CreateLeadCommand` (dueño = quien convierte; duplicados según la empresa).
+    - Resuelve la pendiente como `ConvertedToLead` con `LeadId` y cierra su actividad de revisión. No crea clientes.
+  - La cola de pendientes acepta `status=5` y devuelve `LeadId`.
+  - Los tipos de contacto de la empresa exponen `CalendarActivityCompanyId` (en la lista y en `/Leads/catalogs`).
+- **WebApi:**
+  - El 403 `MODULE_NOT_ENABLED` del contacto se arma con el mismo `ProblemDetails` que el filtro de SPEC 48-post (`BuildModuleNotEnabledProblem` pasa a `internal`).
+  - `POST /PersonPendingConfirmations/{id}/convert-to-lead` (`CanUpdate`).
+- **Seed:** los tipos que agendan (`ONLINE_MEETING`, `DEMO` → Reunión; `VISIT` → Cita) toman la actividad de calendario de la empresa cuando la tiene.
+- **Verificación:**
+  - Build Release sin errores.
+  - Unit tests: 3407 OK, cobertura de líneas 94,37 %.
+  - Integración: 330/330 OK, 4 nuevas (criterios 1–5; el 2 con `ModuleEnforcementPostgreSqlWebApplicationFactory`).
+
 ## Decisiones
 
 - **Reutilizar el calendario existente** en vez de un campo "próxima acción" en el lead: el evento ya tiene horario, estado, recordatorios futuros y sincronización.

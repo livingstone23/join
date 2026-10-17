@@ -667,6 +667,30 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             });
         }
 
+        // SPEC 65 item 2: the types that schedule events use the company's calendar activity (when it has the calendar).
+        await _context.SaveChangesAsync(cancellationToken);
+        var activityByMaster = new Dictionary<string, string>
+        {
+            ["ONLINE_MEETING"] = CalendarCodes.Activities.Meeting,
+            ["VISIT"] = CalendarCodes.Activities.Appointment,
+            ["DEMO"] = CalendarCodes.Activities.Meeting
+        };
+        var activities = await (from ac in _context.CalendarActivityCompanies.IgnoreQueryFilters()
+                                join a in _context.CalendarActivities.IgnoreQueryFilters() on ac.CalendarActivityId equals a.Id
+                                where ac.CompanyId == companyId && ac.GcRecord == 0 && ac.IsActive
+                                select new { a.Code, ac.Id }).ToListAsync(cancellationToken);
+        var schedulable = await (from c in _context.ContactTypeCompanies.IgnoreQueryFilters()
+                                 join t in _context.ContactTypes.IgnoreQueryFilters() on c.ContactTypeId equals t.Id
+                                 where c.CompanyId == companyId && c.GcRecord == 0 && c.CalendarActivityCompanyId == null && t.SchedulesCalendarEvent
+                                 select new { Copy = c, t.Code }).ToListAsync(cancellationToken);
+        foreach (var row in schedulable)
+        {
+            if (activityByMaster.TryGetValue(row.Code, out var activityCode) && activities.FirstOrDefault(a => a.Code == activityCode) is { } activity)
+            {
+                row.Copy.CalendarActivityCompanyId = activity.Id;
+            }
+        }
+
         if (!await _context.LeadCompanySettings.IgnoreQueryFilters().AnyAsync(x => x.CompanyId == companyId && x.GcRecord == 0, cancellationToken))
         {
             _context.LeadCompanySettings.Add(LeadCompanySettings.Defaults(companyId));

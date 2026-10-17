@@ -52,6 +52,11 @@ public sealed class CalendarEventConfiguration : IEntityTypeConfiguration<Calend
             .HasFilter("\"gcrecord\" = 0")
             .HasDatabaseName("IX_CalendarEvents_RequesterPerson");
 
+        builder.HasIndex(x => new { x.CompanyId, x.LeadId })
+            .HasFilter("\"leadid\" IS NOT NULL AND \"gcrecord\" = 0")
+            .HasDatabaseName("IX_CalendarEvents_Company_Lead");
+        builder.HasOne<JOIN.Domain.Customers.Leads.Lead>().WithMany().HasForeignKey(x => x.LeadId).OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(x => x.TicketId)
             .HasFilter("\"gcrecord\" = 0")
             .HasDatabaseName("IX_CalendarEvents_Ticket");

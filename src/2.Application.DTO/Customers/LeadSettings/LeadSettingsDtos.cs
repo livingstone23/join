@@ -70,6 +70,8 @@ public sealed record ContactTypeCompanyDto
     public bool AsksDuration { get; init; }
     public int SortOrder { get; init; }
     public bool IsActive { get; init; }
+    /// <summary>Calendar activity used to schedule a next action with this type (SPEC 65); null = cannot schedule.</summary>
+    public Guid? CalendarActivityCompanyId { get; init; }
 }
 
 /// <summary>

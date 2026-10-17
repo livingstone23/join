@@ -38,3 +38,6 @@ public sealed record GetLeadDuplicatesQuery(Guid PersonId) : IRequest<Response<I
 
 /// <summary><c>GET /Leads/catalogs</c> (SPEC 61 C.21): active catalogs and currencies of the company.</summary>
 public sealed record GetLeadCatalogsQuery : IRequest<Response<LeadCatalogsDto>>;
+
+/// <summary><c>GET /Leads/{id}/events</c> (SPEC 65): calendar events linked to the lead, newest first.</summary>
+public sealed record GetLeadEventsQuery(Guid Id) : IRequest<Response<IReadOnlyList<LeadEventDto>>>;

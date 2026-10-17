@@ -1024,6 +1024,10 @@ namespace JOIN.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("lastmodifiedby");
 
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("leadid");
+
                     b.Property<Guid>("PersonId")
                         .HasColumnType("uuid")
                         .HasColumnName("personid");
@@ -1067,6 +1071,9 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasIndex("CustomerId")
                         .HasDatabaseName("ix_personpendingconfirmations_customerid");
+
+                    b.HasIndex("LeadId")
+                        .HasDatabaseName("ix_personpendingconfirmations_leadid");
 
                     b.HasIndex("PersonId")
                         .HasDatabaseName("ix_personpendingconfirmations_personid");
@@ -1790,6 +1797,10 @@ namespace JOIN.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("lastmodifiedby");
 
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("leadid");
+
                     b.Property<string>("Location")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)")
@@ -1890,6 +1901,9 @@ namespace JOIN.Persistence.Migrations
                     b.HasIndex("CustomerId")
                         .HasDatabaseName("ix_events_customerid");
 
+                    b.HasIndex("LeadId")
+                        .HasDatabaseName("ix_events_leadid");
+
                     b.HasIndex("OriginChannelId")
                         .HasDatabaseName("ix_events_originchannelid");
 
@@ -1916,6 +1930,10 @@ namespace JOIN.Persistence.Migrations
                     b.HasIndex("CalendarId", "StartUtc")
                         .HasDatabaseName("ix_calendarevents_calendar_range")
                         .HasFilter("\"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "LeadId")
+                        .HasDatabaseName("ix_calendarevents_company_lead")
+                        .HasFilter("\"leadid\" IS NOT NULL AND \"gcrecord\" = 0");
 
                     b.HasIndex("SeriesMasterId", "OriginalStartUtc")
                         .IsUnique()
@@ -3626,6 +3644,10 @@ namespace JOIN.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("CalendarActivityCompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calendaractivitycompanyid");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
                         .HasColumnName("companyid");
@@ -3670,6 +3692,9 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_contacttypecompanies");
+
+                    b.HasIndex("CalendarActivityCompanyId")
+                        .HasDatabaseName("ix_contacttypecompanies_calendaractivitycompanyid");
 
                     b.HasIndex("ContactTypeId")
                         .HasDatabaseName("ix_contacttypecompanies_contacttypeid");
@@ -4222,6 +4247,10 @@ namespace JOIN.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("leadid");
 
+                    b.Property<Guid?>("NextActionEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("nextactioneventid");
+
                     b.Property<DateTime>("OccurredAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("occurredat");
@@ -4248,6 +4277,9 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasIndex("LeadId")
                         .HasDatabaseName("ix_leadinteractions_leadid");
+
+                    b.HasIndex("NextActionEventId")
+                        .HasDatabaseName("ix_leadinteractions_nextactioneventid");
 
                     b.HasIndex("CompanyId", "LeadId", "OccurredAt")
                         .HasDatabaseName("ix_leadinteractions_company_lead_occurredat");
@@ -7826,6 +7858,12 @@ namespace JOIN.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_personpendingconfirmations_customers_customerid");
 
+                    b.HasOne("JOIN.Domain.Customers.Leads.Lead", null)
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_personpendingconfirmations_leads_leadid");
+
                     b.HasOne("JOIN.Domain.Admin.Person", "Person")
                         .WithMany()
                         .HasForeignKey("PersonId")
@@ -8028,6 +8066,12 @@ namespace JOIN.Persistence.Migrations
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_events_customers_customerid");
+
+                    b.HasOne("JOIN.Domain.Customers.Leads.Lead", null)
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_events_leads_leadid");
 
                     b.HasOne("JOIN.Domain.Common.CommunicationChannel", "OriginChannel")
                         .WithMany()
@@ -8502,6 +8546,12 @@ namespace JOIN.Persistence.Migrations
 
             modelBuilder.Entity("JOIN.Domain.Customers.Leads.ContactTypeCompany", b =>
                 {
+                    b.HasOne("JOIN.Domain.Calendars.CalendarActivityCompany", null)
+                        .WithMany()
+                        .HasForeignKey("CalendarActivityCompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_contacttypecompanies_activitycompanies_calendaractivitycomp~");
+
                     b.HasOne("JOIN.Domain.Common.Company", "Company")
                         .WithMany()
                         .HasForeignKey("CompanyId")
@@ -8714,6 +8764,12 @@ namespace JOIN.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_leadinteractions_leads_leadid");
+
+                    b.HasOne("JOIN.Domain.Calendars.CalendarEvent", null)
+                        .WithMany()
+                        .HasForeignKey("NextActionEventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_leadinteractions_events_nextactioneventid");
 
                     b.Navigation("Company");
                 });

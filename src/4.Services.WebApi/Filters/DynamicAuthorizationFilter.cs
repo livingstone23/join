@@ -169,7 +169,7 @@ public class DynamicAuthorizationFilter : IAsyncAuthorizationFilter
     /// so the global <c>CustomizeProblemDetails</c> in <c>Program.cs</c> adds <c>instance</c>, <c>traceId</c> and
     /// <c>timestamp</c>, like every other error; falls back to a plain <see cref="ProblemDetails"/> without it.
     /// </summary>
-    private static ProblemDetails BuildModuleNotEnabledProblem(HttpContext httpContext, string? moduleName)
+    internal static ProblemDetails BuildModuleNotEnabledProblem(HttpContext httpContext, string? moduleName)
     {
         const string title = "Module not enabled";
         var detail = moduleName is null

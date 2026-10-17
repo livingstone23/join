@@ -9,6 +9,8 @@ public class ContactTypeCompany : BaseTenantEntity
     public string Name { get; set; } = string.Empty;
     public int SortOrder { get; set; }
     public bool IsActive { get; set; } = true;
+    /// <summary>Calendar activity used when scheduling a next action with this type (SPEC 65).</summary>
+    public Guid? CalendarActivityCompanyId { get; set; }
 
     public virtual ContactType ContactType { get; set; } = null!;
 }

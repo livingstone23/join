@@ -18,6 +18,20 @@ public sealed record LeadInteractionInput
     /// <summary>1 Interested, 2 ProposalRequested, 3 NoAnswer, 4 NotInterested, 99 Other.</summary>
     public int Outcome { get; init; } = 99;
     public string Summary { get; init; } = string.Empty;
+    /// <summary>Next action to schedule in the owner's calendar (SPEC 65; only on <c>POST /Leads/{id}/interactions</c>).</summary>
+    public LeadNextActionInput? NextAction { get; init; }
+}
+
+/// <summary>Next action of a contact: a calendar event in the lead owner's calendar (SPEC 65).</summary>
+public sealed record LeadNextActionInput
+{
+    /// <summary>Company contact type whose calendar activity is used.</summary>
+    public Guid ContactTypeCompanyId { get; init; }
+    public DateTime StartUtc { get; init; }
+    public DateTime EndUtc { get; init; }
+    public string? Title { get; init; }
+    public string? Location { get; init; }
+    public string? VideoCallUrl { get; init; }
 }
 
 /// <summary>Input of an offered product line (create lead, <c>POST /Leads/{id}/products</c>).</summary>

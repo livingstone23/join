@@ -92,6 +92,8 @@ public class LeadInteraction : BaseTenantEntity
     public Guid UserId { get; set; }
     public InteractionOutcome Outcome { get; set; } = InteractionOutcome.Other;
     public string Summary { get; set; } = string.Empty;
+    /// <summary>Calendar event scheduled as the next action when the contact was registered (SPEC 65).</summary>
+    public Guid? NextActionEventId { get; set; }
 }
 
 /// <summary>A comment on a lead, optionally on one of its contacts (table <c>Customer.LeadComments</c>).</summary>

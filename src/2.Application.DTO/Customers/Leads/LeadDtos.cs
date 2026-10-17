@@ -166,7 +166,26 @@ public sealed record LeadInteractionDto
     public string UserName { get; init; } = string.Empty;
     public int Outcome { get; init; }
     public string Summary { get; init; } = string.Empty;
+    /// <summary>Calendar event scheduled as the next action (SPEC 65).</summary>
+    public Guid? NextActionEventId { get; init; }
     public DateTime CreatedAt { get; init; }
+}
+
+/// <summary>A calendar event linked to a lead (SPEC 65): next actions, pending and past.</summary>
+public sealed record LeadEventDto
+{
+    public Guid Id { get; init; }
+    public string Title { get; init; } = string.Empty;
+    public DateTime StartUtc { get; init; }
+    public DateTime EndUtc { get; init; }
+    public Guid OwnerUserId { get; init; }
+    public string OwnerName { get; init; } = string.Empty;
+    public Guid CalendarActivityCompanyId { get; init; }
+    public string ActivityName { get; init; } = string.Empty;
+    public string StatusCode { get; init; } = string.Empty;
+    public string StatusName { get; init; } = string.Empty;
+    public string? Location { get; init; }
+    public string? VideoCallUrl { get; init; }
 }
 
 /// <summary>A comment on a lead.</summary>

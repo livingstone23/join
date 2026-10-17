@@ -25,7 +25,8 @@ public record PersonPendingConfirmationDto(
     Guid? CustomerId,
     Guid? ResolvedByUserId,
     DateTime? ResolvedUtc,
-    string? ResolutionNotes);
+    string? ResolutionNotes,
+    Guid? LeadId = null);
 
 /// <summary>
 /// Detail of a single pending, with the person's active contacts and the activities that target them (SPEC 45 F5).

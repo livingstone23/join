@@ -89,6 +89,8 @@ internal sealed class LeadTestContext : IDisposable
         services.RemoveAll<IExchangeRateResolver>();
         services.AddSingleton<IExchangeRateResolver>(Rates);
         services.AddSingleton<IFileStorageResolver>(Storage);
+        // SPEC 65: the next action uses the calendar processor (its recurrence expander lives in Infrastructure).
+        services.AddSingleton<ICalendarRecurrenceExpander, JOIN.Infrastructure.Calendars.IcalRecurrenceExpander>();
         services.RemoveAll<ILeadAccessScopeResolver>();
         services.AddSingleton<ILeadAccessScopeResolver>(Scopes);
         Services = services.BuildServiceProvider();

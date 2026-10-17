@@ -138,7 +138,7 @@ internal static class LeadWorkMapping
     internal static LeadInteractionDto ToDto(LeadInteraction i) => new()
     {
         Id = i.Id, LeadId = i.LeadId, ContactTypeCompanyId = i.ContactTypeCompanyId, Direction = (int)i.Direction, OccurredAt = i.OccurredAt,
-        DurationMinutes = i.DurationMinutes, UserId = i.UserId, Outcome = (int)i.Outcome, Summary = i.Summary, CreatedAt = i.Created
+        DurationMinutes = i.DurationMinutes, UserId = i.UserId, Outcome = (int)i.Outcome, Summary = i.Summary, NextActionEventId = i.NextActionEventId, CreatedAt = i.Created
     };
 
     internal static LeadCommentDto ToDto(LeadComment c) => new()
@@ -159,7 +159,8 @@ public sealed class AddLeadInteractionCommandHandler(
     IUnitOfWork unitOfWork,
     LeadCommandContext context,
     LeadReferenceValidator references,
-    LeadWorkRules work)
+    LeadWorkRules work,
+    LeadNextActionScheduler scheduler)
     : IRequestHandler<AddLeadInteractionCommand, Response<LeadInteractionDto>>
 {
     public async Task<Response<LeadInteractionDto>> Handle(AddLeadInteractionCommand request, CancellationToken cancellationToken)
@@ -190,6 +191,18 @@ public sealed class AddLeadInteractionCommandHandler(
         if (buildError is not null)
         {
             return buildError;
+        }
+
+        // SPEC 65: the next action is a calendar event in the owner's calendar, linked to the lead.
+        if (request.Interaction.NextAction is { } nextAction)
+        {
+            var (eventId, scheduleError) = await scheduler.ScheduleAsync<LeadInteractionDto>(lead, nextAction, cancellationToken);
+            if (scheduleError is not null)
+            {
+                return scheduleError;
+            }
+
+            interaction!.NextActionEventId = eventId;
         }
 
         LeadWorkRules.Touch(lead, interaction!.OccurredAt);

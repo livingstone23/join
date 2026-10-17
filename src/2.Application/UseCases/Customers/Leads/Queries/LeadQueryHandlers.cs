@@ -360,6 +360,13 @@ public sealed class GetLeadTimelineQueryHandler(ISqlConnectionFactory connection
                 INNER JOIN security.users u ON u.Id = c.UserId
                 WHERE c.LeadId = @LeadId AND c.GcRecord = 0
                 UNION ALL
+                SELECT 'Event', e.Id, e.StartUtc, e.OwnerUserId, CONCAT(u.FirstName, ' ', u.LastName), e.Title, st.Code, e.CalendarActivityCompanyId
+                FROM calendar.events e
+                INNER JOIN calendar.statuscompanies sc ON sc.Id = e.CalendarStatusCompanyId
+                INNER JOIN calendar.statuses st ON st.Id = sc.CalendarStatusId
+                INNER JOIN security.users u ON u.Id = e.OwnerUserId
+                WHERE e.LeadId = @LeadId AND e.CompanyId = @CompanyId AND e.GcRecord = 0
+                UNION ALL
                 SELECT 'Document', d.Id, d.Created, d.UploadedByUserId, CONCAT(u.FirstName, ' ', u.LastName), d.OriginalName, d.ContentType, d.LeadInteractionId
                 FROM customer.leaddocuments d
                 INNER JOIN security.users u ON u.Id = d.UploadedByUserId
@@ -393,7 +400,7 @@ public sealed class GetLeadTimelineQueryHandler(ISqlConnectionFactory connection
             """;
 
         var items = (await connection.QueryAsync<LeadTimelineItemDto>(new CommandDefinition(
-                sql, new { LeadId = request.Id, Limit = Math.Clamp(request.Limit ?? 200, 1, 500) }, cancellationToken: cancellationToken)))
+                sql, new { LeadId = request.Id, actor.CompanyId, Limit = Math.Clamp(request.Limit ?? 200, 1, 500) }, cancellationToken: cancellationToken)))
             .ToList();
         return new Response<IReadOnlyList<LeadTimelineItemDto>> { IsSuccess = true, Message = "Lead timeline retrieved successfully.", Data = items };
     }
@@ -421,7 +428,7 @@ public sealed class GetLeadInteractionsQueryHandler(ISqlConnectionFactory connec
             SELECT
                 i.Id, i.LeadId, i.ContactTypeCompanyId, ct.Code AS ContactTypeCode, ctc.Name AS ContactTypeName, ct.Icon,
                 i.Direction, i.OccurredAt, i.DurationMinutes, i.UserId, CONCAT(u.FirstName, ' ', u.LastName) AS UserName,
-                i.Outcome, i.Summary, i.Created AS CreatedAt
+                i.Outcome, i.Summary, i.NextActionEventId, i.Created AS CreatedAt
             FROM customer.leadinteractions i
             INNER JOIN customer.contacttypecompanies ctc ON ctc.Id = i.ContactTypeCompanyId
             INNER JOIN customer.contacttypes ct ON ct.Id = ctc.ContactTypeId
@@ -487,7 +494,7 @@ public sealed class GetLeadCatalogsQueryHandler(ISqlConnectionFactory connection
             SELECT {Columns}, t.UsedFor FROM customer.leadreasons t {Live};
             SELECT {Columns}, t.OnWin FROM customer.relationshiptypes t {Live};
             SELECT c.Id, c.CompanyId, c.ContactTypeId, ct.Code, c.Name, ct.Name AS MasterName, ct.Icon, ct.CommunicationChannelCode,
-                   ct.SchedulesCalendarEvent, ct.AsksDuration, c.SortOrder, c.IsActive
+                   ct.SchedulesCalendarEvent, ct.AsksDuration, c.SortOrder, c.IsActive, c.CalendarActivityCompanyId
             FROM customer.contacttypecompanies c
             INNER JOIN customer.contacttypes ct ON ct.Id = c.ContactTypeId AND ct.GcRecord = 0 AND ct.IsActive = TRUE
             WHERE c.CompanyId = @CompanyId AND c.GcRecord = 0 AND c.IsActive = TRUE
@@ -512,5 +519,43 @@ public sealed class GetLeadCatalogsQueryHandler(ISqlConnectionFactory connection
         };
 
         return new Response<LeadCatalogsDto> { IsSuccess = true, Message = "Lead catalogs retrieved successfully.", Data = catalogs };
+    }
+}
+
+/// <summary>Handles <see cref="GetLeadEventsQuery"/>.</summary>
+public sealed class GetLeadEventsQueryHandler(ISqlConnectionFactory connectionFactory, ICurrentUserService currentUserService, LeadAccessGuard guard)
+    : IRequestHandler<GetLeadEventsQuery, Response<IReadOnlyList<LeadEventDto>>>
+{
+    public async Task<Response<IReadOnlyList<LeadEventDto>>> Handle(GetLeadEventsQuery request, CancellationToken cancellationToken)
+    {
+        if (LeadCommandContext.ActorOf<IReadOnlyList<LeadEventDto>>(currentUserService, out var actor) is { } noActor)
+        {
+            return noActor;
+        }
+
+        var access = await guard.ResolveAsync(actor.CompanyId, actor.UserId, cancellationToken);
+        using var connection = connectionFactory.CreateConnection();
+        if (!await LeadQuerySql.IsVisibleAsync(connection, request.Id, actor.CompanyId, access, cancellationToken))
+        {
+            return LeadCommandContext.NotFound<IReadOnlyList<LeadEventDto>>();
+        }
+
+        const string sql = """
+            SELECT
+                e.Id, e.Title, e.StartUtc, e.EndUtc, e.OwnerUserId, CONCAT(u.FirstName, ' ', u.LastName) AS OwnerName,
+                e.CalendarActivityCompanyId, ac.Name AS ActivityName, st.Code AS StatusCode, sc.Name AS StatusName, e.Location, e.VideoCallUrl
+            FROM calendar.events e
+            INNER JOIN calendar.activitycompanies ac ON ac.Id = e.CalendarActivityCompanyId
+            INNER JOIN calendar.statuscompanies sc ON sc.Id = e.CalendarStatusCompanyId
+            INNER JOIN calendar.statuses st ON st.Id = sc.CalendarStatusId
+            INNER JOIN security.users u ON u.Id = e.OwnerUserId
+            WHERE e.LeadId = @LeadId
+              AND e.CompanyId = @CompanyId
+              AND e.GcRecord = 0
+            ORDER BY e.StartUtc DESC;
+            """;
+
+        var items = (await connection.QueryAsync<LeadEventDto>(new CommandDefinition(sql, new { LeadId = request.Id, actor.CompanyId }, cancellationToken: cancellationToken))).ToList();
+        return new Response<IReadOnlyList<LeadEventDto>> { IsSuccess = true, Message = "Lead events retrieved successfully.", Data = items };
     }
 }

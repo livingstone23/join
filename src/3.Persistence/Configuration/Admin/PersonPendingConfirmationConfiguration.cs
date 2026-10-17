@@ -55,6 +55,8 @@ public sealed class PersonPendingConfirmationConfiguration : IEntityTypeConfigur
             .HasForeignKey(x => x.CustomerId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne<JOIN.Domain.Customers.Leads.Lead>().WithMany().HasForeignKey(x => x.LeadId).OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(x => x.ResolvedByUser)
             .WithMany()
             .HasForeignKey(x => x.ResolvedByUserId)

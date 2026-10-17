@@ -74,7 +74,8 @@ public sealed class UpdateContactTypeCompanyCommandHandler(IUnitOfWork unitOfWor
                 SchedulesCalendarEvent = master.SchedulesCalendarEvent,
                 AsksDuration = master.AsksDuration,
                 SortOrder = entity.SortOrder,
-                IsActive = entity.IsActive
+                IsActive = entity.IsActive,
+                CalendarActivityCompanyId = entity.CalendarActivityCompanyId
             }
         };
     }

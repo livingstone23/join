@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Admin;
+using JOIN.Application.UseCases.Admin.PersonPendingConfirmations.Commands.ConvertPersonPendingToLead;
 using JOIN.Application.UseCases.Admin.PersonPendingConfirmations.Commands.LinkCustomerToPersonPendingConfirmation;
 using JOIN.Application.UseCases.Admin.PersonPendingConfirmations.Commands.ResolvePersonPendingConfirmation;
 using JOIN.Application.UseCases.Admin.PersonPendingConfirmations.Queries.GetPersonPendingConfirmationById;
@@ -63,6 +64,18 @@ public class PersonPendingConfirmationsController(ISender sender) : ControllerBa
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> LinkCustomer(Guid id, [FromBody] LinkCustomerBody body, CancellationToken cancellationToken = default) =>
         this.ToResult(await sender.Send(new LinkCustomerToPersonPendingConfirmationCommand(id, body.CustomerId), cancellationToken));
+
+    /// <summary>
+    /// Converts the pending person into an open lead with origin <c>PENDING</c> (SPEC 65) and closes it as
+    /// <c>ConvertedToLead</c>. No customer is created. An update of the pending.
+    /// </summary>
+    [HttpPost("{id:guid}/convert-to-lead")]
+    [RequirePermission(Domain.Security.PermissionFlags.CanUpdate)]
+    [ProducesResponseType(typeof(Response<ConvertPersonPendingToLeadDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ConvertToLead(Guid id, [FromBody] ConvertPersonPendingToLeadCommand command, CancellationToken cancellationToken = default) =>
+        this.ToResult(await sender.Send(command with { PendingConfirmationId = id }, cancellationToken));
 
     /// <summary> Body of <c>POST /{id}/resolve</c>: <c>status</c> is <c>Confirmed</c> or <c>Discarded</c>. </summary>
     public sealed record ResolvePersonPendingConfirmationBody(string? Status, string? Notes);

@@ -166,8 +166,23 @@ public class LeadsController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(Response<LeadInteractionDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> AddInteraction(Guid id, [FromBody] LeadInteractionInput body, CancellationToken cancellationToken = default) =>
-        this.ToCommercialCreated(await mediator.Send(new AddLeadInteractionCommand { LeadId = id, Interaction = body }, cancellationToken));
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> AddInteraction(Guid id, [FromBody] LeadInteractionInput body, CancellationToken cancellationToken = default)
+    {
+        var response = await mediator.Send(new AddLeadInteractionCommand { LeadId = id, Interaction = body }, cancellationToken);
+
+        // SPEC 65: scheduling without the Calendar module answers like the SPEC 48-post filter (403 MODULE_NOT_ENABLED).
+        return response.Message == "MODULE_NOT_ENABLED"
+            ? new ObjectResult(DynamicAuthorizationFilter.BuildModuleNotEnabledProblem(HttpContext, response.Errors?.FirstOrDefault())) { StatusCode = StatusCodes.Status403Forbidden }
+            : this.ToCommercialCreated(response);
+    }
+
+    /// <summary>Calendar events linked to the lead (SPEC 65): scheduled next actions, pending and past.</summary>
+    [HttpGet("{id:guid}/events")]
+    [ProducesResponseType(typeof(Response<IReadOnlyList<LeadEventDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetEvents(Guid id, CancellationToken cancellationToken = default) =>
+        this.ToCommercialResult(await mediator.Send(new GetLeadEventsQuery(id), cancellationToken));
 
     /// <summary>Only its author, within 24 hours.</summary>
     [HttpPut("{id:guid}/interactions/{interactionId:guid}")]

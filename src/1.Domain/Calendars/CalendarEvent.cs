@@ -105,6 +105,9 @@ public class CalendarEvent : BaseTenantEntity
 
     public Guid? TicketId { get; set; }
 
+    /// <summary> Lead whose next action this event is (SPEC 65). </summary>
+    public Guid? LeadId { get; set; }
+
     public Guid? ProjectId { get; set; }
 
     // --- Status ---

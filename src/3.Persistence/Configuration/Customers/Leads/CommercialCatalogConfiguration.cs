@@ -114,6 +114,7 @@ public class ContactTypeCompanyConfiguration : IEntityTypeConfiguration<ContactT
         builder.Property(x => x.IsActive).IsRequired();
         builder.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.ContactType).WithMany().HasForeignKey(x => x.ContactTypeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<JOIN.Domain.Calendars.CalendarActivityCompany>().WithMany().HasForeignKey(x => x.CalendarActivityCompanyId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.CompanyId, x.ContactTypeId }).IsUnique().HasFilter("\"gcrecord\" = 0").HasDatabaseName("UX_ContactTypeCompanies_Company_Type");
     }
 }

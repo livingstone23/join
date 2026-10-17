@@ -50,6 +50,9 @@ public static class LeadErrorCodes
     public const string PersonIdentificationRequired = "PERSON_IDENTIFICATION_REQUIRED";
     public const string DuplicateKey = "DUPLICATE_KEY";
 
+    public const string ModuleNotEnabled = "MODULE_NOT_ENABLED";
+    public const string ContactTypeNotSchedulable = "CONTACT_TYPE_NOT_SCHEDULABLE";
+
     public const string LeadStageInUse = "LEAD_STAGE_IN_USE";
     public const string LeadSourceInUse = "LEAD_SOURCE_IN_USE";
     public const string LeadReasonInUse = "LEAD_REASON_IN_USE";

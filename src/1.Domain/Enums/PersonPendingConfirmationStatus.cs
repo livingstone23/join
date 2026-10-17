@@ -17,5 +17,8 @@ public enum PersonPendingConfirmationStatus
     LinkedToCustomer = 3,
 
     /// <summary> The pending was discarded (spam, error, duplicate). </summary>
-    Discarded = 4
+    Discarded = 4,
+
+    /// <summary> Converted into an open lead (SPEC 65); <c>LeadId</c> points to it. </summary>
+    ConvertedToLead = 5
 }

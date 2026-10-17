@@ -2159,3 +2159,21 @@ curl -s "$BASE_URL/api/v1/LeadReports/by-contact-type?from=2026-10-01&to=2026-10
 curl -s "$BASE_URL/api/v1/LeadReports/won-leads?from=2026-10-01&to=2026-10-31&pageNumber=1&pageSize=20" -H "Authorization: Bearer $TOKEN"
 curl -s "$BASE_URL/api/v1/LeadReports/won-leads?from=2026-10-01&to=2026-10-31&export=true" -H "Authorization: Bearer $TOKEN"   # CanExport, max 10 000 rows
 ```
+
+## Customers — next action in the calendar and pending persons as leads (SPEC 65)
+
+A contact can schedule its next action: a calendar event in the lead owner's calendar, with the activity of the
+contact type (`calendarActivityCompanyId` in `/Leads/catalogs`), linked to the lead. It needs the Calendar module
+when `Modules:EnforceCompanyModules` is on (403 `MODULE_NOT_ENABLED`; the SuperAdmin is never blocked). A pending person
+can become an open lead with origin `PENDING`; the pending closes as `ConvertedToLead` (5) and no customer is created.
+
+```bash
+curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/interactions" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "contactTypeCompanyId": "<call-id>", "durationMinutes": 10, "summary": "Acordamos una demo", "outcome": 1,
+        "nextAction": { "contactTypeCompanyId": "<online-meeting-id>", "startUtc": "2026-10-21T15:00:00Z", "endUtc": "2026-10-21T16:00:00Z", "videoCallUrl": "https://meet.example/demo" } }'
+curl -s "$BASE_URL/api/v1/Leads/<id>/events" -H "Authorization: Bearer $TOKEN"
+
+curl -s -X POST "$BASE_URL/api/v1/PersonPendingConfirmations/<id>/convert-to-lead" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "topic": "Pidió precios por WhatsApp", "relationshipTypeId": "<prospect-customer-id>", "notes": "Atendido" }'
+curl -s "$BASE_URL/api/v1/PersonPendingConfirmations?status=5" -H "Authorization: Bearer $TOKEN"
+```

@@ -22,7 +22,8 @@ internal static class ContactTypeCompanyQuerySql
             t.SchedulesCalendarEvent,
             t.AsksDuration,
             c.SortOrder,
-            c.IsActive
+            c.IsActive,
+            c.CalendarActivityCompanyId
         FROM customer.contacttypecompanies c
         INNER JOIN customer.contacttypes t ON t.Id = c.ContactTypeId AND t.GcRecord = 0
         """;

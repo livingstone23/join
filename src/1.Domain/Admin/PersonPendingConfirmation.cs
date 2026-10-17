@@ -40,6 +40,9 @@ public class PersonPendingConfirmation : BaseTenantEntity
     public Guid? CustomerId { get; set; }
 
     /// <summary> User who resolved the pending. </summary>
+    /// <summary> Lead created from this pending (SPEC 65, status <c>ConvertedToLead</c>). </summary>
+    public Guid? LeadId { get; set; }
+
     public Guid? ResolvedByUserId { get; set; }
 
     public DateTime? ResolvedUtc { get; set; }

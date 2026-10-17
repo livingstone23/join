@@ -38,7 +38,8 @@ public sealed class GetPersonPendingConfirmationsQueryHandler(
                ppc.customerid AS CustomerId,
                ppc.resolvedbyuserid AS ResolvedByUserId,
                ppc.resolvedutc AS ResolvedUtc,
-               ppc.resolutionnotes AS ResolutionNotes
+               ppc.resolutionnotes AS ResolutionNotes,
+               ppc.leadid AS LeadId
           FROM admin.personpendingconfirmations ppc
           INNER JOIN admin.persons p ON p.id = ppc.personid
           INNER JOIN common.communicationchannels cc ON cc.id = ppc.communicationchannelid
@@ -61,7 +62,7 @@ public sealed class GetPersonPendingConfirmationsQueryHandler(
         if (!Enum.IsDefined(typeof(PersonPendingConfirmationStatus), status))
         {
             return Response<PagedResult<PersonPendingConfirmationDto>>.Error(CalendarErrorCodes.PersonPendingInvalidStatus,
-                ["status must be Pending (1), Confirmed (2), LinkedToCustomer (3) or Discarded (4)."]);
+                ["status must be Pending (1), Confirmed (2), LinkedToCustomer (3), Discarded (4) or ConvertedToLead (5)."]);
         }
 
         var (pageNumber, pageSize) = _pagination.Sanitize(request.Page, request.PageSize);
@@ -147,9 +148,10 @@ internal sealed class PendingRow
     public Guid? ResolvedByUserId { get; init; }
     public DateTime? ResolvedUtc { get; init; }
     public string? ResolutionNotes { get; init; }
+    public Guid? LeadId { get; init; }
 
     public PersonPendingConfirmationDto ToDto() => new(
         Id, PersonId, PersonFullName, Identification, ChannelId, ChannelName, ChannelIdentifier, Reason,
         DateTime.SpecifyKind(RequestedUtc, DateTimeKind.Utc), Status, ReviewEventId, ReviewEventStatus, CustomerId, ResolvedByUserId,
-        ResolvedUtc is null ? null : DateTime.SpecifyKind(ResolvedUtc.Value, DateTimeKind.Utc), ResolutionNotes);
+        ResolvedUtc is null ? null : DateTime.SpecifyKind(ResolvedUtc.Value, DateTimeKind.Utc), ResolutionNotes, LeadId);
 }
