@@ -10,10 +10,12 @@ public sealed record CustomerStatusHistoryDto
     /// <summary><c>CustomerStatusAction</c>: 1 Created, 2 Activated, 3 Confirmed, 4 Deactivated.</summary>
     public int Action { get; init; }
     public string ActionName { get; init; } = string.Empty;
-    /// <summary><c>CustomerStatusSource</c>: 1 Manual, 2 Seed, 3 Migration, 4 PersonDeactivated.</summary>
+    /// <summary><c>CustomerStatusSource</c>: 1 Manual, 2 Seed, 3 Migration, 4 PersonDeactivated, 5 Lead.</summary>
     public int Source { get; init; }
     public string SourceName { get; init; } = string.Empty;
     public Guid? SourceReferenceId { get; init; }
+    /// <summary>Code of the referenced lead when the event comes from a lead (SPEC 63).</summary>
+    public string? SourceReferenceCode { get; init; }
     public string? Notes { get; init; }
     public Guid UserId { get; init; }
     public string UserEmail { get; init; } = string.Empty;

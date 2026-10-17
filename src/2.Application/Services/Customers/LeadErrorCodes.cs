@@ -45,6 +45,11 @@ public static class LeadErrorCodes
     public const string FileNotFoundInStorage = "FILE_NOT_FOUND_IN_STORAGE";
     public const string SuperAdminRequired = "SUPERADMIN_REQUIRED";
 
+    public const string LeadNotLost = "LEAD_NOT_LOST";
+    public const string InvalidLeadProduct = "INVALID_LEAD_PRODUCT";
+    public const string PersonIdentificationRequired = "PERSON_IDENTIFICATION_REQUIRED";
+    public const string DuplicateKey = "DUPLICATE_KEY";
+
     public const string LeadStageInUse = "LEAD_STAGE_IN_USE";
     public const string LeadSourceInUse = "LEAD_SOURCE_IN_USE";
     public const string LeadReasonInUse = "LEAD_REASON_IN_USE";

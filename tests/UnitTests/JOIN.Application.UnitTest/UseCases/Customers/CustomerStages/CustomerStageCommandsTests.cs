@@ -61,7 +61,7 @@ public sealed class CustomerStageCommandsTests
     {
         using var ctx = await CustomerTestContext.CreateAsync();
 
-        (await ctx.SendAsync(NewStage("lead"))).Message.Should().Be(CustomerErrorCodes.DuplicateKey);
+        (await ctx.SendAsync(NewStage("recurring"))).Message.Should().Be(CustomerErrorCodes.DuplicateKey);
         (await ctx.SendAsync(NewStage("VIP", isDefault: true, isActive: false))).Message.Should().Be(CustomerErrorCodes.CustomerStageDefaultInactive);
     }
 
@@ -76,18 +76,18 @@ public sealed class CustomerStageCommandsTests
         (await ctx.SendAsync(Edit(stages[CustomerStage.Codes.Customer], isActive: false))).Message
             .Should().Be(CustomerErrorCodes.CustomerStageDefaultInactive);
 
-        var moved = await ctx.SendAsync(Edit(stages[CustomerStage.Codes.Lead], isDefault: true));
+        var moved = await ctx.SendAsync(Edit(stages[CustomerStage.Codes.Recurring], isDefault: true));
 
         moved.IsSuccess.Should().BeTrue(moved.Message);
-        (await ctx.StagesAsync()).Where(s => s.IsDefault).Select(s => s.Code).Should().Equal(CustomerStage.Codes.Lead);
+        (await ctx.StagesAsync()).Where(s => s.IsDefault).Select(s => s.Code).Should().Equal(CustomerStage.Codes.Recurring);
     }
 
     [Fact]
     public async Task Update_DeactivatingAStage_ShouldKeepItOnItsCustomers()
     {
         using var ctx = await CustomerTestContext.CreateAsync();
-        var customer = (await ctx.SendAsync(new CreateCustomerCommand(ctx.PersonId, ctx.Stage[CustomerStage.Codes.Prospect]))).Data!;
-        var prospect = (await ctx.StagesAsync()).Single(s => s.Code == CustomerStage.Codes.Prospect);
+        var customer = (await ctx.SendAsync(new CreateCustomerCommand(ctx.PersonId, ctx.Stage[CustomerStage.Codes.Former]))).Data!;
+        var prospect = (await ctx.StagesAsync()).Single(s => s.Code == CustomerStage.Codes.Former);
 
         var response = await ctx.SendAsync(Edit(prospect, isActive: false));
 
@@ -102,9 +102,9 @@ public sealed class CustomerStageCommandsTests
         using var ctx = await CustomerTestContext.CreateAsync();
         var stages = (await ctx.StagesAsync()).ToDictionary(s => s.Code);
 
-        (await ctx.SendAsync(Edit(stages[CustomerStage.Codes.Lead], code: CustomerStage.Codes.Former))).Message
+        (await ctx.SendAsync(Edit(stages[CustomerStage.Codes.Recurring], code: CustomerStage.Codes.Former))).Message
             .Should().Be(CustomerErrorCodes.DuplicateKey);
-        (await ctx.SendAsync(Edit(stages[CustomerStage.Codes.Lead]) with { Id = Guid.NewGuid() })).Message
+        (await ctx.SendAsync(Edit(stages[CustomerStage.Codes.Recurring]) with { Id = Guid.NewGuid() })).Message
             .Should().Be(CustomerErrorCodes.CustomerStageNotFound);
     }
 
@@ -112,9 +112,9 @@ public sealed class CustomerStageCommandsTests
     public async Task Delete_ShouldBlockStagesInUseAndTheDefault_AndRestoreShouldBringItBack()
     {
         using var ctx = await CustomerTestContext.CreateAsync();
-        await ctx.SendAsync(new CreateCustomerCommand(ctx.PersonId, ctx.Stage[CustomerStage.Codes.Lead]));
+        await ctx.SendAsync(new CreateCustomerCommand(ctx.PersonId, ctx.Stage[CustomerStage.Codes.Recurring]));
 
-        (await ctx.SendAsync(new DeleteCustomerStageCommand(ctx.Stage[CustomerStage.Codes.Lead]))).Message
+        (await ctx.SendAsync(new DeleteCustomerStageCommand(ctx.Stage[CustomerStage.Codes.Recurring]))).Message
             .Should().Be(CustomerErrorCodes.CustomerStageInUse);
         (await ctx.SendAsync(new DeleteCustomerStageCommand(ctx.Stage[CustomerStage.Codes.Customer]))).Message
             .Should().Be(CustomerErrorCodes.CustomerStageDefaultRequired);

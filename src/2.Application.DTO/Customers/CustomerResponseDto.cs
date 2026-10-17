@@ -27,4 +27,8 @@ public sealed record CustomerResponseDto : SoftDeletableDto
     /// <summary>Source of the last status event (<c>CustomerStatusSource</c>).</summary>
     public int? LastStatusSource { get; init; }
     public DateTime? LastStatusAt { get; init; }
+
+    /// <summary>Lead the customer came from: first <c>Created</c>/<c>Activated</c> event with origin <c>Lead</c> (SPEC 63).</summary>
+    public Guid? OriginLeadId { get; init; }
+    public string? OriginLeadCode { get; init; }
 }

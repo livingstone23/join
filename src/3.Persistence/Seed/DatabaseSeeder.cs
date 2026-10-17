@@ -9,6 +9,7 @@ using JOIN.Domain.Calendars.Enums;
 using JOIN.Domain.Catalog;
 using JOIN.Domain.Common;
 using JOIN.Domain.Customers;
+using JOIN.Application.UseCases.Customers.Leads.Common;
 using JOIN.Domain.Customers.Leads;
 using JOIN.Domain.Customers.Teams;
 using ContactType = JOIN.Domain.Enums.ContactType;
@@ -469,10 +470,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     {
         (string Code, string Name, int SortOrder, bool IsDefault)[] seeds =
         [
-            (CustomerStage.Codes.Lead, "En contacto", 1, false),
-            (CustomerStage.Codes.Prospect, "En proceso", 2, false),
-            (CustomerStage.Codes.Customer, "Cliente", 3, true),
-            (CustomerStage.Codes.Former, "Cliente anterior", 4, false)
+            (CustomerStage.Codes.Customer, "Cliente", 1, true),
+            (CustomerStage.Codes.Recurring, "Recurrente", 2, false),
+            (CustomerStage.Codes.Former, "Cliente anterior", 3, false)
         ];
 
         var live = await _context.CustomerStages
@@ -920,6 +920,37 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             }
         }
 
+        // SPEC 63 item 8: the lookup persons that were funnel customers (LEAD/PROSPECT) are open leads instead.
+        var funnel = GetJoinLookupPersonSeeds().Where(x => IsLegacyFunnelStage(x.CustomerStageCode)).ToList();
+        var funnelNumbers = funnel.Select(x => x.IdentificationNumber).ToList();
+        var funnelPersons = await _context.Persons.IgnoreQueryFilters()
+            .Where(p => p.CompanyId == joinCompanyId && p.GcRecord == 0 && p.IdentificationNumber != null && funnelNumbers.Contains(p.IdentificationNumber))
+            .ToDictionaryAsync(p => p.IdentificationNumber!, p => p.Id, cancellationToken);
+        var registrar = users["livingstone23@gmail.com"];
+        foreach (var seed in funnel)
+        {
+            if (!funnelPersons.TryGetValue(seed.IdentificationNumber, out var personId))
+            {
+                continue;
+            }
+
+            number++;
+            var stage = stages[seed.CustomerStageCode == CustomerStage.LegacyCodes.Prospect && stages.ContainsKey("QUALIFIED") ? "QUALIFIED" : "NEW"];
+            var lead = new Lead
+            {
+                CompanyId = joinCompanyId, Code = $"LD-{number:D6}", PersonId = personId, Topic = "Interés en JOIN CRM", OwnerUserId = registrar,
+                SalesTeamId = teams.TryGetValue("Equipo Norte", out var norte) ? norte : null, LeadStageId = stage.Id, LeadSourceId = sources["WEB"],
+                RelationshipTypeId = relationships["PROSPECT_CUSTOMER"], CurrencyId = currencies["DOP"], ExchangeRate = 1m, ExchangeRateDate = today
+            };
+            _context.Leads.Add(lead);
+            _context.LeadStageHistory.Add(new LeadStageHistory { CompanyId = joinCompanyId, LeadId = lead.Id, ToStageId = stage.Id, UserId = registrar, ChangedAt = now });
+            _context.LeadOwnershipHistory.Add(new LeadOwnershipHistory
+            {
+                CompanyId = joinCompanyId, LeadId = lead.Id, ToUserId = registrar, ToTeamId = lead.SalesTeamId, Cause = LeadOwnershipCause.Created, UserId = registrar, At = now
+            });
+            _context.LeadStatusHistory.Add(new LeadStatusHistory { CompanyId = joinCompanyId, LeadId = lead.Id, ToStatus = LeadStatus.Open, UserId = registrar, At = now });
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
     }
 
@@ -956,6 +987,146 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         {
             await SeedLeadAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// SPEC 63 C: every live customer in the retired funnel stages (<c>LEAD</c>/<c>PROSPECT</c>) becomes an open lead
+    /// linked to it (<c>Lead.CustomerId</c>); an active customer is deactivated (<c>Deactivated · Migration</c>, reference =
+    /// lead) and moved to the company's default stage. Then <c>RECURRING</c> is added when missing and the two retired
+    /// stages are deleted logically. Idempotent: with no customer left in those stages it only finishes the stage cleanup.
+    /// Runs on startup after the migrations.
+    /// </summary>
+    public async Task MigrateFunnelCustomersToLeadsAsync(CancellationToken cancellationToken = default)
+    {
+        var legacy = new[] { CustomerStage.LegacyCodes.Lead, CustomerStage.LegacyCodes.Prospect };
+        var companyIds = await _context.CustomerStages.IgnoreQueryFilters()
+            .Where(st => st.GcRecord == 0 && legacy.Contains(st.Code))
+            .Select(st => st.CompanyId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        foreach (var companyId in companyIds)
+        {
+            var created = await MigrateFunnelCustomersOfCompanyAsync(companyId, cancellationToken);
+            _logger.LogInformation("SPEC 63 migration: {Count} lead(s) created from LEAD/PROSPECT customers in company {CompanyId}.", created, companyId);
+        }
+    }
+
+    private async Task<int> MigrateFunnelCustomersOfCompanyAsync(Guid companyId, CancellationToken cancellationToken)
+    {
+        var stages = await _context.CustomerStages.IgnoreQueryFilters().Where(st => st.CompanyId == companyId && st.GcRecord == 0).ToListAsync(cancellationToken);
+        var legacyStages = stages.Where(st => IsLegacyFunnelStage(st.Code)).ToList();
+        var legacyIds = legacyStages.Select(st => st.Id).ToList();
+
+        // The default stage cannot stay on a retired stage: CUSTOMER takes it (created when missing).
+        var customerStage = stages.FirstOrDefault(st => st.Code == CustomerStage.Codes.Customer);
+        if (customerStage is null)
+        {
+            customerStage = CustomerStage.Create(companyId, CustomerStage.Codes.Customer, "Cliente", null, 1, isDefault: false);
+            _context.CustomerStages.Add(customerStage);
+            stages.Add(customerStage);
+        }
+
+        var defaultStage = stages.FirstOrDefault(st => st.IsDefault && !IsLegacyFunnelStage(st.Code));
+        if (defaultStage is null)
+        {
+            foreach (var stage in stages.Where(st => st.IsDefault))
+            {
+                stage.UnmarkAsDefault();
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+            customerStage.MarkAsDefault();
+            defaultStage = customerStage;
+        }
+
+        var customers = await _context.Customers.IgnoreQueryFilters()
+            .Where(c => c.CompanyId == companyId && c.GcRecord == 0 && legacyIds.Contains(c.CustomerStageId))
+            .ToListAsync(cancellationToken);
+
+        var created = 0;
+        if (customers.Count > 0)
+        {
+            var leadStages = await _context.LeadStages.IgnoreQueryFilters().Where(x => x.CompanyId == companyId && x.GcRecord == 0).ToListAsync(cancellationToken);
+            var initial = leadStages.FirstOrDefault(x => x.Kind == LeadStageKind.Initial);
+            var source = (await _context.LeadSources.IgnoreQueryFilters().Where(x => x.CompanyId == companyId && x.GcRecord == 0).ToListAsync(cancellationToken))
+                .OrderBy(x => x.Code == "MIGRATION" ? 0 : 1).FirstOrDefault();
+            var relationship = (await _context.RelationshipTypes.IgnoreQueryFilters().Where(x => x.CompanyId == companyId && x.GcRecord == 0).ToListAsync(cancellationToken))
+                .OrderBy(x => x.Code == "PROSPECT_CUSTOMER" ? 0 : x.OnWin == RelationshipOnWin.Customer ? 1 : 2).FirstOrDefault();
+            var baseCurrency = await _context.CompanyCurrencies.IgnoreQueryFilters()
+                .Where(cc => cc.CompanyId == companyId && cc.GcRecord == 0 && cc.IsBase).Select(cc => (Guid?)cc.CurrencyId).FirstOrDefaultAsync(cancellationToken);
+            if (initial is null || source is null || relationship is null || baseCurrency is null)
+            {
+                _logger.LogWarning("SPEC 63 migration skipped for company {CompanyId}: commercial settings or base currency missing.", companyId);
+                return 0;
+            }
+
+            var settings = await _context.LeadCompanySettings.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.CompanyId == companyId && x.GcRecord == 0, cancellationToken)
+                ?? LeadCompanySettings.Defaults(companyId);
+            var codes = await _context.Leads.IgnoreQueryFilters().Where(l => l.CompanyId == companyId).Select(l => l.Code).ToListAsync(cancellationToken);
+            var sequence = codes.Select(code => LeadCodeGenerator.TryParse(code, settings.CodePrefix)).Where(n => n.HasValue).Select(n => n!.Value).DefaultIfEmpty(0).Max();
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var now = DateTime.UtcNow;
+
+            foreach (var customer in customers)
+            {
+                var legacyCode = legacyStages.First(st => st.Id == customer.CustomerStageId).Code;
+                var targetCode = legacyCode == CustomerStage.LegacyCodes.Prospect ? "QUALIFIED" : "NEW";
+                var leadStage = leadStages.FirstOrDefault(x => x.Code == targetCode && x.IsActive && x.Kind is LeadStageKind.Initial or LeadStageKind.Open) ?? initial;
+                var teamId = await _context.SalesTeamMembers.IgnoreQueryFilters()
+                    .Where(m => m.CompanyId == companyId && m.UserId == customer.UserId && m.GcRecord == 0 && m.IsPrimary
+                        && m.ValidFrom <= today && (m.ValidTo == null || m.ValidTo >= today))
+                    .Select(m => (Guid?)m.SalesTeamId)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                var lead = new Lead
+                {
+                    CompanyId = companyId,
+                    Code = LeadCodeGenerator.Format(settings.CodePrefix, ++sequence, settings.CodeSequenceLength),
+                    PersonId = customer.PersonId,
+                    Topic = "Migrado desde clientes",
+                    OwnerUserId = customer.UserId,
+                    SalesTeamId = teamId,
+                    LeadStageId = leadStage.Id,
+                    LeadSourceId = source.Id,
+                    RelationshipTypeId = relationship.Id,
+                    CurrencyId = baseCurrency.Value,
+                    ExchangeRate = 1m,
+                    ExchangeRateDate = today,
+                    CustomerId = customer.Id,
+                    CreatedBy = "SPEC63_Migration"
+                };
+                _context.Leads.Add(lead);
+                _context.LeadStageHistory.Add(new LeadStageHistory { CompanyId = companyId, LeadId = lead.Id, ToStageId = leadStage.Id, UserId = customer.UserId, ChangedAt = now });
+                _context.LeadOwnershipHistory.Add(new LeadOwnershipHistory
+                {
+                    CompanyId = companyId, LeadId = lead.Id, ToUserId = customer.UserId, ToTeamId = teamId, Cause = LeadOwnershipCause.Created, UserId = customer.UserId, At = now, Notes = "Migración SPEC 63"
+                });
+                _context.LeadStatusHistory.Add(new LeadStatusHistory { CompanyId = companyId, LeadId = lead.Id, ToStatus = LeadStatus.Open, UserId = customer.UserId, At = now });
+
+                if (customer.Deactivate())
+                {
+                    _context.CustomerStatusHistory.Add(CustomerStatusHistory.Create(
+                        companyId, customer.Id, CustomerStatusAction.Deactivated, CustomerStatusSource.Migration, customer.UserId, lead.Id, "Migrado a lead (SPEC 63)"));
+                }
+
+                customer.ChangeStage(defaultStage.Id);
+                created++;
+            }
+        }
+
+        if (!stages.Any(st => st.Code == CustomerStage.Codes.Recurring))
+        {
+            _context.CustomerStages.Add(CustomerStage.Create(companyId, CustomerStage.Codes.Recurring, "Recurrente", null, 2, isDefault: false));
+        }
+
+        foreach (var stage in legacyStages)
+        {
+            stage.MarkAsDeleted();
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return created;
     }
 
     /// <summary>
@@ -1877,7 +2048,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             .Where(s => s.CompanyId == companyId && s.GcRecord == 0)
             .ToDictionaryAsync(s => s.Code, s => s.Id);
 
-        var customerSeeds = GetJoinLookupPersonSeeds().Where(s => s.CustomerStageCode is not null).ToList();
+        // SPEC 63: the persons that were funnel customers (LEAD/PROSPECT) become open leads in SeedJoinLeadsAsync.
+        var customerSeeds = GetJoinLookupPersonSeeds()
+            .Where(s => s.CustomerStageCode is not null && !IsLegacyFunnelStage(s.CustomerStageCode))
+            .ToList();
         var identificationNumbers = customerSeeds.Select(s => s.IdentificationNumber).ToList();
         var personsByIdNumber = await _context.Persons
             .IgnoreQueryFilters()
@@ -1938,6 +2112,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         _logger.LogInformation("JOIN customers seed finished (SPEC 54). Inserted: {Inserted}, Existing: {Existing}", inserted, customerSeeds.Count - inserted);
     }
+
+    private static bool IsLegacyFunnelStage(string? code) =>
+        code is CustomerStage.LegacyCodes.Lead or CustomerStage.LegacyCodes.Prospect;
 
     private async Task SeedPrivatePersonsAsync(Guid companyId, Guid idTypeId)
     {
@@ -2130,14 +2307,14 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new(PersonType.Physical, "Norma", null, "Osorio", null, null, CedulaIdentificationType, "103-2001035-1", true, null),
         new(PersonType.Physical, "Gabriela", null, "Cano", "Ferreira", null, CedulaIdentificationType, "001-1789456-2", true, CustomerStage.Codes.Customer),
         new(PersonType.Physical, "Mateo", null, "Cano", "Ruiz", null, CedulaIdentificationType, "001-1823410-7", false, null),
-        new(PersonType.Physical, "Valeria", null, "Osorio", "Peña", null, CedulaIdentificationType, "402-2150987-3", true, CustomerStage.Codes.Prospect),
+        new(PersonType.Physical, "Valeria", null, "Osorio", "Peña", null, CedulaIdentificationType, "402-2150987-3", true, CustomerStage.LegacyCodes.Prospect),
         new(PersonType.Physical, "Andrés", "Felipe", "Quintero", null, null, PasaporteIdentificationType, "AB4417320", false, CustomerStage.Codes.Customer),
         new(PersonType.Physical, "Daniela", null, "Castillo", "Mejía", null, CedulaIdentificationType, "223-0098451-6", true, CustomerStage.Codes.Customer),
         new(PersonType.Physical, "Rafael", "Antonio", "Guzmán", null, null, CedulaIdentificationType, "031-0456123-9", false, CustomerStage.Codes.Customer),
-        new(PersonType.Physical, "Isabel", "Cristina", "Rosario", null, null, CedulaIdentificationType, "047-1203389-4", true, CustomerStage.Codes.Lead),
+        new(PersonType.Physical, "Isabel", "Cristina", "Rosario", null, null, CedulaIdentificationType, "047-1203389-4", true, CustomerStage.LegacyCodes.Lead),
         new(PersonType.Physical, "Tomás", null, "Herrera", "Báez", null, CedulaIdentificationType, "001-0871245-1", false, CustomerStage.Codes.Customer),
         new(PersonType.Physical, "Lucía", null, "Fernández", "Almonte", null, PasaporteIdentificationType, "30981245", true, CustomerStage.Codes.Customer),
-        new(PersonType.Physical, "Joaquín", null, "Medina", "Paulino", null, CedulaIdentificationType, "402-1987742-0", false, CustomerStage.Codes.Prospect),
+        new(PersonType.Physical, "Joaquín", null, "Medina", "Paulino", null, CedulaIdentificationType, "402-1987742-0", false, CustomerStage.LegacyCodes.Prospect),
         new(PersonType.Physical, "Camila", null, "Santana", "Veras", null, CedulaIdentificationType, "001-1567023-8", true, CustomerStage.Codes.Customer),
         new(PersonType.Physical, "Esteban", null, "Marte", "Cabrera", null, CedulaIdentificationType, "056-0034781-2", false, null),
         new(PersonType.Physical, "Paola", null, "Jiménez", "Tejada", null, CedulaIdentificationType, "223-0145567-5", true, null),
@@ -2145,12 +2322,12 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new(PersonType.Physical, "Mariana", null, "Batista", "Cruz", null, PasaporteIdentificationType, "C2245871", true, CustomerStage.Codes.Customer),
         new(PersonType.Physical, "Ricardo", null, "Peña", "Lora", null, CedulaIdentificationType, "031-0789012-6", false, null),
         new(PersonType.Physical, "Natalia", null, "Vásquez", "Ortiz", null, CedulaIdentificationType, "402-2233198-1", true, CustomerStage.Codes.Customer),
-        new(PersonType.Physical, "Fernando", null, "Abreu", "Matos", null, CedulaIdentificationType, "001-1345987-4", false, CustomerStage.Codes.Lead),
+        new(PersonType.Physical, "Fernando", null, "Abreu", "Matos", null, CedulaIdentificationType, "001-1345987-4", false, CustomerStage.LegacyCodes.Lead),
         new(PersonType.Physical, "Sofía", null, "Encarnación", "Gil", null, CedulaIdentificationType, "047-0987654-0", true, CustomerStage.Codes.Customer),
         new(PersonType.Physical, "Alejandro", null, "Núñez", "Brito", null, PasaporteIdentificationType, "41237765", false, null),
         new(PersonType.Physical, "Verónica", null, "Taveras", "Sosa", null, CedulaIdentificationType, "001-1902345-9", true, CustomerStage.Codes.Customer, CustomerInactive: true),
         new(PersonType.Physical, "Manuel", "de Jesús", "Acosta", null, null, CedulaIdentificationType, "034-0012876-3", false, CustomerStage.Codes.Customer),
-        new(PersonType.Physical, "Carolina", null, "Espinal", "Durán", null, CedulaIdentificationType, "402-1765432-8", true, CustomerStage.Codes.Prospect),
+        new(PersonType.Physical, "Carolina", null, "Espinal", "Durán", null, CedulaIdentificationType, "402-1765432-8", true, CustomerStage.LegacyCodes.Prospect),
         new(PersonType.Physical, "Diego", null, "Rosario", "Familia", null, CedulaIdentificationType, "001-0567812-2", false, null),
         new(PersonType.Physical, "Adriana", "Mercedes", "Lugo", null, null, CedulaIdentificationType, "223-0198765-7", true, CustomerStage.Codes.Customer),
         new(PersonType.Physical, "Iván", null, "Sánchez", "Holguín", null, PasaporteIdentificationType, "D7781203", false, CustomerStage.Codes.Customer),
@@ -2161,9 +2338,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new(PersonType.Legal, "Norma", null, "Osorio", null, "Distribuidora Osorio & Asociados S.R.L.", RncIdentificationType, "1-31-45678-2", false, CustomerStage.Codes.Customer),
         new(PersonType.Legal, "Tomás", null, "Herrera", null, "Agroindustrial Cibao S.A.", RncIdentificationType, "1-01-23456-7", false, CustomerStage.Codes.Customer),
         new(PersonType.Legal, "Lucía", null, "Fernández", null, "Clínica Santa Lucía S.R.L.", RncIdentificationType, "1-30-98765-4", false, CustomerStage.Codes.Customer),
-        new(PersonType.Legal, "Manuel", null, "Acosta", null, "Ferretería El Progreso S.R.L.", RncIdentificationType, "1-31-11223-5", false, CustomerStage.Codes.Lead),
+        new(PersonType.Legal, "Manuel", null, "Acosta", null, "Ferretería El Progreso S.R.L.", RncIdentificationType, "1-31-11223-5", false, CustomerStage.LegacyCodes.Lead),
         new(PersonType.Legal, "Iván", null, "Sánchez", null, "Transporte Caribe Express S.A.", RncIdentificationType, "1-01-77889-1", false, CustomerStage.Codes.Customer),
-        new(PersonType.Legal, "Rosa", null, "Fermín", null, "Colegio Nuevo Horizonte S.R.L.", RncIdentificationType, "1-30-44556-9", false, CustomerStage.Codes.Prospect),
+        new(PersonType.Legal, "Rosa", null, "Fermín", null, "Colegio Nuevo Horizonte S.R.L.", RncIdentificationType, "1-30-44556-9", false, CustomerStage.LegacyCodes.Prospect),
         new(PersonType.Legal, "Camila", null, "Santana", null, "Hotel Playa Dorada S.A.", RncIdentificationType, "1-01-99001-3", false, CustomerStage.Codes.Customer),
         new(PersonType.Legal, "Livingstone", null, "Cano", null, "Software Cano Tech S.R.L.", RncIdentificationType, "1-31-66778-0", false, CustomerStage.Codes.Customer)
     ];

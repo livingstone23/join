@@ -62,6 +62,7 @@ public sealed class GetCustomerStatusHistoryQueryHandler(
                 h.Action,
                 h.Source,
                 h.SourceReferenceId,
+                ld.Code AS SourceReferenceCode,
                 h.Notes,
                 h.UserId,
                 COALESCE(u.Email, '') AS UserEmail,
@@ -69,6 +70,9 @@ public sealed class GetCustomerStatusHistoryQueryHandler(
             FROM customer.customerstatushistory h
             LEFT JOIN Security.Users u
                 ON u.Id = h.UserId
+            LEFT JOIN customer.leads ld
+                ON h.Source = 5
+               AND ld.Id = h.SourceReferenceId
             WHERE h.CustomerId = @CustomerId
               AND h.CompanyId = @TenantId
               AND h.GcRecord = 0

@@ -89,6 +89,39 @@
 10. `GET /Customers` muestra `OriginLeadCode` en los clientes que vinieron de un lead.
 11. Unit tests de los comandos, la migración y el seed; integración para 1–10.
 
+## Registro de implementación (2026-10-17)
+
+Rama `spec-63-lead-win-loss-and-customer-conversion` (desde `spec-62-lead-interaction-documents`, para encadenar las migraciones).
+
+- **Dominio y persistencia:**
+  - `Lead` suma `WonValue`, `WonExchangeRate`, `WonValueBase` y `CompetitorName`. Migración `Spec63LeadWinLossAndCustomerConversion`: cuatro columnas nulas.
+  - `CustomerStatusSource.Lead = 5`.
+  - `CustomerStage.Codes` queda con `CUSTOMER`, `RECURRING` y `FORMER`. `LEAD` y `PROSPECT` pasan a `CustomerStage.LegacyCodes` y solo los usa la migración.
+- **Application:**
+  - `WinLeadCommand`:
+    - Lead abierto y visible; motivo de uso `Won`.
+    - Si la vinculación crea clientes, completa la identificación (unicidad, `DUPLICATE_KEY`) o responde `PERSON_IDENTIFICATION_REQUIRED` cuando la empresa la exige.
+    - Líneas aceptadas o rechazadas; `WonValue` y la tasa del día de cierre. El valor estimado no se toca.
+    - Pasa a la etapa `Won` con sus historiales y llama a `EnsureActiveAsync` con origen `Lead` y referencia = lead. La respuesta trae cliente, código y acción.
+  - `LoseLeadCommand` (motivo `Lost`, competidor) y `ReopenLeadCommand` (solo `Lost`; vuelve a la última etapa abierta activa del historial o a la inicial).
+  - Reabrir queda en el historial de estado como la transición `Lost → Open`.
+  - `GET /Customers` y `GET /Customers/{id}` suman `OriginLeadId`/`OriginLeadCode`. `GET /Customers/{id}/status-history` suma `SourceReferenceCode` en los eventos con origen `Lead`.
+- **WebApi:** `POST /Leads/{id}/win`, `/lose` y `/reopen` (`CanUpdate`); `LEAD_NOT_LOST` → 409.
+- **Seed y migración:**
+  - Las empresas nuevas nacen con `CUSTOMER` (por defecto), `RECURRING` y `FORMER`.
+  - En `JOIN-001`, las 7 personas del seed de SPEC 54 que eran clientes en `LEAD`/`PROSPECT` pasan a ser leads abiertos (`NEW`/`QUALIFIED`) en vez de clientes.
+  - `MigrateFunnelCustomersToLeadsAsync` corre en cada arranque después de las migraciones (`Program.cs`) y es idempotente. Por cada cliente en `LEAD`/`PROSPECT`:
+    - Crea un lead abierto en `NEW`/`QUALIFIED`, con origen `MIGRATION`, vinculación `PROSPECT_CUSTOMER`, dueño = `Customer.UserId`, grupo principal vigente, moneda base y `CustomerId`.
+    - Desactiva al cliente con `Deactivated · Migration` (referencia = lead) y lo pasa a la etapa por defecto.
+  - Después la migración agrega `RECURRING` si falta y borra lógicamente `LEAD` y `PROSPECT` (si eran la etapa por defecto, la por defecto pasa antes a `CUSTOMER`). Escribe en el log cuántos leads creó por empresa.
+- **Tests existentes ajustados (Ajuste por SPEC 63):**
+  - Las pruebas de etapas de cliente usan `RECURRING`/`FORMER`.
+  - El seed de SPEC 54 deja 23 clientes, no 30, y 3 etapas por empresa.
+- **Verificación:**
+  - Build Release sin errores.
+  - Unit tests: 3393 OK, cobertura de líneas 94,39 %.
+  - Integración: 320/320 OK, 8 nuevas (criterios 1–10, incluida la migración corrida dos veces).
+
 ## Decisiones
 
 - **Lead propio, cliente al ganar** (decisión del usuario): `Customers` solo tiene relaciones comerciales reales; el embudo vive en los leads.

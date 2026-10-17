@@ -8,12 +8,18 @@ namespace JOIN.Domain.Customers;
 /// </summary>
 public class CustomerStage : BaseTenantEntity
 {
-    /// <summary>Codes of the four initial stages every company starts with.</summary>
-    public static class Codes
+    /// <summary>Post-sale stages every company starts with (SPEC 63: the funnel lives in the leads).</summary>
+    /// <summary>Funnel stages retired by SPEC 63; only the data migration still reads them.</summary>
+    public static class LegacyCodes
     {
         public const string Lead = "LEAD";
         public const string Prospect = "PROSPECT";
+    }
+
+    public static class Codes
+    {
         public const string Customer = "CUSTOMER";
+        public const string Recurring = "RECURRING";
         public const string Former = "FORMER";
     }
 

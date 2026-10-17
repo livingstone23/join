@@ -19,7 +19,7 @@ namespace JOIN.Application.UnitTest.UseCases.Customers;
 
 /// <summary>
 /// Customer test bed (SPEC 55): InMemory <see cref="ApplicationDbContext"/>, the real <see cref="UnitOfWork"/> without
-/// the advisory lock and the Application services. Seeds a company with the four initial stages (CUSTOMER default),
+/// the advisory lock and the Application services. Seeds a company with the three post-sale stages (CUSTOMER default, SPEC 63),
 /// a user (the current one) and two active persons.
 /// </summary>
 internal sealed class CustomerTestContext : IDisposable
@@ -134,10 +134,9 @@ internal sealed class CustomerTestContext : IDisposable
 
         foreach (var (code, name, order, isDefault) in new[]
                  {
-                     (CustomerStage.Codes.Lead, "En contacto", 1, false),
-                     (CustomerStage.Codes.Prospect, "En proceso", 2, false),
-                     (CustomerStage.Codes.Customer, "Cliente", 3, true),
-                     (CustomerStage.Codes.Former, "Cliente anterior", 4, false)
+                     (CustomerStage.Codes.Customer, "Cliente", 1, true),
+                     (CustomerStage.Codes.Recurring, "Recurrente", 2, false),
+                     (CustomerStage.Codes.Former, "Cliente anterior", 3, false)
                  })
         {
             var stage = CustomerStage.Create(CompanyId, code, name, null, order, isDefault);

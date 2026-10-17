@@ -206,9 +206,24 @@ internal sealed class LeadTestContext : IDisposable
             Db.Products.Add(product);
         }
 
+        Db.CustomerStages.Add(JOIN.Domain.Customers.CustomerStage.Create(CompanyId, JOIN.Domain.Customers.CustomerStage.Codes.Customer, "Cliente", null, 1, isDefault: true));
+        foreach (var (code, usage) in new[] { ("BEST_PRICE", LeadReasonUsage.Won) })
+        {
+            var reason = new LeadReason { CompanyId = CompanyId, Code = code, Name = code, UsedFor = usage };
+            Reason[code] = reason.Id;
+            Db.LeadReasons.Add(reason);
+        }
+
+        var supplier = new RelationshipType { CompanyId = CompanyId, Code = "SUPPLIER", Name = "Proveedor", OnWin = RelationshipOnWin.None };
+        Relationship["SUPPLIER"] = supplier.Id;
+        Db.RelationshipTypes.Add(supplier);
+        IdentificationTypeId = idType.Id;
+
         await Db.SaveChangesAsync();
         Db.ChangeTracker.Clear();
     }
+
+    public Guid IdentificationTypeId { get; private set; }
 
     public void Dispose()
     {

@@ -2127,3 +2127,19 @@ curl -s "$BASE_URL/api/v1/LeadAttachmentSettings" -H "Authorization: Bearer $TOK
 curl -s -X PUT "$BASE_URL/api/v1/LeadAttachmentSettings" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{ "allowedDocumentTypes": 23, "maxFileSizeBytes": 10485760, "maxFilesPerInteraction": 5, "maxFilesPerDay": 200 }'
 ```
+
+## Customers — win, lose and reopen leads (SPEC 63)
+
+Win from any open stage with a win reason. The listed lines become `Accepted` (the rest `Rejected`), and the won value
+is fixed with the rate of the closing day (`wonExchangeRate`, `wonValueBase`). When the lead's relationship type has
+`onWin = Customer`, the person's customer is created, reactivated or confirmed with origin `Lead` (5). If the company
+requires identification and the person has none, send `identificationTypeId` + `identificationNumber`. Customer stages
+are post-sale now (`CUSTOMER`, `RECURRING`, `FORMER`); `GET /Customers` shows `originLeadId`/`originLeadCode`.
+
+```bash
+curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/win" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "leadReasonId": "<won-reason-id>", "acceptedLeadProductIds": ["<line-id>"], "identificationTypeId": "<rnc-id>", "identificationNumber": "1-31-11223-5", "notes": "Firmó" }'
+curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/lose" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "leadReasonId": "<lost-reason-id>", "competitorName": "Otro CRM" }'
+curl -s -X POST "$BASE_URL/api/v1/Leads/<id>/reopen" -H "Authorization: Bearer $TOKEN"
+```

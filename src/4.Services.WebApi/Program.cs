@@ -244,6 +244,9 @@ using (var scope = app.Services.CreateScope())
             }
         }
 
+        // SPEC 63: customers still in the retired LEAD/PROSPECT stages become open leads (no-op once migrated).
+        await seeder.MigrateFunnelCustomersToLeadsAsync();
+
     }
     catch (Exception ex)
     {

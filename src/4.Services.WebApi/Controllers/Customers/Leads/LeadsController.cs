@@ -128,6 +128,34 @@ public class LeadsController(IMediator mediator) : ControllerBase
     public async Task<IActionResult> Reactivate(Guid id, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] ReactivateLeadCommand? command, CancellationToken cancellationToken = default) =>
         this.ToCommercialResult(await mediator.Send((command ?? new ReactivateLeadCommand()) with { Id = id }, cancellationToken));
 
+    /// <summary>
+    /// Wins the lead from any open stage (SPEC 63): accepted lines, won value at the closing-day rate and, when the
+    /// relationship type creates customers, the customer created, reactivated or confirmed.
+    /// </summary>
+    [HttpPost("{id:guid}/win")]
+    [RequirePermission(PermissionFlags.CanUpdate)]
+    [ProducesResponseType(typeof(Response<LeadWinResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Win(Guid id, [FromBody] WinLeadCommand command, CancellationToken cancellationToken = default) =>
+        this.ToCommercialResult(await mediator.Send(command with { Id = id }, cancellationToken));
+
+    /// <summary>Loses the lead with a loss reason and an optional competitor (SPEC 63).</summary>
+    [HttpPost("{id:guid}/lose")]
+    [RequirePermission(PermissionFlags.CanUpdate)]
+    [ProducesResponseType(typeof(Response<LeadDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Lose(Guid id, [FromBody] LoseLeadCommand command, CancellationToken cancellationToken = default) =>
+        this.ToCommercialResult(await mediator.Send(command with { Id = id }, cancellationToken));
+
+    /// <summary>Reopens a lost lead in its last open stage (SPEC 63). Won leads are not reopened.</summary>
+    [HttpPost("{id:guid}/reopen")]
+    [RequirePermission(PermissionFlags.CanUpdate)]
+    [ProducesResponseType(typeof(Response<LeadDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Reopen(Guid id, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] ReopenLeadCommand? command, CancellationToken cancellationToken = default) =>
+        this.ToCommercialResult(await mediator.Send((command ?? new ReopenLeadCommand()) with { Id = id }, cancellationToken));
+
     [HttpGet("{id:guid}/interactions")]
     [ProducesResponseType(typeof(Response<IReadOnlyList<LeadInteractionDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetInteractions(Guid id, CancellationToken cancellationToken = default) =>

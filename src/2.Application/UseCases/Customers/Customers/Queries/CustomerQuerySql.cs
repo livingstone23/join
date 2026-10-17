@@ -47,7 +47,9 @@ internal static class CustomerQuerySql
             cust.Created AS CreatedAt,
             lh.Action AS LastStatusAction,
             lh.Source AS LastStatusSource,
-            lh.OccurredAt AS LastStatusAt
+            lh.OccurredAt AS LastStatusAt,
+            ol.LeadId AS OriginLeadId,
+            ol.Code AS OriginLeadCode
         {FromClause}
         LEFT JOIN LATERAL (
             SELECT h.Action, h.Source, h.OccurredAt
@@ -57,5 +59,16 @@ internal static class CustomerQuerySql
             ORDER BY h.OccurredAt DESC
             LIMIT 1
         ) lh ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT ld.Id AS LeadId, ld.Code
+            FROM customer.customerstatushistory oh
+            INNER JOIN customer.leads ld ON ld.Id = oh.SourceReferenceId
+            WHERE oh.CustomerId = cust.Id
+              AND oh.GcRecord = 0
+              AND oh.Source = 5
+              AND oh.Action IN (1, 2)
+            ORDER BY oh.OccurredAt
+            LIMIT 1
+        ) ol ON TRUE
         """;
 }

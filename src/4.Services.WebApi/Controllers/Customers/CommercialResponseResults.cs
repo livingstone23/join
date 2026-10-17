@@ -12,7 +12,7 @@ public static class CommercialResponseResults
 {
     private static readonly HashSet<string> Conflicts =
     [
-        "DUPLICATE_KEY", "LEAD_DUPLICATE_OPEN", "LEAD_NOT_OPEN", "LEAD_NOT_INACTIVE", "LEAD_CURRENCY_LOCKED", "LEAD_PERSON_INACTIVE"
+        "DUPLICATE_KEY", "LEAD_DUPLICATE_OPEN", "LEAD_NOT_OPEN", "LEAD_NOT_INACTIVE", "LEAD_NOT_LOST", "LEAD_CURRENCY_LOCKED", "LEAD_PERSON_INACTIVE"
     ];
 
     /// <summary>HTTP status of a failed response.</summary>

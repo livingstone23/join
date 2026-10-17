@@ -3707,6 +3707,11 @@ namespace JOIN.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("companyid");
 
+                    b.Property<string>("CompetitorName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("competitorname");
+
                     b.Property<DateTime>("Created")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created");
@@ -3816,6 +3821,21 @@ namespace JOIN.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("topic");
+
+                    b.Property<decimal?>("WonExchangeRate")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("wonexchangerate");
+
+                    b.Property<decimal?>("WonValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("wonvalue");
+
+                    b.Property<decimal?>("WonValueBase")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("wonvaluebase");
 
                     b.HasKey("Id")
                         .HasName("pk_leads");

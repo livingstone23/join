@@ -40,9 +40,9 @@ public sealed class CustomerLifecycleTests
     {
         using var ctx = await CustomerTestContext.CreateAsync();
 
-        var response = await ctx.SendAsync(new CreateCustomerCommand(ctx.OtherPersonId, ctx.Stage[CustomerStage.Codes.Lead]));
+        var response = await ctx.SendAsync(new CreateCustomerCommand(ctx.OtherPersonId, ctx.Stage[CustomerStage.Codes.Recurring]));
 
-        response.Data!.CustomerStageCode.Should().Be(CustomerStage.Codes.Lead);
+        response.Data!.CustomerStageCode.Should().Be(CustomerStage.Codes.Recurring);
         response.Data.PersonName.Should().Be("Osorio SRL");
     }
 
@@ -138,11 +138,11 @@ public sealed class CustomerLifecycleTests
         var created = (await ctx.SendAsync(new CreateCustomerCommand(ctx.PersonId))).Data!;
         await ctx.SendAsync(new DeactivateCustomerCommand(created.Id));
 
-        var updated = await ctx.SendAsync(new UpdateCustomerCommand(created.Id, ctx.Stage[CustomerStage.Codes.Prospect]));
-        var unchanged = await ctx.SendAsync(new UpdateCustomerCommand(created.Id, ctx.Stage[CustomerStage.Codes.Prospect]));
+        var updated = await ctx.SendAsync(new UpdateCustomerCommand(created.Id, ctx.Stage[CustomerStage.Codes.Former]));
+        var unchanged = await ctx.SendAsync(new UpdateCustomerCommand(created.Id, ctx.Stage[CustomerStage.Codes.Former]));
 
         updated.IsSuccess.Should().BeTrue(updated.Message);
-        updated.Data!.CustomerStageCode.Should().Be(CustomerStage.Codes.Prospect);
+        updated.Data!.CustomerStageCode.Should().Be(CustomerStage.Codes.Former);
         updated.Data.IsActive.Should().BeFalse("the stage never changes the state (rule 6)");
         updated.Data.LastStatusAction.Should().Be((int)CustomerStatusAction.Deactivated);
         unchanged.IsSuccess.Should().BeTrue("saving the same stage is not a failure");
@@ -154,7 +154,7 @@ public sealed class CustomerLifecycleTests
         using var ctx = await CustomerTestContext.CreateAsync();
         var created = (await ctx.SendAsync(new CreateCustomerCommand(ctx.PersonId))).Data!;
 
-        (await ctx.SendAsync(new UpdateCustomerCommand(Guid.NewGuid(), ctx.Stage[CustomerStage.Codes.Lead]))).Message
+        (await ctx.SendAsync(new UpdateCustomerCommand(Guid.NewGuid(), ctx.Stage[CustomerStage.Codes.Recurring]))).Message
             .Should().Be(CustomerErrorCodes.CustomerNotFound);
         (await ctx.SendAsync(new UpdateCustomerCommand(created.Id, Guid.NewGuid()))).Message
             .Should().Be(CustomerErrorCodes.InvalidCustomerStage);

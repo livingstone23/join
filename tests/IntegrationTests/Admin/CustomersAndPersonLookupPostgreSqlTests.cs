@@ -43,7 +43,7 @@ public sealed class CustomersAndPersonLookupPostgreSqlTests : IClassFixture<Cust
     // ---------------------------------------------------------------- SPEC 54 — seed
 
     [Fact]
-    public async Task Seed_ShouldCreateTheLookupPersonsAndThirtyCustomersWithTheirHistory()
+    public async Task Seed_ShouldCreateTheLookupPersonsAndTheirCustomersWithTheirHistory()
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -54,15 +54,16 @@ public sealed class CustomersAndPersonLookupPostgreSqlTests : IClassFixture<Cust
         idTypes.Should().Contain(["Cedula", "Pasaporte", "RNC"]);
 
         var customers = await db.Customers.IgnoreQueryFilters().Where(c => c.CompanyId == joinId).ToListAsync();
-        customers.Should().HaveCount(30);
+        // SPEC 63: the 7 lookup persons that were LEAD/PROSPECT customers are open leads instead of customers.
+        customers.Should().HaveCount(23);
         customers.Count(c => !c.IsActive).Should().Be(2);
         customers.Should().OnlyContain(c => c.UserId == registeringUser.Id && c.GcRecord == 0);
         customers.Select(c => c.CustomerCode).Should().OnlyHaveUniqueItems().And.Contain("C000000001");
 
         var customerIds = customers.Select(c => c.Id).ToList();
         var history = await db.CustomerStatusHistory.IgnoreQueryFilters().Where(h => customerIds.Contains(h.CustomerId)).ToListAsync();
-        history.Should().HaveCount(32);
-        history.Count(h => h.Action == CustomerStatusAction.Created).Should().Be(30);
+        history.Should().HaveCount(25);
+        history.Count(h => h.Action == CustomerStatusAction.Created).Should().Be(23);
         history.Count(h => h.Action == CustomerStatusAction.Deactivated).Should().Be(2);
         history.Should().OnlyContain(h => h.Source == CustomerStatusSource.Seed);
 
@@ -75,7 +76,7 @@ public sealed class CustomersAndPersonLookupPostgreSqlTests : IClassFixture<Cust
             .GroupBy(s => s.CompanyId)
             .Select(g => new { Count = g.Count(), Defaults = g.Count(s => s.IsDefault) })
             .ToListAsync();
-        stagesByCompany.Should().HaveCount(2).And.OnlyContain(s => s.Count == 4 && s.Defaults == 1);
+        stagesByCompany.Should().HaveCount(2).And.OnlyContain(s => s.Count == 3 && s.Defaults == 1);
     }
 
     [Fact]
@@ -301,9 +302,9 @@ public sealed class CustomersAndPersonLookupPostgreSqlTests : IClassFixture<Cust
         var list = await client.GetAsync("/api/v1/CustomerStages");
         list.StatusCode.Should().Be(HttpStatusCode.OK, await list.Content.ReadAsStringAsync());
         Data(await list.Content.ReadAsStringAsync()).EnumerateArray().Select(s => s.GetProperty("code").GetString())
-            .Should().Equal(CustomerStage.Codes.Lead, CustomerStage.Codes.Prospect, CustomerStage.Codes.Customer, CustomerStage.Codes.Former);
+            .Should().Equal(CustomerStage.Codes.Customer, CustomerStage.Codes.Recurring, CustomerStage.Codes.Former);
 
-        var duplicate = await client.PostAsJsonAsync("/api/v1/CustomerStages", new { code = "lead", name = "Otro", sortOrder = 9, isActive = true });
+        var duplicate = await client.PostAsJsonAsync("/api/v1/CustomerStages", new { code = "recurring", name = "Otro", sortOrder = 9, isActive = true });
         duplicate.StatusCode.Should().Be(HttpStatusCode.Conflict);
 
         var created = await client.PostAsJsonAsync("/api/v1/CustomerStages", new { code = "VIP", name = "VIP", sortOrder = 9, isActive = true });

@@ -28,6 +28,10 @@ public class LeadConfiguration : IEntityTypeConfiguration<Lead>
         builder.Property(x => x.EstimatedValue).HasPrecision(18, 2);
         builder.Property(x => x.EstimatedValueBase).HasPrecision(18, 2);
         builder.Property(x => x.EstimatedCloseDate).HasColumnType("date");
+        builder.Property(x => x.WonValue).HasPrecision(18, 2);
+        builder.Property(x => x.WonExchangeRate).HasPrecision(18, 6);
+        builder.Property(x => x.WonValueBase).HasPrecision(18, 2);
+        builder.Property(x => x.CompetitorName).HasMaxLength(200);
 
         builder.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Person>().WithMany().HasForeignKey(x => x.PersonId).OnDelete(DeleteBehavior.Restrict);

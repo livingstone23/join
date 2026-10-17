@@ -15,5 +15,8 @@ public enum CustomerStatusSource
     Migration = 3,
 
     /// <summary>The customer's person was deactivated (rule 7).</summary>
-    PersonDeactivated = 4
+    PersonDeactivated = 4,
+
+    /// <summary>Lead won (SPEC 63); <c>SourceReferenceId</c> is the lead.</summary>
+    Lead = 5
 }

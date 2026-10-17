@@ -36,6 +36,13 @@ public class Lead : BaseTenantEntity
     public Guid? AreaId { get; set; }
     /// <summary>Denormalized for the inbox order.</summary>
     public DateTime? LastInteractionAt { get; set; }
+    /// <summary>Sum of the accepted lines at win (SPEC 63), in the lead currency.</summary>
+    public decimal? WonValue { get; set; }
+    /// <summary>Rate of the closing day (SPEC 63 rule 5); the funnel rate stays.</summary>
+    public decimal? WonExchangeRate { get; set; }
+    public decimal? WonValueBase { get; set; }
+    /// <summary>Optional competitor named when the lead is lost (SPEC 63).</summary>
+    public string? CompetitorName { get; set; }
 }
 
 /// <summary>A stage change of a lead (table <c>Customer.LeadStageHistory</c>); the first row has no origin.</summary>

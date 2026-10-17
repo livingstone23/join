@@ -31,7 +31,26 @@ public sealed record LeadDto
     public Guid? AreaId { get; init; }
     public DateTime? LastInteractionAt { get; init; }
     public DateTime? InactivatedAt { get; init; }
+    public DateTime? ClosedAt { get; init; }
+    public Guid? CustomerId { get; init; }
+    /// <summary>Accepted lines at win, in the lead currency (SPEC 63).</summary>
+    public decimal? WonValue { get; init; }
+    public decimal? WonExchangeRate { get; init; }
+    public decimal? WonValueBase { get; init; }
+    public string? CompetitorName { get; init; }
     public DateTime CreatedAt { get; init; }
+}
+
+/// <summary>
+/// Result of <c>POST /Leads/{id}/win</c> (SPEC 63): the closed lead and, when its relationship type creates customers,
+/// the customer and what happened to it (<c>Created</c>, <c>Activated</c> or <c>Confirmed</c>).
+/// </summary>
+public sealed record LeadWinResultDto
+{
+    public LeadDto Lead { get; init; } = new();
+    public Guid? CustomerId { get; init; }
+    public string? CustomerCode { get; init; }
+    public string? CustomerAction { get; init; }
 }
 
 /// <summary>Result of <c>POST /Leads</c>: the lead and the open leads the person already had (policy <c>Warn</c>).</summary>
@@ -102,6 +121,11 @@ public sealed record LeadDetailDto : LeadListItemDto
     public DateTime? InactivatedAt { get; init; }
     public DateTime? ClosedAt { get; init; }
     public Guid? CustomerId { get; init; }
+    public string? CustomerCode { get; init; }
+    public decimal? WonValue { get; init; }
+    public decimal? WonExchangeRate { get; init; }
+    public decimal? WonValueBase { get; init; }
+    public string? CompetitorName { get; init; }
     public Guid? ProjectId { get; init; }
     public Guid? AreaId { get; init; }
     public int InteractionsCount { get; init; }

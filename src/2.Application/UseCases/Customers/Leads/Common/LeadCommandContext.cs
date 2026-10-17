@@ -110,6 +110,12 @@ public sealed class LeadCommandContext(IUnitOfWork unitOfWork, ICurrentUserServi
         AreaId = lead.AreaId,
         LastInteractionAt = lead.LastInteractionAt,
         InactivatedAt = lead.InactivatedAt,
+        ClosedAt = lead.ClosedAt,
+        CustomerId = lead.CustomerId,
+        WonValue = lead.WonValue,
+        WonExchangeRate = lead.WonExchangeRate,
+        WonValueBase = lead.WonValueBase,
+        CompetitorName = lead.CompetitorName,
         CreatedAt = lead.Created
     };
 }
