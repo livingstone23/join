@@ -9,6 +9,9 @@ using JOIN.Domain.Calendars.Enums;
 using JOIN.Domain.Catalog;
 using JOIN.Domain.Common;
 using JOIN.Domain.Customers;
+using JOIN.Domain.Customers.Leads;
+using ContactType = JOIN.Domain.Enums.ContactType;
+using MasterContactType = JOIN.Domain.Customers.Leads.ContactType;
 using JOIN.Application.Services.Customers;
 using JOIN.Domain.Enums;
 using JOIN.Domain.Finance;
@@ -87,6 +90,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         await SeedCustomerStagesForCompanyAsync(companyId, cancellationToken);
         // SPEC 56: every company is born with DOP as its base currency.
         await SeedCompanyCurrenciesForCompanyAsync(companyId, cancellationToken);
+        // SPEC 59: commercial settings (stages, sources, reasons, relationship types, contact types and rules).
+        await SeedContactTypesAsync(cancellationToken);
+        await SeedLeadSettingsForCompanyAsync(companyId, cancellationToken);
     }
 
     /// <summary>
@@ -286,6 +292,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedJoinParallelCurrenciesAsync(joinCompanyId);
             // SPEC 57: sample categories and products of the commercial proposal in JOIN-001 (development data).
             await SeedJoinProductCatalogAsync(joinCompanyId);
+            // SPEC 59: global contact types and the commercial settings of every live company.
+            await SeedContactTypesAsync();
+            await SeedLeadSettingsForAllCompaniesAsync();
 
             // 7. Entidades operacionales (Clientes)
             await SeedJoinPersonsAsync(joinCompanyId, idTypeId);
@@ -480,6 +489,197 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         if (inserted > 0)
         {
             await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// SPEC 59 §17: the global master of contact types, idempotent by <c>Code</c> among live rows.
+    /// </summary>
+    private async Task SeedContactTypesAsync(CancellationToken cancellationToken = default)
+    {
+        (string Code, string Name, string Icon, string? Channel, bool Schedules, bool AsksDuration)[] seeds =
+        [
+            ("CALL", "Llamada", "@Icons.Material.Filled.Phone", null, false, true),
+            ("ONLINE_MEETING", "Reunión en línea", "@Icons.Material.Filled.VideoCall", CommunicationChannelCodes.Web, true, true),
+            ("VISIT", "Visita", "@Icons.Material.Filled.Place", null, true, true),
+            ("EMAIL", "Correo", "@Icons.Material.Filled.Email", CommunicationChannelCodes.SendGrid, false, false),
+            ("SMS", "SMS", "@Icons.Material.Filled.Sms", null, false, false),
+            ("WHATSAPP", "WhatsApp", "@Icons.Material.Filled.Chat", CommunicationChannelCodes.WhatsApp, false, false),
+            ("DEMO", "Demostración", "@Icons.Material.Filled.Slideshow", null, true, true)
+        ];
+
+        var liveCodes = await _context.ContactTypes
+            .IgnoreQueryFilters()
+            .Where(t => t.GcRecord == 0)
+            .Select(t => t.Code)
+            .ToListAsync(cancellationToken);
+
+        var order = 0;
+        var inserted = 0;
+        foreach (var seed in seeds)
+        {
+            order++;
+            if (liveCodes.Contains(seed.Code))
+            {
+                continue;
+            }
+
+            _context.ContactTypes.Add(new MasterContactType
+            {
+                Code = seed.Code,
+                Name = seed.Name,
+                Icon = seed.Icon,
+                CommunicationChannelCode = seed.Channel,
+                SchedulesCalendarEvent = seed.Schedules,
+                AsksDuration = seed.AsksDuration,
+                SortOrder = order,
+                IsActive = true
+            });
+            inserted++;
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// SPEC 59 §17: the commercial settings of a company, idempotent (each row is added only when its code, or the
+    /// company's row, is missing among live rows). Contact types are copied active from the live master.
+    /// </summary>
+    public async Task SeedLeadSettingsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        (string Code, string Name, int Probability, LeadStageKind Kind)[] stages =
+        [
+            ("NEW", "Nuevo", 10, LeadStageKind.Initial),
+            ("CONTACTED", "Contactado", 25, LeadStageKind.Open),
+            ("QUALIFIED", "Calificado", 40, LeadStageKind.Open),
+            ("PROPOSAL", "Propuesta", 60, LeadStageKind.Open),
+            ("NEGOTIATION", "Negociación", 80, LeadStageKind.Open),
+            ("WON", "Ganado", 100, LeadStageKind.Won),
+            ("LOST", "Perdido", 0, LeadStageKind.Lost)
+        ];
+        (string Code, string Name)[] sources =
+        [
+            ("REFERRAL", "Referido"),
+            ("WEB", "Sitio web"),
+            ("EVENT", "Evento"),
+            ("WA_IN", "WhatsApp entrante"),
+            ("COLD", "Llamada en frío"),
+            ("EMAIL_CAMP", "Campaña de correo"),
+            ("PENDING", "Persona pendiente"),
+            ("MIGRATION", "Migración")
+        ];
+        (string Code, string Name, LeadReasonUsage UsedFor)[] reasons =
+        [
+            ("BEST_PRICE", "Mejor precio", LeadReasonUsage.Won),
+            ("REFERRAL_TRUST", "Confianza por referencia", LeadReasonUsage.Won),
+            ("FEATURES", "Funcionalidades", LeadReasonUsage.Won),
+            ("HIGH_PRICE", "Precio alto", LeadReasonUsage.Lost),
+            ("COMPETITOR", "Eligió a la competencia", LeadReasonUsage.Lost),
+            ("NO_BUDGET", "Sin presupuesto", LeadReasonUsage.Lost),
+            ("POSTPONED", "Pospuesto", LeadReasonUsage.Inactive),
+            ("NO_ANSWER", "Sin respuesta", LeadReasonUsage.Inactive),
+            ("NO_CAPACITY", "Sin capacidad", LeadReasonUsage.Inactive)
+        ];
+        (string Code, string Name, RelationshipOnWin OnWin)[] relationships =
+        [
+            ("PROSPECT_CUSTOMER", "Posible cliente", RelationshipOnWin.Customer),
+            ("DISTRIBUTOR", "Distribuidor", RelationshipOnWin.Customer),
+            ("SUPPLIER", "Proveedor", RelationshipOnWin.None),
+            ("PARTNER", "Socio", RelationshipOnWin.None),
+            ("REFERRER", "Referidor", RelationshipOnWin.None)
+        ];
+
+        var liveStages = await _context.LeadStages.IgnoreQueryFilters()
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0).ToListAsync(cancellationToken);
+        var order = 0;
+        foreach (var seed in stages)
+        {
+            order++;
+            // A company that already has its Initial/Won/Lost stage under another code keeps it (unique index).
+            if (liveStages.Any(x => x.Code == seed.Code || x.Name == seed.Name || (seed.Kind != LeadStageKind.Open && x.Kind == seed.Kind)))
+            {
+                continue;
+            }
+
+            _context.LeadStages.Add(new LeadStage
+            {
+                CompanyId = companyId, Code = seed.Code, Name = seed.Name, Probability = seed.Probability, Kind = seed.Kind, SortOrder = order
+            });
+        }
+
+        var liveSources = await _context.LeadSources.IgnoreQueryFilters()
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0).ToListAsync(cancellationToken);
+        order = 0;
+        foreach (var seed in sources)
+        {
+            order++;
+            if (!liveSources.Any(x => x.Code == seed.Code || x.Name == seed.Name))
+            {
+                _context.LeadSources.Add(new LeadSource { CompanyId = companyId, Code = seed.Code, Name = seed.Name, SortOrder = order });
+            }
+        }
+
+        var liveReasons = await _context.LeadReasons.IgnoreQueryFilters()
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0).ToListAsync(cancellationToken);
+        order = 0;
+        foreach (var seed in reasons)
+        {
+            order++;
+            if (!liveReasons.Any(x => x.Code == seed.Code || x.Name == seed.Name))
+            {
+                _context.LeadReasons.Add(new LeadReason { CompanyId = companyId, Code = seed.Code, Name = seed.Name, UsedFor = seed.UsedFor, SortOrder = order });
+            }
+        }
+
+        var liveRelationships = await _context.RelationshipTypes.IgnoreQueryFilters()
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0).ToListAsync(cancellationToken);
+        order = 0;
+        foreach (var seed in relationships)
+        {
+            order++;
+            if (!liveRelationships.Any(x => x.Code == seed.Code || x.Name == seed.Name))
+            {
+                _context.RelationshipTypes.Add(new RelationshipType { CompanyId = companyId, Code = seed.Code, Name = seed.Name, OnWin = seed.OnWin, SortOrder = order });
+            }
+        }
+
+        var masters = await _context.ContactTypes.IgnoreQueryFilters()
+            .Where(t => t.GcRecord == 0).ToListAsync(cancellationToken);
+        var companyTypeIds = await _context.ContactTypeCompanies.IgnoreQueryFilters()
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0).Select(x => x.ContactTypeId).ToListAsync(cancellationToken);
+        foreach (var master in masters.Where(m => !companyTypeIds.Contains(m.Id)))
+        {
+            _context.ContactTypeCompanies.Add(new ContactTypeCompany
+            {
+                CompanyId = companyId, ContactTypeId = master.Id, Name = master.Name, SortOrder = master.SortOrder, IsActive = master.IsActive
+            });
+        }
+
+        if (!await _context.LeadCompanySettings.IgnoreQueryFilters().AnyAsync(x => x.CompanyId == companyId && x.GcRecord == 0, cancellationToken))
+        {
+            _context.LeadCompanySettings.Add(LeadCompanySettings.Defaults(companyId));
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// SPEC 59 §17: applies <see cref="SeedLeadSettingsForCompanyAsync"/> to every live company.
+    /// </summary>
+    private async Task SeedLeadSettingsForAllCompaniesAsync(CancellationToken cancellationToken = default)
+    {
+        var companyIds = await _context.Companies
+            .IgnoreQueryFilters()
+            .Where(c => c.GcRecord == 0)
+            .Select(c => c.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var companyId in companyIds)
+        {
+            await SeedLeadSettingsForCompanyAsync(companyId, cancellationToken);
         }
     }
 
@@ -3794,6 +3994,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Customers", "/customers/customers", "@Icons.Material.Filled.Badge", "Customers", "CustomersMenu", "Customers", true, true, true, true, CanDownload: true, IsVisibleMenu: true, OrderMenu: 15),
         // SPEC 55 — per-company customer stage catalog.
         new("CustomerStages", "/customers/customer-stages", "@Icons.Material.Filled.Timeline", "Customers", "CustomersMenu", "CustomerStages", true, true, true, true, IsVisibleMenu: true, OrderMenu: 16),
+        // SPEC 59: one option and one permission resource for every commercial catalog and the company rules.
+        new("LeadSettings", "/customers/lead-settings", "@Icons.Material.Filled.Tune", "Customers", "CustomersMenu", "LeadSettings", true, true, true, true, IsVisibleMenu: true, OrderMenu: 17),
 
 
         new("TicketManagement", "/tickets", "@Icons.Material.Filled.Label", "Tickets", null, null, false, false, false, false),
@@ -3868,6 +4070,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("SuperAdmin", "ExchangeRates", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Products", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "ProductCategories", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "LeadSettings", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
 
@@ -3907,6 +4110,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // SPEC 57: Manager maintains the product catalog; Supervisor reads it.
         new("Manager", "Products", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "ProductCategories", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        // SPEC 59: Manager configures the commercial settings; Supervisor reads them.
+        new("Manager", "LeadSettings", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
         new("Manager", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "TicketManagement", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -3947,6 +4152,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "ExchangeRates", true, false, false, false),
         new("Supervisor", "Products", true, false, false, false),
         new("Supervisor", "ProductCategories", true, false, false, false),
+        new("Supervisor", "LeadSettings", true, false, false, false),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Companies", true, true, true, false),
         new("Supervisor", "TicketManagement", true, true, true, true),

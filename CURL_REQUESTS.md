@@ -2000,3 +2000,41 @@ curl -s -X POST "$BASE_URL/api/v1/Persons" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{ "personType": 2, "firstName": "Ferretería", "lastName": "El Puente", "commercialName": "Ferretería El Puente" }'
 ```
+
+## Customers — commercial settings (SPEC 59)
+
+Every catalog lives under the single `LeadSettings` permission resource (one menu option, `/customers/lead-settings`).
+Codes are normalized (upper-case, no spaces) and code and name are unique per company. Lead stage `kind`: 1 Initial,
+2 Open, 3 Won, 4 Lost — exactly one live Initial, Won and Lost (`409 DUPLICATE_KEY` for a second one,
+`400 LEAD_STAGE_KIND_REQUIRED` when the company would run out of one, `400 LEAD_STAGE_SYSTEM` for deleting,
+deactivating or re-coding Won/Lost). Reason `usedFor`: 1 Won, 2 Lost, 3 Inactive. Relationship `onWin`: 0 None,
+1 Customer. `DuplicateOpenLeadPolicy`: 1 Warn, 2 Block, 3 Allow.
+
+```bash
+# Catalogs (same shape for LeadSources, LeadReasons and RelationshipTypes; restore is SuperAdmin-only)
+curl -s "$BASE_URL/api/v1/LeadStages?includeInactive=false" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/LeadStages" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "code": "demo", "name": "Demo agendada", "probability": 50, "kind": 2, "sortOrder": 4 }'
+curl -s "$BASE_URL/api/v1/LeadReasons?usedFor=3" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/RelationshipTypes" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "code": "RESELLER", "name": "Revendedor", "onWin": 1 }'
+
+# Company contact types (created by the seed; rename, order, activate)
+curl -s "$BASE_URL/api/v1/ContactTypeCompanies" -H "Authorization: Bearer $TOKEN"
+curl -s -X PUT "$BASE_URL/api/v1/ContactTypeCompanies/<id>" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "name": "Llamada telefónica", "sortOrder": 1, "isActive": true }'
+
+# Global master (SuperAdmin): a new type reaches every company inactive
+curl -s -X POST "$BASE_URL/api/v1/ContactTypes" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "code": "FAIR", "name": "Feria", "icon": "@Icons.Material.Filled.Store", "schedulesCalendarEvent": true, "asksDuration": true }'
+
+# Company rules: the row, or the defaults with isDefault=true; PUT creates or updates it
+curl -s "$BASE_URL/api/v1/LeadCompanySettings" -H "Authorization: Bearer $TOKEN"
+curl -s -X PUT "$BASE_URL/api/v1/LeadCompanySettings" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "duplicateOpenLeadPolicy": 1, "requireIdentificationForCustomer": true, "codePrefix": "LD-", "codeSequenceLength": 6 }'
+```

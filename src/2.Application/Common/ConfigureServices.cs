@@ -25,6 +25,7 @@ using JOIN.Application.Services.Finance;
 using JOIN.Application.Services.Catalog;
 using JOIN.Application.UseCases.Finance.CompanyCurrencies;
 using JOIN.Application.UseCases.Customers.CustomerStages;
+using JOIN.Application.UseCases.Customers.LeadSettings.LeadStages;
 using JOIN.Application.Mappings.Security;
 using JOIN.Application.Mappings.Security.RoleSystemOption;
 using JOIN.Application.Mappings.Security.SystemOption;
@@ -104,6 +105,9 @@ public static class ConfigureServices
         services.AddSingleton<IMoneyConverter, MoneyConverter>();
         // SPEC 57 — product reference prices lock the base currency (SPEC 56 rule 6).
         services.AddScoped<IBaseCurrencyAmountSource, ProductReferencePriceAmountSource>();
+        // SPEC 59 — commercial settings: company rules and the lead stage kinds.
+        services.AddScoped<ILeadCompanySettingsProvider, LeadCompanySettingsProvider>();
+        services.AddScoped<LeadStageKindCoordinator>();
         services.AddScoped<IAuthenticatedSessionIssuer, AuthenticatedSessionIssuer>();
         services.AddScoped<IMfaLoginChallengeIssuer, MfaLoginChallengeIssuer>();
         services.AddScoped<PersonAddressDefaultCoordinator>();

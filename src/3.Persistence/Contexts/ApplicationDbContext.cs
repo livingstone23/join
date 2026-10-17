@@ -9,6 +9,7 @@ using JOIN.Domain.Calendars;
 using JOIN.Domain.Catalog;
 using JOIN.Domain.Common;
 using JOIN.Domain.Customers;
+using JOIN.Domain.Customers.Leads;
 using JOIN.Domain.Finance;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
@@ -120,6 +121,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<TicketInboundChannel> TicketInboundChannels => Set<TicketInboundChannel>();
 
 
+
+    // --- COMMERCIAL SETTINGS (SPEC 59) ---
+    public DbSet<LeadStage> LeadStages => Set<LeadStage>();
+    public DbSet<LeadSource> LeadSources => Set<LeadSource>();
+    public DbSet<LeadReason> LeadReasons => Set<LeadReason>();
+    public DbSet<RelationshipType> RelationshipTypes => Set<RelationshipType>();
+    public DbSet<ContactType> ContactTypes => Set<ContactType>();
+    public DbSet<ContactTypeCompany> ContactTypeCompanies => Set<ContactTypeCompany>();
+    public DbSet<LeadCompanySettings> LeadCompanySettings => Set<LeadCompanySettings>();
 
     // --- CATALOG MODULE (SPEC 57) ---
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
@@ -281,6 +291,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<CustomerStage>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<CustomerStatusHistory>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
+        // Commercial settings (SPEC 59): the company's lead catalogs and rules.
+        builder.Entity<LeadStage>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<LeadSource>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<LeadReason>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<RelationshipType>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<ContactTypeCompany>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<LeadCompanySettings>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+
         // Catalog (SPEC 57): the company's products, services and categories.
         builder.Entity<ProductCategory>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<Product>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
@@ -349,6 +367,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         // Calendar global catalogs (SPEC 44): the list of every possible type and status, no owning company.
         builder.Entity<CalendarActivity>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<CalendarStatus>().HasQueryFilter(e => e.GcRecord == 0);
+
+        // Commercial settings global master (SPEC 59): contact types, no owning company.
+        builder.Entity<ContactType>().HasQueryFilter(e => e.GcRecord == 0);
 
         // Finance global catalog (SPEC 56): ISO currencies, no owning company.
         builder.Entity<Currency>().HasQueryFilter(e => e.GcRecord == 0);

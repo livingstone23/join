@@ -83,6 +83,32 @@
 7. Sin permiso `LeadSettings` responde 403; los catálogos de una empresa no se ven desde otra.
 8. Unit tests de handlers, validadores y coordinador; integración para 1–7; `EXPLAIN` del SQL nuevo.
 
+## Registro de implementación (2026-10-17)
+
+Rama `spec-59-commercial-settings-catalogs` (desde `spec-58-person-optional-identification`, para encadenar las migraciones).
+
+- **Dominio y persistencia:**
+  - `JOIN.Domain.Customers.Leads`: `LeadStage`, `LeadSource`, `LeadReason`, `RelationshipType` (con la interfaz común `ICommercialCatalogItem` y `CommercialCode.Normalize`), `ContactType` (global), `ContactTypeCompany` y `LeadCompanySettings`, más los enums de la spec.
+  - Esquema `customer`, índices únicos filtrados `(CompanyId, Code)` y `(CompanyId, Name)` por catálogo; `UX_LeadStages_Company_Initial` (`"kind" = 1`) y `UX_LeadStages_Company_WonLost` (`(CompanyId, Kind)` con `"kind" IN (3, 4)`) cubren "una sola inicial, ganada y perdida" también con requests concurrentes.
+  - Filtros globales de tenant para las seis tablas por empresa y de borrado lógico para el maestro.
+  - Migración `Spec59CommercialSettingsCatalogs`: solo crea tablas e índices.
+- **Application:**
+  - Handlers comunes de alta, edición, borrado lógico y restauración para los cuatro catálogos (`CommercialCatalogHandlers`), con código y nombre únicos por empresa.
+  - `LeadStageKindCoordinator` (regla 2): segunda inicial/ganada/perdida → `DUPLICATE_KEY`; borrar, desactivar o recodificar `Won`/`Lost` → `LEAD_STAGE_SYSTEM`; borrar o desactivar la inicial, o cambiar de tipo una etapa única → `LEAD_STAGE_KIND_REQUIRED`. Restaurar una etapa única no la trae si ya hay otra viva del mismo tipo.
+  - Tipos de contacto: CRUD del maestro solo SuperAdmin; al crear uno se agrega la fila inactiva a todas las empresas vivas. `PUT /ContactTypeCompanies/{id}` cambia nombre, orden y estado de la copia de la empresa.
+  - `ILeadCompanySettingsProvider` devuelve los valores por defecto si la empresa no tiene fila; `GET /LeadCompanySettings` los marca con `isDefault = true` y `PUT` crea o actualiza la fila.
+  - `CustomerActivationService.EnsureActiveAsync` exige identificación solo si `RequireIdentificationForCustomer` (SPEC 58 regla 4).
+  - El bloqueo por uso (`<ENTIDAD>_IN_USE`) queda para SPEC 61; aquí el borrado es lógico.
+- **WebApi:** `LeadStages`, `LeadSources`, `LeadReasons` (filtro `usedFor`), `RelationshipTypes`, `ContactTypes` (`[Authorize(Roles = "SuperAdmin")]`), `ContactTypeCompanies` y `LeadCompanySettings`, todos con `[PermissionResource("LeadSettings")]`; `LeadSettingsResponseResults` mapea `*_NOT_FOUND` → 404 y `*_IN_USE`/`DUPLICATE_KEY` → 409.
+- **Seed:**
+  - Opción `LeadSettings` (`/customers/lead-settings`, módulo `Customers`, padre `CustomersMenu`); permisos para SuperAdmin y Manager, y solo lectura para Supervisor.
+  - `SeedContactTypesAsync` (maestro) y `SeedLeadSettingsForCompanyAsync` (§17), idempotentes; los llaman `SeedDefaultCatalogsForCompanyAsync` (empresas nuevas) y `SeedAsync` para todas las empresas vivas.
+- **Nota:** el nombre `ContactType` ya existía como enum en `JOIN.Domain.Enums` (contactos de personas); el seeder usa alias para distinguirlos.
+- **Verificación:**
+  - Build Release sin errores.
+  - Unit tests: 3330 OK, cobertura de líneas 94,25 %.
+  - Integración: 288/288 OK (7 nuevas: seed completo e idempotente, tipos de etapa también en la base, reglas por defecto y `PUT`, tipo de contacto maestro nuevo, filtro `usedFor`, 403 y aislamiento por empresa, `EXPLAIN`).
+
 ## Decisiones
 
 - **Una sola opción de menú y un solo recurso de permiso** (`LeadSettings`) para todos los catálogos: misma idea que `[PermissionResource("Persons")]` en los subrecursos de personas; evita llenar el menú y la matriz de permisos con siete opciones.

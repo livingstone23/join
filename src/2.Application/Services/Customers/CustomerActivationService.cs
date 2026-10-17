@@ -9,7 +9,8 @@ namespace JOIN.Application.Services.Customers;
 /// <inheritdoc />
 public sealed class CustomerActivationService(
     IUnitOfWork unitOfWork,
-    ICustomerCodeGenerator customerCodeGenerator) : ICustomerActivationService
+    ICustomerCodeGenerator customerCodeGenerator,
+    ILeadCompanySettingsProvider leadSettings) : ICustomerActivationService
 {
     /// <inheritdoc />
     public async Task<Response<CustomerActivationResult>> EnsureActiveAsync(
@@ -36,8 +37,8 @@ public sealed class CustomerActivationService(
                 ["The person does not exist, is inactive or deleted in the current company."]);
         }
 
-        // SPEC 58 rule 4: every customer has an identification (SPEC 59 makes it configurable per company).
-        if (!person.HasIdentification)
+        // SPEC 58 rule 4: every customer has an identification, unless the company turned it off (SPEC 59).
+        if (!person.HasIdentification && (await leadSettings.GetAsync(companyId)).RequireIdentificationForCustomer)
         {
             return Response<CustomerActivationResult>.Error(
                 CustomerErrorCodes.PersonIdentificationRequired,

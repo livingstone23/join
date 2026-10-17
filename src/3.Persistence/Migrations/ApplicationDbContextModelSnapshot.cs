@@ -3542,6 +3542,505 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("customerstatushistory", "customer");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.ContactType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AsksDuration")
+                        .HasColumnType("boolean")
+                        .HasColumnName("asksduration");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("CommunicationChannelCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("communicationchannelcode");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("icon");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<bool>("SchedulesCalendarEvent")
+                        .HasColumnType("boolean")
+                        .HasColumnName("schedulescalendarevent");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_contacttypes");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_contacttypes_code")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("contacttypes", "customer");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.ContactTypeCompany", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<Guid>("ContactTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contacttypeid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_contacttypecompanies");
+
+                    b.HasIndex("ContactTypeId")
+                        .HasDatabaseName("ix_contacttypecompanies_contacttypeid");
+
+                    b.HasIndex("CompanyId", "ContactTypeId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_contacttypecompanies_company_type")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("contacttypecompanies", "customer");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadCompanySettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CodePrefix")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("codeprefix");
+
+                    b.Property<int>("CodeSequenceLength")
+                        .HasColumnType("integer")
+                        .HasColumnName("codesequencelength");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("DuplicateOpenLeadPolicy")
+                        .HasColumnType("integer")
+                        .HasColumnName("duplicateopenleadpolicy");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<bool>("RequireIdentificationForCustomer")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requireidentificationforcustomer");
+
+                    b.HasKey("Id")
+                        .HasName("pk_leadcompanysettings");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_leadcompanysettings_company")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("leadcompanysettings", "customer");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadReason", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.Property<int>("UsedFor")
+                        .HasColumnType("integer")
+                        .HasColumnName("usedfor");
+
+                    b.HasKey("Id")
+                        .HasName("pk_leadreasons");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_leadreasons_company_code")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_leadreasons_company_name")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("leadreasons", "customer");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_leadsources");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_leadsources_company_code")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_leadsources_company_name")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("leadsources", "customer");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadStage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isactive");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Probability")
+                        .HasColumnType("integer")
+                        .HasColumnName("probability");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_leadstages");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_leadstages_company_initial")
+                        .HasFilter("\"kind\" = 1 AND \"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_leadstages_company_code")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ux_leadstages_company_wonlost")
+                        .HasFilter("\"kind\" IN (3, 4) AND \"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_leadstages_company_name")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("leadstages", "customer");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.RelationshipType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("OnWin")
+                        .HasColumnType("integer")
+                        .HasColumnName("onwin");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_relationshiptypes");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_relationshiptypes_company_code")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_relationshiptypes_company_name")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("relationshiptypes", "customer");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Finance.CompanyCurrency", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6964,6 +7463,87 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Customer");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.ContactTypeCompany", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_contacttypecompanies_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Customers.Leads.ContactType", "ContactType")
+                        .WithMany()
+                        .HasForeignKey("ContactTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_contacttypecompanies_contacttypes_contacttypeid");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("ContactType");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadCompanySettings", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_leadcompanysettings_companies_companyid");
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadReason", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_leadreasons_companies_companyid");
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadSource", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_leadsources_companies_companyid");
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.LeadStage", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_leadstages_companies_companyid");
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Customers.Leads.RelationshipType", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_relationshiptypes_companies_companyid");
+
+                    b.Navigation("Company");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Finance.CompanyCurrency", b =>
