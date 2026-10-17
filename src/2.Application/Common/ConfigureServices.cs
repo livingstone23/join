@@ -20,6 +20,9 @@ using JOIN.Application.UseCases.Messaging.TicketUserCompanies;
 using JOIN.Application.UseCases.Messaging.Tickets;
 using JOIN.Application.Mappings;
 using JOIN.Application.Services.Customers;
+using JOIN.Application.Interface.Finance;
+using JOIN.Application.Services.Finance;
+using JOIN.Application.UseCases.Finance.CompanyCurrencies;
 using JOIN.Application.UseCases.Customers.CustomerStages;
 using JOIN.Application.Mappings.Security;
 using JOIN.Application.Mappings.Security.RoleSystemOption;
@@ -93,6 +96,11 @@ public static class ConfigureServices
         // SPEC 55 — customers: idempotent activation and one default stage per company.
         services.AddScoped<ICustomerActivationService, CustomerActivationService>();
         services.AddScoped<CustomerStageDefaultCoordinator>();
+        // SPEC 56 — finance: base currency rules, rate resolution and conversion.
+        services.AddScoped<CompanyBaseCurrencyCoordinator>();
+        services.AddScoped<CompanyBaseCurrencyChangeGuard>();
+        services.AddScoped<IExchangeRateResolver, ExchangeRateResolver>();
+        services.AddSingleton<IMoneyConverter, MoneyConverter>();
         services.AddScoped<IAuthenticatedSessionIssuer, AuthenticatedSessionIssuer>();
         services.AddScoped<IMfaLoginChallengeIssuer, MfaLoginChallengeIssuer>();
         services.AddScoped<PersonAddressDefaultCoordinator>();

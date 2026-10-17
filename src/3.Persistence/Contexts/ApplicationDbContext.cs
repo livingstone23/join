@@ -8,6 +8,7 @@ using JOIN.Domain.Audit;
 using JOIN.Domain.Calendars;
 using JOIN.Domain.Common;
 using JOIN.Domain.Customers;
+using JOIN.Domain.Finance;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
 using JOIN.Domain.Support;
@@ -118,6 +119,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<TicketInboundChannel> TicketInboundChannels => Set<TicketInboundChannel>();
 
 
+
+    // --- FINANCE MODULE (SPEC 56) ---
+    public DbSet<Currency> Currencies => Set<Currency>();
+    public DbSet<CompanyCurrency> CompanyCurrencies => Set<CompanyCurrency>();
+    public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
 
     // --- 7. CALENDAR MODULE (SPEC 44) ---
     public DbSet<CalendarActivity> CalendarActivities => Set<CalendarActivity>();
@@ -270,6 +276,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<CustomerStage>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<CustomerStatusHistory>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
+        // Finance (SPEC 56): the company's currencies and dated exchange rates.
+        builder.Entity<CompanyCurrency>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<ExchangeRate>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+
         // Messaging / Tickets
         builder.Entity<Ticket>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<TicketStatus>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
@@ -330,6 +340,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         // Calendar global catalogs (SPEC 44): the list of every possible type and status, no owning company.
         builder.Entity<CalendarActivity>().HasQueryFilter(e => e.GcRecord == 0);
         builder.Entity<CalendarStatus>().HasQueryFilter(e => e.GcRecord == 0);
+
+        // Finance global catalog (SPEC 56): ISO currencies, no owning company.
+        builder.Entity<Currency>().HasQueryFilter(e => e.GcRecord == 0);
 
 
 

@@ -84,6 +84,32 @@
 8. `Currencies` solo responde a SuperAdmin (403 al resto); las monedas y tasas de una empresa no se ven desde otra.
 9. Unit tests de handlers, coordinador, guard, resolver y convertidor; integración (`CustomWebApplicationFactory`, `postgres:17`) para 1–6 y 8; `EXPLAIN` del SQL nuevo (convención 10).
 
+## Registro de implementación (2026-10-17)
+
+Rama `spec-56-company-currencies-and-exchange-rates` (desde `main_postgresql`).
+
+- **Dominio y persistencia:**
+  - `JOIN.Domain.Finance`: `Currency`, `CompanyCurrency` y `ExchangeRate`, con configuración en el esquema `finance`.
+  - Índices únicos filtrados `UX_Currencies_Code`, `UX_CompanyCurrencies_Company_Currency`, `UX_CompanyCurrencies_Company_Base` y `UX_ExchangeRates_Company_Currency_Date`.
+  - Filtros globales: tenant en las dos tablas por empresa y solo borrado lógico en el catálogo global.
+  - Migración `Spec56CompanyCurrenciesAndExchangeRates`: solo crea tablas e índices.
+- **Application:**
+  - `CompanyBaseCurrencyCoordinator`, `CompanyBaseCurrencyChangeGuard` (con `IBaseCurrencyAmountSource`; esta spec no registra ninguna fuente), `IExchangeRateResolver`/`ExchangeRateResolver` (Dapper) e `IMoneyConverter`/`MoneyConverter`.
+  - Comandos, validadores y queries de `Currencies`, `CompanyCurrencies` y `ExchangeRates`.
+- **WebApi:** `CurrenciesController` (`[Authorize(Roles = "SuperAdmin")]`), `CompanyCurrenciesController`, `ExchangeRatesController` (con `GET /resolve`) y `FinanceResponseResults`.
+- **Seed:**
+  - Catálogo de 10 monedas.
+  - `DOP` como base para todas las empresas vivas (`SeedCompanyCurrenciesForAllCompaniesAsync`, al aplicar la migración) y para las nuevas (`ICompanyCatalogSeeder.SeedDefaultCatalogsForCompanyAsync`).
+  - `USD` y `EUR` con tasa de ejemplo en `JOIN-001`.
+  - Opciones `Currencies`, `CompanyCurrencies` y `ExchangeRates` en `Administration`, con permisos para SuperAdmin y Manager, y solo lectura de tasas para Supervisor.
+- **Notas:**
+  - Admin recibe por la regla general del seed (`GetAdminFullSystemOptionPermissionSeeds`) la opción `Currencies` como todas las administrativas, pero el controlador la limita a SuperAdmin.
+  - Dapper 2.1.72 no enlaza `DateOnly` como parámetro: las fechas se envían como `DateTime`, igual que en las queries del calendario.
+- **Verificación:**
+  - Build Release sin errores.
+  - Unit tests: 3284 OK (44 nuevos de Finance), cobertura de líneas 94,75 % (gate 90 %).
+  - Integración: 271/271 OK (9 nuevos: criterios 1–6 y 8 con una factory que registra una fuente de montos activable, y `EXPLAIN` del SQL nuevo).
+
 ## Decisiones
 
 - **Esquema `Finance` compartido** (valor por defecto aceptado por el usuario): ventas, compras y presupuestos usarán las mismas monedas y tasas; no pertenecen al módulo de clientes.

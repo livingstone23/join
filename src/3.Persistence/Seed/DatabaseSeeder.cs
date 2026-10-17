@@ -10,6 +10,7 @@ using JOIN.Domain.Common;
 using JOIN.Domain.Customers;
 using JOIN.Application.Services.Customers;
 using JOIN.Domain.Enums;
+using JOIN.Domain.Finance;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
 using JOIN.Persistence.Contexts;
@@ -83,6 +84,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         await SeedMessagingCatalogsForCompanyAsync(companyId, cancellationToken);
         await SeedCalendarCatalogsForCompanyAsync(companyId, cancellationToken);
         await SeedCustomerStagesForCompanyAsync(companyId, cancellationToken);
+        // SPEC 56: every company is born with DOP as its base currency.
+        await SeedCompanyCurrenciesForCompanyAsync(companyId, cancellationToken);
     }
 
     /// <summary>
@@ -276,6 +279,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             // SPEC 55: each company's customer stages, before any customer is seeded.
             await SeedCustomerStagesForCompanyAsync(joinCompanyId);
             await SeedCustomerStagesForCompanyAsync(privateCompanyId);
+            // SPEC 56: global ISO catalog, DOP base for every existing company and sample parallel currencies in JOIN-001.
+            await SeedCurrenciesAsync();
+            await SeedCompanyCurrenciesForAllCompaniesAsync();
+            await SeedJoinParallelCurrenciesAsync(joinCompanyId);
 
             // 7. Entidades operacionales (Clientes)
             await SeedJoinPersonsAsync(joinCompanyId, idTypeId);
@@ -471,6 +478,178 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         {
             await _context.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// SPEC 56 D.13: the global ISO currency catalog, idempotent by <c>Code</c> among live rows.
+    /// </summary>
+    private async Task SeedCurrenciesAsync(CancellationToken cancellationToken = default)
+    {
+        (string Code, string Name, string Symbol, int Decimals)[] seeds =
+        [
+            ("DOP", "Peso dominicano", "RD$", 2),
+            ("USD", "Dólar estadounidense", "US$", 2),
+            ("EUR", "Euro", "€", 2),
+            ("COP", "Peso colombiano", "COL$", 2),
+            ("MXN", "Peso mexicano", "MX$", 2),
+            ("PEN", "Sol peruano", "S/", 2),
+            ("CLP", "Peso chileno", "CLP$", 0),
+            ("ARS", "Peso argentino", "AR$", 2),
+            ("GTQ", "Quetzal", "Q", 2),
+            ("CRC", "Colón costarricense", "₡", 2)
+        ];
+
+        var liveCodes = await _context.Currencies
+            .IgnoreQueryFilters()
+            .Where(c => c.GcRecord == 0)
+            .Select(c => c.Code)
+            .ToListAsync(cancellationToken);
+
+        var inserted = 0;
+        foreach (var seed in seeds.Where(seed => !liveCodes.Contains(seed.Code)))
+        {
+            _context.Currencies.Add(new Currency
+            {
+                Code = seed.Code,
+                Name = seed.Name,
+                Symbol = seed.Symbol,
+                Decimals = seed.Decimals,
+                IsActive = true,
+                CreatedBy = "System_Seeder"
+            });
+            inserted++;
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// SPEC 56 D.14: <c>DOP</c> as the base currency of a company that has no live base yet. Idempotent; seeds the
+    /// global catalog first when it is empty (new company created before the catalog existed).
+    /// </summary>
+    public async Task SeedCompanyCurrenciesForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        var dopId = await _context.Currencies
+            .IgnoreQueryFilters()
+            .Where(c => c.GcRecord == 0 && c.Code == "DOP")
+            .Select(c => c.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (dopId == Guid.Empty)
+        {
+            await SeedCurrenciesAsync(cancellationToken);
+            dopId = await _context.Currencies
+                .IgnoreQueryFilters()
+                .Where(c => c.GcRecord == 0 && c.Code == "DOP")
+                .Select(c => c.Id)
+                .FirstAsync(cancellationToken);
+        }
+
+        var live = await _context.CompanyCurrencies
+            .IgnoreQueryFilters()
+            .Where(c => c.CompanyId == companyId && c.GcRecord == 0)
+            .ToListAsync(cancellationToken);
+
+        if (live.Any(c => c.IsBase))
+        {
+            return;
+        }
+
+        var dop = live.FirstOrDefault(c => c.CurrencyId == dopId);
+        if (dop is null)
+        {
+            _context.CompanyCurrencies.Add(new CompanyCurrency
+            {
+                CompanyId = companyId,
+                CurrencyId = dopId,
+                IsBase = true,
+                IsActive = true,
+                CreatedBy = "System_Seeder"
+            });
+        }
+        else
+        {
+            dop.IsBase = true;
+            dop.IsActive = true;
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// SPEC 56 D.14: applies <see cref="SeedCompanyCurrenciesForCompanyAsync"/> to every live company, so the
+    /// companies created with <c>POST /Companies</c> before this spec also get a base currency.
+    /// </summary>
+    private async Task SeedCompanyCurrenciesForAllCompaniesAsync(CancellationToken cancellationToken = default)
+    {
+        var companyIds = await _context.Companies
+            .IgnoreQueryFilters()
+            .Where(c => c.GcRecord == 0)
+            .Select(c => c.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var companyId in companyIds)
+        {
+            await SeedCompanyCurrenciesForCompanyAsync(companyId, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// SPEC 56 D.14 (development data): JOIN-001 also uses USD and EUR, each with a sample rate dated the seed day.
+    /// Idempotent: a currency that already has any rate is left alone.
+    /// </summary>
+    private async Task SeedJoinParallelCurrenciesAsync(Guid joinCompanyId, CancellationToken cancellationToken = default)
+    {
+        (string Code, decimal Rate)[] seeds = [("USD", 59.36m), ("EUR", 64.10m)];
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        foreach (var seed in seeds)
+        {
+            var currencyId = await _context.Currencies
+                .IgnoreQueryFilters()
+                .Where(c => c.GcRecord == 0 && c.Code == seed.Code)
+                .Select(c => c.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (currencyId == Guid.Empty)
+            {
+                continue;
+            }
+
+            var exists = await _context.CompanyCurrencies
+                .IgnoreQueryFilters()
+                .AnyAsync(c => c.CompanyId == joinCompanyId && c.CurrencyId == currencyId && c.GcRecord == 0, cancellationToken);
+            if (!exists)
+            {
+                _context.CompanyCurrencies.Add(new CompanyCurrency
+                {
+                    CompanyId = joinCompanyId,
+                    CurrencyId = currencyId,
+                    IsBase = false,
+                    IsActive = true,
+                    CreatedBy = "System_Seeder"
+                });
+            }
+
+            var hasRate = await _context.ExchangeRates
+                .IgnoreQueryFilters()
+                .AnyAsync(r => r.CompanyId == joinCompanyId && r.CurrencyId == currencyId && r.GcRecord == 0, cancellationToken);
+            if (!hasRate)
+            {
+                _context.ExchangeRates.Add(new ExchangeRate
+                {
+                    CompanyId = joinCompanyId,
+                    CurrencyId = currencyId,
+                    RateDate = today,
+                    Rate = seed.Rate,
+                    CreatedBy = "System_Seeder"
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     private async Task SeedDefaultUsersAsync()
@@ -3531,6 +3710,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("EntityStatuses", "/administration/entity-statuses", "@Icons.Material.Filled.Highlight", "Administration", "Administration", "EntityStatuses", true, true, true, true),
         new("CompanyModules", "/administration/company-modules", "@Icons.Material.Filled.HolidayVillage", "Administration", "Administration", "CompanyModules", true, true, true, true),
         new("CommunicationChannels", "/administration/communication-channels", "@Icons.Material.Filled.KeyboardAlt", "Administration", "Administration", "CommunicationChannels", true, true, true, true),
+        // SPEC 56 — currencies (global catalog, SuperAdmin only), the company's currencies and its exchange rates.
+        new("Currencies", "/administration/currencies", "@Icons.Material.Filled.CurrencyExchange", "Administration", "Administration", "Currencies", true, true, true, true),
+        new("CompanyCurrencies", "/administration/company-currencies", "@Icons.Material.Filled.Payments", "Administration", "Administration", "CompanyCurrencies", true, true, true, true),
+        new("ExchangeRates", "/administration/exchange-rates", "@Icons.Material.Filled.TrendingUp", "Administration", "Administration", "ExchangeRates", true, true, true, true),
 
 
         new("Genders", "/administration/genders", "@Icons.Material.Filled.Factory", "Administration", "Administration", "Genders", true, true, true, true),
@@ -3615,6 +3798,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("SuperAdmin", "TicketUserCompanies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Customers", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "CustomerStages", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "Currencies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "CompanyCurrencies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "ExchangeRates", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
 
@@ -3648,6 +3834,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "Persons", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "Customers", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "CustomerStages", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        // SPEC 56: Manager runs the company's currencies and rates; the global catalog stays SuperAdmin-only.
+        new("Manager", "CompanyCurrencies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "ExchangeRates", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
 
         new("Manager", "Companies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "TicketManagement", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -3684,6 +3873,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "CustomersMenu", true, true, true, true),
         new("Supervisor", "Persons", true, true, true, true),
         new("Supervisor", "Customers", true, true, true, false),
+        // SPEC 56: Supervisor reads the exchange rates.
+        new("Supervisor", "ExchangeRates", true, false, false, false),
         new("Supervisor", "CommunicationChannels", true, true, true, false),
         new("Supervisor", "Companies", true, true, true, false),
         new("Supervisor", "TicketManagement", true, true, true, true),

@@ -1918,3 +1918,45 @@ curl -s -X POST "$BASE_URL/api/v1/PersonPendingConfirmations/$PENDING_ID/link-cu
 | `CALENDAR_EVENT_NOT_FOUND` | 404 | The activity is not of the identified person (or is the internal review) |
 | `PERSON_PENDING_NOT_FOUND` / `PERSON_PENDING_ALREADY_RESOLVED` | 404 / 400 | Unknown pending / not in Pending |
 | `PERSON_PENDING_INVALID_CUSTOMER` | 400 | The customer is not of the company or of the same person |
+
+## Finance — currencies and exchange rates (SPEC 56)
+
+Each company has exactly one **base currency** (`isBase = true`, DOP after the seed) plus optional parallel
+currencies with dated exchange rates: `1 <currency> = rate <base>`. The base currency is locked once the company
+stores amounts (`409 BASE_CURRENCY_IN_USE`). The global ISO catalog (`/Currencies`) is SuperAdmin only.
+
+| Code | HTTP | When |
+|---|---|---|
+| `BASE_CURRENCY_REQUIRED` | 400 | Unmark, deactivate or delete the base |
+| `BASE_CURRENCY_IN_USE` | 409 | Change the base when the company already stores amounts |
+| `EXCHANGE_RATE_FOR_BASE` | 400 | Register a rate for the base currency |
+| `EXCHANGE_RATE_INVALID` | 400 | Rate for a currency the company does not use (or inactive) |
+| `EXCHANGE_RATE_NOT_FOUND` | 400 | `resolve` with no rate on or before the date |
+| `CURRENCY_IN_USE` | 409 | Delete a global currency used by any company |
+| `DUPLICATE_KEY` | 409 | Same currency twice in a company, or two rates for the same currency and date |
+
+```bash
+# Global catalog (SuperAdmin)
+curl -s "$BASE_URL/api/v1/Currencies?search=us" -H "Authorization: Bearer $TOKEN"
+
+# Currencies of the company of the token (base first, with the latest rate)
+curl -s "$BASE_URL/api/v1/CompanyCurrencies" -H "Authorization: Bearer $TOKEN"
+
+# Activate USD as a parallel currency (currencyId = id of the global USD row)
+curl -s -X POST "$BASE_URL/api/v1/CompanyCurrencies" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "currencyId": "<usd-id>", "isBase": false }'
+
+# Make it the base (only while the company has no amounts); the previous base turns parallel
+curl -s -X PUT "$BASE_URL/api/v1/CompanyCurrencies/<company-currency-id>" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "isBase": true, "isActive": true }'
+
+# Register a rate: 1 USD = 59.36 DOP on 2026-10-16
+curl -s -X POST "$BASE_URL/api/v1/ExchangeRates" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "currencyId": "<usd-id>", "rateDate": "2026-10-16", "rate": 59.36 }'
+
+# Rate that applies on a date (the latest on or before it; the base returns 1)
+curl -s "$BASE_URL/api/v1/ExchangeRates/resolve?currencyId=<usd-id>&date=2026-10-17" -H "Authorization: Bearer $TOKEN"
+```
