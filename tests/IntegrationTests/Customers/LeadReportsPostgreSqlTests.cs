@@ -84,7 +84,7 @@ public sealed class LeadReportsPostgreSqlTests : IClassFixture<CustomWebApplicat
         teams.Sum(t => t.GetProperty("wonValueBase").GetDecimal()).Should().Be(summary.GetProperty("wonValueBase").GetDecimal());
         ranking.Sum(r => r.GetProperty("createdCount").GetInt32()).Should().Be(summary.GetProperty("createdCount").GetInt32());
         ranking.Sum(r => r.GetProperty("wonCount").GetInt32()).Should().Be(summary.GetProperty("wonCount").GetInt32());
-        summary.GetProperty("baseCurrencyCode").GetString().Should().Be("DOP");
+        summary.GetProperty("baseCurrencyCode").GetString().Should().Be("USD");
 
         var funnel = (await DataAsync(await superAdmin.GetAsync($"/api/v1/LeadReports/funnel?{Period}"))).EnumerateArray().ToList();
         funnel.Sum(f => f.GetProperty("count").GetInt32()).Should().Be(summary.GetProperty("openCount").GetInt32());
@@ -158,21 +158,21 @@ public sealed class LeadReportsPostgreSqlTests : IClassFixture<CustomWebApplicat
     }
 
     [Fact]
-    public async Task UsdLead_SumsItsStoredBaseValue_NotARecalculation()
+    public async Task DopLead_SumsItsStoredBaseValue_NotARecalculation()
     {
         var c = await CompanyAsync();
-        Guid usd;
+        Guid dop;
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
-            usd = await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Currencies.IgnoreQueryFilters().Where(x => x.Code == "USD").Select(x => x.Id).SingleAsync();
+            dop = await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Currencies.IgnoreQueryFilters().Where(x => x.Code == "DOP").Select(x => x.Id).SingleAsync();
         }
 
-        (await c.Admin.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = usd })).EnsureSuccessStatusCode();
+        (await c.Admin.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = dop })).EnsureSuccessStatusCode();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        (await c.Admin.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = usd, rateDate = today.AddDays(-1).ToString("yyyy-MM-dd"), rate = 60m })).EnsureSuccessStatusCode();
-        var won = (await WinAsync(c, c.Admin, await LeadAsync(c, c.Admin, currencyId: usd, value: 100m))).GetProperty("lead");
+        (await c.Admin.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = dop, rateDate = today.AddDays(-1).ToString("yyyy-MM-dd"), rate = 60m })).EnsureSuccessStatusCode();
+        var won = (await WinAsync(c, c.Admin, await LeadAsync(c, c.Admin, currencyId: dop, value: 100m))).GetProperty("lead");
         won.GetProperty("wonValueBase").GetDecimal().Should().Be(6000m);
-        (await c.Admin.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = usd, rateDate = today.ToString("yyyy-MM-dd"), rate = 75m })).EnsureSuccessStatusCode();
+        (await c.Admin.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = dop, rateDate = today.ToString("yyyy-MM-dd"), rate = 75m })).EnsureSuccessStatusCode();
 
         var summary = await DataAsync(await c.Admin.GetAsync($"/api/v1/LeadReports/summary?{Period}"));
         summary.GetProperty("wonValueBase").GetDecimal().Should().Be(6000m);

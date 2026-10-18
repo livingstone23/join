@@ -228,19 +228,19 @@ public sealed class LeadsPostgreSqlTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task Products_InUsd_StoreRateAndBaseValue_AndLockTheCurrency()
+    public async Task Products_InDop_StoreRateAndBaseValue_AndLockTheCurrency()
     {
         var c = await CompanyAsync();
-        var usdId = await CurrencyIdAsync("USD");
-        (await c.Admin.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = usdId })).EnsureSuccessStatusCode();
+        var dopId = await CurrencyIdAsync("DOP");
+        (await c.Admin.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = dopId })).EnsureSuccessStatusCode();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        (await c.Admin.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = usdId, rateDate = today.AddDays(-1).ToString("yyyy-MM-dd"), rate = 59.3612m })).EnsureSuccessStatusCode();
+        (await c.Admin.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = dopId, rateDate = today.AddDays(-1).ToString("yyyy-MM-dd"), rate = 59.3612m })).EnsureSuccessStatusCode();
         var product = await DataAsync(await c.Admin.PostAsJsonAsync("/api/v1/Products", new { code = "CRM-USR", name = "Licencia", kind = 2, referencePrice = 1450m }));
 
         var lead = (await CreateAsync(c.Admin, new
         {
             newPerson = new { personType = 2, firstName = "Óptica", lastName = "Visión", commercialName = "Óptica Visión" },
-            topic = "Licencias", relationshipTypeId = c.Relationship("PROSPECT_CUSTOMER"), leadSourceId = c.Source("REFERRAL"), currencyId = usdId
+            topic = "Licencias", relationshipTypeId = c.Relationship("PROSPECT_CUSTOMER"), leadSourceId = c.Source("REFERRAL"), currencyId = dopId
         })).GetProperty("lead");
         var id = lead.GetProperty("id").GetGuid();
 
@@ -254,17 +254,17 @@ public sealed class LeadsPostgreSqlTests : IClassFixture<CustomWebApplicationFac
         detail.GetProperty("exchangeRate").GetDecimal().Should().Be(59.3612m);
         detail.GetProperty("exchangeRateDate").GetString().Should().Be(today.AddDays(-1).ToString("yyyy-MM-dd"));
         detail.GetProperty("estimatedValueBase").GetDecimal().Should().Be(Math.Round(value * 59.3612m, 2, MidpointRounding.AwayFromZero));
-        detail.GetProperty("currencyCode").GetString().Should().Be("USD");
-        detail.GetProperty("baseCurrencyCode").GetString().Should().Be("DOP");
+        detail.GetProperty("currencyCode").GetString().Should().Be("DOP");
+        detail.GetProperty("baseCurrencyCode").GetString().Should().Be("USD");
         detail.GetProperty("products").GetArrayLength().Should().Be(2);
         rejected.GetProperty("status").GetInt32().Should().Be(3);
 
-        var locked = await c.Admin.PutAsJsonAsync($"/api/v1/Leads/{id}", new { topic = "Licencias", relationshipTypeId = c.Relationship("PROSPECT_CUSTOMER"), leadSourceId = c.Source("REFERRAL"), currencyId = await CurrencyIdAsync("DOP") });
+        var locked = await c.Admin.PutAsJsonAsync($"/api/v1/Leads/{id}", new { topic = "Licencias", relationshipTypeId = c.Relationship("PROSPECT_CUSTOMER"), leadSourceId = c.Source("REFERRAL"), currencyId = await CurrencyIdAsync("USD") });
         locked.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await locked.Content.ReadAsStringAsync()).Should().Contain("LEAD_CURRENCY_LOCKED");
 
         var baseChange = await c.Admin.PutAsJsonAsync(
-            $"/api/v1/CompanyCurrencies/{(await DataAsync(await c.Admin.GetAsync("/api/v1/CompanyCurrencies"))).EnumerateArray().Single(x => x.GetProperty("code").GetString() == "USD").GetProperty("id").GetGuid()}",
+            $"/api/v1/CompanyCurrencies/{(await DataAsync(await c.Admin.GetAsync("/api/v1/CompanyCurrencies"))).EnumerateArray().Single(x => x.GetProperty("code").GetString() == "DOP").GetProperty("id").GetGuid()}",
             new { isBase = true, isActive = true });
         baseChange.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await baseChange.Content.ReadAsStringAsync()).Should().Contain("BASE_CURRENCY_IN_USE").And.Contain("Leads");

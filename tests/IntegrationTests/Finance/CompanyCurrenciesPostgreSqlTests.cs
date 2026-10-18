@@ -23,7 +23,7 @@ namespace JOIN.IntegrationTests.Finance;
 /// <summary>
 /// SPEC 56 — base currency per company, parallel currencies and dated exchange rates against PostgreSQL 17.
 /// Each test that changes a base works on its own company (created with <c>POST /Companies</c>) and a SuperAdmin
-/// bound to it, so JOIN-001 keeps DOP for the rest of the suite.
+/// bound to it, so JOIN-001 keeps USD for the rest of the suite.
 /// </summary>
 public sealed class CompanyCurrenciesPostgreSqlTests : IClassFixture<FinancePostgreSqlWebApplicationFactory>
 {
@@ -49,11 +49,11 @@ public sealed class CompanyCurrenciesPostgreSqlTests : IClassFixture<FinancePost
 
             bases.GroupBy(b => b.CompanyId).Should().OnlyContain(g => g.Count() == 1);
             bases.Select(b => b.CompanyId).Should().BeEquivalentTo(companies);
-            bases.Should().OnlyContain(b => b.Code == "DOP");
+            bases.Should().OnlyContain(b => b.Code == "USD");
         }
 
         var (companyId, _) = await CreateCompanyWithAdminAsync();
-        (await BaseCodeAsync(companyId)).Should().Be("DOP", "a company created with POST /Companies is born with DOP");
+        (await BaseCodeAsync(companyId)).Should().Be("USD", "a company created with POST /Companies is born with USD");
     }
 
     [Fact]
@@ -61,9 +61,9 @@ public sealed class CompanyCurrenciesPostgreSqlTests : IClassFixture<FinancePost
     {
         var (companyId, client) = await CreateCompanyWithAdminAsync();
 
-        var usd = await client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = await CurrencyIdAsync("USD"), isBase = true });
-        usd.StatusCode.Should().Be(HttpStatusCode.Created, await usd.Content.ReadAsStringAsync());
-        (await BaseCodeAsync(companyId)).Should().Be("USD");
+        var dop = await client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = await CurrencyIdAsync("DOP"), isBase = true });
+        dop.StatusCode.Should().Be(HttpStatusCode.Created, await dop.Content.ReadAsStringAsync());
+        (await BaseCodeAsync(companyId)).Should().Be("DOP");
 
         var eurId = await CurrencyIdAsync("EUR");
         var copId = await CurrencyIdAsync("COP");
@@ -81,10 +81,10 @@ public sealed class CompanyCurrenciesPostgreSqlTests : IClassFixture<FinancePost
     public async Task TheBase_CannotBeDeactivatedNorDeleted()
     {
         var (_, client) = await CreateCompanyWithAdminAsync();
-        var dop = await CompanyCurrencyAsync(client, "DOP");
+        var usd = await CompanyCurrencyAsync(client, "USD");
 
-        var deactivate = await client.PutAsJsonAsync($"/api/v1/CompanyCurrencies/{dop.GetProperty("id").GetGuid()}", new { isBase = true, isActive = false });
-        var delete = await client.DeleteAsync($"/api/v1/CompanyCurrencies/{dop.GetProperty("id").GetGuid()}");
+        var deactivate = await client.PutAsJsonAsync($"/api/v1/CompanyCurrencies/{usd.GetProperty("id").GetGuid()}", new { isBase = true, isActive = false });
+        var delete = await client.DeleteAsync($"/api/v1/CompanyCurrencies/{usd.GetProperty("id").GetGuid()}");
 
         deactivate.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await deactivate.Content.ReadAsStringAsync()).Should().Contain("BASE_CURRENCY_REQUIRED");
@@ -101,33 +101,33 @@ public sealed class CompanyCurrenciesPostgreSqlTests : IClassFixture<FinancePost
             _factory.AmountSource.CompaniesWithAmounts.Add(companyId);
         }
 
-        var response = await client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = await CurrencyIdAsync("USD"), isBase = true });
+        var response = await client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = await CurrencyIdAsync("DOP"), isBase = true });
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await response.Content.ReadAsStringAsync()).Should().Contain("BASE_CURRENCY_IN_USE").And.Contain("TestAmounts");
-        (await BaseCodeAsync(companyId)).Should().Be("DOP");
+        (await BaseCodeAsync(companyId)).Should().Be("USD");
     }
 
     [Fact]
     public async Task Resolve_ReturnsTheBaseTheExactRateTheLatestEarlierOrNotFound()
     {
         var (_, client) = await CreateCompanyWithAdminAsync();
-        var usdId = await CurrencyIdAsync("USD");
-        var eurId = await CurrencyIdAsync("EUR");
-        (await client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = usdId })).EnsureSuccessStatusCode();
-        (await client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = eurId })).EnsureSuccessStatusCode();
-        (await client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = usdId, rateDate = "2026-10-10", rate = 59.10m })).EnsureSuccessStatusCode();
-        (await client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = usdId, rateDate = "2026-10-14", rate = 59.36m })).EnsureSuccessStatusCode();
         var dopId = await CurrencyIdAsync("DOP");
+        var eurId = await CurrencyIdAsync("EUR");
+        (await client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = dopId })).EnsureSuccessStatusCode();
+        (await client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = eurId })).EnsureSuccessStatusCode();
+        (await client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = dopId, rateDate = "2026-10-10", rate = 59.10m })).EnsureSuccessStatusCode();
+        (await client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = dopId, rateDate = "2026-10-14", rate = 59.36m })).EnsureSuccessStatusCode();
+        var usdId = await CurrencyIdAsync("USD");
 
-        var baseRate = Data(await client.GetStringAsync($"/api/v1/ExchangeRates/resolve?currencyId={dopId}&date=2026-10-16"));
+        var baseRate = Data(await client.GetStringAsync($"/api/v1/ExchangeRates/resolve?currencyId={usdId}&date=2026-10-16"));
         baseRate.GetProperty("rate").GetDecimal().Should().Be(1m);
         baseRate.GetProperty("isBase").GetBoolean().Should().BeTrue();
 
-        var exact = Data(await client.GetStringAsync($"/api/v1/ExchangeRates/resolve?currencyId={usdId}&date=2026-10-10"));
+        var exact = Data(await client.GetStringAsync($"/api/v1/ExchangeRates/resolve?currencyId={dopId}&date=2026-10-10"));
         exact.GetProperty("rate").GetDecimal().Should().Be(59.10m);
 
-        var fallback = Data(await client.GetStringAsync($"/api/v1/ExchangeRates/resolve?currencyId={usdId}&date=2026-10-16"));
+        var fallback = Data(await client.GetStringAsync($"/api/v1/ExchangeRates/resolve?currencyId={dopId}&date=2026-10-16"));
         fallback.GetProperty("rate").GetDecimal().Should().Be(59.36m);
         fallback.GetProperty("rateDate").GetString().Should().Be("2026-10-14");
 
@@ -140,12 +140,12 @@ public sealed class CompanyCurrenciesPostgreSqlTests : IClassFixture<FinancePost
     public async Task Rates_ForTheBaseOrOnATakenDate_AreRejected()
     {
         var (_, client) = await CreateCompanyWithAdminAsync();
-        var usdId = await CurrencyIdAsync("USD");
-        (await client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = usdId })).EnsureSuccessStatusCode();
-        (await client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = usdId, rateDate = "2026-10-16", rate = 59.36m })).EnsureSuccessStatusCode();
+        var dopId = await CurrencyIdAsync("DOP");
+        (await client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = dopId })).EnsureSuccessStatusCode();
+        (await client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = dopId, rateDate = "2026-10-16", rate = 59.36m })).EnsureSuccessStatusCode();
 
-        var forBase = await client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = await CurrencyIdAsync("DOP"), rateDate = "2026-10-16", rate = 1m });
-        var duplicate = await client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = usdId, rateDate = "2026-10-16", rate = 60m });
+        var forBase = await client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = await CurrencyIdAsync("USD"), rateDate = "2026-10-16", rate = 1m });
+        var duplicate = await client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = dopId, rateDate = "2026-10-16", rate = 60m });
 
         forBase.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await forBase.Content.ReadAsStringAsync()).Should().Contain("EXCHANGE_RATE_FOR_BASE");
@@ -156,9 +156,9 @@ public sealed class CompanyCurrenciesPostgreSqlTests : IClassFixture<FinancePost
     public async Task GlobalCatalog_IsSuperAdminOnly_AndCompanyDataIsIsolated()
     {
         var (_, other) = await CreateCompanyWithAdminAsync();
-        var usdId = await CurrencyIdAsync("USD");
-        (await other.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = usdId })).EnsureSuccessStatusCode();
-        (await other.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = usdId, rateDate = "2026-01-02", rate = 58.77m })).EnsureSuccessStatusCode();
+        var dopId = await CurrencyIdAsync("DOP");
+        (await other.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = dopId })).EnsureSuccessStatusCode();
+        (await other.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = dopId, rateDate = "2026-01-02", rate = 58.77m })).EnsureSuccessStatusCode();
 
         using var manager = await ModuleTestHelpers.LoginAsync(_factory, "manager@join.com");
         (await manager.GetAsync("/api/v1/Currencies")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
