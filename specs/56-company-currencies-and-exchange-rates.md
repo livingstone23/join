@@ -1,6 +1,6 @@
 # SPEC 56 — Monedas por empresa: moneda base, monedas paralelas y tasas de cambio
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 39 (fork PostgreSQL), SPEC 41-post (borrado lógico y restauración), SPEC 43-post (módulos, menú y rutas en inglés). Rama de trabajo: `spec-56-company-currencies-and-exchange-rates`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-16
 > **Objective:** Que cada empresa tenga una moneda base, pueda usar monedas paralelas y registre tasas de cambio fechadas, para que los montos del módulo de clientes (y luego de ventas, compras y presupuestos) se guarden en su moneda y se sumen en moneda base.
