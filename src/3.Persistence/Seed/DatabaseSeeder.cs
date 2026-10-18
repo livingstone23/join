@@ -90,7 +90,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         await SeedMessagingCatalogsForCompanyAsync(companyId, cancellationToken);
         await SeedCalendarCatalogsForCompanyAsync(companyId, cancellationToken);
         await SeedCustomerStagesForCompanyAsync(companyId, cancellationToken);
-        // SPEC 56: every company is born with DOP as its base currency.
+        // SPEC 56: every company is born with USD as its base currency.
         await SeedCompanyCurrenciesForCompanyAsync(companyId, cancellationToken);
         // SPEC 59: commercial settings (stages, sources, reasons, relationship types, contact types and rules).
         await SeedContactTypesAsync(cancellationToken);
@@ -292,7 +292,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             // SPEC 55: each company's customer stages, before any customer is seeded.
             await SeedCustomerStagesForCompanyAsync(joinCompanyId);
             await SeedCustomerStagesForCompanyAsync(privateCompanyId);
-            // SPEC 56: global ISO catalog, DOP base for every existing company and sample parallel currencies in JOIN-001.
+            // SPEC 56: global ISO catalog, USD base for every existing company and sample parallel currencies in JOIN-001.
             await SeedCurrenciesAsync();
             await SeedCompanyCurrenciesForAllCompaniesAsync();
             await SeedJoinParallelCurrenciesAsync(joinCompanyId);
@@ -312,7 +312,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedJoinLookupPersonsAsync(joinCompanyId, idTypes);
             await SeedJoinCustomersAsync(joinCompanyId);
             await SeedJoinTicketsAsync(joinCompanyId);
-            // SPEC 61: sample leads of the proposal (open, inactive, one in USD) with contacts and products.
+            // SPEC 61: sample leads of the proposal (open, inactive, one in DOP) with contacts and products.
             await SeedJoinLeadsAsync(joinCompanyId);
 
             // Guardado final para asegurar consistencia
@@ -800,7 +800,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
     /// <summary>
     /// SPEC 61 D.33 (development data): sample leads of JOIN-001 on the seeded persons, users, teams and products —
-    /// open leads in several stages, one in USD and one inactive — with their first contact, lines and histories.
+    /// open leads in several stages, one in DOP and one inactive — with their first contact, lines and histories.
     /// Skipped when the company already has leads.
     /// </summary>
     private async Task SeedJoinLeadsAsync(Guid joinCompanyId, CancellationToken cancellationToken = default)
@@ -830,14 +830,14 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         var products = await _context.Products.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, cancellationToken);
         var teams = await _context.SalesTeams.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken);
         var currencies = await _context.Currencies.IgnoreQueryFilters().Where(c => c.GcRecord == 0).ToDictionaryAsync(c => c.Code, c => c.Id, cancellationToken);
-        if (persons.Count < 8 || !stages.ContainsKey("NEW") || !currencies.ContainsKey("DOP")
+        if (persons.Count < 8 || !stages.ContainsKey("NEW") || !currencies.ContainsKey("USD")
             || !users.ContainsKey("manager@join.com") || !users.ContainsKey("simpleuser@join.com") || !users.ContainsKey("livingstone23@gmail.com"))
         {
             return;
         }
 
-        var usdRate = await _context.ExchangeRates.IgnoreQueryFilters()
-            .Where(r => r.CompanyId == joinCompanyId && r.CurrencyId == currencies["USD"] && r.GcRecord == 0)
+        var dopRate = await _context.ExchangeRates.IgnoreQueryFilters()
+            .Where(r => r.CompanyId == joinCompanyId && r.CurrencyId == currencies["DOP"] && r.GcRecord == 0)
             .OrderByDescending(r => r.RateDate)
             .Select(r => (decimal?)r.Rate)
             .FirstOrDefaultAsync(cancellationToken);
@@ -845,17 +845,17 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         (string Topic, string Owner, string Team, string Stage, string Source, string Relationship, string Currency, decimal Manual,
             (string Code, decimal Qty)[] Lines, (string Type, int? Minutes, string Summary) Contact, string? InactiveReason)[] seeds =
         [
-            ("Punto de venta para 3 sucursales", "manager@join.com", "Equipo Capital", "NEW", "REFERRAL", "PROSPECT_CUSTOMER", "DOP", 0m,
+            ("Punto de venta para 3 sucursales", "manager@join.com", "Equipo Capital", "NEW", "REFERRAL", "PROSPECT_CUSTOMER", "USD", 0m,
                 [("POS-01", 3m), ("IMP-BAS", 1m)], ("CALL", 15, "Primer contacto: necesitan POS para tres sucursales."), null),
-            ("CRM para admisiones y cobros", "simpleuser@join.com", "Equipo Capital", "NEGOTIATION", "EVENT", "PROSPECT_CUSTOMER", "DOP", 0m,
+            ("CRM para admisiones y cobros", "simpleuser@join.com", "Equipo Capital", "NEGOTIATION", "EVENT", "PROSPECT_CUSTOMER", "USD", 0m,
                 [("CRM-USR", 25m), ("CAP-HR", 1m)], ("VISIT", 60, "Visita al colegio; revisamos el flujo de admisiones."), null),
-            ("Reventa de licencias en la zona este", "manager@join.com", "Equipo Capital", "QUALIFIED", "WEB", "DISTRIBUTOR", "DOP", 158000m,
+            ("Reventa de licencias en la zona este", "manager@join.com", "Equipo Capital", "QUALIFIED", "WEB", "DISTRIBUTOR", "USD", 2650m,
                 [], ("EMAIL", null, "Enviada la propuesta de distribución."), null),
-            ("Licencias para consultorio", "simpleuser@join.com", "Equipo Capital", "CONTACTED", "WA_IN", "PROSPECT_CUSTOMER", "DOP", 30000m,
+            ("Licencias para consultorio", "simpleuser@join.com", "Equipo Capital", "CONTACTED", "WA_IN", "PROSPECT_CUSTOMER", "USD", 500m,
                 [], ("WHATSAPP", null, "Pidió precios por WhatsApp."), null),
-            ("Licencias y soporte", "livingstone23@gmail.com", "Equipo Norte", "PROPOSAL", "REFERRAL", "PROSPECT_CUSTOMER", usdRate is null ? "DOP" : "USD", 0m,
+            ("Licencias y soporte", "livingstone23@gmail.com", "Equipo Norte", "PROPOSAL", "REFERRAL", "PROSPECT_CUSTOMER", dopRate is null ? "USD" : "DOP", 0m,
                 [("CRM-USR", 10m), ("SOP-12", 1m)], ("ONLINE_MEETING", 45, "Reunión online con la gerencia."), null),
-            ("Caja registradora", "livingstone23@gmail.com", "Equipo Norte", "CONTACTED", "COLD", "PROSPECT_CUSTOMER", "DOP", 25000m,
+            ("Caja registradora", "livingstone23@gmail.com", "Equipo Norte", "CONTACTED", "COLD", "PROSPECT_CUSTOMER", "USD", 420m,
                 [], ("CALL", 10, "No contestan desde hace dos semanas."), "NO_ANSWER")
         ];
 
@@ -867,7 +867,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             var personId = persons[number];
             number++;
             var ownerId = users[seed.Owner];
-            var rate = seed.Currency == "USD" ? usdRate!.Value : 1m;
+            var rate = seed.Currency == "DOP" ? dopRate!.Value : 1m;
             var lead = new Lead
             {
                 CompanyId = joinCompanyId,
@@ -958,7 +958,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 CompanyId = joinCompanyId, Code = $"LD-{number:D6}", PersonId = personId, Topic = closeTopic, OwnerUserId = ownerId,
                 SalesTeamId = teams.TryGetValue("Equipo Capital", out var capital) ? capital : null,
                 LeadStageId = stages[isWon ? "WON" : "LOST"].Id, LeadSourceId = sources["REFERRAL"], RelationshipTypeId = relationships["PROSPECT_CUSTOMER"],
-                CurrencyId = currencies["DOP"], ExchangeRate = 1m, ExchangeRateDate = today, Status = isWon ? LeadStatus.Won : LeadStatus.Lost,
+                CurrencyId = currencies["USD"], ExchangeRate = 1m, ExchangeRateDate = today, Status = isWon ? LeadStatus.Won : LeadStatus.Lost,
                 LeadReasonId = reasons[isWon ? "BEST_PRICE" : "HIGH_PRICE"], ClosedAt = closedAt
             };
             _context.Leads.Add(lead);
@@ -1044,7 +1044,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             {
                 CompanyId = joinCompanyId, Code = $"LD-{number:D6}", PersonId = personId, Topic = "Interés en JOIN CRM", OwnerUserId = registrar,
                 SalesTeamId = teams.TryGetValue("Equipo Norte", out var norte) ? norte : null, LeadStageId = stage.Id, LeadSourceId = sources["WEB"],
-                RelationshipTypeId = relationships["PROSPECT_CUSTOMER"], CurrencyId = currencies["DOP"], ExchangeRate = 1m, ExchangeRateDate = today
+                RelationshipTypeId = relationships["PROSPECT_CUSTOMER"], CurrencyId = currencies["USD"], ExchangeRate = 1m, ExchangeRateDate = today
             };
             _context.Leads.Add(lead);
             _context.LeadStageHistory.Add(new LeadStageHistory { CompanyId = joinCompanyId, LeadId = lead.Id, ToStageId = stage.Id, UserId = registrar, ChangedAt = now });
@@ -1299,23 +1299,23 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     }
 
     /// <summary>
-    /// SPEC 56 D.14: <c>DOP</c> as the base currency of a company that has no live base yet. Idempotent; seeds the
+    /// SPEC 56 D.14: <c>USD</c> as the base currency of a company that has no live base yet. Idempotent; seeds the
     /// global catalog first when it is empty (new company created before the catalog existed).
     /// </summary>
     public async Task SeedCompanyCurrenciesForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
     {
-        var dopId = await _context.Currencies
+        var usdId = await _context.Currencies
             .IgnoreQueryFilters()
-            .Where(c => c.GcRecord == 0 && c.Code == "DOP")
+            .Where(c => c.GcRecord == 0 && c.Code == "USD")
             .Select(c => c.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (dopId == Guid.Empty)
+        if (usdId == Guid.Empty)
         {
             await SeedCurrenciesAsync(cancellationToken);
-            dopId = await _context.Currencies
+            usdId = await _context.Currencies
                 .IgnoreQueryFilters()
-                .Where(c => c.GcRecord == 0 && c.Code == "DOP")
+                .Where(c => c.GcRecord == 0 && c.Code == "USD")
                 .Select(c => c.Id)
                 .FirstAsync(cancellationToken);
         }
@@ -1330,13 +1330,13 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             return;
         }
 
-        var dop = live.FirstOrDefault(c => c.CurrencyId == dopId);
-        if (dop is null)
+        var usd = live.FirstOrDefault(c => c.CurrencyId == usdId);
+        if (usd is null)
         {
             _context.CompanyCurrencies.Add(new CompanyCurrency
             {
                 CompanyId = companyId,
-                CurrencyId = dopId,
+                CurrencyId = usdId,
                 IsBase = true,
                 IsActive = true,
                 CreatedBy = "System_Seeder"
@@ -1344,8 +1344,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         }
         else
         {
-            dop.IsBase = true;
-            dop.IsActive = true;
+            usd.IsBase = true;
+            usd.IsActive = true;
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -1370,12 +1370,12 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     }
 
     /// <summary>
-    /// SPEC 56 D.14 (development data): JOIN-001 also uses USD and EUR, each with a sample rate dated the seed day.
-    /// Idempotent: a currency that already has any rate is left alone.
+    /// SPEC 56 D.14 (development data): JOIN-001 also uses DOP and EUR, each with a sample rate in USD
+    /// (1 unit = Rate USD) dated the seed day. Idempotent: a currency that already has any rate is left alone.
     /// </summary>
     private async Task SeedJoinParallelCurrenciesAsync(Guid joinCompanyId, CancellationToken cancellationToken = default)
     {
-        (string Code, decimal Rate)[] seeds = [("USD", 59.36m), ("EUR", 64.10m)];
+        (string Code, decimal Rate)[] seeds = [("DOP", 0.016846m), ("EUR", 1.080000m)];
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         foreach (var seed in seeds)
@@ -1426,7 +1426,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
     /// <summary>
     /// SPEC 57 D.9 (development data): the categories and the six products of the commercial proposal in JOIN-001,
-    /// idempotent by category name and product code among live rows. Prices are in the company's base currency (DOP).
+    /// idempotent by category name and product code among live rows. Prices are in the company's base currency (USD).
     /// </summary>
     private async Task SeedJoinProductCatalogAsync(Guid joinCompanyId, CancellationToken cancellationToken = default)
     {
@@ -1451,12 +1451,12 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         (string Code, string Name, ProductKind Kind, string Category, decimal Price, bool IsActive)[] products =
         [
-            ("CRM-USR", "Licencia JOIN CRM · usuario/mes", ProductKind.Service, "Software", 1450m, true),
-            ("IMP-BAS", "Implementación básica", ProductKind.Service, "Servicios profesionales", 85000m, true),
-            ("CAP-HR", "Capacitación (hora)", ProductKind.Service, "Servicios profesionales", 3200m, true),
-            ("SOP-12", "Soporte premium 12 meses", ProductKind.Service, "Soporte", 120000m, true),
-            ("POS-01", "Terminal punto de venta", ProductKind.Product, "Equipos", 38500m, true),
-            ("MNT-PRE", "Mantenimiento preventivo", ProductKind.Service, "Soporte", 18000m, false)
+            ("CRM-USR", "Licencia JOIN CRM · usuario/mes", ProductKind.Service, "Software", 25m, true),
+            ("IMP-BAS", "Implementación básica", ProductKind.Service, "Servicios profesionales", 1450m, true),
+            ("CAP-HR", "Capacitación (hora)", ProductKind.Service, "Servicios profesionales", 55m, true),
+            ("SOP-12", "Soporte premium 12 meses", ProductKind.Service, "Soporte", 2000m, true),
+            ("POS-01", "Terminal punto de venta", ProductKind.Product, "Equipos", 650m, true),
+            ("MNT-PRE", "Mantenimiento preventivo", ProductKind.Service, "Soporte", 300m, false)
         ];
 
         var liveCodes = await _context.Products

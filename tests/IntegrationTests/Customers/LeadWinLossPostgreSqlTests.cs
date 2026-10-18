@@ -112,29 +112,29 @@ public sealed class LeadWinLossPostgreSqlTests : IClassFixture<CustomWebApplicat
     }
 
     [Fact]
-    public async Task Win_AcceptedLinesAndTheClosingRateInUsd()
+    public async Task Win_AcceptedLinesAndTheClosingRateInDop()
     {
         var s = await SetupAsync();
         await s.Client.PutAsJsonAsync("/api/v1/LeadCompanySettings", new { duplicateOpenLeadPolicy = 1, requireIdentificationForCustomer = false, codePrefix = "LD-", codeSequenceLength = 6 });
-        Guid usd;
+        Guid dop;
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
-            usd = await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Currencies.IgnoreQueryFilters().Where(c => c.Code == "USD").Select(c => c.Id).SingleAsync();
+            dop = await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Currencies.IgnoreQueryFilters().Where(c => c.Code == "DOP").Select(c => c.Id).SingleAsync();
         }
 
-        (await s.Client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = usd })).EnsureSuccessStatusCode();
+        (await s.Client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = dop })).EnsureSuccessStatusCode();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        (await s.Client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = usd, rateDate = today.AddDays(-3).ToString("yyyy-MM-dd"), rate = 59m })).EnsureSuccessStatusCode();
+        (await s.Client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = dop, rateDate = today.AddDays(-3).ToString("yyyy-MM-dd"), rate = 59m })).EnsureSuccessStatusCode();
         var product = (await DataAsync(await s.Client.PostAsJsonAsync("/api/v1/Products", new { code = "CRM", name = "CRM", kind = 2, referencePrice = 5900m }))).GetProperty("id").GetGuid();
-        var lead = await LeadAsync(s, currencyId: usd);
+        var lead = await LeadAsync(s, currencyId: dop);
         var id = lead.GetProperty("id").GetGuid();
         var a = (await DataAsync(await s.Client.PostAsJsonAsync($"/api/v1/Leads/{id}/products", new { productId = product, quantity = 2 }))).GetProperty("id").GetGuid();
         var b = (await DataAsync(await s.Client.PostAsJsonAsync($"/api/v1/Leads/{id}/products", new { productId = product, quantity = 5 }))).GetProperty("id").GetGuid();
-        (await s.Client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = usd, rateDate = today.ToString("yyyy-MM-dd"), rate = 60m })).EnsureSuccessStatusCode();
+        (await s.Client.PostAsJsonAsync("/api/v1/ExchangeRates", new { currencyId = dop, rateDate = today.ToString("yyyy-MM-dd"), rate = 60m })).EnsureSuccessStatusCode();
 
         var won = (await DataAsync(await s.Client.PostAsJsonAsync($"/api/v1/Leads/{id}/win", new { leadReasonId = s.Id("reasons", "BEST_PRICE"), acceptedLeadProductIds = new[] { a } }))).GetProperty("lead");
 
-        won.GetProperty("wonValue").GetDecimal().Should().Be(200m, "2 × 100 USD");
+        won.GetProperty("wonValue").GetDecimal().Should().Be(200m, "2 × 100 DOP");
         won.GetProperty("wonExchangeRate").GetDecimal().Should().Be(60m);
         won.GetProperty("wonValueBase").GetDecimal().Should().Be(12000m);
         won.GetProperty("estimatedValueBase").GetDecimal().Should().Be(41300m, "the funnel keeps the rate of the day the lines were entered");

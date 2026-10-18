@@ -41,7 +41,7 @@ public sealed class ProductCatalogPostgreSqlTests : IClassFixture<CustomWebAppli
         var body = await created.Content.ReadAsStringAsync();
         created.StatusCode.Should().Be(HttpStatusCode.Created, body);
         Data(body).GetProperty("code").GetString().Should().Be("CRM-USR");
-        Data(body).GetProperty("baseCurrencyCode").GetString().Should().Be("DOP");
+        Data(body).GetProperty("baseCurrencyCode").GetString().Should().Be("USD");
 
         (await first.PostAsJsonAsync("/api/v1/Products", new { code = "CRM-USR", name = "Otra", kind = 2 })).StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await second.PostAsJsonAsync("/api/v1/Products", new { code = "CRM-USR", name = "Licencia", kind = 2 })).StatusCode.Should().Be(HttpStatusCode.Created);
@@ -63,16 +63,16 @@ public sealed class ProductCatalogPostgreSqlTests : IClassFixture<CustomWebAppli
     public async Task AProductWithPrice_LocksTheBaseCurrency()
     {
         var (_, client) = await CreateCompanyWithAdminAsync();
-        var usdId = await CurrencyIdAsync("USD");
+        var dopId = await CurrencyIdAsync("DOP");
         (await client.PostAsJsonAsync("/api/v1/Products", new { code = "FREE", name = "Sin precio", kind = 2, referencePrice = 0m })).EnsureSuccessStatusCode();
 
-        var stillFree = await client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = usdId, isBase = false });
+        var stillFree = await client.PostAsJsonAsync("/api/v1/CompanyCurrencies", new { currencyId = dopId, isBase = false });
         stillFree.EnsureSuccessStatusCode();
 
         (await client.PostAsJsonAsync("/api/v1/Products", new { code = "PAID", name = "Con precio", kind = 1, referencePrice = 10m })).EnsureSuccessStatusCode();
-        var usdRow = Data(await client.GetStringAsync("/api/v1/CompanyCurrencies")).EnumerateArray().Single(c => c.GetProperty("code").GetString() == "USD");
+        var dopRow = Data(await client.GetStringAsync("/api/v1/CompanyCurrencies")).EnumerateArray().Single(c => c.GetProperty("code").GetString() == "DOP");
 
-        var change = await client.PutAsJsonAsync($"/api/v1/CompanyCurrencies/{usdRow.GetProperty("id").GetGuid()}", new { isBase = true, isActive = true });
+        var change = await client.PutAsJsonAsync($"/api/v1/CompanyCurrencies/{dopRow.GetProperty("id").GetGuid()}", new { isBase = true, isActive = true });
 
         change.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await change.Content.ReadAsStringAsync()).Should().Contain("BASE_CURRENCY_IN_USE").And.Contain("Products");
@@ -151,7 +151,7 @@ public sealed class ProductCatalogPostgreSqlTests : IClassFixture<CustomWebAppli
         return await db.Currencies.IgnoreQueryFilters().Where(c => c.Code == code && c.GcRecord == 0).Select(c => c.Id).SingleAsync();
     }
 
-    /// <summary>Creates a company with <c>POST /Companies</c> (DOP base by seed) and a fresh SuperAdmin bound to it.</summary>
+    /// <summary>Creates a company with <c>POST /Companies</c> (USD base by seed) and a fresh SuperAdmin bound to it.</summary>
     private async Task<(Guid CompanyId, HttpClient Client)> CreateCompanyWithAdminAsync()
     {
         using var superAdmin = await ModuleTestHelpers.LoginAsync(_factory, "lcano@join.com");

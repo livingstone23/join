@@ -5,6 +5,7 @@
 > **Date:** 2026-10-16
 > **Objective:** Que cada empresa tenga una moneda base, pueda usar monedas paralelas y registre tasas de cambio fechadas, para que los montos del módulo de clientes (y luego de ventas, compras y presupuestos) se guarden en su moneda y se sumen en moneda base.
 > **Origen:** diseño del módulo de clientes (2026-10-16, propuesta visual "Clientes JOIN", vista "Parametrización → Monedas y tasas"). Primera de la serie 56–65.
+> **Historia (2026-10-18):** a pedido del usuario, la moneda base del seed pasa de `DOP` a `USD`: toda empresa nace con `USD` base y las tasas de ejemplo de `JOIN-001` (`DOP`, `EUR`) se expresan en dólares. Las bases de datos existentes conservan su base (el seed solo asigna base a una empresa que no la tiene y la base queda fija con el primer monto).
 
 ---
 
@@ -12,7 +13,7 @@
 
 1. **Una moneda base por empresa, exactamente una.** Se marca con `IsBase` en la moneda de la empresa. La base no lleva tasa: vale 1.
 2. **Monedas paralelas** con tasas de cambio fechadas, todo por empresa.
-3. **Convención de la tasa:** 1 unidad de la moneda paralela = `Rate` unidades de la moneda base (1 USD = 59.36 DOP). `Rate` con 6 decimales; los montos convertidos a moneda base se redondean a 2 decimales (`MidpointRounding.AwayFromZero`).
+3. **Convención de la tasa:** 1 unidad de la moneda paralela = `Rate` unidades de la moneda base (1 DOP = 0.016846 USD; 1 EUR = 1.08 USD). `Rate` con 6 decimales; los montos convertidos a moneda base se redondean a 2 decimales (`MidpointRounding.AwayFromZero`).
 4. **Tasa del día con respaldo:** para convertir en una fecha se usa la tasa de esa fecha; si no hay, la última anterior, y la respuesta dice de qué fecha es. Si la moneda nunca tuvo tasa, no se puede usar (`EXCHANGE_RATE_NOT_FOUND`).
 5. **Carga manual** de tasas por empresa (una por moneda y fecha). Traerlas de un servicio externo queda fuera.
 6. **La moneda base no cambia una vez que hay montos.** Solo se puede cambiar mientras ningún registro de la empresa guarde montos (ver `CompanyBaseCurrencyChangeGuard`).
@@ -48,14 +49,14 @@
 **D. Menú, permisos y seed (SPEC 43)**
 12. `SystemOption` en el módulo base `Administration`: `Currencies` (`/administration/currencies`, solo SuperAdmin), `CompanyCurrencies` (`/administration/company-currencies`) y `ExchangeRates` (`/administration/exchange-rates`). Permisos sembrados para SuperAdmin, Admin y Manager (lectura y escritura); Supervisor solo lectura de `ExchangeRates`.
 13. Seed del catálogo global: `DOP`, `USD`, `EUR`, `COP`, `MXN`, `PEN`, `CLP`, `ARS`, `GTQ`, `CRC` (código, nombre, símbolo, decimales).
-14. Seed por empresa (`SeedCompanyCurrenciesForCompanyAsync`, idempotente, mismo patrón que `SeedCustomerStagesForCompanyAsync`): `DOP` como base para las empresas existentes y para las nuevas: se llama desde `ICompanyCatalogSeeder.SeedDefaultCatalogsForCompanyAsync`, que ya invoca `CreateCompanyCommandHandler` (`POST /Companies`). En desarrollo, `JOIN-001` también activa `USD` y `EUR` con una tasa de ejemplo.
+14. Seed por empresa (`SeedCompanyCurrenciesForCompanyAsync`, idempotente, mismo patrón que `SeedCustomerStagesForCompanyAsync`): `USD` como base para las empresas existentes y para las nuevas: se llama desde `ICompanyCatalogSeeder.SeedDefaultCatalogsForCompanyAsync`, que ya invoca `CreateCompanyCommandHandler` (`POST /Companies`). En desarrollo, `JOIN-001` también activa `DOP` y `EUR` con una tasa de ejemplo en dólares.
 
 **Out of scope:**
 
 - Tasas automáticas desde un servicio externo.
 - Listas de precios por moneda (con el módulo de Ventas).
 - Reportes en otra moneda que no sea la base.
-- Elegir la moneda base al crear la empresa (por ahora `DOP`; se cambia en `CompanyCurrencies` mientras no haya montos).
+- Elegir la moneda base al crear la empresa (por ahora `USD`; se cambia en `CompanyCurrencies` mientras no haya montos).
 
 ## Errores
 
@@ -74,8 +75,8 @@
 
 ## Criterios de aceptación
 
-1. Cada empresa existente tiene `DOP` como base después de la migración y el seed; una empresa nueva nace con `DOP` base.
-2. Marcar `USD` como base desmarca `DOP` en la misma transacción mientras no haya montos; nunca hay dos bases ni ninguna (también con dos requests concurrentes: el índice único lo impide).
+1. Cada empresa existente sin base tiene `USD` como base después de la migración y el seed; una empresa nueva nace con `USD` base.
+2. Marcar `DOP` como base desmarca `USD` en la misma transacción mientras no haya montos; nunca hay dos bases ni ninguna (también con dos requests concurrentes: el índice único lo impide).
 3. Desactivar o borrar la base responde 400 `BASE_CURRENCY_REQUIRED`.
 4. Con una fuente de montos registrada que responde "sí" (fake en el test), cambiar la base responde 409 `BASE_CURRENCY_IN_USE`.
 5. `resolve` devuelve `1` e `isBase = true` para la base; la tasa exacta de la fecha si existe; la última anterior con su `rateDate` si no; `EXCHANGE_RATE_NOT_FOUND` si no hay ninguna.
@@ -99,8 +100,8 @@ Rama `spec-56-company-currencies-and-exchange-rates` (desde `main_postgresql`).
 - **WebApi:** `CurrenciesController` (`[Authorize(Roles = "SuperAdmin")]`), `CompanyCurrenciesController`, `ExchangeRatesController` (con `GET /resolve`) y `FinanceResponseResults`.
 - **Seed:**
   - Catálogo de 10 monedas.
-  - `DOP` como base para todas las empresas vivas (`SeedCompanyCurrenciesForAllCompaniesAsync`, al aplicar la migración) y para las nuevas (`ICompanyCatalogSeeder.SeedDefaultCatalogsForCompanyAsync`).
-  - `USD` y `EUR` con tasa de ejemplo en `JOIN-001`.
+  - `USD` como base para todas las empresas vivas (`SeedCompanyCurrenciesForAllCompaniesAsync`, al aplicar la migración) y para las nuevas (`ICompanyCatalogSeeder.SeedDefaultCatalogsForCompanyAsync`).
+  - `DOP` y `EUR` con tasa de ejemplo en dólares en `JOIN-001`.
   - Opciones `Currencies`, `CompanyCurrencies` y `ExchangeRates` en `Administration`, con permisos para SuperAdmin y Manager, y solo lectura de tasas para Supervisor.
 - **Notas:**
   - Admin recibe por la regla general del seed (`GetAdminFullSystemOptionPermissionSeeds`) la opción `Currencies` como todas las administrativas, pero el controlador la limita a SuperAdmin.
@@ -116,13 +117,13 @@ Rama `spec-56-company-currencies-and-exchange-rates` (desde `main_postgresql`).
 - **Menú en `Administration`:** son datos maestros de la empresa, como `CompanyModules`.
 - **Catálogo global + activación por empresa** (decisión del usuario): evita códigos inventados y mantiene un solo nombre y símbolo por moneda.
 - **Guard por fuentes registradas** en vez de consultar tablas conocidas: Finance no depende de los módulos que guardan montos; cada módulo declara su tabla.
-- **`DOP` como base inicial:** todas las empresas de desarrollo y QA son dominicanas. Se cambia sin costo mientras no haya montos.
+- **`USD` como base inicial:** el dólar es la moneda de referencia de las tasas (decisión del usuario, 2026-10-18). Se cambia sin costo mientras no haya montos.
 
 ## Riesgos
 
 | Riesgo | Mitigación |
 |---|---|
-| Una empresa empieza a cargar montos antes de corregir su base. | El seed deja `DOP`; la pantalla de monedas muestra la base y el aviso de que queda fija con el primer monto. |
+| Una empresa empieza a cargar montos antes de corregir su base. | El seed deja `USD`; la pantalla de monedas muestra la base y el aviso de que queda fija con el primer monto. |
 | Tasas desactualizadas. | `resolve` devuelve la fecha de la tasa usada y el front la muestra; las specs que guardan montos guardan también la tasa y su fecha. |
 
 ## Impacto en el frontend
