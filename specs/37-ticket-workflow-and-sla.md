@@ -12,7 +12,7 @@
 
 ## Por qué existe esta spec y por qué es la más acotada de las cinco
 
-Es la última de la segmentación original y, desde el análisis que dio origen a SPEC 34, quedó marcada como la de alcance más abierto — el brief la resume en una sola frase ("la gestión del ticket deberá ser parametrizable") sin especificar mecánica. Al llegar acá, con SPEC 34-36 y 99 ya redactadas, el criterio de esta spec fue deliberadamente conservador: **cerrar exactamente lo que el dominio ya insinúa y nada más.**
+Es la última de la segmentación original y, desde el análisis que dio origen a SPEC 34, quedó marcada como la de alcance más abierto — el brief la resume en una sola frase ("la gestión del ticket deberá ser parametrizable") sin especificar mecánica. Al llegar acá, con SPEC 34-36 y 00 ya redactadas, el criterio de esta spec fue deliberadamente conservador: **cerrar exactamente lo que el dominio ya insinúa y nada más.**
 
 Evidencia concreta de qué insinúa el dominio: `TicketComplexity.ResolutionTimeUnits` y `TicketCompanyDefault.MaxDayTicketInactivity` existen desde la migración `InitialReset` —es decir, desde antes de que este proceso de specs empezara— con comentarios XML que describen exactamente su propósito de negocio ("resolution time", "trigger an alert or escalation"), pero un `grep` de ambos campos sobre todo `src/` confirma que **ningún handler los lee nunca**: se pueden crear, editar y borrar vía sus respectivos CRUD, pero no participan en ninguna decisión. Son, literalmente, campos muertos. Esta spec les da el primer uso real.
 
@@ -68,9 +68,9 @@ También se confirmó, antes de diseñar nada, que **no existe ninguna infraestr
 **Out of scope (para specs futuras):**
 
 - **Cualquier acción automática sobre un ticket con SLA vencido o inactivo.** Esta spec calcula y expone `IsSlaBreached`/`IsInactive`; no reasigna, no escala, no cambia de status ni notifica a nadie. Eso requiere una decisión de infraestructura de jobs en segundo plano que el repo no tiene hoy — spec aparte, una vez que negocio defina qué "escalar" significa en la práctica (¿notificar? ¿reasignar al `IsSuperAdminTicket`? ¿ambas?).
-- **Activar `TicketNotification`.** Sigue sin consumidor después de esta spec, igual que quedó tras SPEC 35 y SPEC 99.
+- **Activar `TicketNotification`.** Sigue sin consumidor después de esta spec, igual que quedó tras SPEC 35 y SPEC 00.
 
-> **Deuda conocida y aceptada — la única parte del brief que las specs 34-37 y 99 no cubren.**
+> **Deuda conocida y aceptada — la única parte del brief que las specs 34-37 y 00 no cubren.**
 > El brief pide textualmente, sobre `TicketCompanyDefault.MaxDayTicketInactivity`: *"Si se puede llevar un control de días que se notifique que no tiene actividad, **se debe crear rutina con TicketUserCompany para que el SuperAdmin reciba notificaciones** si el ticket no está teniendo seguimiento."* Esa rutina **no existe** al terminar SPEC 37, y `Support.TicketNotifications` —que el brief describe como tabla operativa para registrar por qué canales se notificó un ticket— **queda sin ningún consumidor** en las cinco specs.
 > Lo que sí queda entregado es toda la materia prima: `IsInactive` calculado y confiable (esta spec), el roster con `IsSuperAdminTicket` para saber a quién avisarle (SPEC 34), `IEmailService` ya operativo, y la tabla `TicketNotification` ya migrada.
 > Lo que falta es exclusivamente **el disparador periódico**, y eso es una decisión de arquitectura sin precedente en el repo (no hay `IHostedService`, `BackgroundService`, Hangfire ni Quartz en todo `src/`). Se difiere de forma consciente en vez de resolverla de apuro dentro de una spec de dominio. Candidatos, para cuando se retome: un `BackgroundService` con polling configurable (sin dependencias nuevas), Hangfire (dashboard y reintentos, a cambio de una librería y tablas de infraestructura), o un endpoint `POST /Tickets/notify-inactive` agendado desde afuera (cero infraestructura, control operativo manual).

@@ -13,7 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace JOIN.IntegrationTests.Persistence;
 
 /// <summary>
-/// SPEC 99-post (PostgreSQL, <see cref="CustomWebApplicationFactory"/>) — internal channels <c>WEB</c>/<c>APP</c>: the data migration and the seed leave the six seeded
+/// SPEC 00-post (PostgreSQL, <see cref="CustomWebApplicationFactory"/>) — internal channels <c>WEB</c>/<c>APP</c>: the data migration and the seed leave the six seeded
 /// channels active without duplicates (clean and already-seeded database), the JOIN-001 ticket defaults use
 /// <c>WEB</c>, and a deleted <c>WEB</c> is never revived by the seed (only a SuperAdmin restores it, SPEC 41).
 /// </summary>
@@ -83,7 +83,7 @@ public sealed class CommunicationChannelSeedPostgreSqlTests : IClassFixture<Cust
     }
 
     /// <summary>
-    /// SPEC 99-post (ajuste): the seed updates only the ACTIVE ticket configuration of JOIN-001 and never revives a
+    /// SPEC 00-post (ajuste): the seed updates only the ACTIVE ticket configuration of JOIN-001 and never revives a
     /// deleted one. It used to pick any row and set <c>GcRecord = 0</c>: with a deleted row next to an active one,
     /// the revived row broke <c>ux_ticketcompanydefaults_company_active</c> and the host did not start.
     /// </summary>

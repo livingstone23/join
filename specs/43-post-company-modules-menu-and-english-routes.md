@@ -3,7 +3,7 @@
 > **Status:** Implementado
 > **Origen:** copia de SPEC 43 de `main` (estado allí al copiarla: Borrador), adaptada a PostgreSQL para el fork `main_postgresql`. Se implementa **desde cero** en el fork, sin traer commits de `main` (decisión del usuario, 2026-10-09).
 > **Rama de trabajo:** `spec-43-post-company-modules-menu-and-english-routes`, creada desde `main_postgresql`; PR hacia `main_postgresql`, nunca hacia `main`.
-> **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 99) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
+> **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 00) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
 > **Depends on:** SPEC 39 (fork). Ninguna otra para implementarse.
 > **Related:** SPEC 44 (módulo `Calendar`, opcional), SPEC 48 (bloqueo de APIs por módulo e interruptor `Modules:EnforceCompanyModules`, que también condiciona el filtro del menú de esta spec), SPEC 45 (opciones de menú del agente y de personas pendientes), SPEC 48.
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-10-01)

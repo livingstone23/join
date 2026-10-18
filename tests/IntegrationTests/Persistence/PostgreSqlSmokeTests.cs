@@ -45,7 +45,7 @@ public sealed class PostgreSqlSmokeTests : IClassFixture<CustomWebApplicationFac
     /// <summary>
     /// Case 1 — the fork's migration history applies cleanly on an empty PostgreSQL: it starts with
     /// <c>InitialPostgres</c>, includes the incremental Npgsql migrations of the -post specs
-    /// (SPEC 40-post: <c>FilteredUniqueIndexesForSoftDelete</c>; SPEC 41-post: <c>Spec41FilterTicketCompanyDefaultsIndex</c>; SPEC 99-post: <c>Spec99InternalCommunicationChannels</c>) and nothing is left pending.
+    /// (SPEC 40-post: <c>FilteredUniqueIndexesForSoftDelete</c>; SPEC 41-post: <c>Spec41FilterTicketCompanyDefaultsIndex</c>; SPEC 00-post: <c>Spec99InternalCommunicationChannels</c>) and nothing is left pending.
     /// </summary>
     [Fact]
     public async Task Migrations_StartWithInitialPostgres_AndNoneArePending()

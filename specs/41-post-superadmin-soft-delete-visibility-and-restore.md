@@ -3,7 +3,7 @@
 > **Status:** Implementado
 > **Origen:** copia de SPEC 41 de `main` (estado allí al copiarla: Implementado), adaptada a PostgreSQL para el fork `main_postgresql`. Se implementa **desde cero** en el fork, sin traer commits de `main` (decisión del usuario, 2026-10-09).
 > **Rama de trabajo:** `spec-41-post-superadmin-soft-delete-visibility-and-restore`, creada desde `main_postgresql`; PR hacia `main_postgresql`, nunca hacia `main`.
-> **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 99) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
+> **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 00) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
 > **Depends on:** SPEC 38 (query filters, ya en el fork), SPEC 40-post (índices únicos filtrados — la unicidad debe aplicar solo a activos para poder restaurar sin colisiones).
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-09-28)
 > **Ajuste por SPEC 41-post (implementación, 2026-10-09):** etapas 1 a 4 implementadas en el fork, sin cambio de lógica respecto del texto aprobado. (1) **Origen del código:** cada etapa se armó aplicando el diff de `src`/`tests` del commit de esa etapa en `main` (`2a855e5`, `9d3315c`, `5c4000c`, `8f6ad50`) con `git apply --3way` y adaptándolo a PostgreSQL; ningún commit de `main` entra en la historia del fork. La migración de la Etapa 4 no se copió: se generó contra Npgsql. (2) **Ramas:** una por etapa (`spec-41-post-etapa-1-catalogos`, `-etapa-2-personas`, `-etapa-3-seguridad`, `-etapa-4-tickets`), encadenadas: cada una sale de la anterior porque las previas aún no estaban integradas en `main_postgresql`. Reemplaza a la rama única de la cabecera. (3) **Arreglo previo, fuera de esta spec** (rama `fix-post-dapper-dateonly-and-dappercontext`, decisión del usuario, mergeada en la Etapa 2): `DapperContext` abre `NpgsqlConnection` y un handler de Dapper lee las columnas `date` (que Npgsql devuelve como `DateOnly`) en propiedades `DateTime`; sin él, `GET /PersonEmployment` y el test de guarda de empleos respondían 500. Cierra el pendiente de SPEC 40-post y ejecuta su caso D.2. (4) **Adaptaciones PostgreSQL:** `RoleRepository` proyecta `CAST(COUNT(*) AS integer) AS PermissionsCount`, porque `COUNT(*)` es `bigint` y `RoleDto` es un record posicional (`GET /Roles/detailed` respondía 500); los conflictos de `RoleRepository`/`RoleCompanyRepository` conservan la sintaxis del fork (`LIMIT/OFFSET`, `LIKE CONCAT`, sin corchetes); `TicketCompanyDefaultConfiguration` filtra con `"gcrecord" = 0`. (5) **Tests:** `SoftDeleteVisibilityGuardPostgreSqlTests` (parcial + `.Tickets.cs`) sobre `PostgreSqlWebApplicationFactory`; el sembrado de `PersonFinancialProfile` usa `DateTimeKind.Unspecified` porque `DeclaredDate` sigue siendo `timestamp` (SPEC 50 B); `PostgreSqlSmokeTests` suma el índice `ux_ticketcompanydefaults_company_active` (26 índices filtrados) y comprueba la migración. (6) **Hallazgo pendiente:** `GET /Persons/{id}` responde 500 si la persona tiene direcciones o contactos (lectura `dynamic` con columnas en minúsculas); es anterior a esta spec; quedó en `specs/README.md` → "Pendientes abiertos" y se resolvió el mismo día en `main_postgresql` (filas tipadas en lugar de `dynamic`).
@@ -304,7 +304,7 @@ Rama `spec-41-post-etapa-3-seguridad` (desde `main_postgresql` con las etapas 1 
 
 ### Etapa 4 — Tickets
 
-`Ticket`, `TicketNotification`, `TicketCompanyDefault`, y las entidades de SPEC 34-37 y 99 que ya estén implementadas.
+`Ticket`, `TicketNotification`, `TicketCompanyDefault`, y las entidades de SPEC 34-37 y 00 que ya estén implementadas.
 
 - `TicketLog` no se restaura (sección F).
 - Restaurar un `Ticket` genera una entrada en `TicketLog` (auditoría del ticket).
@@ -313,7 +313,7 @@ Rama `spec-41-post-etapa-3-seguridad` (desde `main_postgresql` con las etapas 1 
 
 Rama `spec-41-post-etapa-4-tickets` (desde `main_postgresql` con las etapas 1 a 3).
 
-**Alcance verificado (F0).** Solo se restauran entidades con caso de uso de borrado. `TicketNotification` no tiene borrado (queda fuera, igual que `ApplicationUser` en la Etapa 3); `TicketLog` nunca se restaura (sección F). BE-99 no está implementada.
+**Alcance verificado (F0).** Solo se restauran entidades con caso de uso de borrado. `TicketNotification` no tiene borrado (queda fuera, igual que `ApplicationUser` en la Etapa 3); `TicketLog` nunca se restaura (sección F). BE-00 no está implementada.
 
 | Entidad | Borrado hoy | Queries (`includeDeleted`) | Padres (`PARENT_DELETED`) | Duplicado activo | Restore |
 |---|---|---|---|---|---|

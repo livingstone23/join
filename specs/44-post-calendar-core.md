@@ -3,8 +3,8 @@
 > **Status:** Implementado
 > **Origen:** copia de SPEC 44 de `main` (estado allí al copiarla: Borrador), adaptada a PostgreSQL para el fork `main_postgresql`. Se implementa **desde cero** en el fork, sin traer commits de `main` (decisión del usuario, 2026-10-09).
 > **Rama de trabajo:** `spec-44-post-calendar-core`, creada desde `main_postgresql`; PR hacia `main_postgresql`, nunca hacia `main`.
-> **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 99) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
-> **Depends on:** SPEC 99-post (canal `WEB` como origen de las actividades creadas desde la aplicación), SPEC 48-post (bloqueo por módulo en el filtro global), SPEC 43-post (`SystemModule.IsBase`, `ModuleName` en `SystemOptionSeed`, rutas con guion y solo SuperAdmin habilita módulos). Es prerequisito de SPEC 45-post y SPEC 46-post.
+> **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 00) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
+> **Depends on:** SPEC 00-post (canal `WEB` como origen de las actividades creadas desde la aplicación), SPEC 48-post (bloqueo por módulo en el filtro global), SPEC 43-post (`SystemModule.IsBase`, `ModuleName` en `SystemOptionSeed`, rutas con guion y solo SuperAdmin habilita módulos). Es prerequisito de SPEC 45-post y SPEC 46-post.
 > **Related:** SPEC 40 (índices únicos filtrados por `GcRecord = 0` — mismo patrón en todos los índices de esta spec), SPEC 39 (fork PostgreSQL — nombres en minúsculas y forma de `HasFilter`), SPEC 42 (patrón "valores iniciales desde la configuración de la empresa").
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-09-29)
 > **Ajuste por SPEC 44-post (implementación, 2026-10-12):** implementada en la rama `spec-44-post-calendar-core` desde cero.
@@ -489,7 +489,7 @@ Tabla `Calendar.Events`. Hereda `BaseTenantEntity`. **Administra:** el dueño de
 
 | Campo | Tipo | Req. | Descripción |
 |---|---|---|---|
-| `OriginChannelId` | Guid FK → CommunicationChannel | Sí | Canal por el que se creó. Desde la app, `WEB` (lo siembra SPEC 99; si todavía no existe, esta spec lo agrega a `SeedCommunicationChannelsAsync` con la misma fila que define SPEC 99). |
+| `OriginChannelId` | Guid FK → CommunicationChannel | Sí | Canal por el que se creó. Desde la app, `WEB` (lo siembra SPEC 00; si todavía no existe, esta spec lo agrega a `SeedCommunicationChannelsAsync` con la misma fila que define SPEC 00). |
 | `OriginType` | int (`CalendarEventOriginType`) | Sí | `User = 1` (usuario de JOIN), `Phone = 2` (número de teléfono o WhatsApp), `Email = 3`, `System = 4` (proceso interno). |
 | `OriginUserId` | Guid FK → Users | No | Usuario de JOIN que la registró (en `OriginType = User`, quien la creó; si vino por el agente, el usuario de servicio del agente). |
 | `OriginIdentifier` | varchar(200) | No | Teléfono en formato E.164 o correo del solicitante cuando no es un usuario de JOIN. |
@@ -835,7 +835,7 @@ Entidades, enums y `CalendarCodes` en `src/1.Domain/Calendars/`.
 Configuraciones EF (`Configuration/Calendars/`), `DbSet`s, query filters explícitos (convención SPEC 38), relaciones `Restrict`, índices filtrados y migración `AddCalendarModule`. Verificar que la migración crea el esquema `calendar` y las 11 tablas en minúsculas, sin `nvarchar`, `datetime2` ni `bit`.
 
 ### F3 — Seed
-`SystemModule` "Calendar", catálogos globales, `SystemOptions`, `RoleSystemOptions`, `SeedCalendarCatalogsForCompanyAsync` dentro de `SeedDefaultCatalogsForCompanyAsync`, y el seed de desarrollo de `JOIN-001` (`CompanyModule`, `CalendarCompany`, provisión). Canal `WEB` si SPEC 99 todavía no lo sembró.
+`SystemModule` "Calendar", catálogos globales, `SystemOptions`, `RoleSystemOptions`, `SeedCalendarCatalogsForCompanyAsync` dentro de `SeedDefaultCatalogsForCompanyAsync`, y el seed de desarrollo de `JOIN-001` (`CompanyModule`, `CalendarCompany`, provisión). Canal `WEB` si SPEC 00 todavía no lo sembró.
 
 ### F4 — Servicios comunes
 `CalendarCompanyGuard`, `CalendarUserProvisioner`, `CalendarUserDefaultCoordinator`, `CalendarEventInitialStatusResolver`, `CalendarEventLogWriter`, `ICalendarRecurrenceExpander` + `IcalRecurrenceExpander` (Infrastructure, paquete Ical.Net) y `CalendarEventScheduleGuard`. Registro DI.

@@ -5,7 +5,7 @@ using JOIN.Domain.Common;
 namespace JOIN.Application.UseCases.Calendars.ChannelIntake;
 
 /// <summary>
-/// Channels a channel agent can write from (SPEC 45). Channels are compared by <c>Code</c> (SPEC 99): the phone
+/// Channels a channel agent can write from (SPEC 45). Channels are compared by <c>Code</c> (SPEC 00): the phone
 /// channels identify the requester by an E.164 number, the e-mail channel by an address.
 /// </summary>
 public static class IntakeChannels

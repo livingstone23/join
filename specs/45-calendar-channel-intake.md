@@ -2,7 +2,7 @@
 
 > **Status:** Pospuesto
 > **Depends on:** SPEC 43 (menú y rutas), SPEC 48 (bloqueo por módulo), SPEC 44 (módulo Calendario: `CalendarEvent`, `CalendarCompany`, `CalendarEventScheduleGuard`, `CalendarEventInitialStatusResolver`, `CalendarEventLogWriter`, tipo `PERSON_REVIEW`, estado `CANCELLED`, `CalendarCompany.RescheduledByOthersStatusCompanyId`).
-> **Related:** SPEC 47 (ingesta de tickets por canal, etapa posterior; antes SPEC 99 — mismo catálogo `CommunicationChannel` y mismo criterio de deduplicación por id de mensaje externo).
+> **Related:** SPEC 47 (ingesta de tickets por canal, etapa posterior; antes SPEC 00 — mismo catálogo `CommunicationChannel` y mismo criterio de deduplicación por id de mensaje externo).
 > **Date:** 2026-09-29
 > **Objective:** Permitir que un agente automatizado (n8n) que atiende WhatsApp, correo u otro canal, autenticado vía API como usuario de servicio, identifique a la empresa y a la persona que escribe, registre a la persona si no existe (`Person` + `PersonContact` + `PersonPendingConfirmation`), consulte disponibilidad, y cree, reprograme o anule actividades en el calendario del usuario indicado o del usuario por defecto de la empresa, dejando trazado el canal y el solicitante, y generando una actividad de revisión para que un usuario interno complete los datos de la persona nueva.
 

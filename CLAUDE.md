@@ -89,7 +89,7 @@ ASP.NET Core Identity (`ApplicationUser`/`ApplicationRole`, GUID keys) + JWT bea
 - Before implementing a spec in `specs/`, search later specs that reference it (`grep "SPEC NN" specs/`) and the "Ajuste por SPEC XX" / "Historia" / "Etapa" notes in its header. The most recent spec wins; report inconsistencies before writing code.
 - A spec in status `Pospuesto` is not implemented until the user resumes it; when resumed it is reviewed against the current state and goes back to `Borrador`.
 - Menu and permissions: `SystemOption`/`SystemModule` names and routes are in English with hyphens, and every `SystemOptionSeed` declares its `ModuleName` (SPEC 43). `ControllerName` (the permission resource) is never translated or renamed.
-- Communication channels are compared by `CommunicationChannel.Code` (constants in `CommunicationChannelCodes`, SPEC 99), never by `Name`.
+- Communication channels are compared by `CommunicationChannel.Code` (constants in `CommunicationChannelCodes`, SPEC 00), never by `Name`.
 
 ## Testing gotchas
 

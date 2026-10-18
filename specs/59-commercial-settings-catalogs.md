@@ -1,7 +1,7 @@
 # SPEC 59 — Parametrización comercial: etapas, orígenes, motivos, vinculación, tipos de contacto y reglas por empresa
 
 > **Status:** Implementado
-> **Depends on:** SPEC 41-post (borrado lógico y bloqueo por uso), SPEC 43-post (módulos, menú y rutas), SPEC 44-post (patrón maestro global + versión por empresa de `CalendarActivity`), SPEC 99-post (`CommunicationChannel.Code`). Rama de trabajo: `spec-59-commercial-settings-catalogs`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
+> **Depends on:** SPEC 41-post (borrado lógico y bloqueo por uso), SPEC 43-post (módulos, menú y rutas), SPEC 44-post (patrón maestro global + versión por empresa de `CalendarActivity`), SPEC 00-post (`CommunicationChannel.Code`). Rama de trabajo: `spec-59-commercial-settings-catalogs`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-16
 > **Objective:** Que cada empresa configure cómo trabaja sus leads: las etapas del embudo con su probabilidad, los orígenes ("razones de registro"), los motivos para ganar, perder o dejar inactivo, los tipos de vinculación esperada, los tipos de contacto y las reglas del módulo (duplicados, identificación del cliente, código).
 > **Origen:** diseño del módulo de clientes (2026-10-16, vista "Parametrización"). Los roles de gestión se definen en SPEC 60 y los límites de adjuntos en SPEC 62.
@@ -30,7 +30,7 @@
 2. `LeadSources`: `Code`, `Name`, `Description?`, `SortOrder`, `IsActive`.
 3. `LeadReasons`: `Code`, `Name`, `UsedFor` (`Won = 1`, `Lost = 2`, `Inactive = 3`), `SortOrder`, `IsActive`.
 4. `RelationshipTypes`: `Code`, `Name`, `OnWin` (`None = 0`, `Customer = 1`), `SortOrder`, `IsActive`.
-5. `ContactTypes` (global, `BaseAuditableEntity`): `Code`, `Name`, `Icon`, `CommunicationChannelCode?` (se compara por código, SPEC 99), `SchedulesCalendarEvent`, `AsksDuration`, `SortOrder`, `IsActive`.
+5. `ContactTypes` (global, `BaseAuditableEntity`): `Code`, `Name`, `Icon`, `CommunicationChannelCode?` (se compara por código, SPEC 00), `SchedulesCalendarEvent`, `AsksDuration`, `SortOrder`, `IsActive`.
 6. `ContactTypeCompanies` (`BaseTenantEntity`): `ContactTypeId`, `Name`, `SortOrder`, `IsActive`. Único filtrado `(CompanyId, ContactTypeId)`.
 7. `LeadCompanySettings` (`BaseTenantEntity`): campos de la regla 6. Único filtrado `(CompanyId)`.
 

@@ -11,7 +11,7 @@ public class ContactType : BaseAuditableEntity
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Icon { get; set; } = string.Empty;
-    /// <summary>Communication channel matched by <c>CommunicationChannel.Code</c> (SPEC 99), if any.</summary>
+    /// <summary>Communication channel matched by <c>CommunicationChannel.Code</c> (SPEC 00), if any.</summary>
     public string? CommunicationChannelCode { get; set; }
     public bool SchedulesCalendarEvent { get; set; }
     public bool AsksDuration { get; set; }

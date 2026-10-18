@@ -2735,7 +2735,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             new() { Name = "Telegram", Provider = "Telegram", Code = CommunicationChannelCodes.Telegram, IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
             new() { Name = "Twilio", Provider = "Twilio", Code = CommunicationChannelCodes.Twilio, IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
             new() { Name = "WhatsApp", Provider = "Meta", Code = CommunicationChannelCodes.WhatsApp, IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
-            // SPEC 99: internal channels for requests born inside JOIN (web console) or a first-party app.
+            // SPEC 00: internal channels for requests born inside JOIN (web console) or a first-party app.
             new() { Name = "Web", Provider = "Internal", Code = CommunicationChannelCodes.Web, IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 },
             new() { Name = "App", Provider = "Internal", Code = CommunicationChannelCodes.App, IsActive = true, Created = now, CreatedBy = "System_Seeder", GcRecord = 0 }
         };
@@ -2750,7 +2750,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
             if (existing is not null)
             {
-                // SPEC 99: a channel created by hand with the same name but another code is not fixed here
+                // SPEC 00: a channel created by hand with the same name but another code is not fixed here
                 // (the code drives the Application logic); the CRUD of channels corrects it.
                 if (!string.Equals(existing.Code, seed.Code, StringComparison.Ordinal))
                 {
@@ -2775,7 +2775,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     }
 
     /// <summary>
-    /// Default channel for seeded ticket data (SPEC 99): <c>WEB</c>, then <c>WHATSAPP</c>, then the oldest active
+    /// Default channel for seeded ticket data (SPEC 00): <c>WEB</c>, then <c>WHATSAPP</c>, then the oldest active
     /// channel. A deleted <c>WEB</c> is never revived here — only a SuperAdmin restores it (SPEC 41) — so the
     /// seed logs a warning and falls back.
     /// </summary>
@@ -3016,7 +3016,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             return;
         }
 
-        // SPEC 99-post: only the ACTIVE configuration is updated. A deleted one is never revived (SPEC 41-post rule,
+        // SPEC 00-post: only the ACTIVE configuration is updated. A deleted one is never revived (SPEC 41-post rule,
         // same as the WEB channel): reviving it next to another active row broke ux_ticketcompanydefaults_company_active.
         var existing = await _context.TicketCompanyDefaults
             .IgnoreQueryFilters()
@@ -3383,7 +3383,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 continue;
             }
 
-            // Tickets seeded before SPEC 99 keep their original channel, so only name the current default when it is theirs.
+            // Tickets seeded before SPEC 00 keep their original channel, so only name the current default when it is theirs.
             var seedCreationSummary = ticket.ChannelId != channel.Id || string.IsNullOrWhiteSpace(channel.Name)
                 ? "Ticket creado"
                 : $"Ticket creado desde {channel.Name}";

@@ -3,7 +3,7 @@
 > **Status:** Implementado
 > **Origen:** copia de SPEC 40 de `main` (estado allí al copiarla: Implementado), adaptada a PostgreSQL para el fork `main_postgresql`. Se implementa **desde cero** en el fork, sin traer commits de `main` (decisión del usuario, 2026-10-09).
 > **Rama de trabajo:** `spec-40-post-filtered-unique-indexes-soft-delete`, creada desde `main_postgresql`; PR hacia `main_postgresql`, nunca hacia `main`.
-> **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 99) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
+> **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 00) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
 > **Depends on:** SPEC 39 (fork `main_postgresql`, convenciones de nombres en minúsculas). Es prerequisito de SPEC 41-post.
 > **Related:** SPEC 38 (query filters), SPEC 39 (fork PostgreSQL — la sintaxis de `HasFilter` es específica del proveedor).
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-09-28)

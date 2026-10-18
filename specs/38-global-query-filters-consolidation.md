@@ -10,7 +10,7 @@
 
 ## Por qué existe esta spec
 
-Al revisar el módulo de tickets (SPEC 34-37 y 99) se auditó `ConfigureGlobalQueryFilters` contra las entidades reales del dominio y aparecieron tres problemas:
+Al revisar el módulo de tickets (SPEC 34-37 y 00) se auditó `ConfigureGlobalQueryFilters` contra las entidades reales del dominio y aparecieron tres problemas:
 
 1. **9 entidades `BaseTenantEntity` no tienen ningún filtro EF**: `Region`, `Customer`, `Gender`, `Industry`, `TaxRegime`, `IncomeRange`, `PersonBusinessProfile`, `PersonEmployment`, `PersonFinancialProfile`. Todas son datos propios de cada empresa: el `AuditableEntitySaveChangesInterceptor` les asigna el `CompanyId` del token al insertar, y sus índices únicos incluyen `CompanyId`. Solo les falta la línea en el método.
 2. **`Region` tiene fuga real de tenant en lectura.** A diferencia de las otras 8 (cuyos handlers Dapper ya filtran `CompanyId = @TenantId`), `GetRegionsQueryHandler` y `GetRegionByIdQueryHandler` solo filtran `GcRecord = 0`: un Manager de la empresa A ve hoy las regiones de la empresa B. Además, `CreateRegionCommandHandler` valida unicidad de nombre/código con `GetAllAsync()` sobre **todas** las empresas, contradiciendo el índice único `(CompanyId, CountryId, Name, GcRecord)`.

@@ -10,8 +10,9 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 
 ### Numeración
 - Una spec nueva toma el **siguiente número libre** (hoy: **66**; la 51 es de `main` —su copia en el fork es `51-post`— y de la 52 a la 65 son propias del fork).
-- Los números **no se reutilizan ni se reordenan**. Si una spec se divide, la parte que sale toma un número nuevo y ambas lo dicen en su encabezado (ejemplo: SPEC 99 → SPEC 47).
+- Los números **no se reutilizan ni se reordenan**. Si una spec se divide, la parte que sale toma un número nuevo y ambas lo dicen en su encabezado (ejemplo: SPEC 00 → SPEC 47).
 - **Excepción autorizada (2026-10-05):** por decisión del usuario se renumeró una sola vez: la 37 (canales `WEB`/`APP`) pasó a **99** y las 38–49 bajaron un número (38→37 … 49→48). Las referencias se actualizaron en ambos repositorios. Una spec citada con su número anterior en un commit o conversación previa a esa fecha debe traducirse con esta tabla.
+- **Excepción autorizada (2026-10-18):** por decisión del usuario, la 99 y la 99-post (canales `WEB`/`APP`) pasaron a **00** y **00-post**. Las referencias se actualizaron en ambos repositorios (BE-99 → BE-00); los nombres ya aplicados no cambian (migración `Spec99InternalCommunicationChannels`, usuario `Spec99_Migration`, rama `spec-99-post-ticket-inbound-channels`). En `main` la spec sigue numerada 99. Una cita a "SPEC 99" anterior a esa fecha se lee como SPEC 00.
 - El nombre del archivo es `NN-tema-en-ingles.md` y el título empieza con `# SPEC NN — `.
 - **Serie `-post`** (2026-10-09): copias de specs de `main` adaptadas a PostgreSQL, `NN-post-tema.md`; no consumen números (ver "Serie `-post`").
 
@@ -38,6 +39,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 
 | Nº | Título | Estado | Depende de (según su encabezado) |
 |---|---|---|---|
+| 00 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
 | 01 | TransactionBehavior para Commands en MediatR | Implementado | — |
 | 02 | PerformanceBehavior para medición de latencia en MediatR | Implementado | 01 |
 | 03 | UnhandledExceptionBehavior y LoggingBehavior | Implementado | 01, 02 |
@@ -81,10 +83,10 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 41 | Visibilidad de registros borrados y restauración para SuperAdmin | Borrador | 38, 40 |
 | 42 | Valores iniciales del ticket desde `TicketCompanyDefaults` | Borrador | — |
 | 43 | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Borrador | — |
-| 44 | Módulo Calendario: parametrización, calendarios y actividades | Borrador | 99, 43, 48 |
+| 44 | Módulo Calendario: parametrización, calendarios y actividades | Borrador | 00, 43, 48 |
 | 45 | Calendario: ingreso por canales (agente) y personas pendientes | **Pospuesto** | 43, 44, 48 |
 | 46 | Calendario: estructura para sincronizar con Google Calendar | Borrador | 44 |
-| 47 | Ingesta de tickets por WhatsApp y correo | **Pospuesto** | 34, 35, 36, 99, 42, 43 |
+| 47 | Ingesta de tickets por WhatsApp y correo | **Pospuesto** | 34, 35, 36, 00, 42, 43 |
 | 48 | Bloqueo de APIs y menú por módulo activo de la empresa | Borrador | 43 |
 | 49 | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Borrador | 36 |
 | 50 | `main_postgresql`: pendientes para llevar QA a PostgreSQL (el port de 40–49 pasó a la serie `-post`) | Aprobado | 39 |
@@ -92,36 +94,35 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 53 | Tickets: mis capacidades (`/TicketUserCompanies/me`), usuarios asignables e inactividad en los valores por defecto | Implementado | 34, 35, 37, 43-post |
 | 54 | Personas: búsqueda única con marca de cliente (`GET /Persons/lookup`) y datos semilla (40 personas, 30 clientes) | Implementado | 38, 39, 43-post, 55 |
 | 55 | Clientes: uno por persona y empresa, solo activo/inactivo (sin borrado), activación idempotente, historial de eventos, catálogo de etapas por empresa (`CustomerStages`, reemplaza el enum `PersonLifecycleStage`) y esquema propio `Customer` (sale de 54) | Implementado | 38, 39, 40-post, 41-post, 43-post, 45-post |
-| 56 | Monedas por empresa: moneda base, monedas paralelas y tasas de cambio fechadas (esquema `Finance`) | Borrador | 39, 41-post, 43-post |
-| 57 | Catálogo compartido de productos y servicios por empresa (esquema `Catalog`) | Borrador | 41-post, 43-post, 56 |
-| 58 | Personas: identificación opcional (única cuando existe; obligatoria para ser cliente) | Borrador | 38, 40-post, 54, 55 |
-| 59 | Parametrización comercial: etapas del lead, orígenes, motivos, tipos de vinculación, tipos de contacto y reglas por empresa | Borrador | 41-post, 43-post, 44-post, 99-post |
-| 60 | Grupos de trabajo: varios por usuario con grupo principal, vigencia y roles de gestión con alcance de visibilidad | Borrador | 28, 43-post, 59 |
-| 61 | Leads: alta, bandeja, detalle, etapas en orden, contactos, comentarios, productos ofrecidos, duplicados, inactivar y reactivar | Borrador | 54, 55, 56, 57, 58, 59, 60 |
-| 62 | Documentos de los leads y sus contactos | Borrador | 36, 49-post, 61 |
-| 63 | Ganar, perder y reabrir leads; conversión a cliente; etapas de cliente post-venta; migración de clientes en LEAD/PROSPECT | Borrador | 54, 55, 58, 59, 61 |
-| 64 | Reportes comerciales: resumen, embudo, ranking de grupos y usuarios, productos, orígenes y contactos | Borrador | 60, 61, 63 |
-| 65 | Leads con calendario y personas pendientes: próxima acción agendada y convertir una persona pendiente en lead | Borrador | 44-post, 45-post, 48-post, 59, 61 |
-| 99 | Canales internos `WEB` y `APP` en el catálogo de canales | Borrador | — |
+| 56 | Monedas por empresa: moneda base, monedas paralelas y tasas de cambio fechadas (esquema `Finance`) | Implementado | 39, 41-post, 43-post |
+| 57 | Catálogo compartido de productos y servicios por empresa (esquema `Catalog`) | Implementado | 41-post, 43-post, 56 |
+| 58 | Personas: identificación opcional (única cuando existe; obligatoria para ser cliente) | Implementado | 38, 40-post, 54, 55 |
+| 59 | Parametrización comercial: etapas del lead, orígenes, motivos, tipos de vinculación, tipos de contacto y reglas por empresa | Implementado | 41-post, 43-post, 44-post, 00-post |
+| 60 | Grupos de trabajo: varios por usuario con grupo principal, vigencia y roles de gestión con alcance de visibilidad | Implementado | 28, 43-post, 59 |
+| 61 | Leads: alta, bandeja, detalle, etapas en orden, contactos, comentarios, productos ofrecidos, duplicados, inactivar y reactivar | Implementado | 54, 55, 56, 57, 58, 59, 60 |
+| 62 | Documentos de los leads y sus contactos | Implementado | 36, 49-post, 61 |
+| 63 | Ganar, perder y reabrir leads; conversión a cliente; etapas de cliente post-venta; migración de clientes en LEAD/PROSPECT | Implementado | 54, 55, 58, 59, 61 |
+| 64 | Reportes comerciales: resumen, embudo, ranking de grupos y usuarios, productos, orígenes y contactos | Implementado | 60, 61, 63 |
+| 65 | Leads con calendario y personas pendientes: próxima acción agendada y convertir una persona pendiente en lead | Implementado | 44-post, 45-post, 48-post, 59, 61 |
 
 ### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)
 
-Las filas 40–49 y 99 de la tabla anterior son las copias de `main` del 2026-10-07: se conservan como referencia y no se implementan en el fork. Las que se implementan aquí son estas:
+Las filas 00 y 40–49 de la tabla anterior son las copias de `main` del 2026-10-07: se conservan como referencia y no se implementan en el fork. Las que se implementan aquí son estas:
 
 | Nº | Título | Estado | Depende de (según su encabezado) |
 |---|---|---|---|
+| 00-post | Canales internos `WEB` y `APP` en el catálogo de canales | Implementado | — |
 | 40-post | Índices únicos filtrados por soft-delete | Implementado | 39 |
 | 41-post | Visibilidad de registros borrados y restauración para SuperAdmin | Implementado | 38, 40-post |
 | 42-post | Valores iniciales del ticket desde `TicketCompanyDefaults` | Implementado | 41-post |
 | 43-post | Módulos por empresa: módulos base, menú filtrado y rutas en inglés | Implementado | 39 |
-| 44-post | Módulo Calendario: parametrización, calendarios y actividades | Implementado | 99-post, 43-post, 48-post |
+| 44-post | Módulo Calendario: parametrización, calendarios y actividades | Implementado | 00-post, 43-post, 48-post |
 | 45-post | Calendario: ingreso por canales (agente) y personas pendientes | Implementado | 43-post, 44-post, 48-post |
 | 46-post | Calendario: estructura para sincronizar con Google Calendar | Implementado | 44-post |
-| 47-post | Ingesta de tickets por WhatsApp y correo | Implementado | 34, 35, 36, 99-post, 42-post, 43-post |
+| 47-post | Ingesta de tickets por WhatsApp y correo | Implementado | 34, 35, 36, 00-post, 42-post, 43-post |
 | 48-post | Bloqueo de APIs y menú por módulo activo de la empresa | Implementado | 43-post |
 | 49-post | Almacenamiento de adjuntos intercambiable: local, Azure Blob, S3 y Cloudflare R2 | Aprobado | 36 |
 | 51-post | Invalidación de la caché de permisos con la clave `permissions:v2` | Implementado | 17, 25 |
-| 99-post | Canales internos `WEB` y `APP` en el catálogo de canales | Implementado | — |
 
 ---
 
@@ -129,7 +130,7 @@ Las filas 40–49 y 99 de la tabla anterior son las copias de `main` del 2026-10
 
 Orden sugerido de implementación (cada uno requiere `Aprobado`):
 
-1. **99** — canales `WEB`/`APP` (lo necesitan 42 y 44).
+1. **00** — canales `WEB`/`APP` (lo necesitan 42 y 44).
 2. **43** — módulos base, opciones conectadas a su módulo, rutas en inglés.
 3. **48** — bloqueo por módulo e interruptor `Modules:EnforceCompanyModules`.
 4. **42** — estado inicial del ticket.
@@ -147,15 +148,15 @@ En paralelo, sin dependencias con lo anterior: **38 → 40 → 41** (query filte
 
 ## Serie `-post` (specs de `main` adaptadas a PostgreSQL)
 
-Decisión del usuario (2026-10-09): las specs 40–49, 51 y 99 de `main` se copian a este fork como **specs `-post`**, idénticas en negocio pero adaptadas a PostgreSQL, y se **implementan desde cero** en `main_postgresql` (no se traen commits de `main`). Reemplaza el "único `git merge main`" que planteaba la sección 0 de SPEC 50.
+Decisión del usuario (2026-10-09): las specs 40–49, 51 y 99 (hoy 00) de `main` se copian a este fork como **specs `-post`**, idénticas en negocio pero adaptadas a PostgreSQL, y se **implementan desde cero** en `main_postgresql` (no se traen commits de `main`). Reemplaza el "único `git merge main`" que planteaba la sección 0 de SPEC 50.
 
 ### Reglas de la serie
 
 - **Archivo:** `NN-post-<nombre-original>.md` (ejemplo: `40-post-filtered-unique-indexes-soft-delete.md`). **Título:** `# SPEC NN-post — …`. **Cita:** "SPEC 40-post" (dentro del fork) o "BE-40-post" (desde `join_frontb`).
 - **No consumen números:** el sufijo `-post` marca una copia de la spec `NN` de `main`; el siguiente número libre no cambia.
 - **Estado propio:** toda `-post` nace en `Borrador` (las copias de specs `Pospuesto` en `main` conservan `Pospuesto`). Su estado en el fork es independiente del de `main`.
-- **Lectura:** dentro de una `-post`, toda referencia a una spec de la serie (40–49, 51, 99) se lee como su versión `-post`. Si el texto copiado de `main` y la sección "Adaptación a PostgreSQL" de la spec difieren, prevalece esta última.
-- **Copias anteriores:** los archivos `40-…md` a `49-…md` y `99-…md` sin sufijo son copias de `main` del 2026-10-07; se conservan sin tocar como referencia y **no** se implementan en el fork.
+- **Lectura:** dentro de una `-post`, toda referencia a una spec de la serie (40–49, 51, 00) se lee como su versión `-post`. Si el texto copiado de `main` y la sección "Adaptación a PostgreSQL" de la spec difieren, prevalece esta última.
+- **Copias anteriores:** los archivos `40-…md` a `49-…md` y `00-…md` sin sufijo son copias de `main` del 2026-10-07; se conservan sin tocar como referencia y **no** se implementan en el fork.
 - **Rama de trabajo:** `spec-NN-post-<nombre>`, creada desde `main_postgresql`, PR hacia `main_postgresql` (nunca hacia `main`).
 
 ### Convenciones PostgreSQL (aplican a toda `-post`)
@@ -186,7 +187,7 @@ Decisión del usuario (2026-10-09): las specs 40–49, 51 y 99 de `main` se copi
 
 ### Orden de implementación en el fork
 
-1. **40-post** → **41-post** (etapas 1–4) → **99-post** → **42-post** → **43-post** → **48-post** → **44-post** → **46-post**. Es el mismo orden en que se implementaron o se implementarán en `main`; 41-post necesita 40-post, y 42-post usa el bloqueo de borrado de 41-post. **Ajuste (2026-10-09, decisión del usuario):** 42-post se implementó antes que 99-post; no dependen entre sí. **Ajuste (2026-10-12, decisión del usuario):** 44-post se implementa antes que 48-post; hasta que 48-post exista, el módulo Calendario queda sembrado pero el filtro global no bloquea sus APIs por módulo inactivo.
+1. **40-post** → **41-post** (etapas 1–4) → **00-post** → **42-post** → **43-post** → **48-post** → **44-post** → **46-post**. Es el mismo orden en que se implementaron o se implementarán en `main`; 41-post necesita 40-post, y 42-post usa el bloqueo de borrado de 41-post. **Ajuste (2026-10-09, decisión del usuario):** 42-post se implementó antes que 00-post; no dependen entre sí. **Ajuste (2026-10-12, decisión del usuario):** 44-post se implementa antes que 48-post; hasta que 48-post exista, el módulo Calendario queda sembrado pero el filtro global no bloquea sus APIs por módulo inactivo.
 2. **49-post** y **51-post**: sin dependencias con lo anterior, en cualquier momento.
 3. **45-post**: `Implementado` (rama `spec-45-post-calendar-channel-intake`, mergeada en `main_postgresql`). **47-post**: `Aprobado`; en `main` sigue `Pospuesto`.
 4. **50**: pendientes para llevar QA a PostgreSQL (sin su antigua sección 0), cuando el usuario lo decida.

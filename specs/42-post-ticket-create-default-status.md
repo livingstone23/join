@@ -3,10 +3,10 @@
 > **Status:** Implementado
 > **Origen:** copia de SPEC 42 de `main` (estado allí al copiarla: Aprobado (implementado en rama `spec-42-ticket-create-default-status`)), adaptada a PostgreSQL para el fork `main_postgresql`. Se implementa **desde cero** en el fork, sin traer commits de `main` (decisión del usuario, 2026-10-09).
 > **Rama de trabajo:** `spec-42-post-ticket-create-default-status`, creada desde `main_postgresql`; PR hacia `main_postgresql`, nunca hacia `main`.
-> **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 99) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el /swtexto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
+> **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 00) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el /swtexto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
 > **Depends on:** SPEC 41-post (bloqueo de borrado con `ActiveDependentsCheck`, que cubre la parte D). Relacionada con SPEC 35 (lifecycle), SPEC 47-post (ingesta por canal, `Pospuesto`), SPEC 37 (estados finales solo vía `FinishTicket`) y con `join_frontb/specs/17-tickets-nuevo.md` y `19-tickets-configuracion.md`.
 > **Date:** 2026-10-09 (copia `-post`; original: 2026-09-28)
-> **Ajuste por SPEC 42-post (implementación, 2026-10-09):** implementada en la rama `spec-42-post-ticket-create-default-status`, sin cambio de lógica. (1) **Origen del código:** se aplicó el diff de `src`/`tests`/`CURL_REQUESTS.md` del commit de `main` (`890cab3`) con `git apply --3way`, sin conflictos; ningún commit de `main` entra en la historia del fork (mismo criterio que SPEC 41-post). No hubo nada que adaptar a PostgreSQL: el resolvedor y los handlers usan repositorios EF. (2) **Orden:** se implementó antes que 99-post por decisión del usuario; no dependen entre sí (README, "Orden de implementación"). (3) **Tests:** `CreateTicketInitialStatusPostgreSqlTests` sobre `PostgreSqlWebApplicationFactory` (los 5 escenarios de F5 más `TICKET_STATUS_DEFAULT_INVALID`). (4) **Parte D:** sin código nuevo; la cubre SPEC 41-post (`TICKET_STATUS_IN_USE` con `"Active ticket company defaults: 1"`). (5) **E:** SPEC 47-post ya cita `TicketInitialStatusResolver`. **G:** `POSTMAN_CURL.txt` no existe; se actualizó `CURL_REQUESTS.md`. (6) **Specs FE:** FE-17 y FE-19 ya describen este contrato (BE-42); sin cambios.
+> **Ajuste por SPEC 42-post (implementación, 2026-10-09):** implementada en la rama `spec-42-post-ticket-create-default-status`, sin cambio de lógica. (1) **Origen del código:** se aplicó el diff de `src`/`tests`/`CURL_REQUESTS.md` del commit de `main` (`890cab3`) con `git apply --3way`, sin conflictos; ningún commit de `main` entra en la historia del fork (mismo criterio que SPEC 41-post). No hubo nada que adaptar a PostgreSQL: el resolvedor y los handlers usan repositorios EF. (2) **Orden:** se implementó antes que 00-post por decisión del usuario; no dependen entre sí (README, "Orden de implementación"). (3) **Tests:** `CreateTicketInitialStatusPostgreSqlTests` sobre `PostgreSqlWebApplicationFactory` (los 5 escenarios de F5 más `TICKET_STATUS_DEFAULT_INVALID`). (4) **Parte D:** sin código nuevo; la cubre SPEC 41-post (`TICKET_STATUS_IN_USE` con `"Active ticket company defaults: 1"`). (5) **E:** SPEC 47-post ya cita `TicketInitialStatusResolver`. **G:** `POSTMAN_CURL.txt` no existe; se actualizó `CURL_REQUESTS.md`. (6) **Specs FE:** FE-17 y FE-19 ya describen este contrato (BE-42); sin cambios.
 > **Objective:** Que al crear un ticket el estado sea opcional en el request: si el cliente lo envía, el backend valida que sea un estado activo, no final y de la misma empresa; si no lo envía, aplica `Messaging.TicketCompanyDefaults.TicketStatusDefaultId`.
 
 ---
@@ -73,7 +73,7 @@ Hoy el backend no soporta bien esta regla:
 
 ### E. Ingesta por canal (SPEC 47, etapa posterior)
 
-- `RegisterInboundTicketCommandHandler` (todavía no implementado) llama a `TicketInitialStatusResolver.ResolveAsync(companyId, null, ct)`: los tickets que entran por WhatsApp o correo quedan siempre en el estado inicial configurado. Se deja la nota en SPEC 99 al aprobar esta spec.
+- `RegisterInboundTicketCommandHandler` (todavía no implementado) llama a `TicketInitialStatusResolver.ResolveAsync(companyId, null, ct)`: los tickets que entran por WhatsApp o correo quedan siempre en el estado inicial configurado. Se deja la nota en SPEC 00 al aprobar esta spec.
 
 ### F. Seed
 
@@ -85,7 +85,7 @@ Hoy el backend no soporta bien esta regla:
 
 **Out of scope:**
 
-- Aplicar en el servidor los demás defaults (complejidad, unidad de tiempo, canal, proyecto, área) cuando el cliente no los envía. Hoy complejidad, unidad y canal son obligatorios en el request; si se quiere que el backend complete los que falten (útil para SPEC 99), es otra spec.
+- Aplicar en el servidor los demás defaults (complejidad, unidad de tiempo, canal, proyecto, área) cuando el cliente no los envía. Hoy complejidad, unidad y canal son obligatorios en el request; si se quiere que el backend complete los que falten (útil para SPEC 00), es otra spec.
 - Restringir por permiso quién puede elegir un estado distinto del inicial al crear.
 - Cambiar `UpdateTicketDto`: el cambio de estado de un ticket existente sigue las reglas de SPEC 37.
 - Formato del código (`UsePersonalizedCode`/`StartCode`/`CodeSequenceLength`): no cambia.

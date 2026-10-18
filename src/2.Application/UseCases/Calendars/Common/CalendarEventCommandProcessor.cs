@@ -432,7 +432,7 @@ public sealed class CalendarEventCommandProcessor(
             .FirstOrDefault();
         if (webChannel is null)
         {
-            return Response<CalendarSession>.Error(CalendarErrorCodes.WebChannelNotFound, ["The WEB communication channel is missing (SPEC 99)."]);
+            return Response<CalendarSession>.Error(CalendarErrorCodes.WebChannelNotFound, ["The WEB communication channel is missing (SPEC 00)."]);
         }
 
         return Ok(new CalendarSession(companyId, actorUserId, company.Data!, new CalendarActor(webChannel.Id, actorUserId)));

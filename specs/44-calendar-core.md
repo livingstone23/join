@@ -1,7 +1,7 @@
 # SPEC 44 — Módulo Calendario: parametrización, calendarios de usuario y actividades
 
 > **Status:** Borrador
-> **Depends on:** SPEC 99 (canal `WEB` como origen de las actividades creadas desde la aplicación), SPEC 48 (bloqueo por módulo en el filtro global), SPEC 43 (`SystemModule.IsBase`, `ModuleName` en `SystemOptionSeed`, rutas con guion y solo SuperAdmin habilita módulos). Es prerequisito de SPEC 45 (ingreso de actividades por canales / agente) y SPEC 46 (estructura de integración con Google Calendar).
+> **Depends on:** SPEC 00 (canal `WEB` como origen de las actividades creadas desde la aplicación), SPEC 48 (bloqueo por módulo en el filtro global), SPEC 43 (`SystemModule.IsBase`, `ModuleName` en `SystemOptionSeed`, rutas con guion y solo SuperAdmin habilita módulos). Es prerequisito de SPEC 45 (ingreso de actividades por canales / agente) y SPEC 46 (estructura de integración con Google Calendar).
 > **Related:** SPEC 40 (índices únicos filtrados por `GcRecord = 0` — mismo patrón en todos los índices de esta spec), SPEC 39 (fork PostgreSQL — la sintaxis de `HasFilter` de esta spec se porta igual que el resto), SPEC 42 (patrón "valores iniciales desde la configuración de la empresa").
 > **Date:** 2026-09-29
 > **Objective:** Crear el módulo Calendario en su propio esquema `Calendar`: un catálogo global de tipos de actividad y de estados que cada empresa habilita y ajusta, la configuración de calendario por empresa (usuario por defecto, horario hábil, zona horaria, feriados), la configuración por usuario (calendario por defecto, horario de contrato, días hábiles, periodos no hábiles), los calendarios de cada usuario y sus actividades (puntuales, de día completo y periódicas), con validación de superposición y de horario hábil, un panel para consultar calendarios de otros usuarios de la misma empresa y todas las APIs que el frontend necesita para las vistas de día, semana y mes.
@@ -446,7 +446,7 @@ Tabla `Calendar.Events`. Hereda `BaseTenantEntity`. **Administra:** el dueño de
 
 | Campo | Tipo | Req. | Descripción |
 |---|---|---|---|
-| `OriginChannelId` | Guid FK → CommunicationChannel | Sí | Canal por el que se creó. Desde la app, `WEB` (lo siembra SPEC 99; si todavía no existe, esta spec lo agrega a `SeedCommunicationChannelsAsync` con la misma fila que define SPEC 99). |
+| `OriginChannelId` | Guid FK → CommunicationChannel | Sí | Canal por el que se creó. Desde la app, `WEB` (lo siembra SPEC 00; si todavía no existe, esta spec lo agrega a `SeedCommunicationChannelsAsync` con la misma fila que define SPEC 00). |
 | `OriginType` | int (`CalendarEventOriginType`) | Sí | `User = 1` (usuario de JOIN), `Phone = 2` (número de teléfono o WhatsApp), `Email = 3`, `System = 4` (proceso interno). |
 | `OriginUserId` | Guid FK → Users | No | Usuario de JOIN que la registró (en `OriginType = User`, quien la creó; si vino por el agente, el usuario de servicio del agente). |
 | `OriginIdentifier` | nvarchar(200) | No | Teléfono en formato E.164 o correo del solicitante cuando no es un usuario de JOIN. |
@@ -792,7 +792,7 @@ Entidades, enums y `CalendarCodes` en `src/1.Domain/Calendars/`.
 Configuraciones EF (`Configuration/Calendars/`), `DbSet`s, query filters explícitos (convención SPEC 38), relaciones `Restrict`, índices filtrados y migración `AddCalendarModule`. Verificar que la migración crea el esquema `Calendar` y las 11 tablas.
 
 ### F3 — Seed
-`SystemModule` "Calendar", catálogos globales, `SystemOptions`, `RoleSystemOptions`, `SeedCalendarCatalogsForCompanyAsync` dentro de `SeedDefaultCatalogsForCompanyAsync`, y el seed de desarrollo de `JOIN-001` (`CompanyModule`, `CalendarCompany`, provisión). Canal `WEB` si SPEC 99 todavía no lo sembró.
+`SystemModule` "Calendar", catálogos globales, `SystemOptions`, `RoleSystemOptions`, `SeedCalendarCatalogsForCompanyAsync` dentro de `SeedDefaultCatalogsForCompanyAsync`, y el seed de desarrollo de `JOIN-001` (`CompanyModule`, `CalendarCompany`, provisión). Canal `WEB` si SPEC 00 todavía no lo sembró.
 
 ### F4 — Servicios comunes
 `CalendarCompanyGuard`, `CalendarUserProvisioner`, `CalendarUserDefaultCoordinator`, `CalendarEventInitialStatusResolver`, `CalendarEventLogWriter`, `ICalendarRecurrenceExpander` + `IcalRecurrenceExpander` (Infrastructure, paquete Ical.Net) y `CalendarEventScheduleGuard`. Registro DI.

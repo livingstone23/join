@@ -1,7 +1,7 @@
 # SPEC 42 — Valores iniciales del ticket desde `TicketCompanyDefaults`, con estado inicial editable
 
 > **Status:** Borrador
-> **Depends on:** Ninguna para implementarse. Relacionada con SPEC 35 (lifecycle), SPEC 47 (ingesta por canal, etapa posterior — su `RegisterInboundTicketCommandHandler` debe usar el mismo resolvedor; antes estaba en SPEC 99), SPEC 37 (estados finales solo vía `FinishTicket`) y con las specs de front `join_frontb/specs/17-tickets-nuevo.md` y `19-tickets-configuracion.md`.
+> **Depends on:** Ninguna para implementarse. Relacionada con SPEC 35 (lifecycle), SPEC 47 (ingesta por canal, etapa posterior — su `RegisterInboundTicketCommandHandler` debe usar el mismo resolvedor; antes estaba en SPEC 00), SPEC 37 (estados finales solo vía `FinishTicket`) y con las specs de front `join_frontb/specs/17-tickets-nuevo.md` y `19-tickets-configuracion.md`.
 > **Date:** 2026-09-28
 > **Objective:** Que al crear un ticket el estado sea opcional en el request: si el cliente lo envía, el backend valida que sea un estado activo, no final y de la misma empresa; si no lo envía, aplica `Messaging.TicketCompanyDefaults.TicketStatusDefaultId`.
 
@@ -55,7 +55,7 @@ Hoy el backend no soporta bien esta regla:
 
 ### E. Ingesta por canal (SPEC 47, etapa posterior)
 
-- `RegisterInboundTicketCommandHandler` (todavía no implementado) llama a `TicketInitialStatusResolver.ResolveAsync(companyId, null, ct)`: los tickets que entran por WhatsApp o correo quedan siempre en el estado inicial configurado. Se deja la nota en SPEC 99 al aprobar esta spec.
+- `RegisterInboundTicketCommandHandler` (todavía no implementado) llama a `TicketInitialStatusResolver.ResolveAsync(companyId, null, ct)`: los tickets que entran por WhatsApp o correo quedan siempre en el estado inicial configurado. Se deja la nota en SPEC 00 al aprobar esta spec.
 
 ### F. Seed
 
@@ -67,7 +67,7 @@ Hoy el backend no soporta bien esta regla:
 
 **Out of scope:**
 
-- Aplicar en el servidor los demás defaults (complejidad, unidad de tiempo, canal, proyecto, área) cuando el cliente no los envía. Hoy complejidad, unidad y canal son obligatorios en el request; si se quiere que el backend complete los que falten (útil para SPEC 99), es otra spec.
+- Aplicar en el servidor los demás defaults (complejidad, unidad de tiempo, canal, proyecto, área) cuando el cliente no los envía. Hoy complejidad, unidad y canal son obligatorios en el request; si se quiere que el backend complete los que falten (útil para SPEC 00), es otra spec.
 - Restringir por permiso quién puede elegir un estado distinto del inicial al crear.
 - Cambiar `UpdateTicketDto`: el cambio de estado de un ticket existente sigue las reglas de SPEC 37.
 - Formato del código (`UsePersonalizedCode`/`StartCode`/`CodeSequenceLength`): no cambia.

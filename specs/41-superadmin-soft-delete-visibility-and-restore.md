@@ -133,7 +133,7 @@ Son las entidades más simples: sin padre (salvo `Province → Country`, `Munici
 
 ### Etapa 4 — Tickets
 
-`Ticket`, `TicketNotification`, `TicketCompanyDefault`, y las entidades de SPEC 34-37 y 99 que ya estén implementadas.
+`Ticket`, `TicketNotification`, `TicketCompanyDefault`, y las entidades de SPEC 34-37 y 00 que ya estén implementadas.
 
 - `TicketLog` no se restaura (sección E).
 - Restaurar un `Ticket` genera una entrada en `TicketLog` (auditoría del ticket).

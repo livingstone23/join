@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace JOIN.Persistence.Migrations
 {
     /// <summary>
-    /// SPEC 99-post: data migration that adds the internal channels <c>Web</c> (<c>WEB</c>) and <c>App</c> (<c>APP</c>).
+    /// SPEC 00-post: data migration that adds the internal channels <c>Web</c> (<c>WEB</c>) and <c>App</c> (<c>APP</c>).
     /// The full seed only runs when a migration is pending, so without this migration an existing database
     /// would never receive them. Each row is inserted only when no channel (active or deleted) already uses
     /// its name or its code: the unique index on <c>name</c> is not filtered by <c>gcrecord</c>, and a deleted

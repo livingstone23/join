@@ -3,16 +3,16 @@
 > **Status:** Implementado
 > **Origen:** copia de SPEC 47 de `main` (estado allí al copiarla: Pospuesto), adaptada a PostgreSQL para el fork `main_postgresql`. Se implementa **desde cero** en el fork, sin traer commits de `main` (decisión del usuario, 2026-10-09).
 > **Rama de trabajo:** `spec-47-post-ticket-external-channel-ingestion`, creada desde `main_postgresql`; PR hacia `main_postgresql`, nunca hacia `main`.
-> **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 99) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
-> **Depends on:** SPEC 34 (`TicketUserCompany`), SPEC 35 (`TicketDtoAssembler`), SPEC 36 (`IFileStorageService`, `TicketAttachmentSettings`, `InboundAttachment`) — las tres ya en el fork —, SPEC 99-post (canales internos `WEB`/`APP`), SPEC 42-post (`TicketInitialStatusResolver`), SPEC 43-post (menú `TicketManagement`, rutas `/tickets/...`).
+> **Lectura en el fork:** dentro de esta spec, toda referencia a una spec de la serie copiada (40–49, 51, 00) se lee como su versión `-post` ("SPEC 41" = SPEC 41-post), y aplican las convenciones de `specs/README.md` → "Serie `-post`". Donde el texto copiado de `main` y la sección "Adaptación a PostgreSQL" difieren, prevalece esta última.
+> **Depends on:** SPEC 34 (`TicketUserCompany`), SPEC 35 (`TicketDtoAssembler`), SPEC 36 (`IFileStorageService`, `TicketAttachmentSettings`, `InboundAttachment`) — las tres ya en el fork —, SPEC 00-post (canales internos `WEB`/`APP`), SPEC 42-post (`TicketInitialStatusResolver`), SPEC 43-post (menú `TicketManagement`, rutas `/tickets/...`).
 > **Related:** SPEC 45 (agente de canales del calendario; la forma en que conviven el agente y la ingesta directa se decide al retomar esta spec).
-> **Date:** 2026-10-09 (copia `-post`; original: 2026-10-01 (contenido original de SPEC 99, 2026-09-25))
+> **Date:** 2026-10-09 (copia `-post`; original: 2026-10-01 (contenido original de SPEC 00, 2026-09-25))
 > **Objective:** Permitir que un ticket se registre automáticamente cuando llega un mensaje de WhatsApp o un correo a una dirección/número configurado por la empresa, sin sesión de usuario ni token JWT, resolviendo el tenant de forma segura vía un token de webhook único por empresa y canal.
 
-> **Origen y etapa (decisión del usuario, 2026-10-01):** este diseño estaba en la SPEC 99 (aprobada el 2026-09-25). Se movió aquí sin cambios de fondo porque la creación automática de tickets desde canales externos —**WhatsApp y correo**— queda para una **etapa posterior**, después de concluir los módulos de Tickets y Calendar y junto con la definición de los agentes de canal (SPEC 45). Hasta entonces, los tickets los crean usuarios con acceso al módulo y permisos (`POST /Tickets`, que ya acepta `PersonId` para crear a nombre de otra persona). Al retomarla, se revisa completa contra el estado final de ambos módulos y vuelve a aprobarse.
+> **Origen y etapa (decisión del usuario, 2026-10-01):** este diseño estaba en la SPEC 00 (aprobada el 2026-09-25). Se movió aquí sin cambios de fondo porque la creación automática de tickets desde canales externos —**WhatsApp y correo**— queda para una **etapa posterior**, después de concluir los módulos de Tickets y Calendar y junto con la definición de los agentes de canal (SPEC 45). Hasta entonces, los tickets los crean usuarios con acceso al módulo y permisos (`POST /Tickets`, que ya acepta `PersonId` para crear a nombre de otra persona). Al retomarla, se revisa completa contra el estado final de ambos módulos y vuelve a aprobarse.
 >
 > **Ya no forman parte de esta spec:**
-> - Los canales internos `WEB` y `APP` → SPEC 99.
+> - Los canales internos `WEB` y `APP` → SPEC 00.
 > - El índice único de `Ticket.Code`: ya es `(CompanyId, Code)` en el código. **No** se filtra por `GcRecord`, porque `TicketCodeGenerator` cuenta también los tickets borrados y nunca reutiliza un código; mantener los borrados en el índice garantiza que restaurar un ticket (SPEC 41) no choque.
 > - `InboundAttachment`: ya existe (SPEC 36).
 >

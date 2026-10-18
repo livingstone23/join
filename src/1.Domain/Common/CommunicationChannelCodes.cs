@@ -1,7 +1,7 @@
 namespace JOIN.Domain.Common;
 
 /// <summary>
-/// Values of <see cref="CommunicationChannel.Code"/> for the channels seeded by the system (SPEC 99).
+/// Values of <see cref="CommunicationChannel.Code"/> for the channels seeded by the system (SPEC 00).
 /// Channels are always compared by <c>Code</c>, never by <c>Name</c>.
 /// </summary>
 public static class CommunicationChannelCodes

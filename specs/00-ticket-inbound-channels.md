@@ -1,6 +1,7 @@
-# SPEC 99 — Canales internos `WEB` y `APP` en el catálogo de canales
+# SPEC 00 — Canales internos `WEB` y `APP` en el catálogo de canales
 
 > **Status:** Borrador
+> **Renumeración (2026-10-18, decisión del usuario):** antes SPEC 99 (archivo `99-ticket-inbound-channels.md`); pasó a **00** sin cambios de negocio. Una cita a "SPEC 99" anterior a esa fecha se lee como SPEC 00.
 > **Depends on:** Ninguna.
 > **Related:** SPEC 44 (el calendario registra como origen `WEB` las actividades creadas desde la aplicación), SPEC 47 (ingesta de tickets por WhatsApp y correo, etapa posterior — contenido que antes estaba en esta spec).
 > **Date:** 2026-10-01 (reescrita; la versión original del 2026-09-25 se movió a SPEC 47)
