@@ -1,6 +1,6 @@
 # SPEC 62 — Documentos de los leads y sus contactos
 
-> **Status:** Aprobados[e]
+> **Status:** Implementado
 > **Depends on:** SPEC 36 (adjuntos de ticket: modelo y validaciones), SPEC 49-post (almacenamiento intercambiable: local, Azure Blob, S3, R2), **SPEC 61** (leads y contactos). Rama de trabajo: `spec-62-lead-interaction-documents`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-16
 > **Objective:** Adjuntar documentos (propuestas, levantamientos, fotos) a un lead y, en particular, a cada momento de contacto, con límites por empresa y el mismo almacenamiento que ya usan los tickets.

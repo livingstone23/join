@@ -1,6 +1,6 @@
 # SPEC 63 — Ganar, perder y reabrir leads; conversión a cliente; etapas de cliente post-venta; migración de clientes en LEAD/PROSPECT
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 54 (seed de personas y clientes), SPEC 55 (clientes, `ICustomerActivationService`, `CustomerStages`), **SPEC 58** (identificación opcional), **SPEC 59** (motivos y vinculación), **SPEC 61** (leads). Rama de trabajo: `spec-63-lead-win-loss-and-customer-conversion`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-16
 > **Objective:** Cerrar un lead como ganado (desde cualquier etapa abierta) o perdido, con motivo; que ganar cree, reactive o confirme el cliente con el origen `Lead`; que las etapas de cliente pasen a describir la vida post-venta; y migrar los clientes que hoy están en `LEAD` o `PROSPECT` a leads abiertos.

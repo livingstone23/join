@@ -1,6 +1,6 @@
 # SPEC 61 — Leads: alta, bandeja, detalle, etapas en orden, contactos, comentarios, productos ofrecidos, duplicados, inactivar y reactivar
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 54 (búsqueda única de personas), SPEC 55 (clientes), **SPEC 56** (monedas y tasas), **SPEC 57** (productos), **SPEC 58** (identificación opcional), **SPEC 59** (parametrización comercial), **SPEC 60** (grupos y alcance). Rama de trabajo: `spec-61-leads-pipeline-and-interactions`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-16
 > **Objective:** Registrar prospectos (leads) sobre una persona, llevarlos por las etapas del embudo de la empresa, registrar cada contacto con comentarios y productos ofrecidos, y permitir dejarlos inactivos para que otro usuario los retome. Ganar y perder quedan en SPEC 63; documentos en SPEC 62.

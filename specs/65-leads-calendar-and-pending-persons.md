@@ -1,6 +1,6 @@
 # SPEC 65 — Leads con calendario y personas pendientes: próxima acción agendada y convertir una persona pendiente en lead
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 44-post (calendario: eventos y actividades por empresa), SPEC 45-post (personas pendientes que llegan por canal), SPEC 48-post (bloqueo por módulo activo), **SPEC 59** (tipos de contacto, origen `PENDING`), **SPEC 61** (leads y contactos). Rama de trabajo: `spec-65-leads-calendar-and-pending-persons`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-16
 > **Objective:** Que la próxima acción de un lead (una reunión, una visita, una demostración) sea un evento real en el calendario del dueño, enlazado al lead, y que una persona que llegó por un canal (WhatsApp, correo) se pueda convertir en lead desde la cola de personas pendientes.

@@ -1,6 +1,6 @@
 # SPEC 64 — Reportes comerciales: resumen, embudo, ranking de grupos y usuarios, productos, orígenes y contactos
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** **SPEC 60** (grupos y alcance), **SPEC 61** (leads), **SPEC 63** (ganar y perder). Rama de trabajo: `spec-64-commercial-reports`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-16
 > **Objective:** Medir qué grupos y qué usuarios registran más clientes en un período, con qué productos, por qué origen llegaron y cómo se los contactó, en moneda base y respetando lo que cada usuario puede ver.
