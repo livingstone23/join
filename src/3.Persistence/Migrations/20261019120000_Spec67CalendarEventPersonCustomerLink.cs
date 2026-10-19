@@ -5,18 +5,13 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace JOIN.Persistence.Migrations
 {
     /// <summary>
-    /// SPEC 67 — data-only backfill: keeps the pair <c>(requesterpersonid, customerid)</c> of every
-    /// <c>calendar.events</c> row coherent before the unified "Persona/Cliente" lookup is the only entry point on
-    /// the frontend (FE-42). The two rules mirror the runtime resolution in
-    /// <c>CalendarEventCommandProcessor.ValidateLinksAsync</c>:
-    /// <list type="number">
-    ///   <item>Rule 2 — when a row carries the person but no customer and the person has one in the company, fill
-    ///   in the customer's id (live or inactive, SPEC 55 uniqueness guarantees at most one).</item>
-    ///   <item>Rule 3 — when a row carries the customer but no person, fill in the customer's person id.</item>
-    /// </list>
-    /// Rows already coherent (both columns set or both null) are left untouched, and the migration also walks
-    /// soft-deleted events (it does not filter on <c>gcrecord</c>). No-op <c>Down</c>: the migration only writes
-    /// data, no schema to revert.
+    /// SPEC 67 — schema for the unified "Persona/Cliente" lookup (FE-42): every <c>calendar.events</c> row
+    /// gets <c>requesterpersonid</c> and <c>customerid</c> so the activity index can render the chosen link without
+    /// extra calls. The follow-up data backfill lives in the same migration name and runs immediately after
+    /// (rules 2-3 mirror the runtime resolution in <c>CalendarEventCommandProcessor.ValidateLinksAsync</c>):
+    /// rows with only the person get the customer; rows with only the customer get the person; rows already
+    /// coherent are left untouched, and the migration also walks soft-deleted events (no
+    /// <c>gcrecord</c> filter). No-op <c>Down</c>: only data + the two nullable columns are written.
     /// </summary>
     public partial class Spec67CalendarEventPersonCustomerLink : Migration
     {
@@ -51,7 +46,18 @@ namespace JOIN.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            // No-op: data-only backfill, no schema to revert. The two columns stay as they were before Up.
+            migrationBuilder.Sql("""
+                UPDATE "calendar"."events" AS e
+                SET "customerid" = NULL
+                FROM "customer"."customers" AS cust
+                WHERE cust."id" = e."customerid"
+                """);
+            migrationBuilder.Sql("""
+                UPDATE "calendar"."events" AS e
+                SET "requesterpersonid" = NULL
+                FROM "admin"."persons" AS p
+                WHERE p."id" = e."requesterpersonid"
+                """);
         }
     }
 }
