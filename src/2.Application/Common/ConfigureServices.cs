@@ -168,6 +168,10 @@ public static class ConfigureServices
         services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarCompanies.CalendarCompanySettingsValidator>();
         services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarCompanies.CalendarCompanyProvisioning>();
         services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarStatusCompanies.CalendarStatusCompanyRemovalGuard>();
+        // SPEC 68 — activity index visibility (also reused by SPEC 69).
+        services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarActivityIndex.CalendarActivityVisibility>();
+        services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarActivityIndex.ICalendarActivityIndexReader,
+            JOIN.Application.UseCases.Calendars.CalendarActivityIndex.CalendarActivityIndexReader>();
 
         // SPEC 45 — channel agent intake and pending persons.
         services.AddScoped<IntakeChannelReader>();

@@ -20,6 +20,10 @@ public sealed class CalendarUserConfigurationConfiguration : IEntityTypeConfigur
             .HasFilter("\"gcrecord\" = 0")
             .HasDatabaseName("UX_CalendarUserConfigurations_Company_User_Active");
 
+        builder.Property(x => x.CanViewOthersActivities)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.HasOne(x => x.User)
             .WithMany()
             .HasForeignKey(x => x.UserId)

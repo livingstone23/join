@@ -2546,6 +2546,12 @@ namespace JOIN.Persistence.Migrations
                         .HasColumnType("time without time zone")
                         .HasColumnName("businesshoursstart");
 
+                    b.Property<bool>("CanViewOthersActivities")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("canviewothersactivities");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
                         .HasColumnName("companyid");

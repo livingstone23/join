@@ -39,6 +39,14 @@ public class CalendarUserConfiguration : BaseTenantEntity
     /// <summary> <see cref="DayOfWeek.Monday"/> or <see cref="DayOfWeek.Sunday"/>. </summary>
     public DayOfWeek WeekStartsOn { get; set; } = DayOfWeek.Monday;
 
+    /// <summary>
+    /// SPEC 68 — when <c>true</c>, the user sees the activities of every member of the company in the activity
+    /// index (and in comments/documents, SPEC 69). Default <c>false</c>: the index lists only the user's own
+    /// activities. Only an administrator can change it (<c>PUT /CalendarUserConfigurations/{userId}</c> with
+    /// <c>CalendarSettings.CanUpdate</c>); <c>PUT …/me</c> silently ignores it.
+    /// </summary>
+    public bool CanViewOthersActivities { get; set; }
+
     // --- Navigation ---
     public virtual ApplicationUser User { get; set; } = null!;
     public virtual UserCalendar DefaultCalendar { get; set; } = null!;

@@ -168,6 +168,87 @@ public sealed class UpdateUserCalendarConfigurationCommandHandlerTests
     }
 
     /// <summary>
+    /// SPEC 68 — the handler persists <c>CanViewOthersActivities</c> on the entity and surfaces it in the
+    /// response DTO so the administrator's choice is reflected immediately in the configuration tab.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenCanViewOthersActivitiesSet_ShouldPersistFlagAndReturnInDto()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var userId = _fixture.Create<Guid>();
+        var context = new UpdateUserCalendarConfigurationCommandTestContext(companyId);
+        var handler = context.CreateHandler();
+        var request = CreateValidCommand(userId) with { CanViewOthersActivities = true };
+        var existingConfig = SeedExistingConfiguration(companyId, userId, new TimeOnly(8, 0), new TimeOnly(17, 0));
+        context.UnitOfWorkMock.SetupRepositoryRows(new[]
+        {
+            new CalendarCompany
+            {
+                CompanyId = companyId,
+                TimeZone = "America/Managua",
+                IsOpen24Hours = true,
+                BusinessHoursStart = new TimeOnly(0, 0),
+                BusinessHoursEnd = new TimeOnly(23, 59),
+                RescheduledByOthersStatusCompanyId = Guid.NewGuid()
+            }
+        });
+        var configurationRepositoryMock = context.UnitOfWorkMock.SetupRepositoryRows(new[] { existingConfig });
+        configurationRepositoryMock.Setup(x => x.GetAsync(existingConfig.Id)).ReturnsAsync(existingConfig);
+        configurationRepositoryMock
+            .Setup(x => x.UpdateAsync(It.IsAny<CalendarUserConfiguration>()))
+            .ReturnsAsync(true);
+        context.UserCalendarRepositoryMock.Setup(x => x.GetAsync(existingConfig.DefaultCalendarId)).ReturnsAsync(new UserCalendar { Name = "Personal" });
+        context.UserRepositoryMock.Setup(x => x.GetAsync(userId)).ReturnsAsync(new ApplicationUser { FirstName = "Alice", LastName = "Smith", Email = "alice@acme.test" });
+
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        existingConfig.CanViewOthersActivities.Should().BeTrue();
+        response.Data!.CanViewOthersActivities.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// SPEC 68 — when the request leaves the flag at its default <c>false</c>, the entity keeps whatever value it
+    /// had (here <c>true</c>): the administrator can always turn the flag off explicitly.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenCanViewOthersActivitiesDefaultsToFalse_ShouldClearExistingFlag()
+    {
+        var companyId = _fixture.Create<Guid>();
+        var userId = _fixture.Create<Guid>();
+        var context = new UpdateUserCalendarConfigurationCommandTestContext(companyId);
+        var handler = context.CreateHandler();
+        var request = CreateValidCommand(userId); // default false
+        var existingConfig = SeedExistingConfiguration(companyId, userId, new TimeOnly(8, 0), new TimeOnly(17, 0));
+        existingConfig.CanViewOthersActivities = true;
+        context.UnitOfWorkMock.SetupRepositoryRows(new[]
+        {
+            new CalendarCompany
+            {
+                CompanyId = companyId,
+                TimeZone = "America/Managua",
+                IsOpen24Hours = true,
+                BusinessHoursStart = new TimeOnly(0, 0),
+                BusinessHoursEnd = new TimeOnly(23, 59),
+                RescheduledByOthersStatusCompanyId = Guid.NewGuid()
+            }
+        });
+        var configurationRepositoryMock = context.UnitOfWorkMock.SetupRepositoryRows(new[] { existingConfig });
+        configurationRepositoryMock.Setup(x => x.GetAsync(existingConfig.Id)).ReturnsAsync(existingConfig);
+        configurationRepositoryMock
+            .Setup(x => x.UpdateAsync(It.IsAny<CalendarUserConfiguration>()))
+            .ReturnsAsync(true);
+        context.UserCalendarRepositoryMock.Setup(x => x.GetAsync(existingConfig.DefaultCalendarId)).ReturnsAsync(new UserCalendar { Name = "Personal" });
+        context.UserRepositoryMock.Setup(x => x.GetAsync(userId)).ReturnsAsync(new ApplicationUser { FirstName = "Alice", LastName = "Smith", Email = "alice@acme.test" });
+
+        var response = await handler.Handle(request, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        existingConfig.CanViewOthersActivities.Should().BeFalse();
+        response.Data!.CanViewOthersActivities.Should().BeFalse();
+    }
+
+    /// <summary>
     /// Creates a valid update command for reuse across test scenarios.
     /// </summary>
     private UpdateUserCalendarConfigurationCommand CreateValidCommand(Guid? userId = null)
