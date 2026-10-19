@@ -55,7 +55,7 @@ public sealed class ListCalendarEventDocumentsQueryHandler(
             UploadedByUserId = d.UploadedByUserId,
             UploadedByUserName = uploaders.TryGetValue(d.UploadedByUserId, out var name) ? name : string.Empty,
             CreatedAt = d.Created,
-            IsDeleted = false
+            IsDeleted = d.DeletedUtc is not null
         }).ToList();
 
         return new Response<IReadOnlyList<CalendarEventDocumentDto>>

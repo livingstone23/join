@@ -54,6 +54,7 @@ public static class CalendarResponseResults
         _ when Conflicts.Contains(message) => StatusCodes.Status409Conflict,
         _ when Unprocessable.Contains(message) => StatusCodes.Status422UnprocessableEntity,
         CalendarErrorCodes.OthersPermissionRequired or CalendarErrorCodes.IntakeCompanyNotAllowed => StatusCodes.Status403Forbidden,
+        CalendarErrorCodes.StorageProviderNotConfigured => StatusCodes.Status503ServiceUnavailable,
         _ => StatusCodes.Status400BadRequest
     };
 

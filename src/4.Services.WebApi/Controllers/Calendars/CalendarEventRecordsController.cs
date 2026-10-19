@@ -3,6 +3,7 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Calendars;
 using JOIN.Application.UseCases.Calendars.CalendarEventRecords.Commands;
 using JOIN.Application.UseCases.Calendars.CalendarEventRecords.Queries;
+using JOIN.Domain.Security;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -82,6 +83,25 @@ public class CalendarEventRecordsController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Response<bool>), StatusCodes.Status200OK)]
     public async Task<IActionResult> DeleteDocument(Guid eventId, Guid documentId, [FromBody] DeleteCommentBody body, CancellationToken cancellationToken) =>
         this.ToResult(await sender.Send(new DeleteCalendarEventDocumentCommand(documentId, body.Reason), cancellationToken));
+
+    /// <summary> Streams the file from the provider that stored it. Requires
+    /// <c>CalendarActivityRecords.CanDownload</c> (plan §10). The activity visibility (regla 5) is enforced by
+    /// the handler, so a foreign-tenant or hidden-activity probe resolves the same <c>CALENDAR_DOCUMENT_NOT_FOUND</c>
+    /// code. </summary>
+    [HttpGet("documents/{documentId:guid}/download")]
+    [RequirePermission(PermissionFlags.CanDownload)]
+    [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> DownloadDocument(Guid eventId, Guid documentId, CancellationToken cancellationToken)
+    {
+        var response = await sender.Send(
+            new DownloadCalendarEventDocumentQuery(eventId, documentId), cancellationToken);
+        return response.IsSuccess
+            ? File(response.Data!.Content, response.Data.ContentType, response.Data.OriginalName)
+            : this.ToResult(response);
+    }
 }
 
 /// <summary> Body for create-comment: <c>{ body }</c>. </summary>

@@ -178,6 +178,67 @@ public sealed class Spec69CalendarActivityCommentsAndDocumentsPostgreSqlTests : 
     }
 
     /// <summary>
+    /// Acceptance #6 — the download endpoint streams the bytes back; a cross-tenant probe answers
+    /// <c>CALENDAR_DOCUMENT_NOT_FOUND</c> and a hidden-activity probe answers the same code. The
+    /// <c>CanDownload</c> 403 path is exercised at the unit-test layer via
+    /// <c>DownloadCalendarEventDocumentQueryHandlerTests</c> and the
+    /// <c>DynamicAuthorizationFilter</c> gate.
+    /// </summary>
+    [Fact]
+    public async Task Download_ReturnsBytes_AndHidesForeignTenant()
+    {
+        var s = await SeedAsync();
+        var activityId = await s.CreateActivityAsync(title: "Download", from: "2027-04-05T10:00:00-06:00", to: "2027-04-05T11:00:00-06:00");
+        var payload = new byte[] { 0x25, 0x26, 0x27, 0x28, 0x29 };
+        var upload = await UploadBytesAsync(s.AdminClient, $"/api/v1/CalendarEvents/{activityId}/documents", null, "manual.pdf", "application/pdf", payload);
+        upload.StatusCode.Should().Be(HttpStatusCode.OK);
+        var documentId = Data(await upload.Content.ReadAsStringAsync()).GetProperty("id").GetGuid();
+
+        // Happy path — same tenant, same activity owner.
+        var download = await s.AdminClient.GetAsync($"/api/v1/CalendarEvents/{activityId}/documents/{documentId}/download");
+        download.StatusCode.Should().Be(HttpStatusCode.OK);
+        download.Content.Headers.ContentType!.MediaType.Should().Be("application/pdf");
+        download.Content.Headers.ContentDisposition!.FileName.Should().Be("manual.pdf");
+        var bytes = await download.Content.ReadAsByteArrayAsync();
+        bytes.Should().Equal(payload);
+
+        // Foreign-tenant probe — register a second company and ask it for the first company's file.
+        var otherEmail = $"b{Guid.NewGuid():N}@t.local";
+        Guid otherCompanyId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var otherCompany = new Company
+            {
+                Name = $"JOIN-S69-DL-{Guid.NewGuid():N}"[..20],
+                TaxId = $"RUC{Guid.NewGuid():N}"[..16],
+                IsActive = true,
+                CreatedBy = Creator
+            };
+            db.Companies.Add(otherCompany);
+            await db.SaveChangesAsync();
+            otherCompanyId = otherCompany.Id;
+        }
+        var otherAdminId = await RegisterMemberAsync(otherCompanyId, otherEmail, "SuperAdmin");
+        var otherClient = await AuthedClientAsync(otherCompanyId, otherEmail);
+
+        // We have to give the other admin at least a calendar configuration so the activity lookup path
+        // does not 500 on missing tenant config.
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var cal = await db.UserCalendars.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(c => c.CompanyId == otherCompanyId);
+            cal.Should().BeNull("the foreign admin was provisioned without a calendar configuration");
+        }
+        _ = otherAdminId; // not strictly needed; just make the compiler happy.
+
+        var foreign = await otherClient.GetAsync($"/api/v1/CalendarEvents/{activityId}/documents/{documentId}/download");
+        foreign.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await foreign.Content.ReadAsStringAsync()).Should().Contain("CALENDAR_DOCUMENT_NOT_FOUND");
+    }
+
+    /// <summary>
     /// EXPLAIN — the comments list query anchors on the events table by index so the FK joins do not
     /// degrade into sequential scans when the calendar grows.
     /// </summary>

@@ -86,4 +86,6 @@ public static class CalendarErrorCodes
     public const string CommentNotFound = "CALENDAR_COMMENT_NOT_FOUND";
     public const string DocumentNotFound = "CALENDAR_DOCUMENT_NOT_FOUND";
     public const string RecordAlreadyDeleted = "CALENDAR_RECORD_ALREADY_DELETED";
+    public const string StorageProviderNotConfigured = "CALENDAR_STORAGE_PROVIDER_NOT_CONFIGURED";
+    public const string FileNotFoundInStorage = "CALENDAR_FILE_NOT_FOUND_IN_STORAGE";
 }
