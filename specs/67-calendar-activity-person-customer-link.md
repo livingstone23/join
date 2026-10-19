@@ -4,6 +4,7 @@
 > **Depends on:** SPEC 44-post (actividades: `RequesterPersonId` y `CustomerId`), SPEC 45-post (ingreso por canales), SPEC 54 (`GET /Persons/lookup`), SPEC 55 (un cliente por persona y empresa), SPEC 65 (próxima acción del lead en el calendario). Rama de trabajo: `spec-67-calendar-activity-person-customer-link`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Que la persona y el cliente de una actividad se elijan con un solo buscador "Persona/Cliente", como en tickets (FE-27), y que el backend mantenga siempre coherentes `RequesterPersonId` y `CustomerId`.
+> **Revisión de implementación (2026-10-19):** la tabla es `calendar.events` (no `calendar.calendarevents`); se agregó el `Designer.cs` que faltaba a la migración y un test de integración que verifica que se aplica. Ajuste editorial, mantiene el estado.
 > **Origen:** pedido del usuario (2026-10-19): en "Nueva actividad", "Relacionado con" tiene dos buscadores separados, "Persona (solicitante)" y "Cliente"; debe ser uno solo, como en el ticket. Se divide con SPEC 68 (índice de actividades) y SPEC 69 (comentarios y documentos). Front: FE-42.
 
 ---
@@ -30,7 +31,7 @@
 3. `CalendarEventDto` suma `RequesterPersonName?`, `CustomerCode?` e `IsCustomerActive?` (nulos sin vínculo), para que el front muestre el vínculo elegido como en FE-27 sin llamadas extra. Aplica al detalle de `CalendarEvents` y `CalendarPanel`.
 
 **C. Datos**
-4. Migración `Spec67CalendarEventPersonCustomerLink`: solo SQL de datos (reglas 2 y 3 sobre `calendar.calendarevents`, incluidas las filas borradas lógicamente). Sin cambios de esquema.
+4. Migración `Spec67CalendarEventPersonCustomerLink`: solo SQL de datos (reglas 2 y 3 sobre `calendar.events`, incluidas las filas borradas lógicamente; la regla 2 solo toma clientes no borrados, `gcrecord = 0`). Sin cambios de esquema, pero lleva su `Designer.cs` con `[Migration]` para que EF Core la descubra y la aplique al arrancar.
 
 **Out of scope:**
 - Buscador de ticket y de proyecto de "Relacionado con": siguen como están (FE-22).

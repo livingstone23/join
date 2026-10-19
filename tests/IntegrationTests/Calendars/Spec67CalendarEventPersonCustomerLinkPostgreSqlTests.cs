@@ -255,6 +255,22 @@ public sealed class Spec67CalendarEventPersonCustomerLinkPostgreSqlTests : IClas
     }
 
     /// <summary>
+    /// Data migration — the migration is discovered by EF Core (it needs its <c>[Migration]</c> Designer partial)
+    /// and applied at startup, so the backfill really runs on every database.
+    /// </summary>
+    [Fact]
+    public async Task Migration_IsRegisteredAndApplied()
+    {
+        var context = await SeedAsync();
+        await using var scope = context.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var applied = await db.Database.GetAppliedMigrationsAsync();
+
+        applied.Should().Contain("20261019120000_Spec67CalendarEventPersonCustomerLink");
+    }
+
+    /// <summary>
     /// Data migration — the same SQL the migration runs leaves no row with one side of the pair missing when
     /// the matching record exists. Inserts an incoherent event, runs the two backfills, and verifies the pair
     /// became coherent. Also asserts no <c>calendar.events</c> row in the test company has one side null when the
