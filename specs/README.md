@@ -9,7 +9,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 ## Reglas
 
 ### Numeración
-- Una spec nueva toma el **siguiente número libre** (hoy: **70**; la 51 es de `main` —su copia en el fork es `51-post`— y de la 52 a la 69 son propias del fork).
+- Una spec nueva toma el **siguiente número libre** (hoy: **73**; la 51 es de `main` —su copia en el fork es `51-post`— y de la 52 a la 72 son propias del fork).
 - Los números **no se reutilizan ni se reordenan**. Si una spec se divide, la parte que sale toma un número nuevo y ambas lo dicen en su encabezado (ejemplo: SPEC 00 → SPEC 47).
 - **Excepción autorizada (2026-10-05):** por decisión del usuario se renumeró una sola vez: la 37 (canales `WEB`/`APP`) pasó a **99** y las 38–49 bajaron un número (38→37 … 49→48). Las referencias se actualizaron en ambos repositorios. Una spec citada con su número anterior en un commit o conversación previa a esa fecha debe traducirse con esta tabla.
 - **Excepción autorizada (2026-10-18):** por decisión del usuario, la 99 y la 99-post (canales `WEB`/`APP`) pasaron a **00** y **00-post**. Las referencias se actualizaron en ambos repositorios (BE-99 → BE-00); los nombres ya aplicados no cambian (migración `Spec99InternalCommunicationChannels`, usuario `Spec99_Migration`, rama `spec-99-post-ticket-inbound-channels`). En `main` la spec sigue numerada 99. Una cita a "SPEC 99" anterior a esa fecha se lee como SPEC 00.
@@ -108,6 +108,9 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 67 | Calendario: "Relacionado con" de la actividad unificado en Persona/Cliente | Borrador | 44-post, 45-post, 54, 55, 65 |
 | 68 | Calendario: índice de actividades con filtros y permiso por usuario para ver las de otros | Borrador | 43-post, 44-post, 48-post, 67 |
 | 69 | Calendario: comentarios y documentos de la actividad, con límites de adjuntos por empresa | Borrador | 36, 44-post, 49-post, 62, 68 |
+| 70 | Productos y servicios: imágenes (hasta 5) y documentos, con límites por empresa | Borrador | 36, 41-post, 43-post, 49-post, 57, 62 |
+| 71 | Plantillas de correo por empresa, agrupadas por tipo, con variables | Borrador | 41-post, 43-post, 61 |
+| 72 | Enviar correos a personas, clientes y leads, y registrarlos en el historial del lead | Borrador | 49-post, 55, 59, 60, 61, 62, 70, 71 |
 
 ### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)
 

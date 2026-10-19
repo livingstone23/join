@@ -5,6 +5,7 @@
 > **Date:** 2026-10-16
 > **Objective:** Que cada empresa defina los productos y servicios que ofrece, en un catálogo que hoy usa el módulo de clientes (productos ofrecidos en un lead, SPEC 61) y mañana reutilizarán inventario, compras, ventas y presupuestos.
 > **Origen:** diseño del módulo de clientes (2026-10-16, vista "Parametrización → Productos y servicios").
+> **Ajuste por SPEC 70 (2026-10-19):** las imágenes de producto, fuera de alcance aquí, y los documentos de producto los agrega SPEC 70; `GET /Products`, `GET /Products/{id}`, `lookup` y `Leads/products-lookup` suman `PrimaryImageId` e `ImageCount`.
 
 ---
 

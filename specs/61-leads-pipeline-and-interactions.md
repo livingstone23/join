@@ -5,6 +5,7 @@
 > **Date:** 2026-10-16
 > **Objective:** Registrar prospectos (leads) sobre una persona, llevarlos por las etapas del embudo de la empresa, registrar cada contacto con comentarios y productos ofrecidos, y permitir dejarlos inactivos para que otro usuario los retome. Ganar y perder quedan en SPEC 63; documentos en SPEC 62.
 > **Origen:** diseño del módulo de clientes (2026-10-16, vistas "Leads", "Nuevo lead" y "Detalle").
+> **Ajuste por SPEC 72 (2026-10-19):** un correo enviado y asociado a un lead abierto se registra como `LeadInteraction` de tipo `EMAIL` (columna nueva `PersonEmailMessageId`), y la línea de tiempo devuelve `EmailMessageId` para abrirlo.
 
 ---
 
