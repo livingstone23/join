@@ -95,6 +95,16 @@ ASP.NET Core Identity (`ApplicationUser`/`ApplicationRole`, GUID keys) + JWT bea
 
 - `CustomWebApplicationFactory` (`tests/IntegrationTests/CustomWebApplicationFactory.cs`) spins up an ephemeral PostgreSQL (`postgres:17`) via Testcontainers per fixture and mocks `IEmailService` so nothing hits a real network. Building the host is guarded by a static `_hostBuildLock`: Serilog's `Log.Logger` is a static singleton, and `Program.Main` (re-invoked by every `WebApplicationFactory<Program>` instance) reassigns and freezes it — concurrent factory construction across xUnit test classes throws `InvalidOperationException: The logger is already frozen` without that lock. Keep the lock if you touch this file.
 
+## `/spec-impl` test rule
+
+When a spec requires new unit tests, run and analyze **only** the new tests + the existing tests that touch the same object/class. Do NOT run the full unit / integration test suite — the user runs that themselves. Apply these filters:
+
+- New test class: run its full test set (`FullyQualifiedName~NewClassName`).
+- Tests of an existing object touched by the spec (e.g. the command handler extended with a new field): run that class's tests too (`FullyQualifiedName~ExistingClassName`).
+- Tests for unrelated handlers / entities: skip — the user audits them.
+- Report counts per filter (passed / failed / skipped) so the user can decide whether to run the rest.
+- Integration tests run only when the spec explicitly asks for them (`Acceptance #… — integración para 1–N`); same scoped filter.
+
 ## API surface
 
 Controllers live under `src/4.Services.WebApi/Controllers/{Admin|Security|Messaging}`. In Development, OpenAPI JSON is at `/openapi/v1.json` and the Scalar UI at `/scalar/v1` (root `/` redirects there). Health checks: `/health/ready` (JSON UI-formatted) and `/health-ui`. See `CURL_REQUESTS.md` / `POSTMAN_CURL.txt` for example requests against each endpoint, including the required `X-Company-Id` header.
