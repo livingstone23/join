@@ -1,6 +1,6 @@
 # SPEC 66 — Clientes: registrar los cambios de etapa en el historial, con comentario opcional
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 55 (clientes, `CustomerStatusHistory`, `PUT /Customers/{id}`), SPEC 63 (etapas de cliente post-venta). Rama de trabajo: `spec-66-customer-stage-change-history`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Que cada cambio de etapa de un cliente (por ejemplo "Cliente" → "Recurrente") quede en su historial, con quién lo hizo, cuándo, de qué etapa a cuál y un comentario opcional, y se vea en el "Historial de estados" del detalle del cliente (FE-32).
