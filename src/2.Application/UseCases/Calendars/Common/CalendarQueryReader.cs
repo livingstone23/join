@@ -100,8 +100,22 @@ public sealed class CalendarQueryReader(ICalendarRecurrenceExpander expander)
         e.ProjectId,
         e.StatusChangedUtc,
         e.StatusChangedByUserId,
-        e.Created AS CreatedAt
+        e.Created AS CreatedAt,
+        NULLIF(CASE
+                    WHEN p.PersonType = 2 AND NULLIF(p.CommercialName, '') IS NOT NULL THEN p.CommercialName
+                    ELSE CONCAT_WS(' ', NULLIF(p.FirstName, ''), NULLIF(p.MiddleName, ''), NULLIF(p.LastName, ''), NULLIF(p.SecondLastName, ''))
+                END, '') AS RequesterPersonName,
+        cust.CustomerCode AS CustomerCode,
+        cust.IsActive AS IsCustomerActive
         {EventJoins}
+        LEFT JOIN Admin.Persons p
+            ON p.Id = e.RequesterPersonId
+           AND p.CompanyId = e.CompanyId
+           AND p.GcRecord = 0
+        LEFT JOIN Customer.Customers cust
+            ON cust.Id = e.CustomerId
+           AND cust.CompanyId = e.CompanyId
+           AND cust.GcRecord = 0
         WHERE e.CompanyId = @TenantId
           AND e.GcRecord = 0
           AND e.Id = @Id;
@@ -376,7 +390,18 @@ public sealed record CalendarEventDetailRow : CalendarEventRow
 {
     public string? Description { get; init; }
     public Guid? RequesterPersonId { get; init; }
+
+    /// <summary> Person full name (commercial name for legal persons). SPEC 67. </summary>
+    public string? RequesterPersonName { get; init; }
+
     public Guid? CustomerId { get; init; }
+
+    /// <summary> Customer code (SPEC 67); <c>null</c> when the activity has no customer. </summary>
+    public string? CustomerCode { get; init; }
+
+    /// <summary> Whether the linked customer is active (SPEC 67); <c>null</c> when there is no customer. </summary>
+    public bool? IsCustomerActive { get; init; }
+
     public Guid? TicketId { get; init; }
     public Guid? ProjectId { get; init; }
     public DateTime? StatusChangedUtc { get; init; }
