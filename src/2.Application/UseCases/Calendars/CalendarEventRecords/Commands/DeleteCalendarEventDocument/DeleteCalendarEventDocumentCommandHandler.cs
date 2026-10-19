@@ -1,7 +1,6 @@
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
-using JOIN.Application.UseCases.Calendars.CalendarActivityIndex;
 using JOIN.Application.UseCases.Calendars.Common;
 using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
@@ -10,14 +9,15 @@ using MediatR;
 namespace JOIN.Application.UseCases.Calendars.CalendarEventRecords.Commands;
 
 /// <summary>
-/// SPEC 69 — handles <see cref="DeleteCalendarEventDocumentCommand"/>: verifies the document exists in the
-/// current tenant, soft-deletes it with the reason and writes the <c>DocumentDeleted</c> log row. The
-/// foreign-tenant probe answers the same code as the already-deleted one.
+/// SPEC 69 — handles <see cref="DeleteCalendarEventDocumentCommand"/>: the document must belong to the route's activity
+/// in the current tenant (otherwise <c>CALENDAR_DOCUMENT_NOT_FOUND</c>), must not be deleted yet
+/// (<c>CALENDAR_RECORD_ALREADY_DELETED</c>) and its activity must be visible (rule 5). Soft-deletes it with the
+/// reason and writes the <c>DocumentDeleted</c> log row with the reason in <c>Notes</c>.
 /// </summary>
 public sealed class DeleteCalendarEventDocumentCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
-    CalendarActivityVisibility visibility,
+    CalendarEventRecordsAccess access,
     CalendarEventLogWriter logWriter)
     : IRequestHandler<DeleteCalendarEventDocumentCommand, Response<bool>>
 {
@@ -33,10 +33,13 @@ public sealed class DeleteCalendarEventDocumentCommandHandler(
             .GetAllIncludingDeletedAsync(x => x.Id == request.DocumentId))
             .FirstOrDefault();
 
-        if (document is null || document.GcRecord != 0)
+        if (document is null
+            || document.GcRecord != 0
+            || document.CompanyId != currentUserService.CompanyId
+            || document.CalendarEventId != request.CalendarEventId)
         {
             return Response<bool>.Error(CalendarErrorCodes.DocumentNotFound,
-                ["The document does not exist in the current tenant."]);
+                ["The document does not exist on this activity in the current tenant."]);
         }
 
         if (document.DeletedUtc is not null)
@@ -45,14 +48,14 @@ public sealed class DeleteCalendarEventDocumentCommandHandler(
                 ["The document has already been deleted."]);
         }
 
-        var access = await visibility.ResolveEventAccessAsync(document.CalendarEventId, cancellationToken);
-        if (!access.IsFoundAndVisible)
+        var eventAccess = await access.ResolveAsync(document.CalendarEventId, cancellationToken);
+        if (!eventAccess.IsFoundAndVisible)
         {
             return Response<bool>.Error(CalendarErrorCodes.EventNotFound,
                 ["The calendar activity was not found or is not visible."]);
         }
 
-        var calendarEvent = access.CalendarEvent!;
+        var calendarEvent = eventAccess.CalendarEvent!;
         var webChannel = (await unitOfWork.GetRepository<CommunicationChannel>()
             .GetAllIncludingDeletedAsync(x => x.Code == CommunicationChannelCodes.Web && x.GcRecord == 0))
             .FirstOrDefault();

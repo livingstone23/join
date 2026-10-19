@@ -12,8 +12,9 @@ namespace JOIN.Services.WebApi.Controllers.Calendars;
 /// <summary>
 /// SPEC 69 — per-company calendar attachment limits (regla 7). The endpoint lives under
 /// <c>CalendarSettings</c> (the "Adjuntos" tab in the calendar configuration page), so the resource is the
-/// same; the route is <c>/api/v1/CalendarAttachmentSettings</c>. <c>POST</c> / <c>PUT</c> require
-/// <c>CalendarSettings.CanUpdate</c>; the default seed creates the row for every new company.
+/// same; the route is <c>/api/v1/CalendarAttachmentSettings</c>. Flags follow the HTTP verb: <c>POST</c> needs
+/// <c>CalendarSettings.CanCreate</c> and <c>PUT</c> <c>CalendarSettings.CanUpdate</c>; the default seed creates the
+/// row for every new company, so the screen normally only uses <c>GET</c> and <c>PUT</c>.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]

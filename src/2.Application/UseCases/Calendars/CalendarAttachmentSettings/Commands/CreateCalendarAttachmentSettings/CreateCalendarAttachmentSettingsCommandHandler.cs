@@ -33,7 +33,7 @@ public sealed class CreateCalendarAttachmentSettingsCommandHandler(
         if (activeExists)
         {
             return Response<CalendarAttachmentSettingsDto>.Error(
-                "CALENDAR_ATTACHMENT_SETTINGS_ALREADY_EXISTS",
+                CalendarErrorCodes.AttachmentSettingsAlreadyExists,
                 ["An active calendar attachment settings row already exists for this company."]);
         }
 

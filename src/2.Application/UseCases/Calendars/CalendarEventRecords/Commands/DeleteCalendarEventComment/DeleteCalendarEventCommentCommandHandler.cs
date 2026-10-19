@@ -1,7 +1,6 @@
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
-using JOIN.Application.UseCases.Calendars.CalendarActivityIndex;
 using JOIN.Application.UseCases.Calendars.Common;
 using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
@@ -10,14 +9,15 @@ using MediatR;
 namespace JOIN.Application.UseCases.Calendars.CalendarEventRecords.Commands;
 
 /// <summary>
-/// SPEC 69 — handles <see cref="DeleteCalendarEventCommentCommand"/>: verifies the comment exists in the
-/// current tenant, soft-deletes it with the reason and writes the <c>CommentDeleted</c> log row. Foreign-tenant
-/// and already-deleted probes answer the same code (404 vs 409).
+/// SPEC 69 — handles <see cref="DeleteCalendarEventCommentCommand"/>: the comment must belong to the route's activity
+/// in the current tenant (otherwise <c>CALENDAR_COMMENT_NOT_FOUND</c>), must not be deleted yet
+/// (<c>CALENDAR_RECORD_ALREADY_DELETED</c>) and its activity must be visible (rule 5). Soft-deletes it with the
+/// reason and writes the <c>CommentDeleted</c> log row with the reason in <c>Notes</c>.
 /// </summary>
 public sealed class DeleteCalendarEventCommentCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
-    CalendarActivityVisibility visibility,
+    CalendarEventRecordsAccess access,
     CalendarEventLogWriter logWriter)
     : IRequestHandler<DeleteCalendarEventCommentCommand, Response<bool>>
 {
@@ -33,10 +33,13 @@ public sealed class DeleteCalendarEventCommentCommandHandler(
             .GetAllIncludingDeletedAsync(x => x.Id == request.CommentId))
             .FirstOrDefault();
 
-        if (comment is null || comment.GcRecord != 0)
+        if (comment is null
+            || comment.GcRecord != 0
+            || comment.CompanyId != currentUserService.CompanyId
+            || comment.CalendarEventId != request.CalendarEventId)
         {
             return Response<bool>.Error(CalendarErrorCodes.CommentNotFound,
-                ["The comment does not exist in the current tenant."]);
+                ["The comment does not exist on this activity in the current tenant."]);
         }
 
         if (comment.DeletedUtc is not null)
@@ -47,14 +50,14 @@ public sealed class DeleteCalendarEventCommentCommandHandler(
 
         // The activity must still be visible to the current user: a user who lost the flag mid-life still
         // cannot delete someone else's comment through this endpoint.
-        var access = await visibility.ResolveEventAccessAsync(comment.CalendarEventId, cancellationToken);
-        if (!access.IsFoundAndVisible)
+        var eventAccess = await access.ResolveAsync(comment.CalendarEventId, cancellationToken);
+        if (!eventAccess.IsFoundAndVisible)
         {
             return Response<bool>.Error(CalendarErrorCodes.EventNotFound,
                 ["The calendar activity was not found or is not visible."]);
         }
 
-        var calendarEvent = access.CalendarEvent!;
+        var calendarEvent = eventAccess.CalendarEvent!;
         var webChannel = (await unitOfWork.GetRepository<CommunicationChannel>()
             .GetAllIncludingDeletedAsync(x => x.Code == CommunicationChannelCodes.Web && x.GcRecord == 0))
             .FirstOrDefault();

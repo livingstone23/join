@@ -41,7 +41,7 @@ public class CalendarEventRecordsController(ISender sender) : ControllerBase
     [HttpDelete("comments/{commentId:guid}")]
     [ProducesResponseType(typeof(Response<bool>), StatusCodes.Status200OK)]
     public async Task<IActionResult> DeleteComment(Guid eventId, Guid commentId, [FromBody] DeleteCommentBody body, CancellationToken cancellationToken) =>
-        this.ToResult(await sender.Send(new DeleteCalendarEventCommentCommand(commentId, body.Reason), cancellationToken));
+        this.ToResult(await sender.Send(new DeleteCalendarEventCommentCommand(eventId, commentId, body.Reason), cancellationToken));
 
     /// <summary> Documents of the activity; pass <c>commentId</c> to filter by one of its comments. </summary>
     [HttpGet("documents")]
@@ -82,7 +82,7 @@ public class CalendarEventRecordsController(ISender sender) : ControllerBase
     [HttpDelete("documents/{documentId:guid}")]
     [ProducesResponseType(typeof(Response<bool>), StatusCodes.Status200OK)]
     public async Task<IActionResult> DeleteDocument(Guid eventId, Guid documentId, [FromBody] DeleteCommentBody body, CancellationToken cancellationToken) =>
-        this.ToResult(await sender.Send(new DeleteCalendarEventDocumentCommand(documentId, body.Reason), cancellationToken));
+        this.ToResult(await sender.Send(new DeleteCalendarEventDocumentCommand(eventId, documentId, body.Reason), cancellationToken));
 
     /// <summary> Streams the file from the provider that stored it. Requires
     /// <c>CalendarActivityRecords.CanDownload</c> (plan §10). The activity visibility (regla 5) is enforced by

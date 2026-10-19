@@ -235,6 +235,8 @@ using (var scope = app.Services.CreateScope())
             await seeder.SeedTicketAttachmentSettingsDefaultsAsync();
             // SPEC 62: every company gets its lead attachment limits (missing rows only).
             await seeder.SeedLeadAttachmentSettingsDefaultsAsync();
+            // SPEC 69: every company gets its calendar attachment limits (missing rows only).
+            await seeder.SeedCalendarAttachmentSettingsDefaultsAsync();
 
             if (app.Environment.IsDevelopment())
             {

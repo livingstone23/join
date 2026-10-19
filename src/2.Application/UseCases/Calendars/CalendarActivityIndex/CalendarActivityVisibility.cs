@@ -52,8 +52,9 @@ public sealed class CalendarActivityVisibility(IUnitOfWork unitOfWork, ICurrentU
 
     /// <summary>
     /// SPEC 69 — can the current user see the activity (rule 5)? Owner always; otherwise the
-    /// <c>CanViewOthersActivities</c> flag. The Panel's <c>CalendarOthers.CanRead</c> rule is enforced by the
-    /// controller / handler layer separately when relevant.
+    /// <c>CanViewOthersActivities</c> flag. An activity that exists but fails both checks comes back as
+    /// <see cref="CalendarActivityAccessResult.Hidden"/>, so <c>CalendarEventRecordsAccess</c> can still grant
+    /// it through the Panel's <c>CalendarOthers.CanRead</c>.
     /// </summary>
     public async Task<CalendarActivityAccessResult> ResolveEventAccessAsync(Guid eventId, CancellationToken cancellationToken)
     {
@@ -74,7 +75,7 @@ public sealed class CalendarActivityVisibility(IUnitOfWork unitOfWork, ICurrentU
         var visible = calendarEvent.OwnerUserId == context.CurrentUserId || context.CanViewOthersActivities;
         return visible
             ? CalendarActivityAccessResult.Visible(calendarEvent, context.CurrentUserId)
-            : CalendarActivityAccessResult.NotFound();
+            : CalendarActivityAccessResult.Hidden(calendarEvent, context.CurrentUserId);
     }
 }
 
@@ -94,6 +95,8 @@ public sealed record CalendarActivityAccessResult(bool Found, bool CanRead, Cale
     public static CalendarActivityAccessResult NotFound() => new(false, false, null, Guid.Empty);
     public static CalendarActivityAccessResult Visible(CalendarEvent calendarEvent, Guid currentUserId) =>
         new(true, true, calendarEvent, currentUserId);
+    public static CalendarActivityAccessResult Hidden(CalendarEvent calendarEvent, Guid currentUserId) =>
+        new(true, false, calendarEvent, currentUserId);
 
     public bool IsFoundAndVisible => Found && CanRead && CalendarEvent is not null;
 }

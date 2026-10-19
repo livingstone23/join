@@ -1,7 +1,6 @@
 using Dapper;
 using JOIN.Application.Common;
 using JOIN.Application.Interface;
-using JOIN.Application.UseCases.Calendars.CalendarActivityIndex;
 using JOIN.Application.UseCases.Calendars.Common;
 using MediatR;
 
@@ -12,11 +11,12 @@ namespace JOIN.Application.UseCases.Calendars.CalendarEventRecords.Queries;
 /// visibility (regla 5), pulls the row with Dapper (queries read through <c>ISqlConnectionFactory</c> per
 /// the project convention), and opens the file with the provider that originally stored it. The provider is
 /// resolved by the <see cref="StorageProviderKind"/> persisted on the row, so a record written to local
-/// storage still streams from local even if the environment switches to R2.
+/// storage still streams from local even if the environment switches to R2. A soft-deleted document no longer
+/// downloads (rule 4): it answers <c>CALENDAR_DOCUMENT_NOT_FOUND</c>.
 /// </summary>
 public sealed class DownloadCalendarEventDocumentQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    CalendarActivityVisibility visibility,
+    CalendarEventRecordsAccess access,
     IFileStorageResolver fileStorageResolver)
     : IRequestHandler<DownloadCalendarEventDocumentQuery, Response<CalendarEventDocumentDownloadResult>>
 {
@@ -24,8 +24,8 @@ public sealed class DownloadCalendarEventDocumentQueryHandler(
         DownloadCalendarEventDocumentQuery request,
         CancellationToken cancellationToken)
     {
-        var access = await visibility.ResolveEventAccessAsync(request.EventId, cancellationToken);
-        if (!access.IsFoundAndVisible)
+        var eventAccess = await access.ResolveAsync(request.EventId, cancellationToken);
+        if (!eventAccess.IsFoundAndVisible)
         {
             return Response<CalendarEventDocumentDownloadResult>.Error(
                 CalendarErrorCodes.DocumentNotFound,
@@ -39,12 +39,13 @@ public sealed class DownloadCalendarEventDocumentQueryHandler(
             WHERE d.Id = @Id
               AND d.CalendarEventId = @EventId
               AND d.CompanyId = @CompanyId
-              AND d.GcRecord = 0;
+              AND d.GcRecord = 0
+              AND d.DeletedUtc IS NULL;
             """;
 
         var row = await connection.QuerySingleOrDefaultAsync<DownloadRow>(new CommandDefinition(
             sql,
-            new { Id = request.DocumentId, request.EventId, CompanyId = access.CalendarEvent!.CompanyId },
+            new { Id = request.DocumentId, request.EventId, CompanyId = eventAccess.CalendarEvent!.CompanyId },
             cancellationToken: cancellationToken));
 
         if (row is null)

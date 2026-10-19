@@ -25,11 +25,11 @@ public sealed class DeleteCalendarEventCommentCommandHandlerTests
         var handler = new DeleteCalendarEventCommentCommandHandler(
             context.UnitOfWorkMock.Object,
             context.CurrentUserServiceMock.Object,
-            context.Visibility,
+            context.Access,
             new CalendarEventLogWriter(context.UnitOfWorkMock.Object));
 
         var response = await handler.Handle(
-            new DeleteCalendarEventCommentCommand(Guid.NewGuid(), "off-topic"),
+            new DeleteCalendarEventCommentCommand(context.EventId, Guid.NewGuid(), "off-topic"),
             CancellationToken.None);
 
         response.IsSuccess.Should().BeFalse();
@@ -56,11 +56,11 @@ public sealed class DeleteCalendarEventCommentCommandHandlerTests
         var handler = new DeleteCalendarEventCommentCommandHandler(
             context.UnitOfWorkMock.Object,
             context.CurrentUserServiceMock.Object,
-            context.Visibility,
+            context.Access,
             new CalendarEventLogWriter(context.UnitOfWorkMock.Object));
 
         var response = await handler.Handle(
-            new DeleteCalendarEventCommentCommand(comment.Id, "again"),
+            new DeleteCalendarEventCommentCommand(context.EventId, comment.Id, "again"),
             CancellationToken.None);
 
         response.IsSuccess.Should().BeFalse();
@@ -85,11 +85,11 @@ public sealed class DeleteCalendarEventCommentCommandHandlerTests
         var handler = new DeleteCalendarEventCommentCommandHandler(
             context.UnitOfWorkMock.Object,
             context.CurrentUserServiceMock.Object,
-            context.Visibility,
+            context.Access,
             new CalendarEventLogWriter(context.UnitOfWorkMock.Object));
 
         var response = await handler.Handle(
-            new DeleteCalendarEventCommentCommand(comment.Id, "audit"),
+            new DeleteCalendarEventCommentCommand(context.EventId, comment.Id, "audit"),
             CancellationToken.None);
 
         response.IsSuccess.Should().BeFalse();
@@ -115,11 +115,11 @@ public sealed class DeleteCalendarEventCommentCommandHandlerTests
         var handler = new DeleteCalendarEventCommentCommandHandler(
             context.UnitOfWorkMock.Object,
             context.CurrentUserServiceMock.Object,
-            context.Visibility,
+            context.Access,
             new CalendarEventLogWriter(context.UnitOfWorkMock.Object));
 
         var response = await handler.Handle(
-            new DeleteCalendarEventCommentCommand(comment.Id, "  audit reason  "),
+            new DeleteCalendarEventCommentCommand(context.EventId, comment.Id, "  audit reason  "),
             CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
@@ -133,5 +133,65 @@ public sealed class DeleteCalendarEventCommentCommandHandlerTests
         log.CalendarEventCommentId.Should().Be(comment.Id);
         log.Notes.Should().Be("audit reason");
         context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary> The comment belongs to another activity than the route's → <c>CALENDAR_COMMENT_NOT_FOUND</c>. </summary>
+    [Fact]
+    public async Task Handle_WhenCommentBelongsToAnotherActivity_RespondsCommentNotFound()
+    {
+        var context = new Spec69CalendarEventRecordsContext();
+        context.TrackWrites();
+        var comment = new CalendarEventComment
+        {
+            CompanyId = context.CompanyId,
+            CalendarEventId = Guid.NewGuid(),
+            AuthorUserId = context.ActorUserId,
+            Body = "elsewhere",
+            CreatedUtc = DateTime.UtcNow
+        };
+        context.CalendarEventCommentRepositoryMock.SetupRows(new[] { comment });
+
+        var handler = new DeleteCalendarEventCommentCommandHandler(
+            context.UnitOfWorkMock.Object,
+            context.CurrentUserServiceMock.Object,
+            context.Access,
+            new CalendarEventLogWriter(context.UnitOfWorkMock.Object));
+
+        var response = await handler.Handle(
+            new DeleteCalendarEventCommentCommand(context.EventId, comment.Id, "audit"),
+            CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be(CalendarErrorCodes.CommentNotFound);
+        context.CapturedCommentUpdates.Should().BeEmpty();
+    }
+
+    /// <summary> The comment belongs to another company → <c>CALENDAR_COMMENT_NOT_FOUND</c>. </summary>
+    [Fact]
+    public async Task Handle_WhenCommentBelongsToAnotherCompany_RespondsCommentNotFound()
+    {
+        var context = new Spec69CalendarEventRecordsContext();
+        var comment = new CalendarEventComment
+        {
+            CompanyId = Guid.NewGuid(),
+            CalendarEventId = context.EventId,
+            AuthorUserId = context.ActorUserId,
+            Body = "foreign",
+            CreatedUtc = DateTime.UtcNow
+        };
+        context.CalendarEventCommentRepositoryMock.SetupRows(new[] { comment });
+
+        var handler = new DeleteCalendarEventCommentCommandHandler(
+            context.UnitOfWorkMock.Object,
+            context.CurrentUserServiceMock.Object,
+            context.Access,
+            new CalendarEventLogWriter(context.UnitOfWorkMock.Object));
+
+        var response = await handler.Handle(
+            new DeleteCalendarEventCommentCommand(context.EventId, comment.Id, "audit"),
+            CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be(CalendarErrorCodes.CommentNotFound);
     }
 }

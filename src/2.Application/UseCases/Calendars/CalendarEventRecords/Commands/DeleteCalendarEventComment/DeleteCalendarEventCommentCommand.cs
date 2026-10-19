@@ -8,5 +8,5 @@ namespace JOIN.Application.UseCases.Calendars.CalendarEventRecords.Commands;
 /// returned by the API; the row stays for the bitácora with the reason in <c>Notes</c>. Deleting a comment does
 /// not delete its documents (rule 11).
 /// </summary>
-public sealed record DeleteCalendarEventCommentCommand(Guid CommentId, string Reason)
+public sealed record DeleteCalendarEventCommentCommand(Guid CalendarEventId, Guid CommentId, string Reason)
     : ITransactionalCommand<Response<bool>>;

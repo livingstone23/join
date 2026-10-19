@@ -26,7 +26,7 @@ public sealed class DownloadCalendarEventDocumentQueryHandlerTests
         var context = new Spec69CalendarEventRecordsContext(ownerCanSeeEvent: false);
         var connection = new FakeSqlConnectionFactory();
         var resolver = new Mock<IFileStorageResolver>();
-        var handler = new DownloadCalendarEventDocumentQueryHandler(connection, context.Visibility, resolver.Object);
+        var handler = new DownloadCalendarEventDocumentQueryHandler(connection, context.Access, resolver.Object);
 
         var response = await handler.Handle(
             new DownloadCalendarEventDocumentQuery(context.EventId, Guid.NewGuid()),
@@ -43,7 +43,7 @@ public sealed class DownloadCalendarEventDocumentQueryHandlerTests
         var context = new Spec69CalendarEventRecordsContext();
         var connection = new FakeSqlConnectionFactory();
         var resolver = new Mock<IFileStorageResolver>();
-        var handler = new DownloadCalendarEventDocumentQueryHandler(connection, context.Visibility, resolver.Object);
+        var handler = new DownloadCalendarEventDocumentQueryHandler(connection, context.Access, resolver.Object);
 
         var response = await handler.Handle(
             new DownloadCalendarEventDocumentQuery(context.EventId, Guid.NewGuid()),
@@ -70,7 +70,7 @@ public sealed class DownloadCalendarEventDocumentQueryHandlerTests
         var resolver = new Mock<IFileStorageResolver>();
         resolver.Setup(x => x.Resolve(StorageProviderKind.CloudflareR2)).Returns((IFileStorageService?)null);
 
-        var handler = new DownloadCalendarEventDocumentQueryHandler(connection, context.Visibility, resolver.Object);
+        var handler = new DownloadCalendarEventDocumentQueryHandler(connection, context.Access, resolver.Object);
         var response = await handler.Handle(
             new DownloadCalendarEventDocumentQuery(context.EventId, Guid.NewGuid()),
             CancellationToken.None);
@@ -99,7 +99,7 @@ public sealed class DownloadCalendarEventDocumentQueryHandlerTests
         var resolver = new Mock<IFileStorageResolver>();
         resolver.Setup(x => x.Resolve(StorageProviderKind.Local)).Returns(localService.Object);
 
-        var handler = new DownloadCalendarEventDocumentQueryHandler(connection, context.Visibility, resolver.Object);
+        var handler = new DownloadCalendarEventDocumentQueryHandler(connection, context.Access, resolver.Object);
         var response = await handler.Handle(
             new DownloadCalendarEventDocumentQuery(context.EventId, Guid.NewGuid()),
             CancellationToken.None);
@@ -129,7 +129,7 @@ public sealed class DownloadCalendarEventDocumentQueryHandlerTests
         var resolver = new Mock<IFileStorageResolver>();
         resolver.Setup(x => x.Resolve(StorageProviderKind.Local)).Returns(localService.Object);
 
-        var handler = new DownloadCalendarEventDocumentQueryHandler(connection, context.Visibility, resolver.Object);
+        var handler = new DownloadCalendarEventDocumentQueryHandler(connection, context.Access, resolver.Object);
         var response = await handler.Handle(
             new DownloadCalendarEventDocumentQuery(context.EventId, Guid.NewGuid()),
             CancellationToken.None);
@@ -138,5 +138,6 @@ public sealed class DownloadCalendarEventDocumentQueryHandlerTests
         response.Data!.OriginalName.Should().Be("x.pdf");
         response.Data.ContentType.Should().Be("application/pdf");
         response.Data.Content.Should().BeSameAs(stream);
+        connection.LastCommandText.Should().Contain("d.DeletedUtc IS NULL", "a soft-deleted document no longer downloads");
     }
 }

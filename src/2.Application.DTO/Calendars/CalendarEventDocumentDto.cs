@@ -1,8 +1,9 @@
 namespace JOIN.Application.DTO.Calendars;
 
 /// <summary>
-/// SPEC 69 — one document attached to a calendar activity. After delete the row stays in the table but the
-/// API no longer returns it for download (rule 4); the file stays on disk.
+/// SPEC 69 — one document attached to a calendar activity. After delete it is still listed with
+/// <see cref="IsDeleted"/> and the soft-delete metadata, but it can no longer be downloaded (rule 4); the file
+/// stays on disk.
 /// </summary>
 public record CalendarEventDocumentDto
 {
@@ -18,4 +19,8 @@ public record CalendarEventDocumentDto
     public string UploadedByUserName { get; init; } = string.Empty;
     public DateTime CreatedAt { get; init; }
     public bool IsDeleted { get; init; }
+    public Guid? DeletedByUserId { get; init; }
+    public string? DeletedByUserName { get; init; }
+    public DateTime? DeletedUtc { get; init; }
+    public string? DeleteReason { get; init; }
 }

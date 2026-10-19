@@ -145,4 +145,11 @@ public record CalendarEventLogDto
     public string? ActorIdentifier { get; init; }
     public string? Notes { get; init; }
     public DateTime OccurredUtc { get; init; }
+
+    /// <summary> SPEC 69 — the comment of a <c>CommentAdded</c> / <c>CommentDeleted</c> row (and the comment a
+    /// <c>DocumentAdded</c> was attached to); null otherwise. </summary>
+    public Guid? CommentId { get; init; }
+
+    /// <summary> SPEC 69 — the document of a <c>DocumentAdded</c> / <c>DocumentDeleted</c> row; null otherwise. </summary>
+    public Guid? DocumentId { get; init; }
 }

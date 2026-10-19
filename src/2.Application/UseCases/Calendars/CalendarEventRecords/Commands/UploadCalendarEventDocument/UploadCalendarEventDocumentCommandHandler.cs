@@ -3,7 +3,6 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Calendars;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
-using JOIN.Application.UseCases.Calendars.CalendarActivityIndex;
 using JOIN.Application.UseCases.Calendars.Common;
 using JOIN.Domain.Common;
 using JOIN.Domain.Enums;
@@ -22,7 +21,7 @@ namespace JOIN.Application.UseCases.Calendars.CalendarEventRecords.Commands;
 public sealed class UploadCalendarEventDocumentCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
-    CalendarActivityVisibility visibility,
+    CalendarEventRecordsAccess access,
     IFileStorageResolver fileStorageResolver,
     CalendarEventLogWriter logWriter)
     : IRequestHandler<UploadCalendarEventDocumentCommand, Response<CalendarEventDocumentDto>>
@@ -37,14 +36,14 @@ public sealed class UploadCalendarEventDocumentCommandHandler(
                 ["The authenticated user could not be resolved."]);
         }
 
-        var access = await visibility.ResolveEventAccessAsync(request.CalendarEventId, cancellationToken);
-        if (!access.IsFoundAndVisible)
+        var eventAccess = await access.ResolveAsync(request.CalendarEventId, cancellationToken);
+        if (!eventAccess.IsFoundAndVisible)
         {
             return Response<CalendarEventDocumentDto>.Error(CalendarErrorCodes.EventNotFound,
                 ["The calendar activity was not found or is not visible."]);
         }
 
-        var calendarEvent = access.CalendarEvent!;
+        var calendarEvent = eventAccess.CalendarEvent!;
 
         var settings = (await unitOfWork.GetRepository<Domain.Calendars.CalendarAttachmentSettings>()
             .GetAllIncludingDeletedAsync(x => x.CompanyId == calendarEvent.CompanyId && x.GcRecord == 0))
@@ -75,7 +74,8 @@ public sealed class UploadCalendarEventDocumentCommandHandler(
                 [$"File size {sizeBytes} bytes exceeds the maximum allowed ({settings.MaxFileSizeBytes} bytes)."]);
         }
 
-        // Rule 7 — per-comment limit, when the document is attached to a comment.
+        // Rule 7 — per-comment limit, when the document is attached to a comment. Documents an administrator
+        // deleted no longer take a slot.
         if (request.CalendarEventCommentId is { } commentId)
         {
             var comment = (await unitOfWork.GetRepository<Domain.Calendars.CalendarEventComment>()
@@ -91,7 +91,9 @@ public sealed class UploadCalendarEventDocumentCommandHandler(
             }
 
             var liveForComment = (await unitOfWork.GetRepository<Domain.Calendars.CalendarEventDocument>()
-                .GetAllIncludingDeletedAsync(x => x.CalendarEventCommentId == commentId && x.GcRecord == 0))
+                .GetAllIncludingDeletedAsync(x => x.CalendarEventCommentId == commentId
+                    && x.GcRecord == 0
+                    && x.DeletedUtc == null))
                 .Count();
             if (liveForComment >= settings.MaxFilesPerComment)
             {

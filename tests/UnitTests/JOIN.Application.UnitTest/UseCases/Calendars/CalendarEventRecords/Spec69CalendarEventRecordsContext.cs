@@ -4,6 +4,7 @@ using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Interface.Persistence.Calendars;
 using JOIN.Application.UseCases.Calendars.CalendarActivityIndex;
+using JOIN.Application.UseCases.Calendars.CalendarEventRecords;
 using JOIN.Application.UnitTest.Common.TestDoubles;
 using JOIN.Domain.Calendars;
 using JOIN.Domain.Common;
@@ -88,8 +89,10 @@ internal sealed class Spec69CalendarEventRecordsContext
 
         ConfigureVisibility(ownerCanSeeEvent);
 
-        // Reusable visibility instance shared by every handler.
+        // Reusable visibility / rule 5 access instances shared by every handler. CalendarOthers.CanRead is
+        // denied unless a test calls GrantCalendarOthersRead.
         Visibility = new CalendarActivityVisibility(UnitOfWorkMock.Object, CurrentUserServiceMock.Object);
+        Access = new CalendarEventRecordsAccess(Visibility, PermissionServiceMock.Object, CurrentUserServiceMock.Object);
     }
 
     public Guid CompanyId { get; }
@@ -111,7 +114,21 @@ internal sealed class Spec69CalendarEventRecordsContext
     public Mock<IGenericRepository<CalendarEventLog>> CalendarEventLogRepositoryMock { get; } = new();
     public Mock<IGenericRepository<ApplicationUser>> ApplicationUserRepositoryMock { get; } = new();
 
+    public Mock<IPermissionService> PermissionServiceMock { get; } = new();
+
     public CalendarActivityVisibility Visibility { get; }
+
+    public CalendarEventRecordsAccess Access { get; }
+
+    /// <summary> The activity belongs to another user of the same company (rule 5 needs the flag or the Panel). </summary>
+    public void MakeEventForeign() => CalendarEvent.OwnerUserId = Guid.NewGuid();
+
+    /// <summary> Grants the Panel's <c>CalendarOthers.CanRead</c> to the current user. </summary>
+    public void GrantCalendarOthersRead() =>
+        PermissionServiceMock
+            .Setup(x => x.HasPermissionAsync(ActorUserId.ToString(), CompanyId.ToString(), "CalendarOthers", "GET",
+                PermissionFlags.CanRead))
+            .ReturnsAsync(true);
 
     /// <summary> Capture insert / update / delete calls so handlers can be asserted in tests. </summary>
     public List<CalendarEventComment> CapturedCommentInserts { get; } = new();

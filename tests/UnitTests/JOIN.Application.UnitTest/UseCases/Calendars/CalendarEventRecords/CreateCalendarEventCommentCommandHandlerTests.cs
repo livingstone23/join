@@ -23,7 +23,7 @@ public sealed class CreateCalendarEventCommentCommandHandlerTests
         var handler = new CreateCalendarEventCommentCommandHandler(
             context.UnitOfWorkMock.Object,
             context.CurrentUserServiceMock.Object,
-            context.Visibility,
+            context.Access,
             LogWriter(context));
 
         var response = await handler.Handle(
@@ -42,7 +42,7 @@ public sealed class CreateCalendarEventCommentCommandHandlerTests
         var handler = new CreateCalendarEventCommentCommandHandler(
             context.UnitOfWorkMock.Object,
             context.CurrentUserServiceMock.Object,
-            context.Visibility,
+            context.Access,
             LogWriter(context));
 
         var response = await handler.Handle(
@@ -66,7 +66,7 @@ public sealed class CreateCalendarEventCommentCommandHandlerTests
         var handler = new CreateCalendarEventCommentCommandHandler(
             context.UnitOfWorkMock.Object,
             context.CurrentUserServiceMock.Object,
-            context.Visibility,
+            context.Access,
             LogWriter(context));
 
         var response = await handler.Handle(

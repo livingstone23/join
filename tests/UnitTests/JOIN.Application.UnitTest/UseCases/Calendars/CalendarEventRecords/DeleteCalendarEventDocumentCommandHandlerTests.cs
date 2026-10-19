@@ -26,11 +26,11 @@ public sealed class DeleteCalendarEventDocumentCommandHandlerTests
         var handler = new DeleteCalendarEventDocumentCommandHandler(
             context.UnitOfWorkMock.Object,
             context.CurrentUserServiceMock.Object,
-            context.Visibility,
+            context.Access,
             new CalendarEventLogWriter(context.UnitOfWorkMock.Object));
 
         var response = await handler.Handle(
-            new DeleteCalendarEventDocumentCommand(Guid.NewGuid(), "audit"),
+            new DeleteCalendarEventDocumentCommand(context.EventId, Guid.NewGuid(), "audit"),
             CancellationToken.None);
 
         response.IsSuccess.Should().BeFalse();
@@ -61,11 +61,11 @@ public sealed class DeleteCalendarEventDocumentCommandHandlerTests
         var handler = new DeleteCalendarEventDocumentCommandHandler(
             context.UnitOfWorkMock.Object,
             context.CurrentUserServiceMock.Object,
-            context.Visibility,
+            context.Access,
             new CalendarEventLogWriter(context.UnitOfWorkMock.Object));
 
         var response = await handler.Handle(
-            new DeleteCalendarEventDocumentCommand(document.Id, "again"),
+            new DeleteCalendarEventDocumentCommand(context.EventId, document.Id, "again"),
             CancellationToken.None);
 
         response.IsSuccess.Should().BeFalse();
@@ -95,11 +95,11 @@ public sealed class DeleteCalendarEventDocumentCommandHandlerTests
         var handler = new DeleteCalendarEventDocumentCommandHandler(
             context.UnitOfWorkMock.Object,
             context.CurrentUserServiceMock.Object,
-            context.Visibility,
+            context.Access,
             new CalendarEventLogWriter(context.UnitOfWorkMock.Object));
 
         var response = await handler.Handle(
-            new DeleteCalendarEventDocumentCommand(document.Id, "  retention  "),
+            new DeleteCalendarEventDocumentCommand(context.EventId, document.Id, "  retention  "),
             CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
@@ -115,5 +115,40 @@ public sealed class DeleteCalendarEventDocumentCommandHandlerTests
         log.CalendarEventDocumentId.Should().Be(document.Id);
         log.Notes.Should().Be("retention");
         context.UnitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary> The document belongs to another activity than the route's → <c>CALENDAR_DOCUMENT_NOT_FOUND</c>. </summary>
+    [Fact]
+    public async Task Handle_WhenDocumentBelongsToAnotherActivity_RespondsDocumentNotFound()
+    {
+        var context = new Spec69CalendarEventRecordsContext();
+        context.TrackWrites();
+        var document = new CalendarEventDocument
+        {
+            CompanyId = context.CompanyId,
+            CalendarEventId = Guid.NewGuid(),
+            DocumentType = DocumentType.Pdf,
+            OriginalName = "elsewhere.pdf",
+            NewName = "elsewhere.pdf",
+            Path = "calendar/elsewhere",
+            ContentType = "application/pdf",
+            SizeBytes = 1,
+            UploadedByUserId = context.ActorUserId
+        };
+        context.CalendarEventDocumentRepositoryMock.SetupRows(new[] { document });
+
+        var handler = new DeleteCalendarEventDocumentCommandHandler(
+            context.UnitOfWorkMock.Object,
+            context.CurrentUserServiceMock.Object,
+            context.Access,
+            new CalendarEventLogWriter(context.UnitOfWorkMock.Object));
+
+        var response = await handler.Handle(
+            new DeleteCalendarEventDocumentCommand(context.EventId, document.Id, "audit"),
+            CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be(CalendarErrorCodes.DocumentNotFound);
+        context.CapturedDocumentUpdates.Should().BeEmpty();
     }
 }

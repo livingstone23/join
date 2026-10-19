@@ -23,6 +23,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
+using JOIN.Application.UseCases.Calendars.CalendarEventRecords.Queries;
 
 namespace JOIN.IntegrationTests.Calendars;
 
@@ -88,32 +89,120 @@ public sealed class Spec69CalendarActivityCommentsAndDocumentsPostgreSqlTests : 
     }
 
     /// <summary>
-    /// Acceptance #4 — the author cannot soft-delete without <c>CalendarActivityRecords.CanDelete</c>;
-    /// SuperAdmin does and the body stops being returned by the API while the row stays.
+    /// Acceptance #4 — the author (a member without <c>CalendarActivityRecords.CanDelete</c>) cannot delete their
+    /// comment (403); an administrator deletes it with a reason, the text stops being returned, the attached file
+    /// is kept in storage and the bitácora records <c>CommentDeleted</c> / <c>DocumentDeleted</c> with the reason.
     /// </summary>
     [Fact]
-    public async Task Delete_WithoutCanDelete_IsForbidden_AdminDeletesAndBodyHides()
+    public async Task Delete_AuthorIsForbidden_AdminDeletesWithReason_FileKeptAndJournaled()
     {
         var s = await SeedAsync();
-        var activityId = await s.CreateActivityAsync(title: "Demo", from: "2027-04-05T10:00:00-06:00", to: "2027-04-05T11:00:00-06:00");
-        var commentId = await CreateCommentAsync(s.OwnerClient, activityId, "first");
+        var (memberId, member) = await MemberAsync(s.CompanyId, "UsuarioSimple", canDownload: true);
+        var memberCalendarId = await CreateUserCalendarAsync(s.CompanyId, memberId, canViewOthers: false);
+        var activityId = await s.CreateActivityAsync("Demo", "2027-04-05T10:00:00-06:00", "2027-04-05T11:00:00-06:00",
+            ownerUserId: memberId, calendarId: memberCalendarId);
+        var commentId = await CreateCommentAsync(member, activityId, "first");
+        var upload = await UploadPdfAsync(member, $"/api/v1/CalendarEvents/{activityId}/documents", commentId, "kept.pdf");
+        upload.StatusCode.Should().Be(HttpStatusCode.OK);
+        var documentId = Data(await upload.Content.ReadAsStringAsync()).GetProperty("id").GetGuid();
 
-        // Owner cannot delete (no CanDelete flag).
-        var denied = await s.OwnerClient.DeleteAsync($"/api/v1/CalendarEvents/{activityId}/comments/{commentId}");
-        denied.IsSuccessStatusCode.Should().BeFalse();
+        (await DeleteWithReasonAsync(member, $"/api/v1/CalendarEvents/{activityId}/comments/{commentId}", "mine"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        // Admin can.
-        var bodyContent = new StringContent("{\"reason\":\"off-topic\"}", Encoding.UTF8, "application/json");
-        var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/v1/CalendarEvents/{activityId}/comments/{commentId}") { Content = bodyContent };
-        var ok = await s.AdminClient.SendAsync(request);
-        ok.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await DeleteWithReasonAsync(s.AdminClient, $"/api/v1/CalendarEvents/{activityId}/comments/{commentId}", "off-topic"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await DeleteWithReasonAsync(s.AdminClient, $"/api/v1/CalendarEvents/{activityId}/documents/{documentId}", "retention"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        var again = await DeleteWithReasonAsync(s.AdminClient, $"/api/v1/CalendarEvents/{activityId}/comments/{commentId}", "again");
+        again.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await again.Content.ReadAsStringAsync()).Should().Contain("CALENDAR_RECORD_ALREADY_DELETED");
 
-        // Subsequent list returns the row with Body = null and the reason.
-        var list = Data(EnsureSuccessContent(await s.OwnerClient.GetAsync($"/api/v1/CalendarEvents/{activityId}/comments")));
-        var item = list.EnumerateArray().Single();
+        var item = Data(EnsureSuccessContent(await member.GetAsync($"/api/v1/CalendarEvents/{activityId}/comments")))
+            .EnumerateArray().Single();
         item.GetProperty("body").ValueKind.Should().Be(JsonValueKind.Null);
         item.GetProperty("isDeleted").GetBoolean().Should().BeTrue();
         item.GetProperty("deleteReason").GetString().Should().Be("off-topic");
+        item.GetProperty("deletedByUserId").GetGuid().Should().Be(s.AdminId);
+        item.GetProperty("documents")[0].GetProperty("isDeleted").GetBoolean().Should().BeTrue();
+
+        // A deleted document no longer downloads, but the file stays in storage.
+        (await member.GetAsync($"/api/v1/CalendarEvents/{activityId}/documents/{documentId}/download"))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var row = await db.CalendarEventDocuments.IgnoreQueryFilters().SingleAsync(d => d.Id == documentId);
+            var storage = scope.ServiceProvider.GetRequiredService<IFileStorageResolver>().Resolve(row.StorageProvider);
+            await using var stream = await storage!.OpenReadAsync(row.Path, CancellationToken.None);
+            stream.Should().NotBeNull("the logical delete keeps the file");
+
+            var logs = await db.CalendarEventLogs.IgnoreQueryFilters()
+                .Where(l => l.CalendarEventId == activityId
+                    && (l.Action == CalendarEventLogAction.CommentDeleted || l.Action == CalendarEventLogAction.DocumentDeleted))
+                .ToListAsync();
+            logs.Should().ContainSingle(l => l.Action == CalendarEventLogAction.CommentDeleted
+                && l.CalendarEventCommentId == commentId && l.Notes == "off-topic");
+            logs.Should().ContainSingle(l => l.Action == CalendarEventLogAction.DocumentDeleted
+                && l.CalendarEventDocumentId == documentId && l.Notes == "retention");
+        }
+
+        // Item 14 — the activity log returns the new actions with their ids.
+        var history = Data(EnsureSuccessContent(await member.GetAsync($"/api/v1/CalendarEvents/{activityId}/logs")))
+            .EnumerateArray().ToList();
+        history.Should().Contain(l => l.GetProperty("action").GetString() == "CommentDeleted"
+            && l.GetProperty("commentId").GetGuid() == commentId);
+        history.Should().Contain(l => l.GetProperty("action").GetString() == "DocumentAdded"
+            && l.GetProperty("documentId").GetGuid() == documentId);
+    }
+
+    /// <summary>
+    /// Acceptance #2 — a comment on the series master is seen from the master (every unmodified occurrence); a
+    /// comment on the modified occurrence is seen only from it.
+    /// </summary>
+    [Fact]
+    public async Task Series_MasterCommentsAndExceptionCommentsAreSeparate()
+    {
+        var s = await SeedAsync();
+        var (masterId, exceptionId) = await s.CreateWeeklySeriesWithExceptionAsync();
+
+        await CreateCommentAsync(s.AdminClient, masterId, "on the series");
+        await CreateCommentAsync(s.AdminClient, exceptionId, "on the moved one");
+
+        var onMaster = Data(EnsureSuccessContent(await s.AdminClient.GetAsync($"/api/v1/CalendarEvents/{masterId}/comments")))
+            .EnumerateArray().Select(c => c.GetProperty("body").GetString()).ToList();
+        var onException = Data(EnsureSuccessContent(await s.AdminClient.GetAsync($"/api/v1/CalendarEvents/{exceptionId}/comments")))
+            .EnumerateArray().Select(c => c.GetProperty("body").GetString()).ToList();
+
+        onMaster.Should().Equal("on the series");
+        onException.Should().Equal("on the moved one");
+    }
+
+    /// <summary>
+    /// Acceptance #3 — a member comments on someone else's activity only with the SPEC 68 flag or with
+    /// <c>CalendarOthers.CanRead</c>; without either the activity answers 404.
+    /// </summary>
+    [Fact]
+    public async Task Visibility_ForeignActivity_NeedsFlagOrPanelRead()
+    {
+        var s = await SeedAsync();
+        var activityId = await s.CreateActivityAsync("Admin's", "2027-04-05T10:00:00-06:00", "2027-04-05T11:00:00-06:00");
+        var url = $"/api/v1/CalendarEvents/{activityId}/comments";
+
+        var (memberId, member) = await MemberAsync(s.CompanyId, "UsuarioSimple", canDownload: true);
+        var hidden = await member.PostAsJsonAsync(url, new { body = "hello" });
+        hidden.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await hidden.Content.ReadAsStringAsync()).Should().Contain("CALENDAR_EVENT_NOT_FOUND");
+        (await member.GetAsync(url)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        await CreateUserCalendarAsync(s.CompanyId, memberId, canViewOthers: true);
+        (await member.PostAsJsonAsync(url, new { body = "with the flag" })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var (_, panelReader) = await MemberAsync(s.CompanyId, "Coordinador", canDownload: true, panelRead: true);
+        (await panelReader.PostAsJsonAsync(url, new { body = "from the panel" })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var bodies = Data(EnsureSuccessContent(await s.AdminClient.GetAsync(url)))
+            .EnumerateArray().Select(c => c.GetProperty("body").GetString()).ToList();
+        bodies.Should().BeEquivalentTo("with the flag", "from the panel");
     }
 
     /// <summary>
@@ -148,6 +237,33 @@ public sealed class Spec69CalendarActivityCommentsAndDocumentsPostgreSqlTests : 
         var blocked = await UploadBytesAsync(s.OwnerClient, $"/api/v1/CalendarEvents/{activityId}/documents", commentId, "extra.pdf", "application/pdf", new byte[] { 0x25 });
         blocked.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await blocked.Content.ReadAsStringAsync()).Should().Contain("CALENDAR_DOCUMENT_LIMIT_PER_COMMENT");
+
+        // Daily quota: the company already uploaded 5 today; lower the quota to 6 and the 7th fails.
+        (await s.AdminClient.PutAsJsonAsync("/api/v1/CalendarAttachmentSettings", new
+        {
+            allowedDocumentTypes = 1 | 2 | 4 | 16,
+            maxFileSizeBytes = 10L * 1024 * 1024,
+            maxFilesPerComment = 5,
+            maxFilesPerDay = 6
+        })).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await UploadPdfAsync(s.OwnerClient, $"/api/v1/CalendarEvents/{activityId}/documents", null, "sixth.pdf"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        var perDay = await UploadPdfAsync(s.OwnerClient, $"/api/v1/CalendarEvents/{activityId}/documents", null, "seventh.pdf");
+        perDay.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await perDay.Content.ReadAsStringAsync()).Should().Contain("CALENDAR_DOCUMENT_LIMIT_PER_DAY");
+
+        // Without a live limits row nothing can be attached.
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var row = await db.CalendarAttachmentSettings.IgnoreQueryFilters()
+                .SingleAsync(x => x.CompanyId == s.CompanyId && x.GcRecord == 0);
+            row.GcRecord = 1;
+            await db.SaveChangesAsync();
+        }
+        var notConfigured = await UploadPdfAsync(s.OwnerClient, $"/api/v1/CalendarEvents/{activityId}/documents", null, "none.pdf");
+        notConfigured.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await notConfigured.Content.ReadAsStringAsync()).Should().Contain("CALENDAR_ATTACHMENT_SETTINGS_NOT_CONFIGURED");
     }
 
     /// <summary>
@@ -157,6 +273,34 @@ public sealed class Spec69CalendarActivityCommentsAndDocumentsPostgreSqlTests : 
     [Fact]
     public async Task Settings_NewCompanyIsBornWithDefaults_AndCanBeUpdated()
     {
+        // A company created through the catalog seeder (the company-creation hook) gets the default row, and the
+        // startup backfill fills a company that has none.
+        Guid bornId;
+        Guid backfilledId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var born = new Company { Name = $"JOIN-S69-N-{Guid.NewGuid():N}"[..20], TaxId = $"RUC{Guid.NewGuid():N}"[..16], IsActive = true, CreatedBy = Creator };
+            var backfilled = new Company { Name = $"JOIN-S69-B-{Guid.NewGuid():N}"[..20], TaxId = $"RUC{Guid.NewGuid():N}"[..16], IsActive = true, CreatedBy = Creator };
+            db.Companies.AddRange(born, backfilled);
+            await db.SaveChangesAsync();
+            bornId = born.Id;
+            backfilledId = backfilled.Id;
+
+            await scope.ServiceProvider.GetRequiredService<ICompanyCatalogSeeder>().SeedDefaultCatalogsForCompanyAsync(bornId);
+            await scope.ServiceProvider.GetRequiredService<JOIN.Persistence.DatabaseSeeder>().SeedCalendarAttachmentSettingsDefaultsAsync();
+        }
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var rows = await db.CalendarAttachmentSettings.IgnoreQueryFilters()
+                .Where(x => (x.CompanyId == bornId || x.CompanyId == backfilledId) && x.GcRecord == 0)
+                .ToListAsync();
+            rows.Should().HaveCount(2);
+            rows.Should().OnlyContain(r => r.AllowedDocumentTypes == CalendarAttachmentSettings.DefaultAllowedTypes
+                && r.MaxFileSizeBytes == 10L * 1024 * 1024 && r.MaxFilesPerComment == 5 && r.MaxFilesPerDay == 200);
+        }
+
         var s = await SeedAsync();
         var get = await s.AdminClient.GetAsync("/api/v1/CalendarAttachmentSettings");
         get.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -239,45 +383,84 @@ public sealed class Spec69CalendarActivityCommentsAndDocumentsPostgreSqlTests : 
     }
 
     /// <summary>
-    /// EXPLAIN — the comments list query anchors on the events table by index so the FK joins do not
-    /// degrade into sequential scans when the calendar grows.
+    /// Acceptance #6 — a role without <c>CalendarActivityRecords.CanDownload</c> lists the documents but the
+    /// download answers 403.
     /// </summary>
     [Fact]
-    public async Task Explain_CommentsListQuery_PlansIndexAnchored()
+    public async Task Download_WithoutCanDownload_IsForbidden()
     {
         var s = await SeedAsync();
+        var (memberId, member) = await MemberAsync(s.CompanyId, "UsuarioSimple", canDownload: false);
+        var memberCalendarId = await CreateUserCalendarAsync(s.CompanyId, memberId, canViewOthers: false);
+        var activityId = await s.CreateActivityAsync("Mine", "2027-04-05T10:00:00-06:00", "2027-04-05T11:00:00-06:00",
+            ownerUserId: memberId, calendarId: memberCalendarId);
+        var upload = await UploadPdfAsync(member, $"/api/v1/CalendarEvents/{activityId}/documents", null, "mine.pdf");
+        upload.StatusCode.Should().Be(HttpStatusCode.OK);
+        var documentId = Data(await upload.Content.ReadAsStringAsync()).GetProperty("id").GetGuid();
+
+        (await member.GetAsync($"/api/v1/CalendarEvents/{activityId}/documents")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await member.GetAsync($"/api/v1/CalendarEvents/{activityId}/documents/{documentId}/download"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    /// <summary>
+    /// EXPLAIN — the new comments and documents list queries (read from the handlers, not copied) can be served by
+    /// the <c>(CalendarEventId, CreatedUtc)</c> / <c>(CalendarEventId, Created)</c> indexes. Sequential scans are
+    /// disabled for the session so the tiny test tables do not hide a missing index.
+    /// </summary>
+    [Fact]
+    public async Task Explain_CommentsAndDocumentsListQueries_UseTheEventIndexes()
+    {
+        var s = await SeedAsync();
+        var applicationAssembly = typeof(ListCalendarEventCommentsQueryHandler).Assembly;
+        var commentsSql = (string)typeof(ListCalendarEventCommentsQueryHandler)
+            .GetField("CommentsSql", BindingFlags.NonPublic | BindingFlags.Static)!.GetRawConstantValue()!;
+        var documentsSql = (string)applicationAssembly
+            .GetType("JOIN.Application.UseCases.Calendars.CalendarEventRecords.Queries.CalendarEventDocumentsSql")!
+            .GetField("Sql", BindingFlags.NonPublic | BindingFlags.Static)!.GetRawConstantValue()!;
+
+        (await ExplainAsync(commentsSql, s.CompanyId)).Should().Contain("ix_eventcomments_event_createdutc");
+        (await ExplainAsync(documentsSql, s.CompanyId)).Should().Contain("ix_eventdocuments_event_created");
+    }
+
+    private async Task<string> ExplainAsync(string sql, Guid companyId)
+    {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        const string plan = """
-            EXPLAIN (FORMAT TEXT)
-            SELECT e.Id
-            FROM Calendar.Events e
-            WHERE e.CompanyId = $1
-              AND e.GcRecord = 0
-              AND ((e.SeriesMasterId IS NULL AND e.StartUtc < $3 AND e.EndUtc > $2)
-                OR (e.SeriesMasterId IS NOT NULL AND e.OriginalStartUtc >= $2 AND e.OriginalStartUtc < $3));
-            """;
-        var rows = new List<string>();
         var connection = db.Database.GetDbConnection();
-        if (connection.State != System.Data.ConnectionState.Open)
+        await connection.OpenAsync();
+        await using (var off = connection.CreateCommand())
         {
-            await connection.OpenAsync();
+            off.CommandText = "SET enable_seqscan = off;";
+            await off.ExecuteNonQueryAsync();
         }
-        using (var command = connection.CreateCommand())
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "EXPLAIN (FORMAT TEXT) " + sql.TrimEnd().TrimEnd(';');
+        foreach (var (name, value) in new[] { ("TenantId", companyId), ("EventId", Guid.NewGuid()) })
         {
-            command.CommandText = plan;
-            var p0 = command.CreateParameter(); p0.Value = s.CompanyId; command.Parameters.Add(p0);
-            var p1 = command.CreateParameter(); p1.Value = new DateTime(2027, 4, 1, 0, 0, 0, DateTimeKind.Utc); command.Parameters.Add(p1);
-            var p2 = command.CreateParameter(); p2.Value = new DateTime(2027, 4, 30, 0, 0, 0, DateTimeKind.Utc); command.Parameters.Add(p2);
-            using var reader = await command.ExecuteReaderAsync();
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = name;
+            parameter.Value = value;
+            command.Parameters.Add(parameter);
+        }
+
+        var rows = new List<string>();
+        await using (var reader = await command.ExecuteReaderAsync())
+        {
             while (await reader.ReadAsync())
             {
                 rows.Add(reader.GetString(0));
             }
         }
-        var joined = string.Join(Environment.NewLine, rows);
-        joined.Should().NotContain("Seq Scan on calendar.events",
-            "the events lookup must plan as an index scan; the FK joins would degrade otherwise");
+
+        // The connection goes back to the pool: restore the planner setting.
+        await using (var reset = connection.CreateCommand())
+        {
+            reset.CommandText = "RESET enable_seqscan;";
+            await reset.ExecuteNonQueryAsync();
+        }
+        return string.Join(Environment.NewLine, rows);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────────────────
@@ -300,6 +483,71 @@ public sealed class Spec69CalendarActivityCommentsAndDocumentsPostgreSqlTests : 
             form.Add(new StringContent(cid.ToString()), "CommentId");
         }
         return await client.PostAsync(url, form);
+    }
+
+    private static Task<HttpResponseMessage> DeleteWithReasonAsync(HttpClient client, string url, string reason) =>
+        client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, url)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new { reason }), Encoding.UTF8, "application/json")
+        });
+
+    /// <summary>
+    /// Registers a member with <paramref name="role"/> and grants that role, in the test company only, the records
+    /// option (<c>CanRead</c> / <c>CanCreate</c>, <c>CanDownload</c> on request, never <c>CanDelete</c>) and the
+    /// calendar log read; <paramref name="panelRead"/> adds <c>CalendarOthers.CanRead</c> (option CalendarPanel).
+    /// </summary>
+    private async Task<(Guid UserId, HttpClient Client)> MemberAsync(Guid companyId, string role, bool canDownload, bool panelRead = false)
+    {
+        var email = $"m{Guid.NewGuid():N}@t.local";
+        var userId = await RegisterMemberAsync(companyId, email, role);
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var roleId = await db.Roles.Where(r => r.Name == role).Select(r => r.Id).SingleAsync();
+            db.UserRoleCompanies.Add(new UserRoleCompany { UserId = userId, RoleId = roleId, CompanyId = companyId, CreatedBy = Creator });
+
+            async Task GrantAsync(string option, bool create, bool download)
+            {
+                var optionId = await db.SystemOptions.IgnoreQueryFilters()
+                    .Where(o => o.Name == option && o.GcRecord == 0).Select(o => o.Id).SingleAsync();
+                var exists = await db.RoleSystemOptions.IgnoreQueryFilters()
+                    .AnyAsync(r => r.RoleId == roleId && r.SystemOptionId == optionId && r.CompanyId == companyId);
+                if (!exists)
+                {
+                    db.RoleSystemOptions.Add(new RoleSystemOption
+                    {
+                        RoleId = roleId, SystemOptionId = optionId, CompanyId = companyId,
+                        CanRead = true, CanCreate = create, CanDownload = download, CreatedBy = Creator
+                    });
+                }
+            }
+
+            await GrantAsync("ActivityRecords", create: true, download: canDownload);
+            await GrantAsync("MyCalendar", create: true, download: false);
+            if (panelRead)
+            {
+                await GrantAsync("CalendarPanel", create: false, download: false);
+            }
+            await db.SaveChangesAsync();
+        }
+
+        return (userId, await AuthedClientAsync(companyId, email));
+    }
+
+    /// <summary> Gives the user a calendar and a calendar configuration with the SPEC 68 flag. </summary>
+    private async Task<Guid> CreateUserCalendarAsync(Guid companyId, Guid userId, bool canViewOthers)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var calendar = new UserCalendar { CompanyId = companyId, OwnerUserId = userId, Name = "Mine", Color = "#1E88E5", IsActive = true, CreatedBy = Creator };
+        db.UserCalendars.Add(calendar);
+        await db.SaveChangesAsync();
+        db.CalendarUserConfigurations.Add(new CalendarUserConfiguration
+        {
+            CompanyId = companyId, UserId = userId, DefaultCalendarId = calendar.Id, CanViewOthersActivities = canViewOthers, CreatedBy = Creator
+        });
+        await db.SaveChangesAsync();
+        return calendar.Id;
     }
 
     private static async Task<Guid> CreateCommentAsync(HttpClient client, Guid activityId, string body)
@@ -377,7 +625,7 @@ public sealed class Spec69CalendarActivityCommentsAndDocumentsPostgreSqlTests : 
         return new Spec69SeedContext(this, adminClient, companyId, adminId, otherId, calendarId, webChannelId);
     }
 
-    private async Task<Guid> RegisterMemberAsync(Guid companyId, string email, string role)
+    private async Task<Guid> RegisterMemberAsync(Guid companyId, string email, string? role)
     {
         using var unauthClient = _factory.CreateClient();
         (await unauthClient.PostAsJsonAsync("/api/v1/users/register", new RegisterCommand
@@ -445,7 +693,7 @@ public sealed class Spec69CalendarActivityCommentsAndDocumentsPostgreSqlTests : 
         public Guid CalendarId { get; }
         public Guid WebChannelId { get; }
 
-        public async Task<Guid> CreateActivityAsync(string title, string from, string to)
+        public async Task<Guid> CreateActivityAsync(string title, string from, string to, Guid? ownerUserId = null, Guid? calendarId = null)
         {
             await using var scope = _parent._factory.Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -457,8 +705,8 @@ public sealed class Spec69CalendarActivityCommentsAndDocumentsPostgreSqlTests : 
             var calendarEvent = new CalendarEvent
             {
                 CompanyId = CompanyId,
-                CalendarId = CalendarId,
-                OwnerUserId = AdminId,
+                CalendarId = calendarId ?? CalendarId,
+                OwnerUserId = ownerUserId ?? AdminId,
                 CalendarActivityCompanyId = activity.Id,
                 CalendarStatusCompanyId = activity.InitialCalendarStatusCompanyId,
                 Title = title,
@@ -475,6 +723,22 @@ public sealed class Spec69CalendarActivityCommentsAndDocumentsPostgreSqlTests : 
             db.CalendarEvents.Add(calendarEvent);
             await db.SaveChangesAsync();
             return eventId;
+        }
+
+        /// <summary> A weekly series of the admin plus one modified occurrence (an exception with its own row). </summary>
+        public async Task<(Guid MasterId, Guid ExceptionId)> CreateWeeklySeriesWithExceptionAsync()
+        {
+            var masterId = await CreateActivityAsync("Weekly", "2027-02-01T10:00:00-06:00", "2027-02-01T11:00:00-06:00");
+            var exceptionId = await CreateActivityAsync("Weekly (moved)", "2027-03-15T12:00:00-06:00", "2027-03-15T13:00:00-06:00");
+            await using var scope = _parent._factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var master = await db.CalendarEvents.IgnoreQueryFilters().SingleAsync(e => e.Id == masterId);
+            master.RecurrenceRule = "FREQ=WEEKLY;BYDAY=MO";
+            var exception = await db.CalendarEvents.IgnoreQueryFilters().SingleAsync(e => e.Id == exceptionId);
+            exception.SeriesMasterId = masterId;
+            exception.OriginalStartUtc = new DateTime(2027, 3, 15, 16, 0, 0, DateTimeKind.Utc);
+            await db.SaveChangesAsync();
+            return (masterId, exceptionId);
         }
     }
 

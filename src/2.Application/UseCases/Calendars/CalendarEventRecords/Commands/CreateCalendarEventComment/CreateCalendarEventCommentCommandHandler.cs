@@ -2,7 +2,6 @@ using JOIN.Application.Common;
 using JOIN.Application.DTO.Calendars;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
-using JOIN.Application.UseCases.Calendars.CalendarActivityIndex;
 using JOIN.Application.UseCases.Calendars.Common;
 using JOIN.Domain.Common;
 using JOIN.Domain.Messaging;
@@ -19,7 +18,7 @@ namespace JOIN.Application.UseCases.Calendars.CalendarEventRecords.Commands;
 public sealed class CreateCalendarEventCommentCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
-    CalendarActivityVisibility visibility,
+    CalendarEventRecordsAccess access,
     CalendarEventLogWriter logWriter)
     : IRequestHandler<CreateCalendarEventCommentCommand, Response<CalendarEventCommentDto>>
 {
@@ -31,14 +30,14 @@ public sealed class CreateCalendarEventCommentCommandHandler(
                 ["The authenticated user could not be resolved."]);
         }
 
-        var access = await visibility.ResolveEventAccessAsync(request.CalendarEventId, cancellationToken);
-        if (!access.IsFoundAndVisible)
+        var eventAccess = await access.ResolveAsync(request.CalendarEventId, cancellationToken);
+        if (!eventAccess.IsFoundAndVisible)
         {
             return Response<CalendarEventCommentDto>.Error(CalendarErrorCodes.EventNotFound,
                 ["The calendar activity was not found or is not visible."]);
         }
 
-        var calendarEvent = access.CalendarEvent!;
+        var calendarEvent = eventAccess.CalendarEvent!;
         var webChannel = (await unitOfWork.GetRepository<CommunicationChannel>()
             .GetAllIncludingDeletedAsync(x => x.Code == CommunicationChannelCodes.Web && x.GcRecord == 0))
             .FirstOrDefault();

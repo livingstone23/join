@@ -38,14 +38,14 @@ public sealed class Spec69RecordsValidatorAndExtensionTests
     public void DeleteCommentValidator_RejectsEmptyReason()
     {
         var validator = new DeleteCalendarEventCommentCommandValidator();
-        validator.TestValidate(new DeleteCalendarEventCommentCommand(Guid.NewGuid(), "")).ShouldHaveValidationErrorFor(x => x.Reason);
+        validator.TestValidate(new DeleteCalendarEventCommentCommand(Guid.NewGuid(), Guid.NewGuid(), "")).ShouldHaveValidationErrorFor(x => x.Reason);
     }
 
     [Fact]
     public void DeleteDocumentValidator_RejectsEmptyReason()
     {
         var validator = new DeleteCalendarEventDocumentCommandValidator();
-        validator.TestValidate(new DeleteCalendarEventDocumentCommand(Guid.NewGuid(), "")).ShouldHaveValidationErrorFor(x => x.Reason);
+        validator.TestValidate(new DeleteCalendarEventDocumentCommand(Guid.NewGuid(), Guid.NewGuid(), "")).ShouldHaveValidationErrorFor(x => x.Reason);
     }
 
     /// <summary>

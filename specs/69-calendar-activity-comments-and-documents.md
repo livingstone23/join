@@ -94,6 +94,15 @@
 - **Documento opcionalmente ligado a un comentario**, como un contacto del lead (BE-62): el front adjunta en el mismo envío del comentario.
 - **Alta y borrado en la bitácora** (decisión del usuario): el "Historial" cuenta todo lo que pasó con la actividad.
 
+## Notas de implementación (revisión 2026-10-19)
+
+Precisan el contrato sin cambiar el alcance (FE-44 ajustado en el mismo cambio):
+- Regla 5 en `CalendarEventRecordsAccess`: dueño, flag de SPEC 68, `CalendarOthers.CanRead` o SuperAdmin; lo demás responde `CALENDAR_EVENT_NOT_FOUND`.
+- Los borrados validan que el comentario o documento sea de la actividad de la ruta y de la empresa; si no, `…_NOT_FOUND`.
+- Los documentos borrados siguen en las listas con `isDeleted` y quién, cuándo y motivo (`deletedByUserName` en ambos DTO), pero no se descargan (404). No ocupan cupo en el máximo por comentario; sí cuentan en el máximo por día (cuenta subidas).
+- `GET …/comments` anida solo los documentos de cada comentario; los sueltos se leen de `GET …/documents`.
+- `POST /CalendarAttachmentSettings` usa el flag por verbo (`CanCreate`); `PUT` usa `CanUpdate`. `CALENDAR_ATTACHMENT_SETTINGS_ALREADY_EXISTS` y `CALENDAR_RECORD_ALREADY_DELETED` responden 409.
+
 ## Riesgos
 
 | Riesgo | Mitigación |

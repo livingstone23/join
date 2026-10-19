@@ -32,6 +32,9 @@ public static class CalendarResponseResults
         CalendarErrorCodes.CalendarHasActiveEvents,
         CalendarErrorCodes.UserHoursOutOfCompanyRange,
         CalendarErrorCodes.IntakeContactBelongsToOtherPerson,
+        // SPEC 69: deleting a record twice, or creating the attachment limits row twice.
+        CalendarErrorCodes.RecordAlreadyDeleted,
+        CalendarErrorCodes.AttachmentSettingsAlreadyExists,
         // SPEC 65: converting a pending that is no longer pending, or a duplicate open lead under the Block policy.
         "PERSON_PENDING_NOT_PENDING",
         "LEAD_DUPLICATE_OPEN"

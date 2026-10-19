@@ -20,7 +20,8 @@ public sealed class CalendarEventQueryService(
                l.PreviousStatusCompanyId, psc.Name AS PreviousStatusName,
                l.NewStatusCompanyId, nsc.Name AS NewStatusName,
                ch.Code AS ChannelCode, l.ActorUserId, CONCAT(u.FirstName, ' ', u.LastName) AS ActorName,
-               l.ActorIdentifier, l.Notes, l.OccurredUtc
+               l.ActorIdentifier, l.Notes, l.OccurredUtc,
+               l.CalendarEventCommentId AS CommentId, l.CalendarEventDocumentId AS DocumentId
         FROM Calendar.EventLogs l
         INNER JOIN Common.CommunicationChannels ch ON ch.Id = l.ChannelId
         LEFT JOIN Calendar.StatusCompanies psc ON psc.Id = l.PreviousStatusCompanyId
@@ -168,7 +169,9 @@ public sealed class CalendarEventQueryService(
                 ActorName = l.ActorName?.Trim(),
                 ActorIdentifier = l.ActorIdentifier,
                 Notes = l.Notes,
-                OccurredUtc = l.OccurredUtc
+                OccurredUtc = l.OccurredUtc,
+                CommentId = l.CommentId,
+                DocumentId = l.DocumentId
             })
             .ToList();
 
@@ -235,5 +238,7 @@ public sealed class CalendarEventQueryService(
         public string? ActorIdentifier { get; init; }
         public string? Notes { get; init; }
         public DateTime OccurredUtc { get; init; }
+        public Guid? CommentId { get; init; }
+        public Guid? DocumentId { get; init; }
     }
 }

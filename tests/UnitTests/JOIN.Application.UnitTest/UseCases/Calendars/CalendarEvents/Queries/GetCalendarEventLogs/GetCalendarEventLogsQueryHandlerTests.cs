@@ -33,6 +33,9 @@ public sealed class GetCalendarEventLogsQueryHandlerTests
         var actorId = Guid.NewGuid();
         var channelCode = "WEB";
         var newStatusId = Guid.NewGuid();
+        // SPEC 69 item 14: the log carries the comment / document of the row.
+        var commentId = Guid.NewGuid();
+        var documentId = Guid.NewGuid();
 
         // GetLogsAsync never reads the calendar company (the R2 owner check uses event ownership only);
         // the two grids are the event row and the logs SQL, in that order.
@@ -99,7 +102,9 @@ public sealed class GetCalendarEventLogsQueryHandlerTests
                     ["ActorName"] = "Ada Lovelace",
                     ["ActorIdentifier"] = null,
                     ["Notes"] = null,
-                    ["OccurredUtc"] = DateTime.SpecifyKind(new DateTime(2026, 6, 15, 13, 59, 0), DateTimeKind.Utc)
+                    ["OccurredUtc"] = DateTime.SpecifyKind(new DateTime(2026, 6, 15, 13, 59, 0), DateTimeKind.Utc),
+                    ["CommentId"] = null,
+                    ["DocumentId"] = null
                 },
                 new Dictionary<string, object?>
                 {
@@ -119,7 +124,9 @@ public sealed class GetCalendarEventLogsQueryHandlerTests
                     ["ActorName"] = "Ada Lovelace",
                     ["ActorIdentifier"] = null,
                     ["Notes"] = "title edited",
-                    ["OccurredUtc"] = DateTime.SpecifyKind(new DateTime(2026, 6, 15, 14, 30, 0), DateTimeKind.Utc)
+                    ["OccurredUtc"] = DateTime.SpecifyKind(new DateTime(2026, 6, 15, 14, 30, 0), DateTimeKind.Utc),
+                    ["CommentId"] = commentId,
+                    ["DocumentId"] = documentId
                 }));
 
         var response = await context.CreateHandler().Handle(new GetCalendarEventLogsQuery(eventId), CancellationToken.None);
@@ -130,6 +137,9 @@ public sealed class GetCalendarEventLogsQueryHandlerTests
         response.Data[0].OccurredUtc.Should().BeBefore(response.Data[1].OccurredUtc);
         response.Data[1].Action.Should().Be(CalendarEventLogAction.Updated.ToString());
         response.Data[1].Notes.Should().Be("title edited");
+        response.Data[0].CommentId.Should().BeNull();
+        response.Data[1].CommentId.Should().Be(commentId);
+        response.Data[1].DocumentId.Should().Be(documentId);
     }
 
     /// <summary>

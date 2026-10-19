@@ -142,6 +142,47 @@ public sealed class UploadCalendarEventDocumentCommandHandlerTests
         response.Message.Should().Be(CalendarErrorCodes.DocumentLimitPerComment);
     }
 
+    /// <summary> A document an administrator deleted no longer takes a slot of the per-comment limit. </summary>
+    [Fact]
+    public async Task Handle_WhenCommentOnlyHasDeletedDocuments_AllowsUpload()
+    {
+        var context = new Spec69CalendarEventRecordsContext();
+        context.TrackWrites();
+        var settings = Tweak(DefaultSettings(context), s => s.MaxFilesPerComment = 1);
+        context.CalendarAttachmentSettingsRepositoryMock.SetupRows(new[] { settings });
+        var comment = new CommentEntity
+        {
+            CompanyId = context.CompanyId,
+            CalendarEventId = context.EventId,
+            AuthorUserId = context.ActorUserId,
+            Body = "limit",
+            CreatedUtc = DateTime.UtcNow
+        };
+        context.CalendarEventCommentRepositoryMock.SetupRows(new[] { comment });
+        var deletedDoc = new DocEntity
+        {
+            CompanyId = context.CompanyId,
+            CalendarEventId = context.EventId,
+            CalendarEventCommentId = comment.Id,
+            DocumentType = DocumentType.Pdf,
+            OriginalName = "x.pdf",
+            NewName = "x.pdf",
+            Path = "x",
+            ContentType = FileContentType,
+            SizeBytes = 1,
+            UploadedByUserId = context.ActorUserId,
+            Created = DateTime.UtcNow.AddDays(-1),
+            DeletedUtc = DateTime.UtcNow.AddHours(-1)
+        };
+        context.CalendarEventDocumentRepositoryMock.SetupRows(new[] { deletedDoc });
+        var handler = NewHandler(context, NewStorageResolver().Resolver);
+
+        var response = await handler.Handle(NewUpload(context, "doc.pdf", commentId: comment.Id), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        context.CapturedDocumentInserts.Should().ContainSingle();
+    }
+
     /// <summary> Daily quota reached → <c>CALENDAR_DOCUMENT_LIMIT_PER_DAY</c>. </summary>
     [Fact]
     public async Task Handle_WhenDailyQuotaReached_RespondsDocumentLimitPerDay()
@@ -250,7 +291,7 @@ public sealed class UploadCalendarEventDocumentCommandHandlerTests
         new(
             context.UnitOfWorkMock.Object,
             context.CurrentUserServiceMock.Object,
-            context.Visibility,
+            context.Access,
             storage,
             new CalendarEventLogWriter(context.UnitOfWorkMock.Object));
 }

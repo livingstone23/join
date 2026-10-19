@@ -126,14 +126,15 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     }
 
     /// <summary>
-    /// SPEC 69 — backfill that applies on existing databases without the migration: every company gets the
-    /// default <c>CalendarAttachmentSettings</c> row when missing. Mirrors
-    /// <see cref="SeedTicketAttachmentSettingsDefaultsAsync"/>.
+    /// SPEC 69 — applies <see cref="SeedCalendarAttachmentSettingsForCompanyAsync"/> to every live company on a
+    /// database with no pending migrations (same hook as <see cref="SeedLeadAttachmentSettingsDefaultsAsync"/>):
+    /// missing rows only.
     /// </summary>
     public async Task SeedCalendarAttachmentSettingsDefaultsAsync(CancellationToken cancellationToken = default)
     {
         var companyIds = await _context.Companies
             .IgnoreQueryFilters()
+            .Where(c => c.GcRecord == 0)
             .Select(c => c.Id)
             .ToListAsync(cancellationToken);
 
@@ -1298,6 +1299,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedLeadSettingsForCompanyAsync(companyId, cancellationToken);
             await SeedTeamRolesForCompanyAsync(companyId, cancellationToken);
             await SeedLeadAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
+            // SPEC 69: calendar attachment limits.
+            await SeedCalendarAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
         }
     }
 

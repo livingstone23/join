@@ -20,6 +20,7 @@ public record CalendarEventCommentDto
 
     public bool IsDeleted { get; init; }
     public Guid? DeletedByUserId { get; init; }
+    public string? DeletedByUserName { get; init; }
     public DateTime? DeletedUtc { get; init; }
     public string? DeleteReason { get; init; }
 }

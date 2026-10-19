@@ -1604,6 +1604,64 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("activitycompanies", "calendar");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarAttachmentSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AllowedDocumentTypes")
+                        .HasColumnType("integer")
+                        .HasColumnName("alloweddocumenttypes");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<long>("MaxFileSizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("maxfilesizebytes");
+
+                    b.Property<int>("MaxFilesPerComment")
+                        .HasColumnType("integer")
+                        .HasColumnName("maxfilespercomment");
+
+                    b.Property<int?>("MaxFilesPerDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("maxfilesperday");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attachmentsettings");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_calendarattachmentsettings_company")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("attachmentsettings", "calendar");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Calendars.CalendarCompany", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1959,6 +2017,199 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("events", "calendar");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarEventComment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AuthorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("authoruserid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("body");
+
+                    b.Property<Guid>("CalendarEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calendareventid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("createdutc");
+
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("deletereason");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedbyuserid");
+
+                    b.Property<DateTime?>("DeletedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deletedutc");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.HasKey("Id")
+                        .HasName("pk_eventcomments");
+
+                    b.HasIndex("AuthorUserId")
+                        .HasDatabaseName("ix_eventcomments_authoruserid");
+
+                    b.HasIndex("CompanyId")
+                        .HasDatabaseName("ix_eventcomments_company");
+
+                    b.HasIndex("DeletedByUserId")
+                        .HasDatabaseName("ix_eventcomments_deletedbyuserid");
+
+                    b.HasIndex("CalendarEventId", "CreatedUtc")
+                        .HasDatabaseName("ix_eventcomments_event_createdutc");
+
+                    b.ToTable("eventcomments", "calendar");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarEventDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("CalendarEventCommentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calendareventcommentid");
+
+                    b.Property<Guid>("CalendarEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calendareventid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("contenttype");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("deletereason");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedbyuserid");
+
+                    b.Property<DateTime?>("DeletedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deletedutc");
+
+                    b.Property<int>("DocumentType")
+                        .HasColumnType("integer")
+                        .HasColumnName("documenttype");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("NewName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("newname");
+
+                    b.Property<string>("OriginalName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("originalname");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("path");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sizebytes");
+
+                    b.Property<int>("StorageProvider")
+                        .HasColumnType("integer")
+                        .HasColumnName("storageprovider");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("uploadedbyuserid");
+
+                    b.HasKey("Id")
+                        .HasName("pk_eventdocuments");
+
+                    b.HasIndex("CalendarEventCommentId")
+                        .HasDatabaseName("ix_eventdocuments_comment");
+
+                    b.HasIndex("CompanyId")
+                        .HasDatabaseName("ix_eventdocuments_company");
+
+                    b.HasIndex("DeletedByUserId")
+                        .HasDatabaseName("ix_eventdocuments_deletedbyuserid");
+
+                    b.HasIndex("UploadedByUserId")
+                        .HasDatabaseName("ix_eventdocuments_uploadedbyuserid");
+
+                    b.HasIndex("CalendarEventId", "Created")
+                        .HasDatabaseName("ix_eventdocuments_event_created");
+
+                    b.ToTable("eventdocuments", "calendar");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Calendars.CalendarEventLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1978,6 +2229,14 @@ namespace JOIN.Persistence.Migrations
                     b.Property<Guid?>("ActorUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("actoruserid");
+
+                    b.Property<Guid?>("CalendarEventCommentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calendareventcommentid");
+
+                    b.Property<Guid?>("CalendarEventDocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calendareventdocumentid");
 
                     b.Property<Guid>("CalendarEventId")
                         .HasColumnType("uuid")
@@ -2049,6 +2308,12 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasIndex("ActorUserId")
                         .HasDatabaseName("ix_eventlogs_actoruserid");
+
+                    b.HasIndex("CalendarEventCommentId")
+                        .HasDatabaseName("ix_calendareventlogs_comment");
+
+                    b.HasIndex("CalendarEventDocumentId")
+                        .HasDatabaseName("ix_calendareventlogs_document");
 
                     b.HasIndex("CalendarEventId")
                         .HasDatabaseName("ix_eventlogs_calendareventid");
@@ -8012,6 +8277,18 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("InitialCalendarStatusCompany");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarAttachmentSettings", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attachmentsettings_companies_companyid");
+
+                    b.Navigation("Company");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Calendars.CalendarCompany", b =>
                 {
                     b.HasOne("JOIN.Domain.Common.Company", "Company")
@@ -8173,6 +8450,90 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Ticket");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarEventComment", b =>
+                {
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "AuthorUser")
+                        .WithMany()
+                        .HasForeignKey("AuthorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_eventcomments_users_authoruserid");
+
+                    b.HasOne("JOIN.Domain.Calendars.CalendarEvent", "CalendarEvent")
+                        .WithMany()
+                        .HasForeignKey("CalendarEventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_eventcomments_events_calendareventid");
+
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_eventcomments_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "DeletedByUser")
+                        .WithMany()
+                        .HasForeignKey("DeletedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_eventcomments_users_deletedbyuserid");
+
+                    b.Navigation("AuthorUser");
+
+                    b.Navigation("CalendarEvent");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("DeletedByUser");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarEventDocument", b =>
+                {
+                    b.HasOne("JOIN.Domain.Calendars.CalendarEventComment", "CalendarEventComment")
+                        .WithMany("Documents")
+                        .HasForeignKey("CalendarEventCommentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_eventdocuments_eventcomments_calendareventcommentid");
+
+                    b.HasOne("JOIN.Domain.Calendars.CalendarEvent", "CalendarEvent")
+                        .WithMany()
+                        .HasForeignKey("CalendarEventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_eventdocuments_events_calendareventid");
+
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_eventdocuments_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "DeletedByUser")
+                        .WithMany()
+                        .HasForeignKey("DeletedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_eventdocuments_users_deletedbyuserid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "UploadedByUser")
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_eventdocuments_users_uploadedbyuserid");
+
+                    b.Navigation("CalendarEvent");
+
+                    b.Navigation("CalendarEventComment");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("DeletedByUser");
+
+                    b.Navigation("UploadedByUser");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Calendars.CalendarEventLog", b =>
                 {
                     b.HasOne("JOIN.Domain.Security.ApplicationUser", "ActorUser")
@@ -8180,6 +8541,18 @@ namespace JOIN.Persistence.Migrations
                         .HasForeignKey("ActorUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_eventlogs_users_actoruserid");
+
+                    b.HasOne("JOIN.Domain.Calendars.CalendarEventComment", "CalendarEventComment")
+                        .WithMany()
+                        .HasForeignKey("CalendarEventCommentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_eventlogs_eventcomments_calendareventcommentid");
+
+                    b.HasOne("JOIN.Domain.Calendars.CalendarEventDocument", "CalendarEventDocument")
+                        .WithMany()
+                        .HasForeignKey("CalendarEventDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_eventlogs_eventdocuments_calendareventdocumentid");
 
                     b.HasOne("JOIN.Domain.Calendars.CalendarEvent", "CalendarEvent")
                         .WithMany("Logs")
@@ -8205,6 +8578,10 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("ActorUser");
 
                     b.Navigation("CalendarEvent");
+
+                    b.Navigation("CalendarEventComment");
+
+                    b.Navigation("CalendarEventDocument");
 
                     b.Navigation("Channel");
 
@@ -9809,6 +10186,11 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Exceptions");
 
                     b.Navigation("Logs");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Calendars.CalendarEventComment", b =>
+                {
+                    b.Navigation("Documents");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Calendars.CalendarStatus", b =>
