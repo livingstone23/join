@@ -17,6 +17,44 @@ public sealed class GetCustomerStatusHistoryQueryHandler(
     IOptions<PaginationSettings> paginationOptions)
     : IRequestHandler<GetCustomerStatusHistoryQuery, Response<PagedResult<CustomerStatusHistoryDto>>>
 {
+    /// <summary>History page and total count; stage names come from the stage rows (SPEC 66). Public for the <c>EXPLAIN</c> test.</summary>
+    public const string Sql = """
+        SELECT
+            h.Id,
+            h.CustomerId,
+            h.Action,
+            h.Source,
+            h.SourceReferenceId,
+            ld.Code AS SourceReferenceCode,
+            h.Notes,
+            h.UserId,
+            COALESCE(u.Email, '') AS UserEmail,
+            h.OccurredAt,
+            fs.Name AS FromStageName,
+            ts.Name AS ToStageName
+        FROM customer.customerstatushistory h
+        LEFT JOIN Security.Users u
+            ON u.Id = h.UserId
+        LEFT JOIN customer.customerstages fs
+            ON fs.Id = h.FromCustomerStageId
+        LEFT JOIN customer.customerstages ts
+            ON ts.Id = h.ToCustomerStageId
+        LEFT JOIN customer.leads ld
+            ON h.Source = 5
+           AND ld.Id = h.SourceReferenceId
+        WHERE h.CustomerId = @CustomerId
+          AND h.CompanyId = @TenantId
+          AND h.GcRecord = 0
+        ORDER BY h.OccurredAt DESC, h.Id
+        LIMIT @PageSize OFFSET @Offset;
+
+        SELECT COUNT(*)
+        FROM customer.customerstatushistory h
+        WHERE h.CustomerId = @CustomerId
+          AND h.CompanyId = @TenantId
+          AND h.GcRecord = 0;
+        """;
+
     private readonly PaginationSettings _paginationSettings = paginationOptions.Value ?? new();
 
     public async Task<Response<PagedResult<CustomerStatusHistoryDto>>> Handle(
@@ -55,39 +93,8 @@ public sealed class GetCustomerStatusHistoryQueryHandler(
             return Response<PagedResult<CustomerStatusHistoryDto>>.Error("CUSTOMER_NOT_FOUND", ["Customer not found."]);
         }
 
-        const string sql = """
-            SELECT
-                h.Id,
-                h.CustomerId,
-                h.Action,
-                h.Source,
-                h.SourceReferenceId,
-                ld.Code AS SourceReferenceCode,
-                h.Notes,
-                h.UserId,
-                COALESCE(u.Email, '') AS UserEmail,
-                h.OccurredAt
-            FROM customer.customerstatushistory h
-            LEFT JOIN Security.Users u
-                ON u.Id = h.UserId
-            LEFT JOIN customer.leads ld
-                ON h.Source = 5
-               AND ld.Id = h.SourceReferenceId
-            WHERE h.CustomerId = @CustomerId
-              AND h.CompanyId = @TenantId
-              AND h.GcRecord = 0
-            ORDER BY h.OccurredAt DESC, h.Id
-            LIMIT @PageSize OFFSET @Offset;
-
-            SELECT COUNT(*)
-            FROM customer.customerstatushistory h
-            WHERE h.CustomerId = @CustomerId
-              AND h.CompanyId = @TenantId
-              AND h.GcRecord = 0;
-            """;
-
         using var multi = await connection.QueryMultipleAsync(
-            new CommandDefinition(sql, parameters, cancellationToken: cancellationToken));
+            new CommandDefinition(Sql, parameters, cancellationToken: cancellationToken));
 
         var items = (await multi.ReadAsync<CustomerStatusHistoryDto>())
             .Select(item => item with

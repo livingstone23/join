@@ -5,13 +5,14 @@
 > **Date:** 2026-10-19
 > **Objective:** Que cada cambio de etapa de un cliente (por ejemplo "Cliente" → "Recurrente") quede en su historial, con quién lo hizo, cuándo, de qué etapa a cuál y un comentario opcional, y se vea en el "Historial de estados" del detalle del cliente (FE-32).
 > **Origen:** pedido del usuario (2026-10-19) desde el detalle del cliente: hoy `Customer.ChangeStage` solo actualiza `CustomerStageId` y el cambio no deja rastro.
+> **Ajuste (2026-10-19, al implementar):** el comentario es de máximo **500** caracteres, no 1000: así lo validan activar y desactivar y así mide la columna `CustomerStatusHistory.Notes` (decisión del usuario). `Customer.ChangeStage` devuelve la fila `StageChanged` a guardar (o `null` sin cambio) y el handler la inserta en la misma transacción. La migración de clientes LEAD/PROSPECT del seed (SPEC 63) también registra su cambio de etapa, con origen `Migration` (regla 1).
 
 ---
 
 ## Reglas de negocio (decisión del usuario, 2026-10-19)
 
 1. **Todo cambio de etapa se registra** en el historial del cliente, venga de donde venga (`PUT /Customers/{id}` hoy; cualquier flujo futuro que cambie la etapa).
-2. **Comentario opcional** al cambiar la etapa (máximo 1000 caracteres, igual que activar o desactivar).
+2. **Comentario opcional** al cambiar la etapa (máximo 500 caracteres, igual que activar o desactivar y que la columna `Notes`).
 3. **Mismo historial que los estados:** el cambio se guarda en `Customer.CustomerStatusHistory` con una acción nueva, para que una sola línea de tiempo muestre estado y etapa en orden. La etapa sigue siendo independiente del estado (BE-55, regla 6): registrar un cambio de etapa no activa ni desactiva al cliente.
 4. **Sin cambio, sin fila:** un `PUT` con la misma etapa responde 200 sin cambios y no escribe historial (BE-55, ajuste 4).
 5. El alta de un cliente (con su etapa inicial) no escribe una fila de cambio de etapa: la etapa inicial ya se ve en la fila `Created`.
@@ -27,7 +28,7 @@
 4. Migración `Spec66CustomerStageChangeHistory`: solo agrega las dos columnas y sus índices de FK. Sin backfill (los cambios anteriores no se conocen).
 
 **B. API**
-5. `UpdateCustomerCommand` suma `Notes?` (máx. 1000). `PUT /Customers/{id}` con `{ id, customerStageId, notes }`.
+5. `UpdateCustomerCommand` suma `Notes?` (máx. 500). `PUT /Customers/{id}` con `{ id, customerStageId, notes }`.
 6. `CustomerStatusHistoryDto` suma `FromStageName?` y `ToStageName?` (nombres vigentes de las etapas, aunque luego se renombren o desactiven); `ActionName` = `StageChanged`.
 7. `CustomerResponseDto.LastStatus*` sigue mostrando el último **estado** (filas que no son `StageChanged`), para no confundir "por qué está activo o inactivo".
 

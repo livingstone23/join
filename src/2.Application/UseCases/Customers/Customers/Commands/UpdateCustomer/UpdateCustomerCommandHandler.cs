@@ -10,7 +10,7 @@ namespace JOIN.Application.UseCases.Customers.Customers.Commands;
 
 /// <summary>
 /// Handles <see cref="UpdateCustomerCommand"/>: moves the customer to a live, active stage of its company.
-/// Never touches the active state (SPEC 55 rule 6).
+/// Never touches the active state (SPEC 55 rule 6); logs the change in the status history (SPEC 66).
 /// </summary>
 public sealed class UpdateCustomerCommandHandler(
     IUnitOfWork unitOfWork,
@@ -47,10 +47,12 @@ public sealed class UpdateCustomerCommandHandler(
                 ["The customer stage does not exist in the current company, is deleted or inactive."]);
         }
 
-        if (customer.CustomerStageId != request.CustomerStageId)
+        // SPEC 66: a real change is logged as a StageChanged row in the same transaction; the same stage writes nothing.
+        var stageChange = customer.ChangeStage(request.CustomerStageId, Guid.Parse(currentUserService.UserId!), request.Notes);
+        if (stageChange is not null)
         {
-            customer.ChangeStage(request.CustomerStageId);
             await unitOfWork.Customers.UpdateAsync(customer);
+            await unitOfWork.GetRepository<CustomerStatusHistory>().InsertAsync(stageChange);
             await unitOfWork.SaveChangesAsync(cancellationToken);
         }
 

@@ -104,7 +104,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 63 | Ganar, perder y reabrir leads; conversión a cliente; etapas de cliente post-venta; migración de clientes en LEAD/PROSPECT | Implementado | 54, 55, 58, 59, 61 |
 | 64 | Reportes comerciales: resumen, embudo, ranking de grupos y usuarios, productos, orígenes y contactos | Implementado | 60, 61, 63 |
 | 65 | Leads con calendario y personas pendientes: próxima acción agendada y convertir una persona pendiente en lead | Implementado | 44-post, 45-post, 48-post, 59, 61 |
-| 66 | Clientes: registrar los cambios de etapa en el historial, con comentario opcional | Borrador | 55, 63 |
+| 66 | Clientes: registrar los cambios de etapa en el historial, con comentario opcional | Aprobado | 55, 63 |
 
 ### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)
 

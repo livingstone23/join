@@ -14,5 +14,7 @@ public sealed class UpdateCustomerCommandValidator : AbstractValidator<UpdateCus
 
         RuleFor(x => x.CustomerStageId)
             .NotEmpty().WithMessage("Customer stage id is required.");
+
+        RuleFor(x => x.Notes).MaximumLength(500).WithMessage("Notes must not exceed 500 characters.");
     }
 }

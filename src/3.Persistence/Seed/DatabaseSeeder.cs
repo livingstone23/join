@@ -1214,7 +1214,12 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                         companyId, customer.Id, CustomerStatusAction.Deactivated, CustomerStatusSource.Migration, customer.UserId, lead.Id, "Migrado a lead (SPEC 63)"));
                 }
 
-                customer.ChangeStage(defaultStage.Id);
+                // SPEC 66: every stage change is logged, also this one.
+                if (customer.ChangeStage(defaultStage.Id, customer.UserId, "Migrado a lead (SPEC 63)", CustomerStatusSource.Migration) is { } stageChange)
+                {
+                    _context.CustomerStatusHistory.Add(stageChange);
+                }
+
                 created++;
             }
         }

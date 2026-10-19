@@ -22,7 +22,7 @@ public sealed record CustomerResponseDto : SoftDeletableDto
     public DateTime ActivatedAt { get; init; }
     public DateTime? DeactivatedAt { get; init; }
     public DateTime CreatedAt { get; init; }
-    /// <summary>Last status event (<c>CustomerStatusAction</c>): why the customer is in its current state.</summary>
+    /// <summary>Last status event (<c>CustomerStatusAction</c>): why the customer is in its current state. Stage changes are ignored (SPEC 66).</summary>
     public int? LastStatusAction { get; init; }
     /// <summary>Source of the last status event (<c>CustomerStatusSource</c>).</summary>
     public int? LastStatusSource { get; init; }

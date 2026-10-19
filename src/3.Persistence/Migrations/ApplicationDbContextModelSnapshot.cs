@@ -3511,6 +3511,10 @@ namespace JOIN.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("customerid");
 
+                    b.Property<Guid?>("FromCustomerStageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fromcustomerstageid");
+
                     b.Property<int>("GcRecord")
                         .HasColumnType("integer")
                         .HasColumnName("gcrecord");
@@ -3540,6 +3544,10 @@ namespace JOIN.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("sourcereferenceid");
 
+                    b.Property<Guid?>("ToCustomerStageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tocustomerstageid");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("userid");
@@ -3549,6 +3557,12 @@ namespace JOIN.Persistence.Migrations
 
                     b.HasIndex("CompanyId")
                         .HasDatabaseName("ix_customerstatushistory_companyid");
+
+                    b.HasIndex("FromCustomerStageId")
+                        .HasDatabaseName("ix_customerstatushistory_fromcustomerstageid");
+
+                    b.HasIndex("ToCustomerStageId")
+                        .HasDatabaseName("ix_customerstatushistory_tocustomerstageid");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_customerstatushistory_userid");
@@ -8530,6 +8544,18 @@ namespace JOIN.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_customerstatushistory_customers_customerid");
 
+                    b.HasOne("JOIN.Domain.Customers.CustomerStage", "FromCustomerStage")
+                        .WithMany()
+                        .HasForeignKey("FromCustomerStageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_customerstatushistory_customerstages_fromcustomerstageid");
+
+                    b.HasOne("JOIN.Domain.Customers.CustomerStage", "ToCustomerStage")
+                        .WithMany()
+                        .HasForeignKey("ToCustomerStageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_customerstatushistory_customerstages_tocustomerstageid");
+
                     b.HasOne("JOIN.Domain.Security.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -8540,6 +8566,10 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("Customer");
+
+                    b.Navigation("FromCustomerStage");
+
+                    b.Navigation("ToCustomerStage");
 
                     b.Navigation("User");
                 });

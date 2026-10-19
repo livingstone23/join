@@ -9,7 +9,8 @@ namespace JOIN.Domain.Customers;
 /// company's funnel (<see cref="CustomerStage"/>).
 /// A person is a customer at most once per company (SPEC 55): the row is never duplicated nor deleted,
 /// it only switches between active and inactive (<see cref="Reactivate"/> / <see cref="Deactivate"/>),
-/// and every event that creates, activates, confirms or deactivates it is logged in <see cref="CustomerStatusHistory"/>.
+/// and every event that creates, activates, confirms or deactivates it, or changes its stage (SPEC 66), is logged in
+/// <see cref="CustomerStatusHistory"/>.
 /// Deactivating its <see cref="Person"/> deactivates the customer; reactivating the person does NOT reactivate it.
 /// Linking a customer to a calendar activity or a pending person does NOT activate it (SPEC 55).
 /// <see cref="BaseAuditableEntity.GcRecord"/> is inherited but always stays 0: a customer is never deleted.
@@ -110,15 +111,28 @@ public class Customer : BaseTenantEntity
 
     /// <summary>
     /// Moves the customer to another stage of the company's funnel. Does not touch <see cref="IsActive"/>.
+    /// Returns the <see cref="CustomerStatusAction.StageChanged"/> history row the caller must persist in the same
+    /// transaction (SPEC 66), or <c>null</c> when the stage is the current one (no change, no row).
     /// </summary>
-    public void ChangeStage(Guid customerStageId)
+    public CustomerStatusHistory? ChangeStage(
+        Guid customerStageId,
+        Guid userId,
+        string? notes = null,
+        CustomerStatusSource source = CustomerStatusSource.Manual)
     {
         if (customerStageId == Guid.Empty)
         {
             throw new ArgumentException("Customer stage id is required.", nameof(customerStageId));
         }
 
+        if (customerStageId == CustomerStageId)
+        {
+            return null;
+        }
+
+        var history = CustomerStatusHistory.CreateStageChange(CompanyId, Id, CustomerStageId, customerStageId, userId, notes, source);
         CustomerStageId = customerStageId;
+        return history;
     }
 
     /// <summary>

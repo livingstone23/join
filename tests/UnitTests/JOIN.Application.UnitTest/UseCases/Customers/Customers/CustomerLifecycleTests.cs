@@ -218,7 +218,7 @@ public sealed class CustomerLifecycleTests
         tooLong.Should().Throw<ArgumentException>();
         var customer = Customer.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), " C000000001 ", Guid.NewGuid());
         customer.CustomerCode.Should().Be("C000000001");
-        var change = () => customer.ChangeStage(Guid.Empty);
+        var change = () => customer.ChangeStage(Guid.Empty, Guid.NewGuid());
         change.Should().Throw<ArgumentException>();
         var history = () => CustomerStatusHistory.Create(Guid.NewGuid(), Guid.NewGuid(), CustomerStatusAction.Created, CustomerStatusSource.Manual, Guid.Empty);
         history.Should().Throw<ArgumentException>();

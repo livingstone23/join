@@ -8,7 +8,8 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace JOIN.Persistence.Configuration.Customers;
 
 /// <summary>
-/// Configures the insert-only customer status history (<c>Customer.CustomerStatusHistory</c>, SPEC 55 part C).
+/// Configures the insert-only customer status history (<c>Customer.CustomerStatusHistory</c>, SPEC 55 part C),
+/// including the stage change rows (SPEC 66).
 /// </summary>
 public class CustomerStatusHistoryConfiguration : IEntityTypeConfiguration<CustomerStatusHistory>
 {
@@ -45,6 +46,17 @@ public class CustomerStatusHistoryConfiguration : IEntityTypeConfiguration<Custo
         builder.HasOne(h => h.User)
             .WithMany()
             .HasForeignKey(h => h.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // SPEC 66: stage change rows point at both stages.
+        builder.HasOne(h => h.FromCustomerStage)
+            .WithMany()
+            .HasForeignKey(h => h.FromCustomerStageId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(h => h.ToCustomerStage)
+            .WithMany()
+            .HasForeignKey(h => h.ToCustomerStageId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(h => new { h.CustomerId, h.OccurredAt })

@@ -9,6 +9,7 @@ using FluentAssertions;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
 using JOIN.Application.UseCases.Admin.Persons.Queries;
+using JOIN.Application.UseCases.Customers.Customers.Queries;
 using JOIN.Application.UseCases.Security.Auth.Login;
 using JOIN.Application.UseCases.Security.Auth.Register;
 using JOIN.Domain.Admin;
@@ -25,7 +26,8 @@ using Npgsql;
 namespace JOIN.IntegrationTests.Admin;
 
 /// <summary>
-/// SPEC 54 (person lookup and seed) and SPEC 55 (one customer per person, idempotent activation, history, stages)
+/// SPEC 54 (person lookup and seed), SPEC 55 (one customer per person, idempotent activation, history, stages) and
+/// SPEC 66 (stage changes in the status history)
 /// against the migrated and seeded PostgreSQL 17 database.
 /// </summary>
 public sealed class CustomersAndPersonLookupPostgreSqlTests : IClassFixture<CustomWebApplicationFactory>
@@ -268,6 +270,71 @@ public sealed class CustomersAndPersonLookupPostgreSqlTests : IClassFixture<Cust
 
         (await client.DeleteAsync($"/api/v1/Customers/{id}")).StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.MethodNotAllowed);
         (await client.PostAsync($"/api/v1/Customers/{id}/restore", content: null)).StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.MethodNotAllowed);
+    }
+
+    // ---------------------------------------------------------------- SPEC 66
+
+    [Fact]
+    public async Task StageChange_ShouldBeLoggedInTheStatusHistoryWithoutChangingTheLastStatus()
+    {
+        var company = await SeedCompanyAsync();
+        var personId = await SeedPersonAsync(company, $"Pg{Guid.NewGuid():N}"[..10], active: true, deleted: false);
+        using var client = await CreateSuperAdminClientAsync(company);
+        var created = Data(await (await client.PostAsJsonAsync("/api/v1/Customers", new { personId })).Content.ReadAsStringAsync());
+        var id = created.GetProperty("id").GetGuid();
+        Guid recurring, former;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var stages = await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().CustomerStages.IgnoreQueryFilters()
+                .Where(s => s.CompanyId == company && s.GcRecord == 0).ToDictionaryAsync(s => s.Code, s => s.Id);
+            recurring = stages[CustomerStage.Codes.Recurring];
+            former = stages[CustomerStage.Codes.Former];
+        }
+
+        var withNotes = await client.PutAsJsonAsync($"/api/v1/Customers/{id}", new { id, customerStageId = recurring, notes = "Compra cada mes" });
+        withNotes.StatusCode.Should().Be(HttpStatusCode.OK, await withNotes.Content.ReadAsStringAsync());
+        Data(await withNotes.Content.ReadAsStringAsync()).GetProperty("lastStatusAction").GetInt32().Should().Be((int)CustomerStatusAction.Created);
+        var same = await client.PutAsJsonAsync($"/api/v1/Customers/{id}", new { id, customerStageId = recurring, notes = "Sin cambio" });
+        same.StatusCode.Should().Be(HttpStatusCode.OK, await same.Content.ReadAsStringAsync());
+        (await client.PutAsJsonAsync($"/api/v1/Customers/{id}", new { id, customerStageId = former })).EnsureSuccessStatusCode();
+        var tooLong = await client.PutAsJsonAsync($"/api/v1/Customers/{id}", new { id, customerStageId = recurring, notes = new string('x', 501) });
+        tooLong.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var items = Data(await (await client.GetAsync($"/api/v1/Customers/{id}/status-history")).Content.ReadAsStringAsync())
+            .GetProperty("items").EnumerateArray().ToList();
+        items.Select(i => i.GetProperty("actionName").GetString()).Should().Equal("StageChanged", "StageChanged", "Created");
+        items[1].GetProperty("fromStageName").GetString().Should().Be("Cliente");
+        items[1].GetProperty("toStageName").GetString().Should().Be("Recurrente");
+        items[1].GetProperty("notes").GetString().Should().Be("Compra cada mes");
+        items[1].GetProperty("userEmail").GetString().Should().NotBeNullOrEmpty();
+        items[0].GetProperty("fromStageName").GetString().Should().Be("Recurrente");
+        items[0].GetProperty("notes").ValueKind.Should().Be(JsonValueKind.Null);
+        items[2].GetProperty("fromStageName").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var detail = Data(await (await client.GetAsync($"/api/v1/Customers/{id}")).Content.ReadAsStringAsync());
+        detail.GetProperty("lastStatusAction").GetInt32().Should().Be((int)CustomerStatusAction.Created, "a stage change is not a status");
+        detail.GetProperty("customerStageCode").GetString().Should().Be(CustomerStage.Codes.Former);
+    }
+
+    [Fact]
+    public async Task StatusHistory_Sql_ShouldExplainWithoutErrors()
+    {
+        await using var connection = new NpgsqlConnection(_factory.ConnectionString);
+        await connection.OpenAsync();
+        var statements = GetCustomerStatusHistoryQueryHandler.Sql
+            .Replace("@CustomerId", "'00000000-0000-0000-0000-000000000000'::uuid")
+            .Replace("@TenantId", "'00000000-0000-0000-0000-000000000000'::uuid")
+            .Replace("@PageSize", "20")
+            .Replace("@Offset", "0")
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        statements.Should().HaveCount(2);
+
+        foreach (var statement in statements)
+        {
+            await using var command = new NpgsqlCommand("EXPLAIN " + statement, connection);
+            await using var reader = await command.ExecuteReaderAsync();
+            (await reader.ReadAsync()).Should().BeTrue(statement);
+        }
     }
 
     [Fact]

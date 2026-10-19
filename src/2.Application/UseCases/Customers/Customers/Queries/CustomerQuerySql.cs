@@ -56,6 +56,7 @@ internal static class CustomerQuerySql
             FROM customer.customerstatushistory h
             WHERE h.CustomerId = cust.Id
               AND h.GcRecord = 0
+              AND h.Action <> 5
             ORDER BY h.OccurredAt DESC
             LIMIT 1
         ) lh ON TRUE

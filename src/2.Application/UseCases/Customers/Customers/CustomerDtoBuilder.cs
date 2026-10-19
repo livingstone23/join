@@ -35,8 +35,10 @@ internal static class CustomerDtoBuilder
         }
         else
         {
+            // SPEC 66: the last status ignores stage changes, it explains why the customer is active or inactive.
             var last = (await unitOfWork.GetRepository<CustomerStatusHistory>()
-                    .GetAllIncludingDeletedAsync(h => h.CustomerId == customer.Id && h.GcRecord == 0))
+                    .GetAllIncludingDeletedAsync(h => h.CustomerId == customer.Id && h.GcRecord == 0
+                        && h.Action != CustomerStatusAction.StageChanged))
                 .OrderByDescending(h => h.OccurredAt)
                 .FirstOrDefault();
             if (last is not null)

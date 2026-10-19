@@ -5,7 +5,7 @@ namespace JOIN.Domain.Customers;
 
 /// <summary>
 /// One status event of a <see cref="Customers.Customer"/> (SPEC 55): creation, activation, confirmation or
-/// deactivation, with the event that caused it. Insert-only.
+/// deactivation, with the event that caused it, or a stage change (SPEC 66). Insert-only.
 /// </summary>
 public class CustomerStatusHistory : BaseTenantEntity
 {
@@ -26,9 +26,19 @@ public class CustomerStatusHistory : BaseTenantEntity
     /// <summary>When the event happened (UTC).</summary>
     public DateTime OccurredAt { get; private set; }
 
+    /// <summary>Stage before the change; only set on <see cref="CustomerStatusAction.StageChanged"/> rows (SPEC 66).</summary>
+    public Guid? FromCustomerStageId { get; private set; }
+
+    /// <summary>Stage after the change; only set on <see cref="CustomerStatusAction.StageChanged"/> rows (SPEC 66).</summary>
+    public Guid? ToCustomerStageId { get; private set; }
+
     public virtual Customer Customer { get; set; } = null!;
 
     public virtual ApplicationUser User { get; set; } = null!;
+
+    public virtual CustomerStage? FromCustomerStage { get; set; }
+
+    public virtual CustomerStage? ToCustomerStage { get; set; }
 
     public static CustomerStatusHistory Create(
         Guid companyId,
@@ -58,5 +68,29 @@ public class CustomerStatusHistory : BaseTenantEntity
             UserId = userId,
             OccurredAt = occurredAtUtc ?? DateTime.UtcNow
         };
+    }
+
+    /// <summary>
+    /// A <see cref="CustomerStatusAction.StageChanged"/> row (SPEC 66): the customer moved from
+    /// <paramref name="fromCustomerStageId"/> to <paramref name="toCustomerStageId"/> (source <c>Manual</c> by default).
+    /// </summary>
+    public static CustomerStatusHistory CreateStageChange(
+        Guid companyId,
+        Guid customerId,
+        Guid fromCustomerStageId,
+        Guid toCustomerStageId,
+        Guid userId,
+        string? notes = null,
+        CustomerStatusSource source = CustomerStatusSource.Manual)
+    {
+        if (fromCustomerStageId == Guid.Empty)
+            throw new ArgumentException("From customer stage id is required.", nameof(fromCustomerStageId));
+        if (toCustomerStageId == Guid.Empty)
+            throw new ArgumentException("To customer stage id is required.", nameof(toCustomerStageId));
+
+        var history = Create(companyId, customerId, CustomerStatusAction.StageChanged, source, userId, notes: notes);
+        history.FromCustomerStageId = fromCustomerStageId;
+        history.ToCustomerStageId = toCustomerStageId;
+        return history;
     }
 }
