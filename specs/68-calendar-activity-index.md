@@ -4,6 +4,7 @@
 > **Depends on:** SPEC 43-post (opciones de menú y rutas en inglés), SPEC 44-post (actividades, ocurrencias, `CalendarUserConfiguration`, recurso `CalendarOthers`), SPEC 48-post (bloqueo por módulo), SPEC 67 (vínculo Persona/Cliente coherente). Rama de trabajo: `spec-68-calendar-activity-index`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Que el usuario consulte en una lista paginada y exportable las actividades del calendario (citas por defecto) con filtros, viendo solo las propias salvo que un administrador le permita ver las de otros usuarios de la empresa.
+> **Revisión de implementación (2026-10-19):** la consulta toma las series por `RecurrenceEndUtc` (como "Mi calendario") y no solo cuando su primera ocurrencia cae en el rango; los filtros se aplican por ocurrencia, así que una ocurrencia modificada que no pasa un filtro no hace reaparecer la de la serie; `OccurrenceStartUtc/EndUtc` son el horario real; SuperAdmin exporta sin chequeo, como en el filtro global; el seed del menú vive en `DatabaseSeeder`. Ajuste editorial, mantiene el estado.
 > **Origen:** pedido del usuario (2026-10-19): "un índice de Citas con tipos de filtros". Se divide con SPEC 67 (Persona/Cliente) y SPEC 69 (comentarios y documentos). Front: FE-43.
 
 ---
@@ -26,16 +27,16 @@
 
 **A. Dominio y persistencia**
 1. `CalendarUserConfiguration.CanViewOthersActivities` (`bool`, default `false`).
-2. Migración `Spec68CalendarActivityIndex`: la columna (default `false`) y el seed de la opción de menú y sus permisos.
+2. Migración `Spec68CalendarActivityIndex`: la columna (default `false`). La opción de menú y sus permisos se siembran en `DatabaseSeeder` (`SystemOptionSeed` / `RoleSystemOptionSeed`), que corre después de la migración.
 
 **B. Configuración por usuario**
 3. `GET /CalendarUserConfigurations` y `GET /CalendarUserConfigurations/{userId}` devuelven `CanViewOthersActivities`; `PUT /CalendarUserConfigurations/{userId}` lo recibe. `PUT …/me` lo ignora (regla 4).
 
 **C. Índice** — `CalendarActivityIndexController`, recurso `CalendarActivityIndex`
-4. `GET /api/v1/CalendarActivityIndex?from&to&activityCompanyIds&statusCompanyIds&ownerUserIds&calendarIds&requesterPersonId&originChannelIds&search&includeCancelled&pageNumber&pageSize&export` → `Response<PagedResult<CalendarActivityIndexItemDto>>`. Con `export=true` exige `CanExport` y usa `pageSize = 10 000`.
+4. `GET /api/v1/CalendarActivityIndex?from&to&activityCompanyIds&statusCompanyIds&ownerUserIds&calendarIds&requesterPersonId&originChannelIds&search&includeCancelled&pageNumber&pageSize&export` → `Response<PagedResult<CalendarActivityIndexItemDto>>`. Con `export=true` exige `CanExport` (SuperAdmin pasa sin chequeo, como en `DynamicAuthorizationFilter`) y usa `pageSize = 10 000`. Las series entran por `RecurrenceEndUtc` y sus excepciones se leen siempre; todos los filtros se aplican a cada ocurrencia ya expandida.
 5. `GET /api/v1/CalendarActivityIndex/{id}` y `/{id}/logs`: detalle e historial (mismos DTO que `CalendarEvents`), con la regla de visibilidad 2–3.
-6. `GET /api/v1/CalendarActivityIndex/owners?search`: usuarios de la empresa con calendario para el filtro "Dueño" (solo con el flag; sin él devuelve solo al usuario actual).
-7. `CalendarActivityIndexItemDto`: `EventId`, `ExceptionId?`, `OccurrenceStartUtc`, `OccurrenceEndUtc`, `IsAllDay`, `IsRecurring`, `Title`, `ActivityCompanyId`, `ActivityName`, `ActivityColor`, `StatusCompanyId`, `StatusName`, `OwnerUserId`, `OwnerName`, `CalendarName`, `RequesterPersonId?`, `RequesterPersonName?`, `CustomerCode?`, `OriginChannelCode`, `Location?`.
+6. `GET /api/v1/CalendarActivityIndex/owners?search&limit`: usuarios de la empresa con calendario para el filtro "Dueño" (`limit` por defecto y máximo 50; solo con el flag; sin él devuelve solo al usuario actual).
+7. `CalendarActivityIndexItemDto`: `EventId`, `ExceptionId?`, `OccurrenceStartUtc`, `OccurrenceEndUtc`, `IsAllDay`, `IsRecurring`, `Title`, `ActivityCompanyId`, `ActivityName`, `ActivityColor`, `StatusCompanyId`, `StatusName`, `OwnerUserId`, `OwnerName`, `CalendarName`, `RequesterPersonId?`, `RequesterPersonName?`, `CustomerCode?`, `OriginChannelCode`, `Location?`. `OccurrenceStartUtc/EndUtc` son el horario real de la ocurrencia (una modificada muestra el suyo); el detalle se abre con `ExceptionId ?? EventId`.
 
 **D. Menú y permisos**
 8. `SystemOption` `Activities` → ruta `/calendar/activities`, módulo `Calendar`, recurso `CalendarActivityIndex`, visible en menú. Seed por rol: los roles con `MyCalendar` reciben `CanRead`; `SuperAdmin`, `Manager` y `Supervisor` además `CanExport`. Admin y SuperAdminCompany por `PrivilegedRoleNames`.

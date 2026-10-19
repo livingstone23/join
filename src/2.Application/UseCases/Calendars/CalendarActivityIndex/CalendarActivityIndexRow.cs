@@ -41,5 +41,6 @@ public sealed record CalendarActivityIndexRow : ICalendarEventSlot
     public string? RequesterPersonName { get; init; }
     public string? CustomerCode { get; init; }
 
+    public Guid OriginChannelId { get; init; }
     public string OriginChannelCode { get; init; } = string.Empty;
 }

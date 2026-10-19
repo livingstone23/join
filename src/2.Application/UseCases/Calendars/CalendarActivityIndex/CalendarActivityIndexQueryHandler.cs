@@ -13,7 +13,7 @@ namespace JOIN.Application.UseCases.Calendars.CalendarActivityIndex;
 /// SPEC 68 — handles the activity index query. Validates the 92-day range cap, applies the visibility scope
 /// (own activities only, or company-wide when the per-user flag is on), fetches candidate rows through the
 /// <see cref="CalendarActivityIndexReader"/>, expands series via <see cref="CalendarOccurrenceExpansion"/>,
-/// optionally drops <c>CANCELLED</c> occurrences, applies the search text filter to the expanded list, sorts by
+/// re-applies every filter per occurrence (including <c>CANCELLED</c> and the search text), sorts by
 /// <see cref="ExpandedOccurrence{T}.StartUtc"/>, paginates and projects to
 /// <see cref="CalendarActivityIndexItemDto"/>. Export = first page of 10 000 rows.
 /// </summary>
@@ -77,20 +77,21 @@ public sealed class CalendarActivityIndexQueryHandler(
         var rows = await reader.ReadAsync(connection, criteria, cancellationToken);
         var occurrences = CalendarOccurrenceExpansion.Expand(rows, fromUtc, toUtc, timeZone, expander);
 
-        var filtered = occurrences.AsEnumerable();
-        if (!request.IncludeCancelled)
-        {
-            filtered = filtered.Where(o => o.Source.StatusCode != CalendarCodes.Statuses.Cancelled);
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.Search))
-        {
-            var term = request.Search.Trim();
-            filtered = filtered.Where(o =>
-                o.Source.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || (o.Source.Summary is not null && o.Source.Summary.Contains(term, StringComparison.OrdinalIgnoreCase))
-                || (o.Source.Location is not null && o.Source.Location.Contains(term, StringComparison.OrdinalIgnoreCase)));
-        }
+        // Every filter is re-applied per occurrence: the reader returns series masters and exceptions unfiltered so
+        // an exception that fails a filter still replaces (hides) the master occurrence it keys.
+        var term = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
+        var filtered = occurrences.Where(o =>
+            Matches(criteria.OwnerUserIds, o.Source.OwnerUserId)
+            && Matches(criteria.CalendarIds, o.Source.CalendarId)
+            && Matches(criteria.ActivityCompanyIds, o.Source.ActivityCompanyId)
+            && Matches(criteria.StatusCompanyIds, o.Source.StatusCompanyId)
+            && Matches(criteria.OriginChannelIds, o.Source.OriginChannelId)
+            && (criteria.RequesterPersonId is null || o.Source.RequesterPersonId == criteria.RequesterPersonId)
+            && (request.IncludeCancelled || o.Source.StatusCode != CalendarCodes.Statuses.Cancelled)
+            && (term is null
+                || o.Source.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || (o.Source.Summary?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (o.Source.Location?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)));
 
         var sorted = filtered
             .OrderBy(o => o.StartUtc)
@@ -122,12 +123,15 @@ public sealed class CalendarActivityIndexQueryHandler(
         };
     }
 
+    private static bool Matches(IReadOnlyCollection<Guid>? filter, Guid value) =>
+        filter is not { Count: > 0 } || filter.Contains(value);
+
     private static CalendarActivityIndexItemDto ToDto(ExpandedOccurrence<CalendarActivityIndexRow> occurrence) => new()
     {
         EventId = occurrence.EventId,
         ExceptionId = occurrence.ExceptionId,
-        OccurrenceStartUtc = CalendarTime.AsUtc(occurrence.OccurrenceStartUtc),
-        OccurrenceEndUtc = CalendarTime.AsUtc(occurrence.OccurrenceStartUtc == occurrence.StartUtc ? occurrence.EndUtc : occurrence.EndUtc),
+        OccurrenceStartUtc = CalendarTime.AsUtc(occurrence.StartUtc),
+        OccurrenceEndUtc = CalendarTime.AsUtc(occurrence.EndUtc),
         IsAllDay = occurrence.Source.IsAllDay,
         IsRecurring = occurrence.IsRecurring,
         Title = occurrence.Source.Title,

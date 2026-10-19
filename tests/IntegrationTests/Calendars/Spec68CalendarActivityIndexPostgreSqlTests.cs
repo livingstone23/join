@@ -105,20 +105,6 @@ public sealed class Spec68CalendarActivityIndexPostgreSqlTests : IClassFixture<C
     }
 
     /// <summary>
-    /// Acceptance #5 — exporting without <c>CanExport</c> is rejected with 403; with the permission the page size
-    /// is the 10 000 ceiling.
-    /// </summary>
-    [Fact]
-    public async Task Export_WithoutCanExport_ReturnsForbidden()
-    {
-        var s = await SeedAsync();
-        await s.CreateActivityAsync(title: "Mine", from: "2027-03-15T10:00:00-06:00", to: "2027-03-15T11:00:00-06:00");
-
-        var response = await s.AdminClient.GetAsync("/api/v1/CalendarActivityIndex?from=2027-03-01T00:00:00Z&to=2027-03-31T00:00:00Z&export=true");
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-    }
-
-    /// <summary>
     /// Acceptance #7 — opening another user's detail without the flag answers 404; with the flag it returns the
     /// detail.
     /// </summary>
@@ -168,6 +154,88 @@ public sealed class Spec68CalendarActivityIndexPostgreSqlTests : IClassFixture<C
     }
 
     /// <summary>
+    /// Acceptance #5 — a role with <c>CanRead</c> but no <c>CanExport</c> reads the index and gets 403 on export;
+    /// SuperAdmin exports (bypass, like the global filter) and the page size is the 10 000 ceiling.
+    /// </summary>
+    [Fact]
+    public async Task Export_RequiresCanExport_AndSuperAdminExports()
+    {
+        var s = await SeedAsync();
+        await s.CreateActivityAsync(title: "Mine", from: "2027-03-15T10:00:00-06:00", to: "2027-03-15T11:00:00-06:00");
+        var reader = await MemberClientAsync(s.CompanyId, "Coordinador", canExport: false);
+
+        (await reader.GetAsync($"{IndexUrl}&export=false")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await reader.GetAsync($"{IndexUrl}&export=true")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var export = await s.AdminClient.GetAsync($"{IndexUrl}&export=true");
+        export.StatusCode.Should().Be(HttpStatusCode.OK);
+        Data(await export.Content.ReadAsStringAsync()).GetProperty("pageSize").GetInt32().Should().Be(10_000);
+    }
+
+    /// <summary>
+    /// Acceptance #3 — a weekly series that started before the range appears once per occurrence of a 30-day
+    /// range, and the modified occurrence shows its own title and times.
+    /// </summary>
+    [Fact]
+    public async Task Index_WeeklySeriesStartedBeforeRange_ListsEachOccurrenceAndTheModifiedOne()
+    {
+        var s = await SeedAsync();
+        var (masterId, exceptionId) = await s.CreateWeeklySeriesWithExceptionAsync();
+
+        var index = await IndexAsync(s.AdminClient);
+
+        index.Items.Should().HaveCount(5);
+        index.Items.Should().OnlyContain(i => i.GetProperty("eventId").GetGuid() == masterId);
+        var moved = index.Items.Single(i => i.GetProperty("exceptionId").ValueKind != JsonValueKind.Null);
+        moved.GetProperty("exceptionId").GetGuid().Should().Be(exceptionId);
+        moved.GetProperty("title").GetString().Should().Be("Weekly (moved)");
+        moved.GetProperty("occurrenceStartUtc").GetDateTime().ToUniversalTime().Should().Be(new DateTime(2027, 3, 15, 18, 0, 0, DateTimeKind.Utc));
+    }
+
+    /// <summary>
+    /// Acceptance #4 — status, person and text filters narrow the result per occurrence; an exception that fails the
+    /// status filter is dropped without bringing back the series occurrence it replaced; cancelled rows are hidden
+    /// unless <c>includeCancelled=true</c>.
+    /// </summary>
+    [Fact]
+    public async Task Index_Filters_NarrowPerOccurrence()
+    {
+        var s = await SeedAsync();
+        var (_, _) = await s.CreateWeeklySeriesWithExceptionAsync(exceptionCancelled: true);
+        var personId = await s.CreatePersonAsync();
+        await s.CreateActivityAsync(title: "With person", from: "2027-03-16T10:00:00-06:00", to: "2027-03-16T11:00:00-06:00", requesterPersonId: personId);
+        var initialStatus = await s.InitialStatusCompanyIdAsync();
+
+        (await IndexAsync(s.AdminClient)).Items.Should().HaveCount(5, "the cancelled occurrence is hidden by default");
+        (await IndexAsync(s.AdminClient, extra: "includeCancelled=true")).Items.Should().HaveCount(6);
+        var byStatus = await IndexAsync(s.AdminClient, extra: $"includeCancelled=true&statusCompanyIds={initialStatus}");
+        byStatus.Items.Should().HaveCount(5);
+        byStatus.Items.Select(i => i.GetProperty("occurrenceStartUtc").GetDateTime().ToUniversalTime())
+            .Should().NotContain(new DateTime(2027, 3, 15, 16, 0, 0, DateTimeKind.Utc), "the cancelled exception must not resurrect the series occurrence");
+        (await IndexAsync(s.AdminClient, extra: $"requesterPersonId={personId}")).Items.Should().ContainSingle()
+            .Which.GetProperty("title").GetString().Should().Be("With person");
+        (await IndexAsync(s.AdminClient, extra: "search=PERSON")).Items.Should().ContainSingle();
+    }
+
+    /// <summary>
+    /// Acceptance #6 — <c>PUT /CalendarUserConfigurations/me</c> does not change the flag;
+    /// <c>PUT /CalendarUserConfigurations/{userId}</c> (CalendarSettings.CanUpdate) does.
+    /// </summary>
+    [Fact]
+    public async Task UserConfiguration_FlagChangesOnlyThroughAdminEndpoint()
+    {
+        var s = await SeedAsync();
+
+        (await s.AdminClient.PutAsJsonAsync("/api/v1/CalendarUserConfigurations/me", new { defaultView = 1, weekStartsOn = 1, canViewOthersActivities = true }))
+            .EnsureSuccessStatusCode();
+        (await s.ReadCanViewOthersAsync()).Should().BeFalse();
+
+        (await s.AdminClient.PutAsJsonAsync($"/api/v1/CalendarUserConfigurations/{s.AdminId}", new { workDays = 31, defaultView = 1, weekStartsOn = 1, canViewOthersActivities = true }))
+            .EnsureSuccessStatusCode();
+        (await s.ReadCanViewOthersAsync()).Should().BeTrue();
+    }
+
+    /// <summary>
     /// Acceptance #7 — <c>EXPLAIN</c> on the index query. We anchor on the events table by index so the FK joins
     /// do not degrade into sequential scans as the table grows.
     /// </summary>
@@ -192,9 +260,11 @@ public sealed class Spec68CalendarActivityIndexPostgreSqlTests : IClassFixture<C
             LEFT JOIN Customer.Customers cust ON cust.Id = e.CustomerId AND cust.CompanyId = e.CompanyId AND cust.GcRecord = 0
             WHERE e.CompanyId = $1
               AND e.GcRecord = 0
-              AND e.OwnerUserId = ANY($4)
-              AND ((e.SeriesMasterId IS NULL AND e.StartUtc < $3 AND e.EndUtc > $2)
-                OR (e.SeriesMasterId IS NOT NULL AND e.OriginalStartUtc >= $2 AND e.OriginalStartUtc < $3));
+              AND e.SeriesMasterId IS NULL
+              AND e.StartUtc < $3
+              AND ((e.RecurrenceRule IS NULL AND e.EndUtc > $2)
+                OR (e.RecurrenceRule IS NOT NULL AND (e.RecurrenceEndUtc IS NULL OR e.RecurrenceEndUtc > $2)))
+              AND e.OwnerUserId = ANY($4);
             """;
 
         var connection = db.Database.GetDbConnection();
@@ -225,12 +295,17 @@ public sealed class Spec68CalendarActivityIndexPostgreSqlTests : IClassFixture<C
 
     // ── helpers ──────────────────────────────────────────────────────────────────────────────
 
-    private static async Task<IndexResult> IndexAsync(HttpClient client, Guid[]? ownerUserIds = null)
+    private static async Task<IndexResult> IndexAsync(HttpClient client, Guid[]? ownerUserIds = null, string? extra = null)
     {
         var query = "from=2027-03-01T00:00:00Z&to=2027-03-31T00:00:00Z";
         if (ownerUserIds is { Length: > 0 })
         {
             query += "&" + string.Join("&", ownerUserIds.Select(id => $"ownerUserIds={id}"));
+        }
+
+        if (extra is not null)
+        {
+            query += "&" + extra;
         }
 
         var response = await client.GetAsync($"/api/v1/CalendarActivityIndex?{query}");
@@ -240,6 +315,33 @@ public sealed class Spec68CalendarActivityIndexPostgreSqlTests : IClassFixture<C
     }
 
     private sealed record IndexResult(IReadOnlyList<JsonElement> Items);
+
+    private const string IndexUrl = "/api/v1/CalendarActivityIndex?from=2027-03-01T00:00:00Z&to=2027-03-31T00:00:00Z";
+
+    /// <summary>
+    /// Registers a member with <paramref name="role"/> in the company and grants that role <c>CanRead</c> (and
+    /// optionally <c>CanExport</c>) on <c>Activities</c>: only JOIN-001 gets seeded permissions.
+    /// </summary>
+    private async Task<HttpClient> MemberClientAsync(Guid companyId, string role, bool canExport)
+    {
+        var email = $"m{Guid.NewGuid():N}@t.local";
+        var userId = await RegisterMemberAsync(companyId, email, role);
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var roleId = await db.Roles.Where(r => r.Name == role).Select(r => r.Id).SingleAsync();
+            var optionId = await db.SystemOptions.IgnoreQueryFilters()
+                .Where(o => o.Name == "Activities" && o.GcRecord == 0).Select(o => o.Id).SingleAsync();
+            db.UserRoleCompanies.Add(new UserRoleCompany { UserId = userId, RoleId = roleId, CompanyId = companyId, CreatedBy = Creator });
+            db.RoleSystemOptions.Add(new RoleSystemOption
+            {
+                RoleId = roleId, SystemOptionId = optionId, CompanyId = companyId, CanRead = true, CanExport = canExport, CreatedBy = Creator
+            });
+            await db.SaveChangesAsync();
+        }
+
+        return await AuthedClientAsync(companyId, email);
+    }
 
     private static async Task<OwnersResult> OwnersAsync(HttpClient client)
     {
@@ -386,7 +488,7 @@ public sealed class Spec68CalendarActivityIndexPostgreSqlTests : IClassFixture<C
         public Guid CalendarId { get; }
         public Guid WebChannelId { get; }
 
-        public async Task<Guid> CreateActivityAsync(string title, string from, string to, Guid? ownerId = null)
+        public async Task<Guid> CreateActivityAsync(string title, string from, string to, Guid? ownerId = null, Guid? requesterPersonId = null)
         {
             await using var scope = _parent._factory.Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -413,6 +515,7 @@ public sealed class Spec68CalendarActivityIndexPostgreSqlTests : IClassFixture<C
                 IsAllDay = false,
                 StartUtc = start,
                 EndUtc = end,
+                RequesterPersonId = requesterPersonId,
                 OriginChannelId = WebChannelId,
                 OriginType = CalendarEventOriginType.User,
                 GcRecord = BaseAuditableEntity.ActiveGcRecord,
@@ -422,6 +525,100 @@ public sealed class Spec68CalendarActivityIndexPostgreSqlTests : IClassFixture<C
             db.CalendarEvents.Add(calendarEvent);
             await db.SaveChangesAsync();
             return eventId;
+        }
+
+        /// <summary>
+        /// Weekly series (Mondays 10:00 Managua) that starts on 2027-02-01, before the March test range, plus an
+        /// exception of the 2027-03-15 occurrence moved to 12:00 (or cancelled).
+        /// </summary>
+        public async Task<(Guid MasterId, Guid ExceptionId)> CreateWeeklySeriesWithExceptionAsync(bool exceptionCancelled = false)
+        {
+            await using var scope = _parent._factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var activity = await db.CalendarActivityCompanies.IgnoreQueryFilters()
+                .FirstAsync(a => a.CompanyId == CompanyId && a.IsActive);
+            var cancelledStatusId = await (
+                from sc in db.CalendarStatusCompanies.IgnoreQueryFilters()
+                join st in db.CalendarStatuses.IgnoreQueryFilters() on sc.CalendarStatusId equals st.Id
+                where sc.CompanyId == CompanyId && st.Code == "CANCELLED"
+                select sc.Id).FirstAsync();
+
+            var master = NewEvent(activity, "Weekly", new DateTime(2027, 2, 1, 16, 0, 0, DateTimeKind.Utc));
+            master.RecurrenceRule = "FREQ=WEEKLY;BYDAY=MO";
+            var masterId = Guid.NewGuid();
+            SetId(master, masterId);
+
+            var originalStart = new DateTime(2027, 3, 15, 16, 0, 0, DateTimeKind.Utc);
+            var exception = NewEvent(activity, exceptionCancelled ? "Weekly" : "Weekly (moved)",
+                exceptionCancelled ? originalStart : originalStart.AddHours(2));
+            exception.SeriesMasterId = masterId;
+            exception.OriginalStartUtc = originalStart;
+            if (exceptionCancelled)
+            {
+                exception.CalendarStatusCompanyId = cancelledStatusId;
+            }
+            var exceptionId = Guid.NewGuid();
+            SetId(exception, exceptionId);
+
+            db.CalendarEvents.AddRange(master, exception);
+            await db.SaveChangesAsync();
+            return (masterId, exceptionId);
+        }
+
+        private CalendarEvent NewEvent(CalendarActivityCompany activity, string title, DateTime startUtc) => new()
+        {
+            CompanyId = CompanyId,
+            CalendarId = CalendarId,
+            OwnerUserId = AdminId,
+            CalendarActivityCompanyId = activity.Id,
+            CalendarStatusCompanyId = activity.InitialCalendarStatusCompanyId,
+            Title = title,
+            IsAllDay = false,
+            StartUtc = startUtc,
+            EndUtc = startUtc.AddHours(1),
+            OriginChannelId = WebChannelId,
+            OriginType = CalendarEventOriginType.User,
+            GcRecord = BaseAuditableEntity.ActiveGcRecord,
+            CreatedBy = Creator
+        };
+
+        public async Task<Guid> CreatePersonAsync()
+        {
+            await using var scope = _parent._factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var person = new Person
+            {
+                CompanyId = CompanyId,
+                PersonType = JOIN.Domain.Enums.PersonType.Physical,
+                FirstName = "Ada",
+                LastName = "Lovelace",
+                CreatedBy = Creator
+            };
+            var personId = Guid.NewGuid();
+            SetId(person, personId);
+            db.Persons.Add(person);
+            await db.SaveChangesAsync();
+            return personId;
+        }
+
+        public async Task<Guid> InitialStatusCompanyIdAsync()
+        {
+            await using var scope = _parent._factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            return await db.CalendarActivityCompanies.IgnoreQueryFilters()
+                .Where(a => a.CompanyId == CompanyId && a.IsActive)
+                .Select(a => a.InitialCalendarStatusCompanyId)
+                .FirstAsync();
+        }
+
+        public async Task<bool> ReadCanViewOthersAsync()
+        {
+            await using var scope = _parent._factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            return await db.CalendarUserConfigurations.IgnoreQueryFilters()
+                .Where(c => c.CompanyId == CompanyId && c.UserId == AdminId && c.GcRecord == 0)
+                .Select(c => c.CanViewOthersActivities)
+                .FirstAsync();
         }
 
         private static void SetId(object entity, Guid id)
