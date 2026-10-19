@@ -64,12 +64,14 @@ public sealed class CalendarFlowPostgreSqlTests : IClassFixture<CustomWebApplica
         var routes = await db.SystemOptions.IgnoreQueryFilters().Where(o => o.Route.StartsWith("/calendar")).Select(o => o.Route).ToListAsync();
         routes.Should().Contain(["/calendar", "/calendar/my-calendar", "/calendar/panel", "/calendar/activity-confirmation", "/calendar/settings", "/calendar/catalogs"]);
 
-        // Physical schema: calendar, all lower case: eleven tables of SPEC 44-post plus the three of SPEC 46-post.
+        // Physical schema: calendar, all lower case: eleven tables of SPEC 44-post plus the three of SPEC 46-post
+        // and the three of SPEC 69 (comments, documents, attachment settings).
         var tables = await db.Database.SqlQueryRaw<string>(
             "SELECT table_name AS \"Value\" FROM information_schema.tables WHERE table_schema = 'calendar'").ToListAsync();
         tables.Should().BeEquivalentTo(["activities", "activitycompanies", "statuses", "statuscompanies", "calendarcompanies",
             "companynonworkingdays", "userconfigurations", "usernonworkingperiods", "usercalendars", "events", "eventlogs",
-            "externalconnections", "externaleventlinks", "syncoutbox"]);
+            "externalconnections", "externaleventlinks", "syncoutbox",
+            "eventcomments", "eventdocuments", "attachmentsettings"]);
     }
 
     [Fact]

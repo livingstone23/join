@@ -47,7 +47,27 @@ public record CalendarEventDto
     public DateTime? OriginalStartUtc { get; init; }
     public CalendarOriginDto Origin { get; init; } = new(string.Empty, string.Empty, null, null);
     public Guid? RequesterPersonId { get; init; }
+
+    /// <summary>
+    /// Readable name of the requester person (SPEC 67 — unified "Persona/Cliente" lookup of FE-42). Empty when the
+    /// activity has no person; the commercial name wins for legal persons, otherwise the trimmed full name.
+    /// </summary>
+    public string? RequesterPersonName { get; init; }
+
     public Guid? CustomerId { get; init; }
+
+    /// <summary>
+    /// Customer code of the linked customer (SPEC 67). <c>null</c> when the activity has no customer. The pair
+    /// <see cref="RequesterPersonId"/>/<see cref="CustomerId"/> is always coherent — see <c>ValidateLinksAsync</c>.
+    /// </summary>
+    public string? CustomerCode { get; init; }
+
+    /// <summary>
+    /// <c>true</c> when the linked customer is active; <c>false</c> when it is inactive (SPEC 67 keeps the link
+    /// for inactive customers); <c>null</c> when the activity has no customer.
+    /// </summary>
+    public bool? IsCustomerActive { get; init; }
+
     public Guid? TicketId { get; init; }
     public Guid? ProjectId { get; init; }
     public DateTime? StatusChangedUtc { get; init; }

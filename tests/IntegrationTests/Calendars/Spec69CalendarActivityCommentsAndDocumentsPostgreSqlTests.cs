@@ -9,6 +9,7 @@ using System.Text.Json;
 using FluentAssertions;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Security;
+using JOIN.Application.Interface;
 using JOIN.Application.UseCases.Security.Auth.Login;
 using JOIN.Application.UseCases.Security.Auth.Register;
 using JOIN.Domain.Admin;
@@ -21,6 +22,7 @@ using JOIN.Persistence.Contexts;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using System.Reflection;
 
 namespace JOIN.IntegrationTests.Calendars;
 
@@ -189,10 +191,10 @@ public sealed class Spec69CalendarActivityCommentsAndDocumentsPostgreSqlTests : 
             EXPLAIN (FORMAT TEXT)
             SELECT e.Id
             FROM Calendar.Events e
-            WHERE e.CompanyId = @CompanyId
+            WHERE e.CompanyId = $1
               AND e.GcRecord = 0
-              AND ((e.SeriesMasterId IS NULL AND e.StartUtc < @ToUtc AND e.EndUtc > @FromUtc)
-                OR (e.SeriesMasterId IS NOT NULL AND e.OriginalStartUtc >= @FromUtc AND e.OriginalStartUtc < @ToUtc));
+              AND ((e.SeriesMasterId IS NULL AND e.StartUtc < $3 AND e.EndUtc > $2)
+                OR (e.SeriesMasterId IS NOT NULL AND e.OriginalStartUtc >= $2 AND e.OriginalStartUtc < $3));
             """;
         var rows = new List<string>();
         var connection = db.Database.GetDbConnection();
@@ -391,9 +393,8 @@ public sealed class Spec69CalendarActivityCommentsAndDocumentsPostgreSqlTests : 
             var eventId = Guid.NewGuid();
             var start = DateTimeOffset.Parse(from).UtcDateTime;
             var end = DateTimeOffset.Parse(to).UtcDateTime;
-            db.CalendarEvents.Add(new CalendarEvent
+            var calendarEvent = new CalendarEvent
             {
-                Id = eventId,
                 CompanyId = CompanyId,
                 CalendarId = CalendarId,
                 OwnerUserId = AdminId,
@@ -407,7 +408,10 @@ public sealed class Spec69CalendarActivityCommentsAndDocumentsPostgreSqlTests : 
                 OriginType = CalendarEventOriginType.User,
                 GcRecord = BaseAuditableEntity.ActiveGcRecord,
                 CreatedBy = Creator
-            });
+            };
+            typeof(CalendarEvent).GetProperty("Id", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)!
+                .SetValue(calendarEvent, eventId);
+            db.CalendarEvents.Add(calendarEvent);
             await db.SaveChangesAsync();
             return eventId;
         }

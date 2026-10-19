@@ -16,7 +16,7 @@ namespace JOIN.Persistence.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "EventComments",
+                name: "eventcomments",
                 schema: "calendar",
                 columns: table => new
                 {
@@ -71,17 +71,17 @@ namespace JOIN.Persistence.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_eventcomments_company",
                 schema: "calendar",
-                table: "EventComments",
+                table: "eventcomments",
                 column: "companyid");
 
             migrationBuilder.CreateIndex(
                 name: "IX_EventComments_Event_CreatedUtc",
                 schema: "calendar",
-                table: "EventComments",
+                table: "eventcomments",
                 columns: new[] { "calendareventid", "createdutc" });
 
             migrationBuilder.CreateTable(
-                name: "EventDocuments",
+                name: "eventdocuments",
                 schema: "calendar",
                 columns: table => new
                 {
@@ -120,7 +120,7 @@ namespace JOIN.Persistence.Migrations
                         "fk_eventdocuments_calendareventcomments_calendareventcommentid",
                         x => x.calendareventcommentid,
                         principalSchema: "calendar",
-                        principalTable: "EventComments",
+                        principalTable: "eventcomments",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
@@ -149,23 +149,23 @@ namespace JOIN.Persistence.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_eventdocuments_company",
                 schema: "calendar",
-                table: "EventDocuments",
+                table: "eventdocuments",
                 column: "companyid");
 
             migrationBuilder.CreateIndex(
                 name: "IX_EventDocuments_Comment",
                 schema: "calendar",
-                table: "EventDocuments",
+                table: "eventdocuments",
                 column: "calendareventcommentid");
 
             migrationBuilder.CreateIndex(
                 name: "IX_EventDocuments_Event_Created",
                 schema: "calendar",
-                table: "EventDocuments",
+                table: "eventdocuments",
                 columns: new[] { "calendareventid", "created" });
 
             migrationBuilder.CreateTable(
-                name: "AttachmentSettings",
+                name: "attachmentsettings",
                 schema: "calendar",
                 columns: table => new
                 {
@@ -196,7 +196,7 @@ namespace JOIN.Persistence.Migrations
             migrationBuilder.CreateIndex(
                 name: "UX_CalendarAttachmentSettings_Company",
                 schema: "calendar",
-                table: "AttachmentSettings",
+                table: "attachmentsettings",
                 column: "companyid",
                 unique: true,
                 filter: "\"gcrecord\" = 0");
@@ -206,46 +206,46 @@ namespace JOIN.Persistence.Migrations
             migrationBuilder.AddColumn<Guid>(
                 name: "calendareventcommentid",
                 schema: "calendar",
-                table: "EventLogs",
+                table: "eventlogs",
                 type: "uuid",
                 nullable: true);
 
             migrationBuilder.AddColumn<Guid>(
                 name: "calendareventdocumentid",
                 schema: "calendar",
-                table: "EventLogs",
+                table: "eventlogs",
                 type: "uuid",
                 nullable: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_CalendarEventLogs_Comment",
                 schema: "calendar",
-                table: "EventLogs",
+                table: "eventlogs",
                 column: "calendareventcommentid");
 
             migrationBuilder.CreateIndex(
                 name: "IX_CalendarEventLogs_Document",
                 schema: "calendar",
-                table: "EventLogs",
+                table: "eventlogs",
                 column: "calendareventdocumentid");
 
             migrationBuilder.AddForeignKey(
                 name: "fk_eventlogs_calendareventcomments_calendareventcommentid",
                 schema: "calendar",
-                table: "EventLogs",
+                table: "eventlogs",
                 column: "calendareventcommentid",
                 principalSchema: "calendar",
-                principalTable: "EventComments",
+                principalTable: "eventcomments",
                 principalColumn: "id",
                 onDelete: ReferentialAction.Restrict);
 
             migrationBuilder.AddForeignKey(
                 name: "fk_eventlogs_calendareventdocuments_calendareventdocumentid",
                 schema: "calendar",
-                table: "EventLogs",
+                table: "eventlogs",
                 column: "calendareventdocumentid",
                 principalSchema: "calendar",
-                principalTable: "EventDocuments",
+                principalTable: "eventdocuments",
                 principalColumn: "id",
                 onDelete: ReferentialAction.Restrict);
         }
@@ -256,43 +256,43 @@ namespace JOIN.Persistence.Migrations
             migrationBuilder.DropForeignKey(
                 name: "fk_eventlogs_calendareventdocuments_calendareventdocumentid",
                 schema: "calendar",
-                table: "EventLogs");
+                table: "eventlogs");
 
             migrationBuilder.DropForeignKey(
                 name: "fk_eventlogs_calendareventcomments_calendareventcommentid",
                 schema: "calendar",
-                table: "EventLogs");
+                table: "eventlogs");
 
             migrationBuilder.DropIndex(
                 name: "IX_CalendarEventLogs_Document",
                 schema: "calendar",
-                table: "EventLogs");
+                table: "eventlogs");
 
             migrationBuilder.DropIndex(
                 name: "IX_CalendarEventLogs_Comment",
                 schema: "calendar",
-                table: "EventLogs");
+                table: "eventlogs");
 
             migrationBuilder.DropColumn(
                 name: "calendareventdocumentid",
                 schema: "calendar",
-                table: "EventLogs");
+                table: "eventlogs");
 
             migrationBuilder.DropColumn(
                 name: "calendareventcommentid",
                 schema: "calendar",
-                table: "EventLogs");
+                table: "eventlogs");
 
             migrationBuilder.DropTable(
-                name: "AttachmentSettings",
+                name: "attachmentsettings",
                 schema: "calendar");
 
             migrationBuilder.DropTable(
-                name: "EventDocuments",
+                name: "eventdocuments",
                 schema: "calendar");
 
             migrationBuilder.DropTable(
-                name: "EventComments",
+                name: "eventcomments",
                 schema: "calendar");
         }
     }

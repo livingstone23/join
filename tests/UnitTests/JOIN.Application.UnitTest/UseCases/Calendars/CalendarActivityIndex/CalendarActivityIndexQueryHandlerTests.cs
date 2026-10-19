@@ -297,6 +297,97 @@ public sealed class CalendarActivityIndexQueryHandlerTests
         context.CapturedCriteria!.CalendarIds.Should().BeNull();
     }
 
+    /// <summary>
+    /// Acceptance #3 — a modified occurrence shows its own data and times; when it fails a filter it is dropped and
+    /// the master occurrence it replaces does not reappear.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenExceptionFailsFilter_DoesNotResurrectMasterOccurrence()
+    {
+        var context = new IndexTestContext(canViewOthers: false);
+        var master = BuildRow(ownerId: context.CurrentUserId, title: "Weekly", recurrenceRule: "FREQ=WEEKLY;BYDAY=MO;COUNT=3");
+        var exception = master with
+        {
+            Id = Guid.NewGuid(),
+            SeriesMasterId = master.Id,
+            OriginalStartUtc = master.StartUtc.AddDays(7),
+            StartUtc = master.StartUtc.AddDays(7).AddHours(3),
+            EndUtc = master.EndUtc.AddDays(7).AddHours(3),
+            RecurrenceRule = null,
+            Title = "Moved",
+            StatusCompanyId = Guid.NewGuid()
+        };
+        context.Reader.Rows = [master, exception];
+        var query = new CalendarActivityIndexQuery
+        {
+            FromUtc = new DateTime(2027, 3, 1, 0, 0, 0, DateTimeKind.Utc),
+            ToUtc = new DateTime(2027, 3, 31, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        var all = await context.CreateHandler().Handle(query, CancellationToken.None);
+        var filtered = await context.CreateHandler().Handle(query with { StatusCompanyIds = [master.StatusCompanyId] }, CancellationToken.None);
+
+        var moved = all.Data!.Items.Should().ContainSingle(i => i.ExceptionId == exception.Id).Subject;
+        moved.Title.Should().Be("Moved");
+        moved.OccurrenceStartUtc.Should().Be(exception.StartUtc);
+        moved.OccurrenceEndUtc.Should().Be(exception.EndUtc);
+        filtered.Data!.Items.Should().HaveCount(2).And.OnlyContain(i => i.ExceptionId == null);
+        filtered.Data.Items.Select(i => i.OccurrenceStartUtc).Should().NotContain(exception.OriginalStartUtc!.Value);
+    }
+
+    /// <summary>
+    /// Acceptance #4 — type, status, channel and person filters are applied to each occurrence, not only in SQL.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenAttributeFiltersAreGiven_NarrowsEachOccurrence()
+    {
+        var context = new IndexTestContext(canViewOthers: false);
+        var person = Guid.NewGuid();
+        var match = BuildRow(ownerId: context.CurrentUserId, title: "Match") with { RequesterPersonId = person, OriginChannelId = Guid.NewGuid() };
+        context.Reader.Rows =
+        [
+            match,
+            match with { Id = Guid.NewGuid(), Title = "Other type", ActivityCompanyId = Guid.NewGuid() },
+            match with { Id = Guid.NewGuid(), Title = "Other status", StatusCompanyId = Guid.NewGuid() },
+            match with { Id = Guid.NewGuid(), Title = "Other channel", OriginChannelId = Guid.NewGuid() },
+            match with { Id = Guid.NewGuid(), Title = "Other person", RequesterPersonId = Guid.NewGuid() }
+        ];
+
+        var response = await context.CreateHandler().Handle(new CalendarActivityIndexQuery
+        {
+            FromUtc = new DateTime(2027, 3, 1, 0, 0, 0, DateTimeKind.Utc),
+            ToUtc = new DateTime(2027, 3, 8, 0, 0, 0, DateTimeKind.Utc),
+            ActivityCompanyIds = [match.ActivityCompanyId],
+            StatusCompanyIds = [match.StatusCompanyId],
+            OriginChannelIds = [match.OriginChannelId],
+            RequesterPersonId = person
+        }, CancellationToken.None);
+
+        response.Data!.Items.Should().ContainSingle().Which.Title.Should().Be("Match");
+    }
+
+    /// <summary>
+    /// Visibility — without the flag, a row of another owner the reader returns is still dropped.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenUserHasNoFlag_DropsOtherOwnersRows()
+    {
+        var context = new IndexTestContext(canViewOthers: false);
+        context.Reader.Rows =
+        [
+            BuildRow(ownerId: context.CurrentUserId, title: "Mine"),
+            BuildRow(ownerId: Guid.NewGuid(), title: "Theirs")
+        ];
+
+        var response = await context.CreateHandler().Handle(new CalendarActivityIndexQuery
+        {
+            FromUtc = new DateTime(2027, 3, 1, 0, 0, 0, DateTimeKind.Utc),
+            ToUtc = new DateTime(2027, 3, 8, 0, 0, 0, DateTimeKind.Utc)
+        }, CancellationToken.None);
+
+        response.Data!.Items.Should().ContainSingle().Which.Title.Should().Be("Mine");
+    }
+
     private static CalendarActivityIndexRow BuildRow(
         Guid ownerId,
         string title,

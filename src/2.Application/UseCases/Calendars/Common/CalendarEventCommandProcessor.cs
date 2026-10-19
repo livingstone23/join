@@ -6,6 +6,7 @@ using JOIN.Domain.Admin;
 using JOIN.Domain.Calendars;
 using JOIN.Domain.Calendars.Enums;
 using JOIN.Domain.Common;
+using JOIN.Domain.Enums;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
 using JOIN.Domain.Customers;
@@ -540,7 +541,7 @@ public sealed class CalendarEventCommandProcessor(
             return Response<PreparedInput>.Error(links.Message, links.Errors);
         }
 
-        return Ok(new PreparedInput(calendar, activity, times.Data.StartUtc, times.Data.EndUtc));
+        return Ok(new PreparedInput(calendar, activity, times.Data.StartUtc, times.Data.EndUtc, links.Data!));
     }
 
     /// <summary>
@@ -616,29 +617,72 @@ public sealed class CalendarEventCommandProcessor(
         return Ok<CalendarRecurrenceRule?>(rule);
     }
 
-    private async Task<Response<bool>> ValidateLinksAsync(Guid companyId, ICalendarEventInput input)
+    /// <summary>
+    /// R9 + SPEC 67: validates each linked record exists in the company and resolves the pair
+    /// <c>(requesterPersonId, customerId)</c> so the two columns always point at the same relationship. Rules 2 and 3
+    /// of SPEC 67 fill in the missing side; rule 4 rejects a mismatch with <c>CALENDAR_PERSON_CUSTOMER_MISMATCH</c>.
+    /// Rule 6 keeps both nulls when both arrive null (the entity is cleared).
+    /// </summary>
+    private async Task<Response<ResolvedLinks>> ValidateLinksAsync(Guid companyId, ICalendarEventInput input)
     {
-        if (input.RequesterPersonId is { } personId && !await IsLinkValidAsync<Person>(personId, companyId))
+        Person? person = null;
+        Customer? customer = null;
+
+        if (input.RequesterPersonId is { } personId)
         {
-            return InvalidLink("requesterPersonId");
+            person = (await unitOfWork.GetRepository<Person>()
+                .GetAllIncludingDeletedAsync(x => x.Id == personId && x.CompanyId == companyId && x.GcRecord == 0))
+                .FirstOrDefault();
+            if (person is null)
+            {
+                return InvalidLink<ResolvedLinks>("requesterPersonId");
+            }
         }
 
-        if (input.CustomerId is { } customerId && !await IsLinkValidAsync<Customer>(customerId, companyId))
+        if (input.CustomerId is { } customerId)
         {
-            return InvalidLink("customerId");
+            customer = await unitOfWork.GetRepository<Customer>().GetAsync(customerId);
+            if (customer is null || customer.CompanyId != companyId || customer.GcRecord != 0)
+            {
+                return InvalidLink<ResolvedLinks>("customerId");
+            }
+        }
+
+        // SPEC 67 rule 2: person → customer (the customer's customer of that person in the company, active or not).
+        if (person is not null && customer is null)
+        {
+            customer = (await unitOfWork.GetRepository<Customer>()
+                .GetAllIncludingDeletedAsync(x => x.CompanyId == companyId && x.PersonId == person.Id && x.GcRecord == 0))
+                .FirstOrDefault();
+        }
+
+        // SPEC 67 rule 3: customer → person (the customer must point at a live person of the company).
+        if (customer is not null && person is null)
+        {
+            person = (await unitOfWork.GetRepository<Person>()
+                .GetAllIncludingDeletedAsync(x => x.Id == customer.PersonId && x.CompanyId == companyId && x.GcRecord == 0))
+                .FirstOrDefault();
+        }
+
+        // SPEC 67 rule 4: when both arrive, they must agree; otherwise the pair is incoherent.
+        if (person is not null && customer is not null && customer.PersonId != person.Id)
+        {
+            return Response<ResolvedLinks>.Error(CalendarErrorCodes.PersonCustomerMismatch,
+                ["The customer does not belong to the requester person."]);
         }
 
         if (input.TicketId is { } ticketId && !await IsLinkValidAsync<Ticket>(ticketId, companyId))
         {
-            return InvalidLink("ticketId");
+            return InvalidLink<ResolvedLinks>("ticketId");
         }
 
         if (input.ProjectId is { } projectId && !await IsLinkValidAsync<Project>(projectId, companyId))
         {
-            return InvalidLink("projectId");
+            return InvalidLink<ResolvedLinks>("projectId");
         }
 
-        return Ok(true);
+        // SPEC 67 rule 6: when both are null the pair is cleared (entity keeps nulls).
+        return Ok(new ResolvedLinks(person?.Id, customer?.Id));
     }
 
     /// <summary>
@@ -650,8 +694,8 @@ public sealed class CalendarEventCommandProcessor(
             .GetAllIncludingDeletedAsync(x => x.Id == id && x.CompanyId == companyId && x.GcRecord == 0))
         .Any();
 
-    private static Response<bool> InvalidLink(string field) =>
-        Response<bool>.Error(CalendarErrorCodes.InvalidLink, [$"{field} does not exist in the current company."]);
+    private static Response<T> InvalidLink<T>(string field) =>
+        Response<T>.Error(CalendarErrorCodes.InvalidLink, [$"{field} does not exist in the current company."]);
 
     private async Task<bool> IsCompanyMemberAsync(Guid companyId, Guid userId) =>
         (await unitOfWork.GetRepository<UserCompany>()
@@ -670,8 +714,8 @@ public sealed class CalendarEventCommandProcessor(
         calendarEvent.IsAllDay = input.IsAllDay;
         calendarEvent.StartUtc = data.StartUtc;
         calendarEvent.EndUtc = data.EndUtc;
-        calendarEvent.RequesterPersonId = input.RequesterPersonId;
-        calendarEvent.CustomerId = input.CustomerId;
+        calendarEvent.RequesterPersonId = data.Links.PersonId;
+        calendarEvent.CustomerId = data.Links.CustomerId;
         calendarEvent.TicketId = input.TicketId;
         calendarEvent.ProjectId = input.ProjectId;
     }
@@ -914,6 +958,16 @@ public sealed class CalendarEventCommandProcessor(
         var calendar = await unitOfWork.GetRepository<UserCalendar>().GetAsync(calendarEvent.CalendarId);
         var owner = await unitOfWork.GetRepository<ApplicationUser>().GetAsync(calendarEvent.OwnerUserId);
         var channel = await unitOfWork.GetRepository<CommunicationChannel>().GetAsync(calendarEvent.OriginChannelId);
+        var person = calendarEvent.RequesterPersonId is { } pid
+            ? (await unitOfWork.GetRepository<Person>()
+                .GetAllIncludingDeletedAsync(p => p.Id == pid && p.CompanyId == calendarEvent.CompanyId && p.GcRecord == 0))
+                .FirstOrDefault()
+            : null;
+        var customer = calendarEvent.CustomerId is { } cid
+            ? (await unitOfWork.GetRepository<Customer>()
+                .GetAllIncludingDeletedAsync(c => c.Id == cid && c.CompanyId == calendarEvent.CompanyId && c.GcRecord == 0))
+                .FirstOrDefault()
+            : null;
 
         var dto = new CalendarEventDto
         {
@@ -952,7 +1006,10 @@ public sealed class CalendarEventCommandProcessor(
             OriginalStartUtc = calendarEvent.OriginalStartUtc,
             Origin = new CalendarOriginDto(channel?.Code ?? string.Empty, calendarEvent.OriginType.ToString(), calendarEvent.OriginIdentifier, calendarEvent.OriginUserId),
             RequesterPersonId = calendarEvent.RequesterPersonId,
+            RequesterPersonName = person is null ? null : PersonDisplayName(person),
             CustomerId = calendarEvent.CustomerId,
+            CustomerCode = customer?.CustomerCode,
+            IsCustomerActive = customer?.IsActive,
             TicketId = calendarEvent.TicketId,
             ProjectId = calendarEvent.ProjectId,
             StatusChangedUtc = calendarEvent.StatusChangedUtc,
@@ -963,6 +1020,17 @@ public sealed class CalendarEventCommandProcessor(
 
         return new Response<CalendarEventDto> { IsSuccess = true, Data = dto, Message = message };
     }
+
+    /// <summary>
+    /// SPEC 67 — mirrors the <c>ByIdSql</c> projection: legal persons get their commercial name, physical persons
+    /// get the trimmed CONCAT_WS of their name parts.
+    /// </summary>
+    private static string PersonDisplayName(Person person) =>
+        person.PersonType == PersonType.Legal && !string.IsNullOrWhiteSpace(person.CommercialName)
+            ? person.CommercialName
+            : string.Join(' ',
+                new[] { person.FirstName, person.MiddleName, person.LastName, person.SecondLastName }
+                    .Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
 
     private static CalendarEvent CopyOf(CalendarEvent source) => new()
     {
@@ -1014,7 +1082,14 @@ public sealed record CalendarExternalOrigin(Guid ChannelId, CalendarEventOriginT
 /// </summary>
 public sealed record CalendarSession(Guid CompanyId, Guid ActorUserId, CalendarCompanyContext Company, CalendarActor Actor);
 
-internal sealed record PreparedInput(UserCalendar Calendar, UsableActivity Activity, DateTime StartUtc, DateTime EndUtc);
+internal sealed record PreparedInput(UserCalendar Calendar, UsableActivity Activity, DateTime StartUtc, DateTime EndUtc, ResolvedLinks Links);
+
+/// <summary>
+/// Pair of ids resolved by <see cref="CalendarEventCommandProcessor.ValidateLinksAsync"/> (SPEC 67): the two columns
+/// are kept consistent on every write — both null, both pointing at the same person/customer pair, or a single
+/// side that fills in the other.
+/// </summary>
+internal sealed record ResolvedLinks(Guid? PersonId, Guid? CustomerId);
 
 internal enum CalendarEditTarget
 {

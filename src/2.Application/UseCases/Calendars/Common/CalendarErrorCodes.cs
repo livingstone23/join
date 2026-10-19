@@ -57,6 +57,9 @@ public static class CalendarErrorCodes
     public const string InvalidEventTimes = "CALENDAR_INVALID_EVENT_TIMES";
     public const string CancellationReasonRequired = "CALENDAR_CANCELLATION_REASON_REQUIRED";
     public const string InvalidLink = "CALENDAR_INVALID_LINK";
+
+    // SPEC 67 — the requester person and customer must point to the same pair (PersonId / CustomerId).
+    public const string PersonCustomerMismatch = "CALENDAR_PERSON_CUSTOMER_MISMATCH";
     public const string RangeTooLarge = "CALENDAR_RANGE_TOO_LARGE";
     public const string TooManyUsers = "CALENDAR_TOO_MANY_USERS";
     public const string OthersPermissionRequired = "CALENDAR_OTHERS_PERMISSION_REQUIRED";

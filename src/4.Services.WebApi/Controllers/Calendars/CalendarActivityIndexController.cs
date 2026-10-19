@@ -41,18 +41,16 @@ public class CalendarActivityIndexController(
         [FromQuery] int? pageNumber = null, [FromQuery] int? pageSize = null,
         [FromQuery] bool export = false, CancellationToken cancellationToken = default)
     {
-        if (export)
-        {
-            var allowed = await permissionService.HasPermissionAsync(
-                currentUserService.UserId,
+        // SuperAdmin bypasses the check like DynamicAuthorizationFilter does (same pattern as LeadReportsController).
+        if (export && !User.IsInRole("SuperAdmin")
+            && !await permissionService.HasPermissionAsync(
+                currentUserService.UserId ?? string.Empty,
                 currentUserService.CompanyId.ToString(),
                 "CalendarActivityIndex",
-                "GET",
-                PermissionFlags.CanExport);
-            if (!allowed)
-            {
-                return new ForbidResult();
-            }
+                HttpMethods.Get,
+                PermissionFlags.CanExport))
+        {
+            return Forbid();
         }
 
         var query = new CalendarActivityIndexQuery

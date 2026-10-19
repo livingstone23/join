@@ -3,7 +3,9 @@ namespace JOIN.Application.DTO.Calendars;
 /// <summary>
 /// One occurrence of the activity index (<c>GET /CalendarActivityIndex</c>, SPEC 68). <see cref="EventId"/> is the
 /// master or the one-time activity; <see cref="ExceptionId"/> is set when the occurrence is an exception.
-/// <see cref="OccurrenceStartUtc"/> is the key of the occurrence in the series.
+/// <see cref="OccurrenceStartUtc"/>/<see cref="OccurrenceEndUtc"/> are the real times of the occurrence: a modified
+/// occurrence shows its own times (it is identified by <see cref="ExceptionId"/>), an unmodified one shows the times
+/// of the series, which are also its key in the series.
 /// </summary>
 public record CalendarActivityIndexItemDto
 {
