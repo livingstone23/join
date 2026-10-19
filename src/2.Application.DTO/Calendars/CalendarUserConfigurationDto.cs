@@ -25,6 +25,12 @@ public record CalendarUserConfigurationDto
     /// <summary> <c>DayOfWeek</c>: Sunday = 0, Monday = 1. </summary>
     public int WeekStartsOn { get; init; }
 
+    /// <summary>
+    /// SPEC 68 — whether the user can list the activities of every member of the company in the index. Default
+    /// <c>false</c>; only an administrator flips it on <c>PUT /CalendarUserConfigurations/{userId}</c>.
+    /// </summary>
+    public bool CanViewOthersActivities { get; init; }
+
     public TimeOnly? EffectiveBusinessHoursStart { get; init; }
 
     /// <summary> <c>null</c> with a start of 00:00 means the whole day. </summary>

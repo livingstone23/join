@@ -19,4 +19,10 @@ public record UpdateUserCalendarConfigurationCommand : ITransactionalCommand<Res
     public CalendarWorkDays WorkDays { get; init; } = CalendarWorkDays.Weekdays;
     public CalendarViewType DefaultView { get; init; } = CalendarViewType.Week;
     public DayOfWeek WeekStartsOn { get; init; } = DayOfWeek.Monday;
+
+    /// <summary>
+    /// SPEC 68 — flag the administrator toggles to let the user see the activities of every member of the
+    /// company in the activity index. Default <c>false</c>; the user cannot change it on <c>PUT …/me</c>.
+    /// </summary>
+    public bool CanViewOthersActivities { get; init; }
 }

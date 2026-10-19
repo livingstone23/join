@@ -4630,6 +4630,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("ActivityConfirmation", "/calendar/activity-confirmation", "@Icons.Material.Filled.EventAvailable", "Calendar", "Calendar", "CalendarActivityConfirmation", false, false, true, false, IsVisibleMenu: false),
         new("CalendarSettings", "/calendar/settings", "@Icons.Material.Filled.EditCalendar", "Calendar", "Calendar", "CalendarSettings", true, true, true, true, CanExecute: true),
         new("CalendarCatalogs", "/calendar/catalogs", "@Icons.Material.Filled.Category", "Calendar", "Calendar", "CalendarCatalogs", true, true, true, true),
+        // SPEC 68 — activity index. Same role permissions the spec defines for `MyCalendar`; SuperAdmin /
+        // Manager / Supervisor additionally get CanExport. Admin and SuperAdminCompany fall through
+        // PrivilegedRoleNames and receive full access.
+        new("Activities", "/calendar/activities", "@Icons.Material.Filled.ListAlt", "Calendar", "Calendar", "CalendarActivityIndex", true, false, false, false, CanExport: false, IsVisibleMenu: true),
 
         // SPEC 47 — endpoint para gestionar canales de ingesta inbound de tickets (Twilio WhatsApp, SendGrid email).
         // CanUpdate queda en false por diseño: rotar un token de webhook es soft-delete + create, no update in-place.
@@ -4810,22 +4814,27 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // CalendarOthers, ActivityConfirmation → CalendarActivityConfirmation). Admin and SuperAdminCompany get
         // full access through PrivilegedRoleNames; Agent and Person get nothing here (Agent: SPEC 45).
         new("SuperAdmin", "MyCalendar", true, true, true, true),
+        new("SuperAdmin", "Activities", true, false, false, false, CanExport: true),
         new("SuperAdmin", "CalendarPanel", true, true, true, true),
         new("SuperAdmin", "ActivityConfirmation", false, false, true, false),
         new("SuperAdmin", "CalendarSettings", true, true, true, true, CanExecute: true),
         new("SuperAdmin", "CalendarCatalogs", true, true, true, true),
         new("Manager", "MyCalendar", true, true, true, true),
+        new("Manager", "Activities", true, false, false, false, CanExport: true),
         new("Manager", "CalendarPanel", true, true, true, true),
         new("Manager", "ActivityConfirmation", false, false, true, false),
         new("Manager", "CalendarSettings", true, true, true, false),
         new("Supervisor", "MyCalendar", true, true, true, true),
+        new("Supervisor", "Activities", true, false, false, false, CanExport: true),
         new("Supervisor", "CalendarPanel", true, true, true, false),
         new("Supervisor", "ActivityConfirmation", false, false, true, false),
         new("Supervisor", "CalendarSettings", true, false, false, false),
         new("Coordinador", "MyCalendar", true, true, true, true),
+        new("Coordinador", "Activities", true, false, false, false),
         new("Coordinador", "CalendarPanel", true, false, false, false),
         new("Coordinador", "ActivityConfirmation", false, false, true, false),
         new("UsuarioSimple", "MyCalendar", true, true, true, true),
+        new("UsuarioSimple", "Activities", true, false, false, false),
         new("UsuarioSimple", "ActivityConfirmation", false, false, true, false),
         // SPEC 61: a member registers and works their own leads (the scope of SPEC 60 limits what they see).
         new("UsuarioSimple", "Leads", true, true, true, false, CanDownload: true),

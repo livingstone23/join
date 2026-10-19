@@ -54,6 +54,7 @@ public sealed class UpdateUserCalendarConfigurationCommandHandler(
         configuration.WorkDays = request.WorkDays;
         configuration.DefaultView = request.DefaultView;
         configuration.WeekStartsOn = request.WeekStartsOn;
+        configuration.CanViewOthersActivities = request.CanViewOthersActivities;
         await unitOfWork.GetRepository<CalendarUserConfiguration>().UpdateAsync(configuration);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

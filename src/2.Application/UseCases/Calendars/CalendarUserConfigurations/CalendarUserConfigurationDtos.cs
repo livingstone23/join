@@ -23,7 +23,8 @@ public static class CalendarUserConfigurationDtos
         c.BusinessHoursEnd,
         COALESCE(c.WorkDays, 0) AS WorkDays,
         COALESCE(c.DefaultView, 0) AS DefaultView,
-        COALESCE(c.WeekStartsOn, 0) AS WeekStartsOn
+        COALESCE(c.WeekStartsOn, 0) AS WeekStartsOn,
+        COALESCE(c.CanViewOthersActivities, FALSE) AS CanViewOthersActivities
         FROM Security.UserCompanies uc
         INNER JOIN Security.Users u ON u.Id = uc.UserId
         LEFT JOIN Calendar.UserConfigurations c ON c.UserId = uc.UserId AND c.CompanyId = @TenantId AND c.GcRecord = 0
@@ -68,6 +69,7 @@ public static class CalendarUserConfigurationDtos
             WorkDays = (int)configuration.WorkDays,
             DefaultView = (int)configuration.DefaultView,
             WeekStartsOn = (int)configuration.WeekStartsOn,
+            CanViewOthersActivities = configuration.CanViewOthersActivities,
             EffectiveBusinessHoursStart = start,
             EffectiveBusinessHoursEnd = end,
             TimeZone = company.TimeZoneId,
