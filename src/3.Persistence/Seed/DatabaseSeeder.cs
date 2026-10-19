@@ -99,6 +99,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         await SeedTeamRolesForCompanyAsync(companyId, cancellationToken);
         // SPEC 62: lead attachment limits.
         await SeedLeadAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
+        // SPEC 69: calendar attachment limits (one live row per company).
+        await SeedCalendarAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
     }
 
     /// <summary>
@@ -120,6 +122,24 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         foreach (var companyId in companyIds)
         {
             await SeedTicketAttachmentSettingsAsync(companyId);
+        }
+    }
+
+    /// <summary>
+    /// SPEC 69 — backfill that applies on existing databases without the migration: every company gets the
+    /// default <c>CalendarAttachmentSettings</c> row when missing. Mirrors
+    /// <see cref="SeedTicketAttachmentSettingsDefaultsAsync"/>.
+    /// </summary>
+    public async Task SeedCalendarAttachmentSettingsDefaultsAsync(CancellationToken cancellationToken = default)
+    {
+        var companyIds = await _context.Companies
+            .IgnoreQueryFilters()
+            .Select(c => c.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var companyId in companyIds)
+        {
+            await SeedCalendarAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
         }
     }
 
@@ -1076,6 +1096,30 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             MaxFileSizeBytes = LeadAttachmentSettings.DefaultMaxFileSizeBytes,
             MaxFilesPerInteraction = LeadAttachmentSettings.DefaultMaxFilesPerInteraction,
             MaxFilesPerDay = LeadAttachmentSettings.DefaultMaxFilesPerDay
+        });
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// SPEC 69 — creates the unique live row of <c>CalendarAttachmentSettings</c> for the company with the
+    /// spec defaults (PDF / Word / Excel / Image, 10 MB per file, 5 per comment, 200 per day). Idempotent: a
+    /// row already present is preserved so the administrator's PUT changes are never overwritten.
+    /// </summary>
+    public async Task SeedCalendarAttachmentSettingsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        if (await _context.CalendarAttachmentSettings.IgnoreQueryFilters()
+            .AnyAsync(s => s.CompanyId == companyId && s.GcRecord == 0, cancellationToken))
+        {
+            return;
+        }
+
+        _context.CalendarAttachmentSettings.Add(new CalendarAttachmentSettings
+        {
+            CompanyId = companyId,
+            AllowedDocumentTypes = CalendarAttachmentSettings.DefaultAllowedTypes,
+            MaxFileSizeBytes = CalendarAttachmentSettings.DefaultMaxFileSizeBytes,
+            MaxFilesPerComment = CalendarAttachmentSettings.DefaultMaxFilesPerComment,
+            MaxFilesPerDay = CalendarAttachmentSettings.DefaultMaxFilesPerDay
         });
         await _context.SaveChangesAsync(cancellationToken);
     }
@@ -4634,6 +4678,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // Manager / Supervisor additionally get CanExport. Admin and SuperAdminCompany fall through
         // PrivilegedRoleNames and receive full access.
         new("Activities", "/calendar/activities", "@Icons.Material.Filled.ListAlt", "Calendar", "Calendar", "CalendarActivityIndex", true, false, false, false, CanExport: false, IsVisibleMenu: true),
+        // SPEC 69 — comments and documents on calendar activities. Hidden from the menu (the controls live
+        // inside the activity detail tab); the resource is the only thing that matters for the permission gate.
+        new("ActivityRecords", "/calendar/activity-records", "@Icons.Material.Filled.CommentBank", "Calendar", "Calendar", "CalendarActivityRecords", true, true, false, false, CanDownload: true, IsVisibleMenu: false),
 
         // SPEC 47 — endpoint para gestionar canales de ingesta inbound de tickets (Twilio WhatsApp, SendGrid email).
         // CanUpdate queda en false por diseño: rotar un token de webhook es soft-delete + create, no update in-place.
@@ -4815,26 +4862,31 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // full access through PrivilegedRoleNames; Agent and Person get nothing here (Agent: SPEC 45).
         new("SuperAdmin", "MyCalendar", true, true, true, true),
         new("SuperAdmin", "Activities", true, false, false, false, CanExport: true),
+        new("SuperAdmin", "ActivityRecords", true, true, true, true, CanDownload: true),
         new("SuperAdmin", "CalendarPanel", true, true, true, true),
         new("SuperAdmin", "ActivityConfirmation", false, false, true, false),
         new("SuperAdmin", "CalendarSettings", true, true, true, true, CanExecute: true),
         new("SuperAdmin", "CalendarCatalogs", true, true, true, true),
         new("Manager", "MyCalendar", true, true, true, true),
         new("Manager", "Activities", true, false, false, false, CanExport: true),
+        new("Manager", "ActivityRecords", true, true, false, false, CanDownload: true),
         new("Manager", "CalendarPanel", true, true, true, true),
         new("Manager", "ActivityConfirmation", false, false, true, false),
         new("Manager", "CalendarSettings", true, true, true, false),
         new("Supervisor", "MyCalendar", true, true, true, true),
         new("Supervisor", "Activities", true, false, false, false, CanExport: true),
+        new("Supervisor", "ActivityRecords", true, true, false, false, CanDownload: true),
         new("Supervisor", "CalendarPanel", true, true, true, false),
         new("Supervisor", "ActivityConfirmation", false, false, true, false),
         new("Supervisor", "CalendarSettings", true, false, false, false),
         new("Coordinador", "MyCalendar", true, true, true, true),
         new("Coordinador", "Activities", true, false, false, false),
+        new("Coordinador", "ActivityRecords", true, true, false, false, CanDownload: true),
         new("Coordinador", "CalendarPanel", true, false, false, false),
         new("Coordinador", "ActivityConfirmation", false, false, true, false),
         new("UsuarioSimple", "MyCalendar", true, true, true, true),
         new("UsuarioSimple", "Activities", true, false, false, false),
+        new("UsuarioSimple", "ActivityRecords", true, true, false, false, CanDownload: true),
         new("UsuarioSimple", "ActivityConfirmation", false, false, true, false),
         // SPEC 61: a member registers and works their own leads (the scope of SPEC 60 limits what they see).
         new("UsuarioSimple", "Leads", true, true, true, false, CanDownload: true),

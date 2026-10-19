@@ -172,6 +172,7 @@ public static class ConfigureServices
         services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarActivityIndex.CalendarActivityVisibility>();
         services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarActivityIndex.ICalendarActivityIndexReader,
             JOIN.Application.UseCases.Calendars.CalendarActivityIndex.CalendarActivityIndexReader>();
+        // SPEC 69 — query / command handlers are auto-registered by MediatR.
 
         // SPEC 45 — channel agent intake and pending persons.
         services.AddScoped<IntakeChannelReader>();

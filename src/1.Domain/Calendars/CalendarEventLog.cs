@@ -39,10 +39,20 @@ public class CalendarEventLog : BaseTenantEntity
     /// <summary> Reason; required when cancelling. </summary>
     public string? Notes { get; set; }
 
+    /// <summary> SPEC 69 — set on a <see cref="CalendarEventLogAction.CommentAdded"/> or
+    /// <see cref="CalendarEventLogAction.CommentDeleted"/> row. Null for every other action. </summary>
+    public Guid? CalendarEventCommentId { get; set; }
+
+    /// <summary> SPEC 69 — set on a <see cref="CalendarEventLogAction.DocumentAdded"/> or
+    /// <see cref="CalendarEventLogAction.DocumentDeleted"/> row. Null for every other action. </summary>
+    public Guid? CalendarEventDocumentId { get; set; }
+
     public DateTime OccurredUtc { get; set; }
 
     // --- Navigation ---
     public virtual CalendarEvent CalendarEvent { get; set; } = null!;
     public virtual CommunicationChannel Channel { get; set; } = null!;
     public virtual ApplicationUser? ActorUser { get; set; }
+    public virtual CalendarEventComment? CalendarEventComment { get; set; }
+    public virtual CalendarEventDocument? CalendarEventDocument { get; set; }
 }

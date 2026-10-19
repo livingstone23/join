@@ -5,7 +5,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace JOIN.Persistence.Configuration.Calendars;
 
 /// <summary>
-/// Configures the activity log (<c>Calendar.EventLogs</c>, SPEC 44).
+/// Configures the activity log (<c>Calendar.EventLogs</c>, SPEC 44 + SPEC 69). One row per operation;
+/// the comment / document id (SPEC 69) is denormalized on the row so the bitácora journal query does not have to
+/// join the related tables.
 /// </summary>
 public sealed class CalendarEventLogConfiguration : IEntityTypeConfiguration<CalendarEventLog>
 {
@@ -35,5 +37,21 @@ public sealed class CalendarEventLogConfiguration : IEntityTypeConfiguration<Cal
             .WithMany()
             .HasForeignKey(x => x.ActorUserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(x => x.CalendarEventComment)
+            .WithMany()
+            .HasForeignKey(x => x.CalendarEventCommentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(x => x.CalendarEventDocument)
+            .WithMany()
+            .HasForeignKey(x => x.CalendarEventDocumentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => x.CalendarEventCommentId)
+            .HasDatabaseName("IX_CalendarEventLogs_Comment");
+
+        builder.HasIndex(x => x.CalendarEventDocumentId)
+            .HasDatabaseName("IX_CalendarEventLogs_Document");
     }
 }

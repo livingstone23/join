@@ -26,6 +26,13 @@ public interface ICompanyCatalogSeeder
     /// <returns>How many activity types and statuses were added.</returns>
     Task<CalendarCatalogSyncResult> SeedCalendarCatalogsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// SPEC 69 — creates the unique live row of <c>CalendarAttachmentSettings</c> for the company with the spec
+    /// defaults (PDF / Word / Excel / Image, 10 MB per file, 5 per comment, 200 per day). Idempotent: a row
+    /// already present is preserved.
+    /// </summary>
+    Task SeedCalendarAttachmentSettingsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
+
 
 }
 

@@ -49,6 +49,53 @@ public sealed class CalendarActivityVisibility(IUnitOfWork unitOfWork, ICurrentU
             .FirstOrDefault();
         return company?.TimeZone;
     }
+
+    /// <summary>
+    /// SPEC 69 — can the current user see the activity (rule 5)? Owner always; otherwise the
+    /// <c>CanViewOthersActivities</c> flag. The Panel's <c>CalendarOthers.CanRead</c> rule is enforced by the
+    /// controller / handler layer separately when relevant.
+    /// </summary>
+    public async Task<CalendarActivityAccessResult> ResolveEventAccessAsync(Guid eventId, CancellationToken cancellationToken)
+    {
+        var context = await ResolveAsync(cancellationToken);
+        if (context.CompanyId == Guid.Empty)
+        {
+            return CalendarActivityAccessResult.Unauthenticated();
+        }
+
+        var calendarEvent = await unitOfWork.CalendarEvents.GetAsync(eventId);
+        if (calendarEvent is null
+            || calendarEvent.CompanyId != context.CompanyId
+            || calendarEvent.GcRecord != 0)
+        {
+            return CalendarActivityAccessResult.NotFound();
+        }
+
+        var visible = calendarEvent.OwnerUserId == context.CurrentUserId || context.CanViewOthersActivities;
+        return visible
+            ? CalendarActivityAccessResult.Visible(calendarEvent, context.CurrentUserId)
+            : CalendarActivityAccessResult.NotFound();
+    }
+}
+
+/// <summary>
+/// SPEC 69 — visibility verdict of <see cref="CalendarActivityVisibility.ResolveEventAccessAsync"/>: either the
+/// event was found and the current user can see it, or it is hidden (404). The visibility helper returns the
+/// not-found verdict both when the event does not exist in the tenant and when it exists but the user lacks
+/// the right to read it (so a foreign-tenant probe cannot distinguish the two cases).
+/// </summary>
+/// <param name="Found"><c>true</c> when the activity exists and is live in the current tenant.</param>
+/// <param name="Visible"><c>true</c> when the user can read the activity.</param>
+/// <param name="CalendarEvent">Loaded activity when <paramref name="Found"/>; <c>null</c> otherwise.</param>
+/// <param name="CurrentUserId">User the visibility was resolved for.</param>
+public sealed record CalendarActivityAccessResult(bool Found, bool CanRead, CalendarEvent? CalendarEvent, Guid CurrentUserId)
+{
+    public static CalendarActivityAccessResult Unauthenticated() => new(false, false, null, Guid.Empty);
+    public static CalendarActivityAccessResult NotFound() => new(false, false, null, Guid.Empty);
+    public static CalendarActivityAccessResult Visible(CalendarEvent calendarEvent, Guid currentUserId) =>
+        new(true, true, calendarEvent, currentUserId);
+
+    public bool IsFoundAndVisible => Found && CanRead && CalendarEvent is not null;
 }
 
 /// <summary>

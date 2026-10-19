@@ -5,20 +5,23 @@ using JOIN.Domain.Calendars.Enums;
 namespace JOIN.Application.UseCases.Calendars.Common;
 
 /// <summary>
-/// Builds and queues the <see cref="CalendarEventLog"/> row of each operation (SPEC 44 R6: every operation is
-/// logged with its channel and actor). Does not save.
+/// Builds and queues the <see cref="CalendarEventLog"/> row of each operation (SPEC 44 R6 + SPEC 69: every
+/// operation is logged with its channel and actor; comment / document rows also carry the denormalized id).
+/// Does not save.
 /// </summary>
 public sealed class CalendarEventLogWriter(IUnitOfWork unitOfWork)
 {
     /// <summary>
     /// Queues a log row for <paramref name="calendarEvent"/>.
     /// </summary>
-    public async Task<CalendarEventLog> WriteAsync(
+    public Task<CalendarEventLog> WriteAsync(
         CalendarEvent calendarEvent,
         CalendarEventLogAction action,
         CalendarActor actor,
         CalendarEventLogChange? change = null,
-        string? notes = null)
+        string? notes = null,
+        Guid? commentId = null,
+        Guid? documentId = null)
     {
         var log = new CalendarEventLog
         {
@@ -35,9 +38,16 @@ public sealed class CalendarEventLogWriter(IUnitOfWork unitOfWork)
             ActorUserId = actor.UserId,
             ActorIdentifier = actor.Identifier,
             Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
+            CalendarEventCommentId = commentId,
+            CalendarEventDocumentId = documentId,
             OccurredUtc = DateTime.UtcNow
         };
 
+        return InsertAsync(log);
+    }
+
+    private async Task<CalendarEventLog> InsertAsync(CalendarEventLog log)
+    {
         await unitOfWork.GetRepository<CalendarEventLog>().InsertAsync(log);
         return log;
     }

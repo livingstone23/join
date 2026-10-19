@@ -73,4 +73,14 @@ public static class CalendarErrorCodes
     public const string PersonPendingAlreadyResolved = "PERSON_PENDING_ALREADY_RESOLVED";
     public const string PersonPendingInvalidCustomer = "PERSON_PENDING_INVALID_CUSTOMER";
     public const string PersonPendingInvalidStatus = "PERSON_PENDING_INVALID_STATUS";
+
+    // SPEC 69 — comments and documents on calendar activities.
+    public const string AttachmentSettingsNotConfigured = "CALENDAR_ATTACHMENT_SETTINGS_NOT_CONFIGURED";
+    public const string DocumentTypeNotAllowed = "CALENDAR_DOCUMENT_TYPE_NOT_ALLOWED";
+    public const string DocumentTooLarge = "CALENDAR_DOCUMENT_TOO_LARGE";
+    public const string DocumentLimitPerComment = "CALENDAR_DOCUMENT_LIMIT_PER_COMMENT";
+    public const string DocumentLimitPerDay = "CALENDAR_DOCUMENT_LIMIT_PER_DAY";
+    public const string CommentNotFound = "CALENDAR_COMMENT_NOT_FOUND";
+    public const string DocumentNotFound = "CALENDAR_DOCUMENT_NOT_FOUND";
+    public const string RecordAlreadyDeleted = "CALENDAR_RECORD_ALREADY_DELETED";
 }

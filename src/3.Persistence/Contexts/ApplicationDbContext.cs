@@ -165,6 +165,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<UserCalendar> UserCalendars => Set<UserCalendar>();
     public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
     public DbSet<CalendarEventLog> CalendarEventLogs => Set<CalendarEventLog>();
+    // SPEC 69 — comments and documents on activities.
+    public DbSet<CalendarEventComment> CalendarEventComments => Set<CalendarEventComment>();
+    public DbSet<CalendarEventDocument> CalendarEventDocuments => Set<CalendarEventDocument>();
+    public DbSet<CalendarAttachmentSettings> CalendarAttachmentSettings => Set<CalendarAttachmentSettings>();
 
     // --- 8. CUSTOMER MODULE (SPEC 55) ---
     public DbSet<Customer> Customers => Set<Customer>();
