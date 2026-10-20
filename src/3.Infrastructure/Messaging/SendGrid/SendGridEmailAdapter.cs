@@ -1,5 +1,6 @@
 using System.Net.Http;
 using JOIN.Application.Interface;
+using JOIN.Application.Interface.Email;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SendGrid;
@@ -119,5 +120,116 @@ public sealed class SendGridEmailAdapter(
 
             return false;
         }
+    }
+
+    /// <inheritdoc />
+    /// <summary>
+    /// SPEC 72 — sends the full message: copies, Reply-To and attachments. The message is built by hand
+    /// (not with <see cref="MailHelper"/>) because the helper only covers the single-recipient case.
+    /// The <c>X-Message-Id</c> header of the answer is the identifier kept in the history of the email.
+    /// </summary>
+    public async Task<EmailSendResult> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_options.ApiKey))
+        {
+            logger.LogError(
+                "[SendGridEmailAdapter] SendGrid ApiKey is not configured. " +
+                "Set the 'SendGrid:ApiKey' value in appsettings or environment variables.");
+            return EmailSendResult.Fail("The email provider is not configured.");
+        }
+
+        if (string.IsNullOrWhiteSpace(message.To))
+        {
+            logger.LogWarning("[SendGridEmailAdapter] SendAsync called with an empty 'to' address.");
+            return EmailSendResult.Fail("The recipient address is empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(message.Subject))
+        {
+            logger.LogWarning("[SendGridEmailAdapter] SendAsync called with an empty 'subject'.");
+            return EmailSendResult.Fail("The subject is empty.");
+        }
+
+        var fromEmail = string.IsNullOrWhiteSpace(message.FromEmail) ? _options.FromEmail : message.FromEmail;
+        var fromName = string.IsNullOrWhiteSpace(message.FromName) ? _options.FromName : message.FromName;
+
+        if (string.IsNullOrWhiteSpace(fromEmail))
+        {
+            logger.LogError(
+                "[SendGridEmailAdapter] Neither the company nor the global sender is configured. " +
+                "Set 'SendGrid:FromEmail' or the sender of the company settings.");
+            return EmailSendResult.Fail("The sender address is not configured.");
+        }
+
+        try
+        {
+            var sendGridMessage = new SendGridMessage
+            {
+                From = new EmailAddress(fromEmail, fromName),
+                Subject = message.Subject,
+                HtmlContent = message.HtmlBody
+            };
+
+            sendGridMessage.AddTo(new EmailAddress(message.To));
+
+            foreach (var cc in message.Cc.Where(address => !string.IsNullOrWhiteSpace(address)))
+            {
+                sendGridMessage.AddCc(new EmailAddress(cc));
+            }
+
+            if (!string.IsNullOrWhiteSpace(message.ReplyTo))
+            {
+                sendGridMessage.SetReplyTo(new EmailAddress(message.ReplyTo));
+            }
+
+            foreach (var attachment in message.Attachments)
+            {
+                sendGridMessage.AddAttachment(
+                    attachment.FileName,
+                    Convert.ToBase64String(attachment.Content),
+                    attachment.ContentType,
+                    disposition: "attachment");
+            }
+
+            var client = new SendGridClient(_httpClient, _options.ApiKey);
+            Response response = await client.SendEmailAsync(sendGridMessage, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var providerMessageId = ReadMessageId(response);
+                logger.LogInformation(
+                    "[SendGridEmailAdapter] Email sent successfully to {Recipient} | Subject: {Subject} | Status: {StatusCode} | MessageId: {MessageId}",
+                    message.To, message.Subject, (int)response.StatusCode, providerMessageId);
+                return EmailSendResult.Ok(providerMessageId);
+            }
+
+            var body = await response.Body.ReadAsStringAsync();
+            logger.LogWarning(
+                "[SendGridEmailAdapter] SendGrid rejected the request. " +
+                "Recipient: {Recipient} | Status: {StatusCode} | Body: {Body}",
+                message.To, (int)response.StatusCode, body);
+
+            return EmailSendResult.Fail($"SendGrid answered {(int)response.StatusCode}: {body}");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "[SendGridEmailAdapter] Unexpected error while sending email to {Recipient} | Subject: {Subject}",
+                message.To, message.Subject);
+
+            return EmailSendResult.Fail(ex.Message);
+        }
+    }
+
+    /// <summary>The <c>X-Message-Id</c> header of the answer, when the provider sends it.</summary>
+    private static string? ReadMessageId(Response response)
+    {
+        if (response.Headers.TryGetValues("X-Message-Id", out var values))
+        {
+            return values.FirstOrDefault();
+        }
+
+        return null;
     }
 }

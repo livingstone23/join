@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using JOIN.Application.Interface;
+using JOIN.Application.Interface.Email;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -157,11 +158,32 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
 public sealed class CapturingEmailService : IEmailService
 {
     private readonly ConcurrentQueue<SentEmail> _sent = new();
+    private readonly ConcurrentQueue<SentMessage> _messages = new();
 
     public Task<bool> SendEmailAsync(string to, string subject, string htmlContent)
     {
         _sent.Enqueue(new SentEmail(to, subject, htmlContent, DateTime.UtcNow));
         return Task.FromResult(true);
+    }
+
+    /// <summary>
+    /// SPEC 72 — captures the full message (copies, Reply-To, sender and attachments) so the
+    /// integration tests can assert what the provider would have received.
+    /// </summary>
+    public Task<EmailSendResult> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+    {
+        _messages.Enqueue(new SentMessage(
+            message.To,
+            message.Cc.ToList(),
+            message.FromEmail,
+            message.FromName,
+            message.ReplyTo,
+            message.Subject,
+            message.HtmlBody,
+            message.Attachments.ToList(),
+            DateTime.UtcNow));
+
+        return Task.FromResult(EmailSendResult.Ok("captured-message-id"));
     }
 
     /// <summary>
@@ -173,5 +195,22 @@ public sealed class CapturingEmailService : IEmailService
             .OrderByDescending(email => email.SentAtUtc)
             .FirstOrDefault();
 
+    /// <summary>
+    /// SPEC 72 — the last full message captured, or <c>null</c> when none has been sent yet.
+    /// </summary>
+    public SentMessage? LastMessage() =>
+        _messages.OrderByDescending(message => message.SentAtUtc).FirstOrDefault();
+
     public sealed record SentEmail(string To, string Subject, string HtmlContent, DateTime SentAtUtc);
+
+    public sealed record SentMessage(
+        string To,
+        IReadOnlyList<string> Cc,
+        string? FromEmail,
+        string? FromName,
+        string? ReplyTo,
+        string Subject,
+        string HtmlBody,
+        IReadOnlyList<EmailAttachment> Attachments,
+        DateTime SentAtUtc);
 }

@@ -2,6 +2,7 @@
 // See LICENSE in the project root for license information.
 
 using JOIN.Application.Interface;
+using JOIN.Application.Interface.Email;
 using Microsoft.Extensions.Logging;
 
 namespace JOIN.Infrastructure.Messaging.Logging;
@@ -50,5 +51,42 @@ public sealed class LoggingEmailAdapter(ILogger<LoggingEmailAdapter> logger) : I
         // Always succeed: dev-mode must not roll back the unit of work over a missing
         // outbound channel. Production uses SendGridEmailAdapter which reports real failures.
         return Task.FromResult(true);
+    }
+
+    /// <inheritdoc />
+    /// <summary>
+    /// SPEC 72 — the development sink writes the full message (copies, Reply-To and attachments) to the
+    /// log and reports success, like <see cref="SendEmailAsync"/> does.
+    /// </summary>
+    public Task<EmailSendResult> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(message.To))
+        {
+            logger.LogWarning("[LoggingEmailAdapter] SendAsync invoked with empty 'to' address.");
+            return Task.FromResult(EmailSendResult.Fail("The recipient address is empty."));
+        }
+
+        if (string.IsNullOrWhiteSpace(message.Subject))
+        {
+            logger.LogWarning("[LoggingEmailAdapter] SendAsync invoked with empty 'subject'.");
+            return Task.FromResult(EmailSendResult.Fail("The subject is empty."));
+        }
+
+        var bodyPreview = message.HtmlBody is { Length: > BodyPreviewMaxLength }
+            ? message.HtmlBody[..BodyPreviewMaxLength] + "..."
+            : message.HtmlBody;
+
+        logger.LogInformation(
+            "[LoggingEmailAdapter] Email → {Recipient} | Cc: {Cc} | ReplyTo: {ReplyTo} | From: {From} | Subject: {Subject} | Attachments: {Attachments} | Body (first {Chars} chars): {Body}",
+            message.To,
+            message.Cc.Count,
+            message.ReplyTo,
+            message.FromEmail,
+            message.Subject,
+            message.Attachments.Count,
+            BodyPreviewMaxLength,
+            bodyPreview);
+
+        return Task.FromResult(EmailSendResult.Ok(null));
     }
 }

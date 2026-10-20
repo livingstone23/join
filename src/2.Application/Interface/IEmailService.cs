@@ -1,5 +1,7 @@
 namespace JOIN.Application.Interface;
 
+using JOIN.Application.Interface.Email;
+
 
 
 /// <summary>
@@ -13,7 +15,7 @@ namespace JOIN.Application.Interface;
 public interface IEmailService
 {
 
-    
+
     /// <summary>
     /// Sends an HTML email message to a single recipient.
     /// </summary>
@@ -33,5 +35,17 @@ public interface IEmailService
     /// </returns>
     Task<bool> SendEmailAsync(string to, string subject, string htmlContent);
 
+    /// <summary>
+    /// SPEC 72 — sends a full message (copies, Reply-To and attachments) and reports what the
+    /// provider answered, instead of a bare boolean. <see cref="SendEmailAsync"/> is not touched:
+    /// its fifteen callers (authentication, alerts, tickets) keep working as they are.
+    /// </summary>
+    /// <param name="message">The message to send.</param>
+    /// <param name="cancellationToken">Token to cancel the delivery.</param>
+    /// <returns>
+    /// <see cref="EmailSendResult.Ok"/> when the provider accepted the message (with its identifier
+    /// when it gives one), <see cref="EmailSendResult.Fail"/> with the reason otherwise.
+    /// </returns>
+    Task<EmailSendResult> SendAsync(EmailMessage message, CancellationToken cancellationToken = default);
 
 }

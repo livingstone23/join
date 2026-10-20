@@ -124,6 +124,66 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("companymodules", "admin");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Admin.EmailCompanySettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<string>("FromEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("fromemail");
+
+                    b.Property<string>("FromName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("fromname");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<long>("MaxAttachmentsTotalBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("maxattachmentstotalbytes");
+
+                    b.Property<int>("MaxEmailsPerUserPerDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("maxemailsperuserperday");
+
+                    b.HasKey("Id")
+                        .HasName("pk_emailcompanysettings");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_emailcompanysettings_company")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("emailcompanysettings", "admin");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Admin.EmailTemplate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -957,6 +1017,214 @@ namespace JOIN.Persistence.Migrations
                         .HasFilter("\"gcrecord\" = 0");
 
                     b.ToTable("personcontacts", "admin");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Admin.PersonEmailMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BodyHtml")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("bodyhtml");
+
+                    b.Property<string>("CcAddresses")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("ccaddresses");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customerid");
+
+                    b.Property<Guid?>("EmailTemplateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("emailtemplateid");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("errormessage");
+
+                    b.Property<string>("FromAddress")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("fromaddress");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("leadid");
+
+                    b.Property<Guid?>("LeadInteractionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("leadinteractionid");
+
+                    b.Property<int>("Origin")
+                        .HasColumnType("integer")
+                        .HasColumnName("origin");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("personid");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("providermessageid");
+
+                    b.Property<string>("ReplyToAddress")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("replytoaddress");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sentat");
+
+                    b.Property<Guid>("SentByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sentbyuserid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("subject");
+
+                    b.Property<string>("ToAddress")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("toaddress");
+
+                    b.HasKey("Id")
+                        .HasName("pk_personemailmessages");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_personemailmessages_customerid");
+
+                    b.HasIndex("EmailTemplateId")
+                        .HasDatabaseName("ix_personemailmessages_emailtemplateid");
+
+                    b.HasIndex("LeadId")
+                        .HasDatabaseName("ix_personemailmessages_leadid");
+
+                    b.HasIndex("PersonId")
+                        .HasDatabaseName("ix_personemailmessages_personid");
+
+                    b.HasIndex("CompanyId", "LeadId", "SentAt")
+                        .HasDatabaseName("ix_personemailmessages_company_lead_sentat");
+
+                    b.HasIndex("CompanyId", "PersonId", "SentAt")
+                        .HasDatabaseName("ix_personemailmessages_company_person_sentat");
+
+                    b.HasIndex("CompanyId", "SentByUserId", "SentAt")
+                        .HasDatabaseName("ix_personemailmessages_company_user_sentat");
+
+                    b.ToTable("personemailmessages", "admin");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Admin.PersonEmailMessageAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("contenttype");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("filename");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<Guid>("PersonEmailMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("personemailmessageid");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sizebytes");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sourceid");
+
+                    b.Property<int>("SourceKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("sourcekind");
+
+                    b.HasKey("Id")
+                        .HasName("pk_personemailmessageattachments");
+
+                    b.HasIndex("CompanyId")
+                        .HasDatabaseName("ix_personemailmessageattachments_companyid");
+
+                    b.HasIndex("PersonEmailMessageId")
+                        .HasDatabaseName("ix_personemailmessageattachments_message");
+
+                    b.ToTable("personemailmessageattachments", "admin");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Admin.PersonEmployment", b =>
@@ -4683,6 +4951,10 @@ namespace JOIN.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("outcome");
 
+                    b.Property<Guid?>("PersonEmailMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("personemailmessageid");
+
                     b.Property<string>("Summary")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -8020,6 +8292,18 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Module");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Admin.EmailCompanySettings", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_emailcompanysettings_companies_companyid");
+
+                    b.Navigation("Company");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Admin.EmailTemplate", b =>
                 {
                     b.HasOne("JOIN.Domain.Common.Company", "Company")
@@ -8240,6 +8524,62 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("Person");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Admin.PersonEmailMessage", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_personemailmessages_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_personemailmessages_customers_customerid");
+
+                    b.HasOne("JOIN.Domain.Admin.EmailTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("EmailTemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_personemailmessages_emailtemplates_emailtemplateid");
+
+                    b.HasOne("JOIN.Domain.Customers.Leads.Lead", null)
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_personemailmessages_leads_leadid");
+
+                    b.HasOne("JOIN.Domain.Admin.Person", null)
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_personemailmessages_persons_personid");
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Admin.PersonEmailMessageAttachment", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_personemailmessageattachments_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Admin.PersonEmailMessage", null)
+                        .WithMany()
+                        .HasForeignKey("PersonEmailMessageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_personemailmessageattachments_personemailmessages_personema~");
+
+                    b.Navigation("Company");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Admin.PersonEmployment", b =>

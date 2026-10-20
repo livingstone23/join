@@ -61,6 +61,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     // SPEC 71 — email templates and their classification catalog, per company.
     public DbSet<EmailTemplate> EmailTemplates => Set<EmailTemplate>();
     public DbSet<EmailTemplateType> EmailTemplateTypes => Set<EmailTemplateType>();
+    // SPEC 72 — the emails sent to the persons and the sending rules of the company.
+    public DbSet<PersonEmailMessage> PersonEmailMessages => Set<PersonEmailMessage>();
+    public DbSet<PersonEmailMessageAttachment> PersonEmailMessageAttachments => Set<PersonEmailMessageAttachment>();
+    public DbSet<EmailCompanySettings> EmailCompanySettings => Set<EmailCompanySettings>();
 
     
     public DbSet<Industry> Industries => Set<Industry>();
@@ -298,6 +302,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         // SPEC 71 — email templates and their types are tenant-owned.
         builder.Entity<EmailTemplate>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<EmailTemplateType>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        // SPEC 72 — the emails sent to the persons and the sending rules of the company are tenant-owned.
+        builder.Entity<PersonEmailMessage>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<PersonEmailMessageAttachment>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<EmailCompanySettings>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
         // Administrative / Catalog rows that are tenant-owned (each company maintains its own list)
         builder.Entity<Gender>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
