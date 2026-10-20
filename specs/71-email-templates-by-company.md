@@ -1,6 +1,6 @@
 # SPEC 71 — Plantillas de correo por empresa, agrupadas por tipo, con variables
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 41-post (borrado lógico y restauración), SPEC 43-post (módulos, menú y rutas), SPEC 61 (leads, para las variables `Lead.*`). Rama de trabajo: `spec-71-email-templates-by-company`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Que cada empresa registre plantillas de correo (asunto y cuerpo con variables), agrupadas por un tipo de un catálogo propio, para usarlas al enviar correos a personas, clientes y leads (SPEC 72).

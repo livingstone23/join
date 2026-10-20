@@ -1,6 +1,6 @@
 # SPEC 70 — Productos y servicios: imágenes (hasta 5) y documentos, con límites por empresa
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 36 (tabla de extensiones de adjuntos), SPEC 41-post (borrado lógico y restauración), SPEC 43-post (módulos, menú y rutas), SPEC 49-post (almacenamiento intercambiable), **SPEC 57** (catálogo de productos), SPEC 62 (patrón de documentos y `LeadAttachmentSettings`). Rama de trabajo: `spec-70-product-images-and-documents`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Que cada producto o servicio tenga de 0 a 5 imágenes para mostrarlo y documentos clasificados (fichas técnicas, propuestas, etc.), con tipos, tamaños y cantidades que controla el administrador de la empresa.
