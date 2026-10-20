@@ -2177,3 +2177,54 @@ curl -s -X POST "$BASE_URL/api/v1/PersonPendingConfirmations/<id>/convert-to-lea
   -d '{ "topic": "Pidió precios por WhatsApp", "relationshipTypeId": "<prospect-customer-id>", "notes": "Atendido" }'
 curl -s "$BASE_URL/api/v1/PersonPendingConfirmations?status=5" -H "Authorization: Bearer $TOKEN"
 ```
+
+## Email templates — `/api/v1/EmailTemplates` and `/api/v1/EmailTemplateTypes` (SPEC 71)
+
+Every company has its own catalog of types and its own templates. The seed creates four types: `INTRO` (Presentación),
+`PROPOSAL` (Propuesta), `FOLLOW_UP` (Seguimiento) and `THANKS` (Agradecimiento). The code of a type is normalized
+(upper-case, no spaces) and unique per company; the name of a template is unique per company among live rows
+(`409 DUPLICATE_KEY`).
+
+The subject and the body use the closed list of variables (`GET /EmailTemplates/variables`): `{{Persona.Nombre}}`,
+`{{Persona.NombreCompleto}}`, `{{Persona.Correo}}`, `{{Cliente.Codigo}}`, `{{Lead.Codigo}}`, `{{Lead.Tema}}`,
+`{{Usuario.Nombre}}`, `{{Usuario.Correo}}`, `{{Empresa.Nombre}}` and `{{Fecha.Hoy}}`. Any other variable is rejected
+with `400 EMAIL_TEMPLATE_UNKNOWN_VARIABLE` (the response names it); a variable without value renders as empty text.
+The body is stored sanitized (no `script`, `iframe`, `on*` attributes nor `javascript:` URLs).
+
+Deleting a type with live templates answers `409 EMAIL_TEMPLATE_TYPE_IN_USE` (`Active EmailTemplates: N`). The delete
+is logical; the restore (`POST /{id}/restore`) is SuperAdmin-only.
+
+```bash
+# Types of the company (the same shape for the templates)
+curl -s "$BASE_URL/api/v1/EmailTemplateTypes?includeInactive=false" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/EmailTemplateTypes" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "code": "renewal", "name": "Renovación", "sortOrder": 5, "isActive": true }'
+curl -s -X PUT "$BASE_URL/api/v1/EmailTemplateTypes/<id>" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "code": "RENEWAL", "name": "Renovación", "sortOrder": 5, "isActive": true }'
+curl -s -X DELETE "$BASE_URL/api/v1/EmailTemplateTypes/<id>" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/EmailTemplateTypes/<id>/restore" -H "Authorization: Bearer $TOKEN"
+
+# Templates: paged list, detail and write
+curl -s "$BASE_URL/api/v1/EmailTemplates?pageNumber=1&pageSize=20&search=bi&isActive=true" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/EmailTemplates/<id>" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/EmailTemplates" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "emailTemplateTypeId": "<type-id>", "name": "Bienvenida", "subject": "Hola {{Persona.Nombre}}",
+        "bodyHtml": "<p>Hola {{Persona.NombreCompleto}}</p>", "isActive": true }'
+curl -s -X PUT "$BASE_URL/api/v1/EmailTemplates/<id>" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "emailTemplateTypeId": "<type-id>", "name": "Bienvenida", "subject": "Hola {{Persona.Nombre}}",
+        "bodyHtml": "<p>Hola {{Persona.NombreCompleto}}</p>", "isActive": true }'
+curl -s -X DELETE "$BASE_URL/api/v1/EmailTemplates/<id>" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/EmailTemplates/<id>/restore" -H "Authorization: Bearer $TOKEN"
+
+# Editor helpers: the closed list of variables, the picker of the sending modal and the render.
+# lookup, variables and render are open to any authenticated user of the company (skip dynamic authorization).
+curl -s "$BASE_URL/api/v1/EmailTemplates/variables" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/EmailTemplates/lookup?emailTemplateTypeId=<type-id>&search=bi" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/EmailTemplates/<id>/render" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "personId": "<person-id>", "emailAddress": "cliente@acme.test", "leadId": "<lead-id>" }'
+```

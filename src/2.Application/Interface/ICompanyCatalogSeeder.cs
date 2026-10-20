@@ -33,6 +33,12 @@ public interface ICompanyCatalogSeeder
     /// </summary>
     Task SeedCalendarAttachmentSettingsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// SPEC 71 — creates the four seed email template types of the company (Presentación, Propuesta,
+    /// Seguimiento, Agradecimiento). Idempotent.
+    /// </summary>
+    Task SeedEmailTemplateTypesForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
+
 
 }
 

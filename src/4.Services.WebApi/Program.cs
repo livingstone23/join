@@ -237,12 +237,25 @@ using (var scope = app.Services.CreateScope())
             await seeder.SeedLeadAttachmentSettingsDefaultsAsync();
             // SPEC 69: every company gets its calendar attachment limits (missing rows only).
             await seeder.SeedCalendarAttachmentSettingsDefaultsAsync();
+            // SPEC 71: every company gets the four seed email template types (missing rows only).
+            await seeder.SeedEmailTemplateDefaultsAsync();
 
             if (app.Environment.IsDevelopment())
             {
                 logger.LogInformation("Running idempotent menu and permissions seed (Development).");
                 var forceReseed = builder.Configuration.GetValue<bool>("Seeding:ForceMenuPermissionsReseed");
                 await seeder.SeedMenuAndPermissionsAsync(forceReseed);
+
+                // SPEC 71: the development templates of JOIN-001 (one per seed type).
+                var joinCompanyId = await context.Companies
+                    .IgnoreQueryFilters()
+                    .Where(c => c.TaxId == "JOIN-001")
+                    .Select(c => c.Id)
+                    .FirstOrDefaultAsync();
+                if (joinCompanyId != Guid.Empty)
+                {
+                    await seeder.SeedJoinEmailTemplatesAsync(joinCompanyId);
+                }
             }
         }
 

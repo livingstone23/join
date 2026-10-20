@@ -101,6 +101,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         await SeedLeadAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
         // SPEC 69: calendar attachment limits (one live row per company).
         await SeedCalendarAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
+        // SPEC 71: the four seed email template types (Presentación, Propuesta, Seguimiento, Agradecimiento).
+        await SeedEmailTemplateTypesForCompanyAsync(companyId, cancellationToken);
     }
 
     /// <summary>
@@ -142,6 +144,111 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         {
             await SeedCalendarAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// SPEC 71 — applies <see cref="SeedEmailTemplateTypesForCompanyAsync"/> to every live company on a
+    /// database with no pending migrations (same hook as SPEC 69): missing rows only.
+    /// </summary>
+    public async Task SeedEmailTemplateDefaultsAsync(CancellationToken cancellationToken = default)
+    {
+        var companyIds = await _context.Companies
+            .IgnoreQueryFilters()
+            .Where(c => c.GcRecord == 0)
+            .Select(c => c.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var companyId in companyIds)
+        {
+            await SeedEmailTemplateTypesForCompanyAsync(companyId, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// SPEC 71 — creates the four seed email template types of the company: Presentación
+    /// (<c>INTRO</c>), Propuesta (<c>PROPOSAL</c>), Seguimiento (<c>FOLLOW_UP</c>) and Agradecimiento
+    /// (<c>THANKS</c>). Idempotent.
+    /// </summary>
+    public async Task SeedEmailTemplateTypesForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        var seedTypes = new[]
+        {
+            ("INTRO", "Presentación", 1),
+            ("PROPOSAL", "Propuesta", 2),
+            ("FOLLOW_UP", "Seguimiento", 3),
+            ("THANKS", "Agradecimiento", 4)
+        };
+
+        foreach (var (code, name, sortOrder) in seedTypes)
+        {
+            var exists = await _context.EmailTemplateTypes.IgnoreQueryFilters()
+                .AnyAsync(t => t.CompanyId == companyId && t.Code == code && t.GcRecord == 0, cancellationToken);
+            if (exists)
+            {
+                continue;
+            }
+
+            _context.EmailTemplateTypes.Add(new EmailTemplateType
+            {
+                CompanyId = companyId,
+                Code = code,
+                Name = name,
+                SortOrder = sortOrder,
+                IsActive = true
+            });
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// SPEC 71 — development data of JOIN-001: one template per seed type, so the picker of the
+    /// sending modal has something to show. Idempotent.
+    /// </summary>
+    public async Task SeedJoinEmailTemplatesAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        var typeIds = await _context.EmailTemplateTypes.IgnoreQueryFilters()
+            .Where(t => t.CompanyId == companyId && t.GcRecord == 0)
+            .ToDictionaryAsync(t => t.Code, t => t.Id, cancellationToken);
+
+        var templates = new[]
+        {
+            ("INTRO", "Presentación de la empresa", "Introducción de {{Empresa.Nombre}}",
+                "<p>Estimado/a {{Persona.NombreCompleto}},</p><p>Le escribimos de parte de <strong>{{Empresa.Nombre}}</strong> para presentar nuestros productos y servicios.</p><p>Fecha: {{Fecha.Hoy}}</p>"),
+            ("PROPOSAL", "Propuesta comercial", "Propuesta para {{Persona.Nombre}}",
+                "<p>Hola {{Persona.Nombre}},</p><p>Le compartimos nuestra propuesta comercial. Si ya es cliente, su código es {{Cliente.Codigo}}.</p><p>Atentamente,<br />{{Usuario.Nombre}} — {{Usuario.Correo}}</p>"),
+            ("FOLLOW_UP", "Seguimiento", "Seguimiento de {{Lead.Tema}}",
+                "<p>Hola {{Persona.Nombre}},</p><p>Retomamos el contacto sobre {{Lead.Tema}} (referencia {{Lead.Codigo}}). ¿Podemos agendar una reunión?</p><p>Saludos,<br />{{Usuario.Nombre}}</p>"),
+            ("THANKS", "Agradecimiento", "Gracias por su atención",
+                "<p>Gracias por su tiempo, {{Persona.NombreCompleto}}.</p><p>Correo de destino: {{Persona.Correo}}</p>")
+        };
+
+        foreach (var (code, name, subject, body) in templates)
+        {
+            if (!typeIds.TryGetValue(code, out var typeId))
+            {
+                continue;
+            }
+
+            var exists = await _context.EmailTemplates.IgnoreQueryFilters()
+                .AnyAsync(t => t.CompanyId == companyId && t.Name == name && t.GcRecord == 0, cancellationToken);
+            if (exists)
+            {
+                continue;
+            }
+
+            _context.EmailTemplates.Add(new EmailTemplate
+            {
+                CompanyId = companyId,
+                EmailTemplateTypeId = typeId,
+                Name = name,
+                Subject = subject,
+                BodyHtml = body,
+                IsActive = true
+            });
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>
@@ -324,6 +431,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedLeadSettingsForAllCompaniesAsync();
             // SPEC 60: development sales teams of JOIN-001 (the roles are seeded with the lead settings above).
             await SeedJoinSalesTeamsAsync(joinCompanyId);
+            // SPEC 71: the four seed email template types of every company and the development templates of JOIN-001.
+            await SeedEmailTemplateTypesForCompanyAsync(joinCompanyId);
+            await SeedEmailTemplateTypesForCompanyAsync(privateCompanyId);
+            await SeedJoinEmailTemplatesAsync(joinCompanyId);
 
             // 7. Entidades operacionales (Clientes)
             await SeedJoinPersonsAsync(joinCompanyId, idTypeId);
@@ -4606,6 +4717,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // SPEC 57 — shared product and service catalog.
         new("Products", "/administration/products", "@Icons.Material.Filled.Inventory2", "Administration", "Administration", "Products", true, true, true, true),
         new("ProductCategories", "/administration/product-categories", "@Icons.Material.Filled.Category", "Administration", "Administration", "ProductCategories", true, true, true, true),
+        // SPEC 71 — email templates and their classification catalog (both administered by the same roles).
+        new("EmailTemplates", "/administration/email-templates", "@Icons.Material.Filled.Email", "Administration", "Administration", "EmailTemplates", true, true, true, true),
+        new("EmailTemplateTypes", "/administration/email-template-types", "@Icons.Material.Filled.Label", "Administration", "Administration", "EmailTemplateTypes", true, true, true, true),
 
 
         new("Genders", "/administration/genders", "@Icons.Material.Filled.Factory", "Administration", "Administration", "Genders", true, true, true, true),
@@ -4709,6 +4823,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("SuperAdmin", "CompanyCurrencies", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "ExchangeRates", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "Products", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        // SPEC 71: email templates and their types. SuperAdmin / Admin / Manager write; Supervisor reads.
+        new("SuperAdmin", "EmailTemplates", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("SuperAdmin", "EmailTemplateTypes", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "ProductCategories", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "LeadSettings", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("SuperAdmin", "SalesTeams", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -4752,6 +4869,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Manager", "ExchangeRates", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         // SPEC 57: Manager maintains the product catalog; Supervisor reads it.
         new("Manager", "Products", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "EmailTemplates", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
+        new("Manager", "EmailTemplateTypes", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         new("Manager", "ProductCategories", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
         // SPEC 59: Manager configures the commercial settings; Supervisor reads them.
         new("Manager", "LeadSettings", true, true, true, true, CanDownload: true, CanExport: true, CanExecute: true),
@@ -4800,6 +4919,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // SPEC 56: Supervisor reads the exchange rates.
         new("Supervisor", "ExchangeRates", true, false, false, false),
         new("Supervisor", "Products", true, false, false, false),
+        new("Supervisor", "EmailTemplates", true, false, false, false),
+        new("Supervisor", "EmailTemplateTypes", true, false, false, false),
         new("Supervisor", "ProductCategories", true, false, false, false),
         new("Supervisor", "LeadSettings", true, false, false, false),
         new("Supervisor", "SalesTeams", true, false, false, false),
