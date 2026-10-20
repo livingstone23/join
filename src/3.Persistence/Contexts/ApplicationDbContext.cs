@@ -147,6 +147,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     // --- CATALOG MODULE (SPEC 57) ---
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+    public DbSet<ProductDocument> ProductDocuments => Set<ProductDocument>();
+    public DbSet<ProductDocumentType> ProductDocumentTypes => Set<ProductDocumentType>();
+    public DbSet<ProductAttachmentSettings> ProductAttachmentSettings => Set<ProductAttachmentSettings>();
 
     // --- FINANCE MODULE (SPEC 56) ---
     public DbSet<Currency> Currencies => Set<Currency>();

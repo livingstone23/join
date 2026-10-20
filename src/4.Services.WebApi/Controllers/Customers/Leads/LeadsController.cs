@@ -2,6 +2,7 @@ using Asp.Versioning;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Catalog;
 using JOIN.Application.DTO.Customers.Leads;
+using JOIN.Application.UseCases.Catalog.ProductImages;
 using JOIN.Application.UseCases.Catalog.Products.Queries;
 using JOIN.Application.UseCases.Customers.Leads.Commands;
 using JOIN.Application.UseCases.Customers.Leads.Common;
@@ -68,6 +69,28 @@ public class LeadsController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(Response<IReadOnlyList<ProductLookupItemDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetProductsLookup([FromQuery] string? search = null, CancellationToken cancellationToken = default) =>
         this.ToCommercialResult(await mediator.Send(new GetProductLookupQuery(search), cancellationToken));
+
+    /// <summary>
+    /// SPEC 70 — streams a product image so a seller with only <c>Leads</c> permission can render the thumbnail
+    /// on the lead form. The endpoint reuses <c>GetProductImageContentQuery</c>, which only checks the tenant
+    /// and not the <c>Products</c> resource — by design (rule 16).
+    /// </summary>
+    [HttpGet("products-lookup/{productId:guid}/images/{imageId:guid}/content")]
+    [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> GetProductImageContentForLeads(Guid productId, Guid imageId, CancellationToken cancellationToken)
+    {
+        var response = await mediator.Send(new GetProductImageContentQuery(productId, imageId), cancellationToken);
+        if (!response.IsSuccess)
+        {
+            return this.ToCommercialResult(response);
+        }
+
+        Response.Headers.CacheControl = "private, max-age=3600";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return File(response.Data!.Content, response.Data.ContentType, response.Data.FileName);
+    }
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(Response<LeadDetailDto>), StatusCodes.Status200OK)]

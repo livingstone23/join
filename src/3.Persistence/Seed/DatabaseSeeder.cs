@@ -101,6 +101,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         await SeedLeadAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
         // SPEC 69: calendar attachment limits (one live row per company).
         await SeedCalendarAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
+        // SPEC 70: product attachment limits (one live row per company) plus the four seed document types.
+        await SeedProductAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
     }
 
     /// <summary>
@@ -142,6 +144,78 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         {
             await SeedCalendarAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// SPEC 70 — applies <see cref="SeedProductAttachmentSettingsForCompanyAsync"/> to every live company on a
+    /// database with no pending migrations (same hook as SPEC 49-post and SPEC 69).
+    /// </summary>
+    public async Task SeedProductAttachmentSettingsDefaultsAsync(CancellationToken cancellationToken = default)
+    {
+        var companyIds = await _context.Companies
+            .IgnoreQueryFilters()
+            .Where(c => c.GcRecord == 0)
+            .Select(c => c.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var companyId in companyIds)
+        {
+            await SeedProductAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// SPEC 70 — creates the unique live row of <c>ProductAttachmentSettings</c> with the spec defaults
+    /// (PDF / Word / Excel / Image, 10 MB per document, 20 per product; JPG / PNG / WEBP, 5 MB per image,
+    /// 5 images per product). Also seeds the four <c>ProductDocumentTypes</c> (TECH_SHEET, PROPOSAL, MANUAL,
+    /// OTHER). Idempotent.
+    /// </summary>
+    public async Task SeedProductAttachmentSettingsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        var settingsRow = await _context.ProductAttachmentSettings.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(s => s.CompanyId == companyId && s.GcRecord == 0, cancellationToken);
+        if (settingsRow is null)
+        {
+            _context.ProductAttachmentSettings.Add(new ProductAttachmentSettings
+            {
+                CompanyId = companyId,
+                AllowedDocumentTypes = ProductAttachmentSettings.DefaultAllowedDocumentTypes,
+                MaxDocumentSizeBytes = ProductAttachmentSettings.DefaultMaxDocumentSizeBytes,
+                MaxDocumentsPerProduct = ProductAttachmentSettings.DefaultMaxDocumentsPerProduct,
+                AllowedImageFormats = ProductAttachmentSettings.DefaultAllowedImageFormats,
+                MaxImageSizeBytes = ProductAttachmentSettings.DefaultMaxImageSizeBytes,
+                MaxImagesPerProduct = ProductAttachmentSettings.DefaultMaxImagesPerProduct
+            });
+        }
+
+        var seedTypes = new[]
+        {
+            ("TECH_SHEET", "Ficha técnica", 1),
+            ("PROPOSAL", "Propuesta", 2),
+            ("MANUAL", "Manual", 3),
+            ("OTHER", "Otro", 4)
+        };
+
+        foreach (var (code, name, sortOrder) in seedTypes)
+        {
+            var exists = await _context.ProductDocumentTypes.IgnoreQueryFilters()
+                .AnyAsync(t => t.CompanyId == companyId && t.Code == code && t.GcRecord == 0, cancellationToken);
+            if (exists)
+            {
+                continue;
+            }
+
+            _context.ProductDocumentTypes.Add(new ProductDocumentType
+            {
+                CompanyId = companyId,
+                Code = code,
+                Name = name,
+                SortOrder = sortOrder,
+                IsActive = true
+            });
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>
@@ -4685,6 +4759,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // inside the activity detail tab); the resource is the only thing that matters for the permission gate.
         new("ActivityRecords", "/calendar/activity-records", "@Icons.Material.Filled.CommentBank", "Calendar", "Calendar", "CalendarActivityRecords", true, true, false, false, CanDownload: true, IsVisibleMenu: false),
 
+        // SPEC 70 — product catalog settings (attachment limits + document types). SuperAdmin / Admin / Manager
+        // can edit, Supervisor reads (CanUpdate == false para Supervisor).
+        new("ProductSettings", "/administration/product-settings", "@Icons.Material.Filled.SettingsApplications", "Administration", "Administration", "ProductSettings", true, true, false, true),
+
         // SPEC 47 — endpoint para gestionar canales de ingesta inbound de tickets (Twilio WhatsApp, SendGrid email).
         // CanUpdate queda en false por diseño: rotar un token de webhook es soft-delete + create, no update in-place.
         new("TicketInboundChannels", "/tickets/ticket-inbound-channels", "@Icons.Material.Filled.Webhook", "Tickets", "TicketManagement", "TicketInboundChannels", true, true, false, true),
@@ -4799,7 +4877,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "Customers", true, true, true, false),
         // SPEC 56: Supervisor reads the exchange rates.
         new("Supervisor", "ExchangeRates", true, false, false, false),
-        new("Supervisor", "Products", true, false, false, false),
+        new("Supervisor", "Products", true, false, false, false, CanDownload: true),
         new("Supervisor", "ProductCategories", true, false, false, false),
         new("Supervisor", "LeadSettings", true, false, false, false),
         new("Supervisor", "SalesTeams", true, false, false, false),
@@ -4895,6 +4973,12 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("UsuarioSimple", "Leads", true, true, true, false, CanDownload: true),
         // SPEC 64: a member reads the reports (its own figures, by scope) and does not export.
         new("UsuarioSimple", "LeadReports", true, false, false, false),
+
+        // SPEC 70 — product catalog settings (limits + document types). SuperAdmin / Admin / Manager write;
+        // Supervisor reads only.
+        new("SuperAdmin", "ProductSettings", true, true, true, true),
+        new("Manager", "ProductSettings", true, true, true, true),
+        new("Supervisor", "ProductSettings", true, false, false, false),
 
         // SPEC 45 — channel agent (CalendarChannelIntake, no CanDelete) and pending-persons inbox (read + update).
         // Admin and SuperAdminCompany get full access through PrivilegedRoleNames; the agent gets nothing else.

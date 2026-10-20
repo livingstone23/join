@@ -33,6 +33,11 @@ public interface ICompanyCatalogSeeder
     /// </summary>
     Task SeedCalendarAttachmentSettingsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// SPEC 70 — creates the unique live row of <c>ProductAttachmentSettings</c> for the company and the four
+    /// seed document types (Ficha técnica, Propuesta, Manual, Otro). Idempotent.
+    /// </summary>
+    Task SeedProductAttachmentSettingsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
 
 }
 

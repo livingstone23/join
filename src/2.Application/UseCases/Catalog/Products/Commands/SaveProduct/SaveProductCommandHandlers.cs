@@ -3,6 +3,7 @@ using JOIN.Application.DTO.Catalog;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Services.Catalog;
+using JOIN.Application.UseCases.Catalog.ProductAttachments;
 using JOIN.Application.UseCases.Finance.CompanyCurrencies;
 using JOIN.Domain.Catalog;
 using JOIN.Domain.Finance;
@@ -10,9 +11,76 @@ using MediatR;
 
 namespace JOIN.Application.UseCases.Catalog.Products.Commands;
 
-/// <summary>
-/// Handles <see cref="CreateProductCommand"/>.
-/// </summary>
+/// <summary>Handles <see cref="DeleteProductCommand"/> with cascade to images and documents (SPEC 70).</summary>
+public sealed class DeleteProductCommandHandler(
+    IUnitOfWork unitOfWork,
+    ICurrentUserService currentUserService,
+    ProductAttachmentCascadeCoordinator cascade)
+    : IRequestHandler<DeleteProductCommand, Response<Guid>>
+{
+    public async Task<Response<Guid>> Handle(DeleteProductCommand request, CancellationToken cancellationToken)
+    {
+        if (currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<Guid>.Error(CatalogErrorCodes.CompanyRequired, ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
+        var repository = unitOfWork.GetRepository<Product>();
+        var entity = await repository.GetAsync(request.Id);
+        if (entity is null || entity.CompanyId != currentUserService.CompanyId || entity.GcRecord != 0)
+        {
+            return Response<Guid>.Error(CatalogErrorCodes.ProductNotFound, ["Product not found."]);
+        }
+
+        // SPEC 61 B.14: a product offered in a live lead line is deactivated, not deleted.
+        var check = await new ActiveDependentsCheck(unitOfWork).CountAsync<JOIN.Domain.Customers.Leads.LeadProduct>(
+            l => l.GcRecord == 0 && l.ProductId == entity.Id, "LeadProducts");
+        if (check.HasDependents)
+        {
+            return Response<Guid>.Error(CatalogErrorCodes.ProductInUse, [.. check.Details]);
+        }
+
+        // SPEC 70 — cascade the soft-delete to images and documents. The same GcRecord stamp is used
+        // so the restore can find them.
+        entity.MarkAsDeleted();
+        var stamp = entity.GcRecord;
+        await repository.UpdateAsync(entity);
+        await cascade.MarkChildrenAsDeletedAsync(entity.Id, stamp, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return new Response<Guid> { IsSuccess = true, Message = "Product deleted successfully.", Data = entity.Id };
+    }
+}
+
+/// <summary>Handles <see cref="RestoreProductCommand"/> with <see cref="SoftDeleteRestorer"/> (SPEC 41-post) and cascade restore (SPEC 70).</summary>
+public sealed class RestoreProductCommandHandler(
+    ICurrentUserService currentUserService,
+    SoftDeleteRestorer restorer,
+    ProductAttachmentCascadeCoordinator cascade)
+    : IRequestHandler<RestoreProductCommand, Response<Guid>>
+{
+    public async Task<Response<Guid>> Handle(RestoreProductCommand request, CancellationToken cancellationToken)
+    {
+        if (currentUserService.CompanyId == Guid.Empty)
+        {
+            return Response<Guid>.Error(CatalogErrorCodes.CompanyRequired, ["The authenticated token must contain a valid CompanyId claim."]);
+        }
+
+        if (!currentUserService.IsInRole("SuperAdmin"))
+        {
+            return Response<Guid>.Error(CatalogErrorCodes.SuperAdminRequired, ["Only a SuperAdmin can restore deleted records."]);
+        }
+
+        return await restorer.RestoreAsync<Product>(
+            request.Id,
+            request.CompanyId,
+            activeDuplicateExists: (entity, _) => restorer.AnyAsync<Product>(
+                x => x.GcRecord == 0 && x.Id != entity.Id && x.CompanyId == entity.CompanyId && x.Code == entity.Code),
+            restoreCascade: (entity, stamp, ct) => cascade.RestoreChildrenAsync(entity.Id, stamp, ct),
+            cancellationToken: cancellationToken);
+    }
+}
+/// <summary>Handles <see cref="CreateProductCommand"/>.</summary>
 public sealed class CreateProductCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
@@ -48,9 +116,7 @@ public sealed class CreateProductCommandHandler(
     }
 }
 
-/// <summary>
-/// Handles <see cref="UpdateProductCommand"/>.
-/// </summary>
+/// <summary>Handles <see cref="UpdateProductCommand"/>.</summary>
 public sealed class UpdateProductCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
@@ -92,74 +158,8 @@ public sealed class UpdateProductCommandHandler(
 }
 
 /// <summary>
-/// Handles <see cref="DeleteProductCommand"/>.
-/// </summary>
-public sealed class DeleteProductCommandHandler(
-    IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService)
-    : IRequestHandler<DeleteProductCommand, Response<Guid>>
-{
-    public async Task<Response<Guid>> Handle(DeleteProductCommand request, CancellationToken cancellationToken)
-    {
-        if (currentUserService.CompanyId == Guid.Empty)
-        {
-            return Response<Guid>.Error(CatalogErrorCodes.CompanyRequired, ["The authenticated token must contain a valid CompanyId claim."]);
-        }
-
-        var repository = unitOfWork.GetRepository<Product>();
-        var entity = await repository.GetAsync(request.Id);
-        if (entity is null || entity.CompanyId != currentUserService.CompanyId || entity.GcRecord != 0)
-        {
-            return Response<Guid>.Error(CatalogErrorCodes.ProductNotFound, ["Product not found."]);
-        }
-
-        // SPEC 61 B.14: a product offered in a live lead line is deactivated, not deleted.
-        var check = await new ActiveDependentsCheck(unitOfWork).CountAsync<JOIN.Domain.Customers.Leads.LeadProduct>(
-            l => l.GcRecord == 0 && l.ProductId == entity.Id, "LeadProducts");
-        if (check.HasDependents)
-        {
-            return Response<Guid>.Error(CatalogErrorCodes.ProductInUse, [.. check.Details]);
-        }
-
-        entity.MarkAsDeleted();
-        await repository.UpdateAsync(entity);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        return new Response<Guid> { IsSuccess = true, Message = "Product deleted successfully.", Data = entity.Id };
-    }
-}
-
-/// <summary>
-/// Handles <see cref="RestoreProductCommand"/> with <see cref="SoftDeleteRestorer"/> (SPEC 41-post).
-/// </summary>
-public sealed class RestoreProductCommandHandler(
-    ICurrentUserService currentUserService,
-    SoftDeleteRestorer restorer)
-    : IRequestHandler<RestoreProductCommand, Response<Guid>>
-{
-    public async Task<Response<Guid>> Handle(RestoreProductCommand request, CancellationToken cancellationToken)
-    {
-        if (currentUserService.CompanyId == Guid.Empty)
-        {
-            return Response<Guid>.Error(CatalogErrorCodes.CompanyRequired, ["The authenticated token must contain a valid CompanyId claim."]);
-        }
-
-        if (!currentUserService.IsInRole("SuperAdmin"))
-        {
-            return Response<Guid>.Error(CatalogErrorCodes.SuperAdminRequired, ["Only a SuperAdmin can restore deleted records."]);
-        }
-
-        return await restorer.RestoreAsync<Product>(
-            request.Id,
-            request.CompanyId,
-            activeDuplicateExists: (entity, _) => restorer.AnyAsync<Product>(
-                x => x.GcRecord == 0 && x.Id != entity.Id && x.CompanyId == entity.CompanyId && x.Code == entity.Code),
-            cancellationToken: cancellationToken);
-    }
-}
-
-/// <summary>
-/// Rules shared by the product commands.
+/// Rules shared by the product commands (validation, apply, DTO mapping). Lives here so every handler in the
+/// folder sees the same defaults.
 /// </summary>
 internal static class ProductRules
 {
@@ -168,10 +168,6 @@ internal static class ProductRules
     internal static Response<ProductDto> CompanyRequired() =>
         Response<ProductDto>.Error(CatalogErrorCodes.CompanyRequired, ["The authenticated token must contain a valid CompanyId claim."]);
 
-    /// <summary>
-    /// The company needs a base currency (the reference price is in it), the category must be a live category of the
-    /// company, and the normalized code must be free among the company's live products.
-    /// </summary>
     internal static async Task<Check> ValidateAsync(
         IUnitOfWork unitOfWork,
         CompanyBaseCurrencyCoordinator baseCurrency,

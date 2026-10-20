@@ -146,6 +146,7 @@ public static class ConfigureServices
         services.AddScoped<RolePermissionCacheInvalidator>();
         services.AddScoped<CompanyPermissionCacheInvalidator>();
         services.AddScoped<PersonCascadeCoordinator>();
+        services.AddScoped<JOIN.Application.UseCases.Catalog.ProductAttachments.ProductAttachmentCascadeCoordinator>();
         services.AddScoped<SystemOptionCascadeCoordinator>();
         services.AddScoped<TicketCascadeCoordinator>();
 

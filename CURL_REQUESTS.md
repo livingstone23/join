@@ -1987,6 +1987,64 @@ curl -s -X POST "$BASE_URL/api/v1/ProductCategories" \
   -d '{ "name": "Licencias", "parentId": "<software-category-id>" }'
 ```
 
+## Catalog — product images and documents (SPEC 70)
+
+0–5 images per product (sorted, one live primary enforced by a filtered unique index). Documents classified by
+the company's `ProductDocumentTypes` catalog (seed: `TECH_SHEET`, `PROPOSAL`, `MANUAL`, `OTHER`). Image format is
+validated by extension **and** by signature of the first bytes — `PRODUCT_IMAGE_FORMAT_NOT_ALLOWED` when they
+disagree. Settings live on `ProductSettings` (separate resource: who edits products does not change limits).
+Uploads require the product to be active (`409 PRODUCT_NOT_ACTIVE`); listing and downloading keep working on
+inactive products. Restoring an image or document is SuperAdmin-only.
+
+```bash
+# Product images
+curl -s "$BASE_URL/api/v1/Products/<product-id>/images" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/Products/<product-id>/images" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/path/to/photo.png"
+curl -s -X PUT "$BASE_URL/api/v1/Products/<product-id>/images/order" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "imageIds": ["<id-1>", "<id-2>", "<id-3>"] }'
+curl -s -X PUT "$BASE_URL/api/v1/Products/<product-id>/images/<image-id>/primary" \
+  -H "Authorization: Bearer $TOKEN"
+curl -s -o photo.png "$BASE_URL/api/v1/Products/<product-id>/images/<image-id>/content" \
+  -H "Authorization: Bearer $TOKEN"  # Cache-Control: private, max-age=3600 + X-Content-Type-Options: nosniff
+curl -s -X DELETE "$BASE_URL/api/v1/Products/<product-id>/images/<image-id>" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/Products/<product-id>/images/<image-id>/restore" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Product documents
+curl -s "$BASE_URL/api/v1/Products/<product-id>/documents" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/Products/<product-id>/documents" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/path/to/spec.pdf" \
+  -F "productDocumentTypeId=<type-id>" \
+  -F "displayName=Ficha técnica 2026" \
+  -F "description=Versión inicial"
+curl -s -o spec.pdf "$BASE_URL/api/v1/Products/<product-id>/documents/<doc-id>/download" \
+  -H "Authorization: Bearer $TOKEN"  # requires Products.CanDownload; 403 without
+curl -s -X DELETE "$BASE_URL/api/v1/Products/<product-id>/documents/<doc-id>" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/Products/<product-id>/documents/<doc-id>/restore" \
+  -H "Authorization: Bearer $TOKEN"
+
+# ProductSettings (resource, not the Products menu): attachment limits + document type catalog.
+curl -s "$BASE_URL/api/v1/ProductSettings/attachment-settings" -H "Authorization: Bearer $TOKEN"
+curl -s -X PUT "$BASE_URL/api/v1/ProductSettings/attachment-settings" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "allowedDocumentTypes": 31, "maxDocumentSizeBytes": 4194304, "maxDocumentsPerProduct": 10,
+        "allowedImageFormats": 7, "maxImageSizeBytes": 2097152, "maxImagesPerProduct": 3 }'
+curl -s "$BASE_URL/api/v1/ProductSettings/document-types" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/ProductSettings/document-types" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "code": "CONTRACT", "name": "Contrato", "sortOrder": 5, "isActive": true }'
+curl -s -X DELETE "$BASE_URL/api/v1/ProductSettings/document-types/<id>" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/ProductSettings/document-types/<id>/restore" -H "Authorization: Bearer $TOKEN"
+
+# Thumbnail for sellers without Products permission (reuses the GET image content path)
+curl -s -o thumb.png "$BASE_URL/api/v1/Leads/products-lookup/<product-id>/images/<image-id>/content" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 ## Persons — optional identification (SPEC 58)
 
 `identificationTypeId` and `identificationNumber` are optional on `POST/PUT /Persons`, but they come together

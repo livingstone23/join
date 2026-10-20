@@ -3098,6 +3098,72 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("products", "catalog");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Catalog.ProductAttachmentSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AllowedDocumentTypes")
+                        .HasColumnType("integer")
+                        .HasColumnName("alloweddocumenttypes");
+
+                    b.Property<int>("AllowedImageFormats")
+                        .HasColumnType("integer")
+                        .HasColumnName("allowedimageformats");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<long>("MaxDocumentSizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("maxdocumentsizebytes");
+
+                    b.Property<int>("MaxDocumentsPerProduct")
+                        .HasColumnType("integer")
+                        .HasColumnName("maxdocumentsperproduct");
+
+                    b.Property<long>("MaxImageSizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("maximagesizebytes");
+
+                    b.Property<int>("MaxImagesPerProduct")
+                        .HasColumnType("integer")
+                        .HasColumnName("maximagesperproduct");
+
+                    b.HasKey("Id")
+                        .HasName("pk_productattachmentsettings");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_productattachmentsettings_company")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("productattachmentsettings", "catalog");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Catalog.ProductCategory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3163,6 +3229,311 @@ namespace JOIN.Persistence.Migrations
                     NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("CompanyId", "ParentId", "Name"), false);
 
                     b.ToTable("productcategories", "catalog");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Catalog.ProductDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("contenttype");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("deletereason");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedbyuserid");
+
+                    b.Property<DateTime?>("DeletedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deletedutc");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("displayname");
+
+                    b.Property<int>("DocumentType")
+                        .HasColumnType("integer")
+                        .HasColumnName("documenttype");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("NewName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("newname");
+
+                    b.Property<string>("OriginalName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("originalname");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("path");
+
+                    b.Property<Guid>("ProductDocumentTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("productdocumenttypeid");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("productid");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sizebytes");
+
+                    b.Property<int>("StorageProvider")
+                        .HasColumnType("integer")
+                        .HasColumnName("storageprovider");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("uploadedbyuserid");
+
+                    b.HasKey("Id")
+                        .HasName("pk_productdocuments");
+
+                    b.HasIndex("ProductDocumentTypeId")
+                        .HasDatabaseName("ix_productdocuments_productdocumenttypeid");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_productdocuments_productid");
+
+                    b.HasIndex("UploadedByUserId")
+                        .HasDatabaseName("ix_productdocuments_uploadedbyuserid");
+
+                    b.HasIndex("CompanyId", "ProductId")
+                        .HasDatabaseName("ix_productdocuments_product");
+
+                    b.ToTable("productdocuments", "catalog");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Catalog.ProductDocumentType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_productdocumenttypes");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_productdocumenttypes_company_code")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("productdocumenttypes", "catalog");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Catalog.ProductImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("contenttype");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("deletereason");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedbyuserid");
+
+                    b.Property<DateTime?>("DeletedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deletedutc");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<int?>("Height")
+                        .HasColumnType("integer")
+                        .HasColumnName("height");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isprimary");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("NewName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("newname");
+
+                    b.Property<string>("OriginalName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("originalname");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("path");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("productid");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sizebytes");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.Property<int>("StorageProvider")
+                        .HasColumnType("integer")
+                        .HasColumnName("storageprovider");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("uploadedbyuserid");
+
+                    b.Property<int?>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
+                    b.HasKey("Id")
+                        .HasName("pk_productimages");
+
+                    b.HasIndex("ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_productimages_oneprimary")
+                        .HasFilter("\"isprimary\" = TRUE AND \"gcrecord\" = 0");
+
+                    b.HasIndex("UploadedByUserId")
+                        .HasDatabaseName("ix_productimages_uploadedbyuserid");
+
+                    b.HasIndex("CompanyId", "ProductId")
+                        .HasDatabaseName("ix_productimages_product");
+
+                    b.HasIndex("CompanyId", "ProductId", "SortOrder")
+                        .HasDatabaseName("ix_productimages_product_sort");
+
+                    b.ToTable("productimages", "catalog");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Common.CommunicationChannel", b =>
@@ -8787,6 +9158,18 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("ProductCategory");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Catalog.ProductAttachmentSettings", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_productattachmentsettings_companies_companyid");
+
+                    b.Navigation("Company");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Catalog.ProductCategory", b =>
                 {
                     b.HasOne("JOIN.Domain.Common.Company", "Company")
@@ -8805,6 +9188,87 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("Parent");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Catalog.ProductDocument", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_productdocuments_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Catalog.ProductDocumentType", "ProductDocumentType")
+                        .WithMany()
+                        .HasForeignKey("ProductDocumentTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_productdocuments_productdocumenttypes_productdocumenttypeid");
+
+                    b.HasOne("JOIN.Domain.Catalog.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_productdocuments_products_productid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "UploadedByUser")
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_productdocuments_users_uploadedbyuserid");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("ProductDocumentType");
+
+                    b.Navigation("UploadedByUser");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Catalog.ProductDocumentType", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_productdocumenttypes_companies_companyid");
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Catalog.ProductImage", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_productimages_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Catalog.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_productimages_products_productid");
+
+                    b.HasOne("JOIN.Domain.Security.ApplicationUser", "UploadedByUser")
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_productimages_users_uploadedbyuserid");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("UploadedByUser");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Common.Municipality", b =>

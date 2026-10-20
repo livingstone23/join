@@ -14,8 +14,8 @@ public static class CatalogResponseResults
     public static int StatusCodeOf(string message) => message switch
     {
         CatalogErrorCodes.CompanyRequired => StatusCodes.Status401Unauthorized,
-        CatalogErrorCodes.ProductNotFound or CatalogErrorCodes.ProductCategoryNotFound => StatusCodes.Status404NotFound,
-        CatalogErrorCodes.ProductInUse or CatalogErrorCodes.ProductCategoryInUse or CatalogErrorCodes.DuplicateKey => StatusCodes.Status409Conflict,
+        CatalogErrorCodes.ProductNotFound or CatalogErrorCodes.ProductCategoryNotFound or CatalogErrorCodes.ProductImageNotFound or CatalogErrorCodes.ProductDocumentNotFound or CatalogErrorCodes.ProductDocumentTypeNotFound => StatusCodes.Status404NotFound,
+        CatalogErrorCodes.ProductInUse or CatalogErrorCodes.ProductCategoryInUse or CatalogErrorCodes.DuplicateKey or CatalogErrorCodes.ProductNotActive or CatalogErrorCodes.ProductImageLimit or CatalogErrorCodes.ProductDocumentLimit or CatalogErrorCodes.ProductDocumentTypeInUse or CatalogErrorCodes.ProductDocumentTypeAlreadyExists or CatalogErrorCodes.ProductAttachmentSettingsAlreadyExists => StatusCodes.Status409Conflict,
         CatalogErrorCodes.SuperAdminRequired => StatusCodes.Status403Forbidden,
         _ => StatusCodes.Status400BadRequest
     };
