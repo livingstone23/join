@@ -1,6 +1,6 @@
 # SPEC 67 — Calendario: "Relacionado con" de la actividad unificado en Persona/Cliente
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 44-post (actividades: `RequesterPersonId` y `CustomerId`), SPEC 45-post (ingreso por canales), SPEC 54 (`GET /Persons/lookup`), SPEC 55 (un cliente por persona y empresa), SPEC 65 (próxima acción del lead en el calendario). Rama de trabajo: `spec-67-calendar-activity-person-customer-link`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Que la persona y el cliente de una actividad se elijan con un solo buscador "Persona/Cliente", como en tickets (FE-27), y que el backend mantenga siempre coherentes `RequesterPersonId` y `CustomerId`.
