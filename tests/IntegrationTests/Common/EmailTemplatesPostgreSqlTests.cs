@@ -440,6 +440,18 @@ public sealed class EmailTemplatesPostgreSqlTests : IClassFixture<CustomWebAppli
             LIMIT @MaxResults;
             """, companyId, ("MaxResults", 50), ("EmailTemplateTypeId", typeId), ("Search", "%Bien%"))).Should().Contain("Plan");
 
+        // SPEC 71 B.8 — the render reads the active template and the lead of the person.
+        (await ExplainAsync(conn, """
+            SELECT t.Id, t.Name, t.Subject, t.BodyHtml
+            FROM admin.emailtemplates t
+            WHERE t.Id = @TemplateId AND t.CompanyId = @CompanyId AND t.GcRecord = 0 AND t.IsActive = TRUE;
+            """, companyId, ("TemplateId", Guid.NewGuid()))).Should().Contain("Plan");
+        (await ExplainAsync(conn, """
+            SELECT l.Code, l.Topic
+            FROM customer.leads l
+            WHERE l.Id = @LeadId AND l.CompanyId = @CompanyId AND l.PersonId = @PersonId AND l.GcRecord = 0;
+            """, companyId, ("LeadId", Guid.NewGuid()), ("PersonId", Guid.NewGuid()))).Should().Contain("Plan");
+
         // SPEC 71 B.8 — the render reads the person context in one statement.
         (await ExplainAsync(conn, """
             SELECT p.FirstName,
