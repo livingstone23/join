@@ -1,6 +1,6 @@
 # SPEC 69 — Calendario: comentarios y documentos de la actividad, con límites de adjuntos por empresa
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 36 (adjuntos de ticket: tabla de extensiones), SPEC 44-post (actividades, bitácora `CalendarEventLog`, recurso `CalendarSettings`), SPEC 49-post (almacenamiento intercambiable), SPEC 62 (patrón de documentos y `LeadAttachmentSettings`), **SPEC 68** (flag `CanViewOthersActivities` y servicio de visibilidad). Rama de trabajo: `spec-69-calendar-activity-comments-and-documents`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Que en el detalle de una actividad se registren comentarios y se adjunten documentos que quedan como histórico (solo un administrador los borra), con tipos y tamaños permitidos parametrizados por empresa.
