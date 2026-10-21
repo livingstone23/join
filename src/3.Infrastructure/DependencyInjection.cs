@@ -2,8 +2,10 @@ using System.Net;
 using System.Net.Http;
 using Dapper;
 using JOIN.Application.Interface;
+using JOIN.Application.Interface.Email;
 using JOIN.Domain.Enums;
 using JOIN.Infrastructure.Audit;
+using JOIN.Infrastructure.Email;
 using JOIN.Infrastructure.HealthChecks;
 using JOIN.Infrastructure.Messaging.Logging;
 using JOIN.Infrastructure.Messaging.SendGrid;
@@ -64,6 +66,8 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogger, AuditLogger>();
         services.AddScoped<IMfaTotpValidator, MfaTotpValidator>();
         services.AddScoped<ISmsService, NoOpSmsService>();
+        // SPEC 71 — HTML sanitizer of the email templates (shared with the sending flow of SPEC 72).
+        services.AddTransient<IHtmlSanitizer, HtmlSanitizer>();
 
         // ------------------------------------------------------------------
         // Messaging: Email adapter (Adapter Pattern — Pillar 4).

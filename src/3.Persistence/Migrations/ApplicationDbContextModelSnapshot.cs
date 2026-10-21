@@ -124,6 +124,145 @@ namespace JOIN.Persistence.Migrations
                     b.ToTable("companymodules", "admin");
                 });
 
+            modelBuilder.Entity("JOIN.Domain.Admin.EmailTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BodyHtml")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("bodyhtml");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<Guid>("EmailTemplateTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("emailtemplatetypeid");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("subject");
+
+                    b.HasKey("Id")
+                        .HasName("pk_emailtemplates");
+
+                    b.HasIndex("EmailTemplateTypeId")
+                        .HasDatabaseName("ix_emailtemplates_emailtemplatetypeid");
+
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_emailtemplates_company_name")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.HasIndex("CompanyId", "EmailTemplateTypeId", "IsActive")
+                        .HasDatabaseName("ix_emailtemplates_company_type_active");
+
+                    b.ToTable("emailtemplates", "admin");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Admin.EmailTemplateType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("companyid");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("createdby");
+
+                    b.Property<int>("GcRecord")
+                        .HasColumnType("integer")
+                        .HasColumnName("gcrecord");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTime?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastmodified");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("lastmodifiedby");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sortorder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_emailtemplatetypes");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_emailtemplatetypes_company_code")
+                        .HasFilter("\"gcrecord\" = 0");
+
+                    b.ToTable("emailtemplatetypes", "admin");
+                });
+
             modelBuilder.Entity("JOIN.Domain.Admin.EntityStatus", b =>
                 {
                     b.Property<Guid>("Id")
@@ -8250,6 +8389,39 @@ namespace JOIN.Persistence.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("Module");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Admin.EmailTemplate", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_emailtemplates_companies_companyid");
+
+                    b.HasOne("JOIN.Domain.Admin.EmailTemplateType", "EmailTemplateType")
+                        .WithMany()
+                        .HasForeignKey("EmailTemplateTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_emailtemplates_emailtemplatetypes_emailtemplatetypeid");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("EmailTemplateType");
+                });
+
+            modelBuilder.Entity("JOIN.Domain.Admin.EmailTemplateType", b =>
+                {
+                    b.HasOne("JOIN.Domain.Common.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_emailtemplatetypes_companies_companyid");
+
+                    b.Navigation("Company");
                 });
 
             modelBuilder.Entity("JOIN.Domain.Admin.Gender", b =>

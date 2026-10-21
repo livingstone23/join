@@ -178,6 +178,10 @@ public static class ConfigureServices
         // SPEC 69 — rule 5 visibility of comments and documents; handlers are auto-registered by MediatR.
         services.AddScoped<JOIN.Application.UseCases.Calendars.CalendarEventRecords.CalendarEventRecordsAccess>();
 
+        // SPEC 71 — email templates: the renderer of the closed list of variables and the write guard.
+        services.AddScoped<JOIN.Application.Interface.Email.IEmailTemplateRenderer, JOIN.Application.Services.Email.EmailTemplateRenderer>();
+        services.AddScoped<JOIN.Application.UseCases.Common.EmailTemplates.EmailTemplateWriteGuard>();
+
         // SPEC 45 — channel agent intake and pending persons.
         services.AddScoped<IntakeChannelReader>();
         services.AddScoped<IntakeRequesterResolver>();
