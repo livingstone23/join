@@ -166,9 +166,13 @@ public sealed class CapturingEmailService : IEmailService
         return Task.FromResult(true);
     }
 
+    /// <summary>SPEC 72 — recipients on this domain are rejected, to exercise the <c>Failed</c> path without shared state.</summary>
+    public const string RejectedDomain = "@rejected.test";
+
     /// <summary>
     /// SPEC 72 — captures the full message (copies, Reply-To, sender and attachments) so the
-    /// integration tests can assert what the provider would have received.
+    /// integration tests can assert what the provider would have received. A recipient on
+    /// <see cref="RejectedDomain"/> is answered as a provider rejection.
     /// </summary>
     public Task<EmailSendResult> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
     {
@@ -183,7 +187,9 @@ public sealed class CapturingEmailService : IEmailService
             message.Attachments.ToList(),
             DateTime.UtcNow));
 
-        return Task.FromResult(EmailSendResult.Ok("captured-message-id"));
+        return Task.FromResult(message.To.EndsWith(RejectedDomain, StringComparison.OrdinalIgnoreCase)
+            ? EmailSendResult.Fail("550 The recipient was rejected.")
+            : EmailSendResult.Ok("captured-message-id"));
     }
 
     /// <summary>
@@ -200,6 +206,12 @@ public sealed class CapturingEmailService : IEmailService
     /// </summary>
     public SentMessage? LastMessage() =>
         _messages.OrderByDescending(message => message.SentAtUtc).FirstOrDefault();
+
+    /// <summary>SPEC 72 — the last full message captured for <paramref name="to"/>, or <c>null</c>.</summary>
+    public SentMessage? LastMessageTo(string to) =>
+        _messages.Where(message => string.Equals(message.To, to, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(message => message.SentAtUtc)
+            .FirstOrDefault();
 
     public sealed record SentEmail(string To, string Subject, string HtmlContent, DateTime SentAtUtc);
 

@@ -214,6 +214,10 @@ public sealed record LeadTimelineItemDto
     public string Title { get; init; } = string.Empty;
     public string? Detail { get; init; }
     public Guid? RefId { get; init; }
+    /// <summary>SPEC 72 — code of the master contact type of an <c>Interaction</c> (<c>EMAIL</c> for a sent email).</summary>
+    public string? ContactTypeCode { get; init; }
+    /// <summary>SPEC 72 — the email that created the contact, to open its detail (<c>GET /Leads/{id}/emails/{emailId}</c>).</summary>
+    public Guid? EmailMessageId { get; init; }
 }
 
 /// <summary>An open stage of the board with its count, base-currency value and first cards.</summary>

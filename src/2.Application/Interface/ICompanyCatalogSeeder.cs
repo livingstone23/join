@@ -45,6 +45,12 @@ public interface ICompanyCatalogSeeder
     /// </summary>
     Task SeedEmailTemplateTypesForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// SPEC 72 — creates the unique live row of <c>EmailCompanySettings</c> (no sender of its own, 50 emails per user per
+    /// day, 15 MB of attachments). Idempotent.
+    /// </summary>
+    Task SeedEmailCompanySettingsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
+
 }
 
 /// <summary>

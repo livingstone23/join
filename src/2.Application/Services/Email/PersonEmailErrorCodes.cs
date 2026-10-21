@@ -25,7 +25,10 @@ public static class PersonEmailErrorCodes
     public const string EmailAttachmentsTooLarge = "EMAIL_ATTACHMENTS_TOO_LARGE";
     public const string EmailDailyLimitReached = "EMAIL_DAILY_LIMIT_REACHED";
     public const string EmailSettingsNotConfigured = "EMAIL_SETTINGS_NOT_CONFIGURED";
+    public const string EmailSettingsAlreadyExists = "EMAIL_SETTINGS_ALREADY_EXISTS";
+    public const string SuperAdminRequired = "SUPERADMIN_REQUIRED";
     public const string EmailSendFailed = "EMAIL_SEND_FAILED";
+    public const string PersonEmailNotFound = "PERSON_EMAIL_NOT_FOUND";
     public const string StorageProviderNotConfigured = "STORAGE_PROVIDER_NOT_CONFIGURED";
     public const string FileNotFoundInStorage = "FILE_NOT_FOUND_IN_STORAGE";
 }

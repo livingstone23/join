@@ -349,31 +349,33 @@ public sealed class GetLeadTimelineQueryHandler(ISqlConnectionFactory connection
             SELECT x.*
             FROM (
                 SELECT 'Interaction' AS Kind, i.Id, i.OccurredAt AS At, i.UserId, CONCAT(u.FirstName, ' ', u.LastName) AS UserName,
-                       ctc.Name AS Title, i.Summary AS Detail, i.ContactTypeCompanyId AS RefId
+                       ctc.Name AS Title, i.Summary AS Detail, i.ContactTypeCompanyId AS RefId,
+                       ct.Code AS ContactTypeCode, i.PersonEmailMessageId AS EmailMessageId
                 FROM customer.leadinteractions i
                 INNER JOIN customer.contacttypecompanies ctc ON ctc.Id = i.ContactTypeCompanyId
+                LEFT JOIN customer.contacttypes ct ON ct.Id = ctc.ContactTypeId
                 INNER JOIN security.users u ON u.Id = i.UserId
                 WHERE i.LeadId = @LeadId AND i.GcRecord = 0
                 UNION ALL
-                SELECT 'Comment', c.Id, c.Created, c.UserId, CONCAT(u.FirstName, ' ', u.LastName), 'Comment', c.Body, c.LeadInteractionId
+                SELECT 'Comment', c.Id, c.Created, c.UserId, CONCAT(u.FirstName, ' ', u.LastName), 'Comment', c.Body, c.LeadInteractionId, NULL, NULL
                 FROM customer.leadcomments c
                 INNER JOIN security.users u ON u.Id = c.UserId
                 WHERE c.LeadId = @LeadId AND c.GcRecord = 0
                 UNION ALL
-                SELECT 'Event', e.Id, e.StartUtc, e.OwnerUserId, CONCAT(u.FirstName, ' ', u.LastName), e.Title, st.Code, e.CalendarActivityCompanyId
+                SELECT 'Event', e.Id, e.StartUtc, e.OwnerUserId, CONCAT(u.FirstName, ' ', u.LastName), e.Title, st.Code, e.CalendarActivityCompanyId, NULL, NULL
                 FROM calendar.events e
                 INNER JOIN calendar.statuscompanies sc ON sc.Id = e.CalendarStatusCompanyId
                 INNER JOIN calendar.statuses st ON st.Id = sc.CalendarStatusId
                 INNER JOIN security.users u ON u.Id = e.OwnerUserId
                 WHERE e.LeadId = @LeadId AND e.CompanyId = @CompanyId AND e.GcRecord = 0
                 UNION ALL
-                SELECT 'Document', d.Id, d.Created, d.UploadedByUserId, CONCAT(u.FirstName, ' ', u.LastName), d.OriginalName, d.ContentType, d.LeadInteractionId
+                SELECT 'Document', d.Id, d.Created, d.UploadedByUserId, CONCAT(u.FirstName, ' ', u.LastName), d.OriginalName, d.ContentType, d.LeadInteractionId, NULL, NULL
                 FROM customer.leaddocuments d
                 INNER JOIN security.users u ON u.Id = d.UploadedByUserId
                 WHERE d.LeadId = @LeadId AND d.GcRecord = 0
                 UNION ALL
                 SELECT 'Stage', h.Id, h.ChangedAt, h.UserId, CONCAT(u.FirstName, ' ', u.LastName),
-                       CONCAT(COALESCE(fs.Name, ''), ' → ', ts.Name), NULL, h.ToStageId
+                       CONCAT(COALESCE(fs.Name, ''), ' → ', ts.Name), NULL, h.ToStageId, NULL, NULL
                 FROM customer.leadstagehistory h
                 LEFT JOIN customer.leadstages fs ON fs.Id = h.FromStageId
                 INNER JOIN customer.leadstages ts ON ts.Id = h.ToStageId
@@ -381,7 +383,7 @@ public sealed class GetLeadTimelineQueryHandler(ISqlConnectionFactory connection
                 WHERE h.LeadId = @LeadId AND h.GcRecord = 0
                 UNION ALL
                 SELECT 'Ownership', h.Id, h.At, h.UserId, CONCAT(u.FirstName, ' ', u.LastName),
-                       CONCAT(COALESCE(CONCAT(fu.FirstName, ' ', fu.LastName), ''), ' → ', CONCAT(tu.FirstName, ' ', tu.LastName)), h.Notes, h.ToUserId
+                       CONCAT(COALESCE(CONCAT(fu.FirstName, ' ', fu.LastName), ''), ' → ', CONCAT(tu.FirstName, ' ', tu.LastName)), h.Notes, h.ToUserId, NULL, NULL
                 FROM customer.leadownershiphistory h
                 LEFT JOIN security.users fu ON fu.Id = h.FromUserId
                 INNER JOIN security.users tu ON tu.Id = h.ToUserId
@@ -389,7 +391,7 @@ public sealed class GetLeadTimelineQueryHandler(ISqlConnectionFactory connection
                 WHERE h.LeadId = @LeadId AND h.GcRecord = 0
                 UNION ALL
                 SELECT 'Status', h.Id, h.At, h.UserId, CONCAT(u.FirstName, ' ', u.LastName),
-                       CONCAT({fromStatus}, ' → ', {toStatus}), CONCAT(COALESCE(r.Name, ''), CASE WHEN r.Name IS NOT NULL AND h.Notes IS NOT NULL THEN ': ' ELSE '' END, COALESCE(h.Notes, '')), h.LeadReasonId
+                       CONCAT({fromStatus}, ' → ', {toStatus}), CONCAT(COALESCE(r.Name, ''), CASE WHEN r.Name IS NOT NULL AND h.Notes IS NOT NULL THEN ': ' ELSE '' END, COALESCE(h.Notes, '')), h.LeadReasonId, NULL, NULL
                 FROM customer.leadstatushistory h
                 LEFT JOIN customer.leadreasons r ON r.Id = h.LeadReasonId
                 INNER JOIN security.users u ON u.Id = h.UserId

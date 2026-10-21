@@ -103,6 +103,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         await SeedCalendarAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
         // SPEC 70: product attachment limits (one live row per company) plus the four seed document types.
         await SeedProductAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
+        // SPEC 72: the sending rules of the company (no sender of its own, 50 emails per user per day, 15 MB).
+        await SeedEmailCompanySettingsForCompanyAsync(companyId, cancellationToken);
         // SPEC 71: the four seed email template types (Presentación, Propuesta, Seguimiento, Agradecimiento).
         await SeedEmailTemplateTypesForCompanyAsync(companyId, cancellationToken);
     }
@@ -146,6 +148,41 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         {
             await SeedCalendarAttachmentSettingsForCompanyAsync(companyId, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// SPEC 72 — applies <see cref="SeedEmailCompanySettingsForCompanyAsync"/> to every live company (missing rows only):
+    /// from <see cref="SeedAsync"/> and from the start-up without pending migrations, like the lead attachment limits.
+    /// </summary>
+    public async Task SeedEmailCompanySettingsDefaultsAsync(CancellationToken cancellationToken = default)
+    {
+        var companyIds = await _context.Companies
+            .IgnoreQueryFilters()
+            .Where(c => c.GcRecord == 0)
+            .Select(c => c.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var companyId in companyIds)
+        {
+            await SeedEmailCompanySettingsForCompanyAsync(companyId, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// SPEC 72 — creates the unique live row of <c>EmailCompanySettings</c> with the spec defaults: no sender of its own
+    /// (the global one is used), 50 emails per user per day and 15 MB of attachments. Idempotent.
+    /// </summary>
+    public async Task SeedEmailCompanySettingsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        var exists = await _context.EmailCompanySettings.IgnoreQueryFilters()
+            .AnyAsync(s => s.CompanyId == companyId && s.GcRecord == 0, cancellationToken);
+        if (exists)
+        {
+            return;
+        }
+
+        _context.EmailCompanySettings.Add(JOIN.Domain.Admin.EmailCompanySettings.Defaults(companyId));
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>
@@ -509,6 +546,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedEmailTemplateTypesForCompanyAsync(joinCompanyId);
             await SeedEmailTemplateTypesForCompanyAsync(privateCompanyId);
             await SeedJoinEmailTemplatesAsync(joinCompanyId);
+            // SPEC 70 / SPEC 72: the product attachment limits and the sending rules of every live company.
+            await SeedProductAttachmentSettingsDefaultsAsync();
+            await SeedEmailCompanySettingsDefaultsAsync();
 
             // 7. Entidades operacionales (Clientes)
             await SeedJoinPersonsAsync(joinCompanyId, idTypeId);
@@ -4878,6 +4918,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // everything, Supervisor read only.
         new("ProductSettings", "/administration/product-settings", "@Icons.Material.Filled.SettingsApplications", "Administration", "Administration", "ProductSettings", true, true, true, true),
 
+        // SPEC 72 — sending rules of the company (sender, daily quota per user, total size of attachments).
+        new("EmailSettings", "/administration/email-settings", "@Icons.Material.Filled.MarkEmailRead", "Administration", "Administration", "EmailSettings", true, true, true, true),
+
         // SPEC 47 — endpoint para gestionar canales de ingesta inbound de tickets (Twilio WhatsApp, SendGrid email).
         // CanUpdate queda en false por diseño: rotar un token de webhook es soft-delete + create, no update in-place.
         new("TicketInboundChannels", "/tickets/ticket-inbound-channels", "@Icons.Material.Filled.Webhook", "Tickets", "TicketManagement", "TicketInboundChannels", true, true, false, true),
@@ -4993,8 +5036,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("Supervisor", "EntityStatuses", true, true, true, false),
         new("Supervisor", "CompanyModules", true, true, true, false),
         new("Supervisor", "CustomersMenu", true, true, true, true),
-        new("Supervisor", "Persons", true, true, true, true),
-        new("Supervisor", "Customers", true, true, true, false),
+        // SPEC 72 D.16: CanExecute (send emails) for the roles with CanUpdate on Persons and Customers.
+        new("Supervisor", "Persons", true, true, true, true, CanExecute: true),
+        new("Supervisor", "Customers", true, true, true, false, CanExecute: true),
         // SPEC 56: Supervisor reads the exchange rates.
         new("Supervisor", "ExchangeRates", true, false, false, false),
         new("Supervisor", "Products", true, false, false, false, CanDownload: true),
@@ -5101,6 +5145,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         new("SuperAdmin", "ProductSettings", true, true, true, true),
         new("Manager", "ProductSettings", true, true, true, true),
         new("Supervisor", "ProductSettings", true, false, false, false),
+
+        // SPEC 72 — email settings: SuperAdmin / Admin (privileged) / Manager with everything.
+        new("SuperAdmin", "EmailSettings", true, true, true, true),
+        new("Manager", "EmailSettings", true, true, true, true),
 
         // SPEC 45 — channel agent (CalendarChannelIntake, no CanDelete) and pending-persons inbox (read + update).
         // Admin and SuperAdminCompany get full access through PrivilegedRoleNames; the agent gets nothing else.

@@ -2304,3 +2304,53 @@ curl -s -X POST "$BASE_URL/api/v1/EmailTemplates/<id>/render" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{ "personId": "<person-id>", "emailAddress": "cliente@acme.test", "leadId": "<lead-id>" }'
 ```
+
+## Emails to persons, customers and leads — `/api/v1/Persons|Customers|Leads/{id}/emails` (SPEC 72)
+
+An email goes only to a valid address registered in the person (a live, active `PrimaryEmail` / `AlternativeEmail`
+contact with a valid format); `toAddress` empty means its primary one. Up to 5 CC, subject up to 200, body up to 50 000
+(sanitized). The `{{…}}` variables of SPEC 71 left in the text are replaced at sending time. `From` is the sender of the
+company (`EmailCompanySettings`) or the global `SendGrid:FromEmail`; `Reply-To` is the mailbox of the user who sends.
+Every send leaves a row in the history of the person (`Sent` or `Failed`); when it is associated to an open lead and was
+sent, it also creates an `EMAIL` contact in the lead, moves `LastInteractionAt`, and the timeline item carries
+`emailMessageId`. Attachments are only existing documents: of products (`sourceKind: 1`, SPEC 70) and of the associated
+lead (`sourceKind: 2`, SPEC 62), up to 10 and within the total size of the company.
+
+Sending answers `201` with `{ id, status, sentAt, toAddress, leadId, leadInteractionId, providerMessageId,
+attachmentCount }`; when the provider rejects it, `502 EMAIL_SEND_FAILED` with the same data (the `Failed` row). Other
+answers: `404` (`PERSON_NOT_FOUND`, `CUSTOMER_NOT_FOUND`, `LEAD_NOT_FOUND`, `EMAIL_TEMPLATE_NOT_FOUND`,
+`EMAIL_ATTACHMENT_NOT_FOUND`), `409` (`PERSON_NOT_ACTIVE`, `LEAD_NOT_OPEN`), `429 EMAIL_DAILY_LIMIT_REACHED`, `400` for the
+rest (`PERSON_EMAIL_NOT_AVAILABLE`, `INVALID_EMAIL_ADDRESS`, `INVALID_LEAD_PERSON`, `EMAIL_CONTACT_TYPE_NOT_CONFIGURED`,
+`EMAIL_TEMPLATE_UNKNOWN_VARIABLE`, `EMAIL_ATTACHMENTS_TOO_LARGE`, `EMAIL_SETTINGS_NOT_CONFIGURED`).
+
+```bash
+# Person (resource Persons): valid addresses, attachment candidates, send (CanExecute), history and detail
+curl -s "$BASE_URL/api/v1/Persons/<person-id>/email-addresses" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/Persons/<person-id>/emails/attachment-candidates?leadId=<lead-id>&search=ficha" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/Persons/<person-id>/emails" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "toAddress": "ana@cliente.test", "cc": ["jefe@cliente.test"], "subject": "Propuesta para {{Persona.Nombre}}",
+        "bodyHtml": "<p>Hola {{Persona.Nombre}}</p>", "emailTemplateId": "<template-id>", "leadId": "<open-lead-id>",
+        "attachments": [ { "sourceKind": 1, "sourceId": "<product-document-id>" }, { "sourceKind": 2, "sourceId": "<lead-document-id>" } ] }'
+curl -s "$BASE_URL/api/v1/Persons/<person-id>/emails?pageNumber=1&pageSize=20" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/Persons/<person-id>/emails/<email-id>" -H "Authorization: Bearer $TOKEN"
+
+# Customer (resource Customers): sends to the person of the customer (origin 2); the history is the person's
+curl -s -X POST "$BASE_URL/api/v1/Customers/<customer-id>/emails" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "subject": "Hola", "bodyHtml": "<p>Hola</p>" }'
+curl -s "$BASE_URL/api/v1/Customers/<customer-id>/emails" -H "Authorization: Bearer $TOKEN"
+
+# Lead (resource Leads, CanUpdate): always associated to the lead of the route (a leadId in the body is ignored)
+curl -s -X POST "$BASE_URL/api/v1/Leads/<lead-id>/emails" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "subject": "Seguimiento de {{Lead.Tema}}", "bodyHtml": "<p>Hola</p>" }'
+curl -s "$BASE_URL/api/v1/Leads/<lead-id>/emails" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/Leads/<lead-id>/emails/<email-id>" -H "Authorization: Bearer $TOKEN"
+
+# Sending rules of the company (resource EmailSettings); seeded: no sender of its own, 50 per user per day, 15 MB
+curl -s "$BASE_URL/api/v1/EmailCompanySettings" -H "Authorization: Bearer $TOKEN"
+curl -s -X PUT "$BASE_URL/api/v1/EmailCompanySettings" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "fromEmail": "ventas@acme.com", "fromName": "Ventas Acme", "maxEmailsPerUserPerDay": 50, "maxAttachmentsTotalBytes": 15728640 }'
+```

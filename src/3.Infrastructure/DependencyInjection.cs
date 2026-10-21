@@ -80,6 +80,11 @@ public static class DependencyInjection
         // ------------------------------------------------------------------
         var emailProvider = configuration["Email:Provider"];
 
+        // SPEC 72 — the global sender (SendGrid:FromEmail / FromName) is read by the Application layer when the
+        // company has no sender of its own, whatever the provider.
+        services.Configure<SendGridOptions>(configuration.GetSection("SendGrid"));
+        services.AddSingleton<IEmailSenderDefaults, SendGridSenderDefaults>();
+
         if (string.Equals(emailProvider, "Log", StringComparison.OrdinalIgnoreCase))
         {
             // Transient lifetime matches the AddHttpClient<> registration used for
@@ -89,7 +94,6 @@ public static class DependencyInjection
         }
         else
         {
-            services.Configure<SendGridOptions>(configuration.GetSection("SendGrid"));
             services.AddHttpClient<IEmailService, SendGridEmailAdapter>()
                 .AddStandardResilienceHandler(options =>
                 {

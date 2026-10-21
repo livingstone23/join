@@ -90,3 +90,21 @@ public sealed record PersonEmailMessageDto
     public DateTime SentAt { get; init; }
     public IReadOnlyList<PersonEmailAttachmentDto> Attachments { get; init; } = [];
 }
+
+/// <summary>
+/// SPEC 72 — the outcome of a send (<c>POST /Persons|Customers|Leads/{id}/emails</c>). It is also the data of the
+/// <c>EMAIL_SEND_FAILED</c> answer, so the client can open the <c>Failed</c> row of the history.
+/// </summary>
+public sealed record PersonEmailSentDto
+{
+    public Guid Id { get; init; }
+    /// <summary>1 Sent, 2 Failed.</summary>
+    public int Status { get; init; }
+    public DateTime SentAt { get; init; }
+    public string ToAddress { get; init; } = string.Empty;
+    public Guid? LeadId { get; init; }
+    /// <summary>Contact created in the lead (only when the email was sent and is associated to a lead).</summary>
+    public Guid? LeadInteractionId { get; init; }
+    public string? ProviderMessageId { get; init; }
+    public int AttachmentCount { get; init; }
+}

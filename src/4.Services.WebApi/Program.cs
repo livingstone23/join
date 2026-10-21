@@ -241,6 +241,8 @@ using (var scope = app.Services.CreateScope())
             await seeder.SeedProductAttachmentSettingsDefaultsAsync();
             // SPEC 71: every company gets the four seed email template types (missing rows only).
             await seeder.SeedEmailTemplateDefaultsAsync();
+            // SPEC 72: every company gets its sending rules (missing rows only).
+            await seeder.SeedEmailCompanySettingsDefaultsAsync();
 
             if (app.Environment.IsDevelopment())
             {

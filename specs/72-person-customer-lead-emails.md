@@ -6,6 +6,7 @@
 > **Objective:** Que un usuario envíe correos desde la persona, el cliente o el lead a una persona que tenga un correo válido registrado, y que cada envío quede en el historial de correos de la persona y, si se asocia a un lead abierto, en su línea de tiempo.
 > **Origen:** pedido del usuario (2026-10-19). Las plantillas van aparte en SPEC 71. Front: FE-47.
 > **Ajuste por SPEC 71 (2026-10-21):** el reemplazo de las variables que queden en el texto al enviar (regla 6) usa el contexto de `EmailTemplateContextReader` de SPEC 71 (el mismo que `render`): persona de la empresa, lead de esa persona y visible según SPEC 60, remitente y empresa. `{{Persona.Nombre}}` es la razón social para una persona jurídica y `{{Fecha.Hoy}}` usa la zona horaria de la empresa. Sus errores (`PERSON_NOT_FOUND`, `LEAD_NOT_FOUND`) son los de SPEC 71.
+> **Ajuste en implementación (2026-10-21):** precisa cómo quedó el código donde el texto era ambiguo; no cambia el alcance. (1) La migración `Spec72PersonCustomerLeadEmails` crea tablas, columna e índices; la opción `EmailSettings`, sus permisos y la fila de `EmailCompanySettings` los siembra `DatabaseSeeder` (como SPEC 62, 69, 70 y 71); `SeedAsync` también siembra los límites de producto de SPEC 70, que faltaban. (2) Código en `UseCases/Common/Emails` (`PersonEmailSender`, `Commands/`, `Queries/`). (3) `toAddress` vacío usa el correo principal (regla 1). (4) Enviar responde **201** con `PersonEmailSentDto` (`id`, `status`, `sentAt`, `toAddress`, `leadId`, `leadInteractionId`, `providerMessageId`, `attachmentCount`); `EMAIL_SEND_FAILED` (502) lleva el mismo objeto con el id del registro `Failed`. (5) `POST /Leads/{id}/emails` ignora un `leadId` en el cuerpo: el lead es el de la ruta, así el front envía el mismo payload desde los tres puntos. (6) El historial de un cliente es el de su persona; la línea de tiempo suma `contactTypeCode` y `emailMessageId` a los contactos. (7) `GET /EmailCompanySettings` sin fila responde `EMAIL_SETTINGS_NOT_CONFIGURED` (el seed la crea). (8) El límite diario cuenta el día UTC. (9) Errores añadidos a la tabla: `PERSON_EMAIL_NOT_FOUND`, `EMAIL_SETTINGS_ALREADY_EXISTS`, `USER_REQUIRED`, `STORAGE_PROVIDER_NOT_CONFIGURED`, `FILE_NOT_FOUND_IN_STORAGE`. FE-47 se ajusta en el mismo cambio.
 
 ---
 
@@ -38,7 +39,7 @@
 2. `PersonEmailMessageAttachment` (`BaseTenantEntity`): `PersonEmailMessageId`, `SourceKind` (`ProductDocument = 1`, `LeadDocument = 2`), `SourceId`, `FileName`, `ContentType`, `SizeBytes`.
 3. `EmailCompanySettings` (`BaseTenantEntity`, índice único filtrado por empresa): `FromEmail?`, `FromName?` (máx. 150), `MaxEmailsPerUserPerDay`, `MaxAttachmentsTotalBytes`.
 4. `LeadInteraction` suma `PersonEmailMessageId?` para que la línea de tiempo enlace el correo.
-5. Migración `Spec72PersonCustomerLeadEmails`: tablas, columna, índices, opción de menú y permisos.
+5. Migración `Spec72PersonCustomerLeadEmails`: tablas, columna e índices. La opción de menú, los permisos y la fila de configuración los siembra `DatabaseSeeder` (D.15–D.17).
 
 **B. Envío** (Application + Infrastructure)
 6. `IEmailService` suma `Task<EmailSendResult> SendAsync(EmailMessage message, CancellationToken ct)`. `SendEmailAsync` no cambia, así que sus 15 usos (autenticación, alertas, tickets) siguen igual.
@@ -102,7 +103,12 @@
 | `EMAIL_ATTACHMENTS_TOO_LARGE` | 400 | Supera `MaxAttachmentsTotalBytes` o más de 10 adjuntos |
 | `EMAIL_DAILY_LIMIT_REACHED` | 429 | El usuario llegó a `MaxEmailsPerUserPerDay` |
 | `EMAIL_SETTINGS_NOT_CONFIGURED` | 400 | La empresa no tiene fila de configuración |
-| `EMAIL_SEND_FAILED` | 502 | El proveedor rechazó el envío; el registro queda `Failed` |
+| `EMAIL_SEND_FAILED` | 502 | El proveedor rechazó el envío; el registro queda `Failed` (la respuesta trae su id) |
+| `PERSON_EMAIL_NOT_FOUND` | 404 | Detalle de un correo de otra persona, otro lead, otra empresa o inexistente |
+| `EMAIL_SETTINGS_ALREADY_EXISTS` | 409 | `POST /EmailCompanySettings` cuando la empresa ya tiene la fila |
+| `USER_REQUIRED` | 401 | El token no trae el usuario (como en SPEC 61) |
+| `STORAGE_PROVIDER_NOT_CONFIGURED` | 503 | El proveedor de almacenamiento de un adjunto no está configurado (SPEC 49-post) |
+| `FILE_NOT_FOUND_IN_STORAGE` | 404 | La fila del documento existe pero el archivo ya no está en el almacenamiento |
 
 ## Implementation plan
 
