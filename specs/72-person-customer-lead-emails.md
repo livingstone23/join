@@ -5,6 +5,7 @@
 > **Date:** 2026-10-19
 > **Objective:** Que un usuario envíe correos desde la persona, el cliente o el lead a una persona que tenga un correo válido registrado, y que cada envío quede en el historial de correos de la persona y, si se asocia a un lead abierto, en su línea de tiempo.
 > **Origen:** pedido del usuario (2026-10-19). Las plantillas van aparte en SPEC 71. Front: FE-47.
+> **Ajuste por SPEC 71 (2026-10-21):** el reemplazo de las variables que queden en el texto al enviar (regla 6) usa el contexto de `EmailTemplateContextReader` de SPEC 71 (el mismo que `render`): persona de la empresa, lead de esa persona y visible según SPEC 60, remitente y empresa. `{{Persona.Nombre}}` es la razón social para una persona jurídica y `{{Fecha.Hoy}}` usa la zona horaria de la empresa. Sus errores (`PERSON_NOT_FOUND`, `LEAD_NOT_FOUND`) son los de SPEC 71.
 
 ---
 
