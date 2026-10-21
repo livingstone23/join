@@ -1987,6 +1987,76 @@ curl -s -X POST "$BASE_URL/api/v1/ProductCategories" \
   -d '{ "name": "Licencias", "parentId": "<software-category-id>" }'
 ```
 
+## Catalog — product images and documents (SPEC 70)
+
+0–5 images per product (sorted, one live primary enforced by a filtered unique index). Documents classified by
+the company's `ProductDocumentTypes` catalog (seed: `TECH_SHEET`, `PROPOSAL`, `MANUAL`, `OTHER`). Image format is
+validated by extension **and** by signature of the first bytes — `PRODUCT_IMAGE_FORMAT_NOT_ALLOWED` when they
+disagree; the server sets the image `Content-Type` from the signature and reads its width and height. Uploads,
+reorder, primary and delete need `Products.CanUpdate`; uploads answer `201`. Limits and document types live on the
+separate `ProductSettings` resource (`/ProductAttachmentSettings`, `/ProductDocumentTypes`): who edits products does
+not change limits. Uploads require the product to be active (`409 PRODUCT_NOT_ACTIVE`); listing, viewing and
+downloading keep working on inactive products. Restoring an image or document is SuperAdmin-only and respects the
+per-product limits (`400 PRODUCT_IMAGE_LIMIT` / `PRODUCT_DOCUMENT_LIMIT`); a restored image goes last and only keeps
+the primary flag if no other live image holds it. `GET /Products`, `GET /Products/{id}`, `Products/lookup` and
+`Leads/products-lookup` return `primaryImageId` and `imageCount`.
+
+```bash
+# Product images
+curl -s "$BASE_URL/api/v1/Products/<product-id>/images" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/Products/<product-id>/images" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/path/to/photo.png"
+curl -s -X PUT "$BASE_URL/api/v1/Products/<product-id>/images/order" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "imageIds": ["<id-1>", "<id-2>", "<id-3>"] }'
+curl -s -X PUT "$BASE_URL/api/v1/Products/<product-id>/images/<image-id>/primary" \
+  -H "Authorization: Bearer $TOKEN"
+curl -s -o photo.png "$BASE_URL/api/v1/Products/<product-id>/images/<image-id>/content" \
+  -H "Authorization: Bearer $TOKEN"  # Content-Disposition: inline, Cache-Control: private, max-age=3600, X-Content-Type-Options: nosniff
+curl -s -X DELETE "$BASE_URL/api/v1/Products/<product-id>/images/<image-id>" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/Products/<product-id>/images/<image-id>/restore" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Product documents (displayName is optional: it defaults to the file name)
+curl -s "$BASE_URL/api/v1/Products/<product-id>/documents" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/Products/<product-id>/documents" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/path/to/spec.pdf" \
+  -F "productDocumentTypeId=<type-id>" \
+  -F "displayName=Ficha técnica 2026" \
+  -F "description=Versión inicial"
+curl -s -o spec.pdf "$BASE_URL/api/v1/Products/<product-id>/documents/<doc-id>/download" \
+  -H "Authorization: Bearer $TOKEN"  # requires Products.CanDownload; 403 without
+curl -s -X DELETE "$BASE_URL/api/v1/Products/<product-id>/documents/<doc-id>" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/Products/<product-id>/documents/<doc-id>/restore" \
+  -H "Authorization: Bearer $TOKEN"
+
+# ProductSettings resource (not the Products menu): attachment limits + document type catalog.
+curl -s "$BASE_URL/api/v1/ProductAttachmentSettings" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/ProductAttachmentSettings" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "allowedDocumentTypes": 23, "maxDocumentSizeBytes": 10485760, "maxDocumentsPerProduct": 20,
+        "allowedImageFormats": 7, "maxImageSizeBytes": 5242880, "maxImagesPerProduct": 5 }'  # 409 when the row exists
+curl -s -X PUT "$BASE_URL/api/v1/ProductAttachmentSettings" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "allowedDocumentTypes": 31, "maxDocumentSizeBytes": 4194304, "maxDocumentsPerProduct": 10,
+        "allowedImageFormats": 7, "maxImageSizeBytes": 2097152, "maxImagesPerProduct": 3 }'
+curl -s "$BASE_URL/api/v1/ProductDocumentTypes?includeInactive=true" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/ProductDocumentTypes" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "code": "CONTRACT", "name": "Contrato", "sortOrder": 5, "isActive": true }'
+curl -s -X PUT "$BASE_URL/api/v1/ProductDocumentTypes/<id>" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "code": "CONTRACT", "name": "Contrato firmado", "sortOrder": 5, "isActive": true }'
+curl -s -X DELETE "$BASE_URL/api/v1/ProductDocumentTypes/<id>" -H "Authorization: Bearer $TOKEN"  # 409 PRODUCT_DOCUMENT_TYPE_IN_USE
+curl -s -X POST "$BASE_URL/api/v1/ProductDocumentTypes/<id>/restore" -H "Authorization: Bearer $TOKEN"  # SuperAdmin
+
+# Thumbnail for sellers without Products permission (reuses the GET image content path)
+curl -s -o thumb.png "$BASE_URL/api/v1/Leads/products-lookup/<product-id>/images/<image-id>/content" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 ## Persons — optional identification (SPEC 58)
 
 `identificationTypeId` and `identificationNumber` are optional on `POST/PUT /Persons`, but they come together
@@ -2192,11 +2262,16 @@ with `400 EMAIL_TEMPLATE_UNKNOWN_VARIABLE` (the response names it); a variable w
 The body is stored sanitized (no `script`, `iframe`, `on*` attributes nor `javascript:` URLs).
 
 Deleting a type with live templates answers `409 EMAIL_TEMPLATE_TYPE_IN_USE` (`Active EmailTemplates: N`). The delete
-is logical; the restore (`POST /{id}/restore`) is SuperAdmin-only.
+is logical; the restore (`POST /{id}/restore`) is SuperAdmin-only, and a template is not restored while its type is
+deleted (`409 PARENT_DELETED`). A SuperAdmin lists the deleted rows with `includeDeleted=true` (`isDeleted` in each
+row); the template list also returns `modifiedAt`. An inactive type cannot be assigned, but a template keeps the type
+it already has. `lookup` returns a flat list ordered by type (`emailTemplateTypeCode`/`Name` on each row) that the
+front groups.
 
 ```bash
 # Types of the company (the same shape for the templates)
 curl -s "$BASE_URL/api/v1/EmailTemplateTypes?includeInactive=false" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/EmailTemplateTypes?includeDeleted=true" -H "Authorization: Bearer $TOKEN"  # SuperAdmin
 curl -s -X POST "$BASE_URL/api/v1/EmailTemplateTypes" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{ "code": "renewal", "name": "Renovación", "sortOrder": 5, "isActive": true }'
@@ -2208,6 +2283,7 @@ curl -s -X POST "$BASE_URL/api/v1/EmailTemplateTypes/<id>/restore" -H "Authoriza
 
 # Templates: paged list, detail and write
 curl -s "$BASE_URL/api/v1/EmailTemplates?pageNumber=1&pageSize=20&search=bi&isActive=true" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/EmailTemplates?includeDeleted=true" -H "Authorization: Bearer $TOKEN"  # SuperAdmin
 curl -s "$BASE_URL/api/v1/EmailTemplates/<id>" -H "Authorization: Bearer $TOKEN"
 curl -s -X POST "$BASE_URL/api/v1/EmailTemplates" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \

@@ -2,11 +2,13 @@ using Asp.Versioning;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Catalog;
 using JOIN.Application.DTO.Customers.Leads;
+using JOIN.Application.UseCases.Catalog.Products.Images.Queries;
 using JOIN.Application.UseCases.Catalog.Products.Queries;
 using JOIN.Application.UseCases.Customers.Leads.Commands;
 using JOIN.Application.UseCases.Customers.Leads.Common;
 using JOIN.Application.UseCases.Customers.Leads.Queries;
 using JOIN.Domain.Security;
+using JOIN.Services.WebApi.Controllers.Catalog;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -68,6 +70,21 @@ public class LeadsController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(Response<IReadOnlyList<ProductLookupItemDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetProductsLookup([FromQuery] string? search = null, CancellationToken cancellationToken = default) =>
         this.ToCommercialResult(await mediator.Send(new GetProductLookupQuery(search), cancellationToken));
+
+    /// <summary>
+    /// SPEC 70 — streams a product image so a seller with only <c>Leads</c> permission can render the thumbnail
+    /// on the lead form. The endpoint reuses <c>GetProductImageContentQuery</c>, which only checks the tenant
+    /// and not the <c>Products</c> resource — by design (SPEC 70 C.16).
+    /// </summary>
+    [HttpGet("products-lookup/{productId:guid}/images/{imageId:guid}/content")]
+    [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Response<object>), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> GetProductImageContentForLeads(Guid productId, Guid imageId, CancellationToken cancellationToken)
+    {
+        var response = await mediator.Send(new GetProductImageContentQuery(productId, imageId), cancellationToken);
+        return response.IsSuccess ? this.ToInlineImage(response.Data!) : this.ToCommercialResult(response);
+    }
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(Response<LeadDetailDto>), StatusCodes.Status200OK)]

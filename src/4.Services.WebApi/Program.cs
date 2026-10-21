@@ -237,6 +237,8 @@ using (var scope = app.Services.CreateScope())
             await seeder.SeedLeadAttachmentSettingsDefaultsAsync();
             // SPEC 69: every company gets its calendar attachment limits (missing rows only).
             await seeder.SeedCalendarAttachmentSettingsDefaultsAsync();
+            // SPEC 70: every company gets its product attachment limits + the four seed document types.
+            await seeder.SeedProductAttachmentSettingsDefaultsAsync();
             // SPEC 71: every company gets the four seed email template types (missing rows only).
             await seeder.SeedEmailTemplateDefaultsAsync();
 

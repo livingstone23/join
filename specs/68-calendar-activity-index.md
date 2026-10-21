@@ -1,6 +1,6 @@
 # SPEC 68 — Calendario: índice de actividades con filtros y permiso por usuario para ver las de otros
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 43-post (opciones de menú y rutas en inglés), SPEC 44-post (actividades, ocurrencias, `CalendarUserConfiguration`, recurso `CalendarOthers`), SPEC 48-post (bloqueo por módulo), SPEC 67 (vínculo Persona/Cliente coherente). Rama de trabajo: `spec-68-calendar-activity-index`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Que el usuario consulte en una lista paginada y exportable las actividades del calendario (citas por defecto) con filtros, viendo solo las propias salvo que un administrador le permita ver las de otros usuarios de la empresa.

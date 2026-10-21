@@ -154,6 +154,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     // --- CATALOG MODULE (SPEC 57) ---
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+    public DbSet<ProductDocument> ProductDocuments => Set<ProductDocument>();
+    public DbSet<ProductDocumentType> ProductDocumentTypes => Set<ProductDocumentType>();
+    public DbSet<ProductAttachmentSettings> ProductAttachmentSettings => Set<ProductAttachmentSettings>();
 
     // --- FINANCE MODULE (SPEC 56) ---
     public DbSet<Currency> Currencies => Set<Currency>();
@@ -381,6 +385,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<UserCalendar>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<CalendarEvent>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<CalendarEventLog>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+
+        // Calendar comments and documents (SPEC 69): tenant + soft delete, same convention as 44.
+        builder.Entity<CalendarEventComment>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CalendarEventDocument>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<CalendarAttachmentSettings>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
         // Calendar external sync (SPEC 46-post): tenant + soft delete, same convention as 44.
         builder.Entity<CalendarExternalConnection>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);

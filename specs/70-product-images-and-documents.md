@@ -5,6 +5,7 @@
 > **Date:** 2026-10-19
 > **Objective:** Que cada producto o servicio tenga de 0 a 5 imágenes para mostrarlo y documentos clasificados (fichas técnicas, propuestas, etc.), con tipos, tamaños y cantidades que controla el administrador de la empresa.
 > **Origen:** pedido del usuario (2026-10-19). SPEC 57 dejó "Imágenes de producto" fuera de alcance; esta spec las agrega. Los documentos los reutiliza SPEC 72 como adjuntos de correo. Front: FE-45.
+> **Ajuste en implementación (2026-10-21):** precisa cómo quedó el código donde el texto era ambiguo; no cambia el alcance. (1) La migración `Spec70ProductImagesAndDocuments` crea solo tablas e índices; la opción `ProductSettings` y sus permisos los siembra `DatabaseSeeder`, como en SPEC 62 y SPEC 69 (el seed corre al aplicar la migración). (2) Subir imagen o documento responde **201**; subir, reordenar, marcar principal y borrar exigen `CanUpdate` sobre `Products` (`[RequirePermission]`, porque `POST` y `DELETE` mapearían a `CanCreate`/`CanDelete`). (3) El `Content-Type` de la imagen lo fija el servidor según la firma; la extensión debe coincidir con la firma y no hay respaldo por extensión. (4) Restaurar una imagen o un documento respeta el máximo por producto (`PRODUCT_IMAGE_LIMIT` / `PRODUCT_DOCUMENT_LIMIT`) y no procede con el producto borrado (`PARENT_DELETED`); la imagen restaurada va al final y solo conserva la marca de principal si ninguna imagen viva la tiene. (5) `displayName` es opcional en el formulario: por defecto, el nombre del archivo sin extensión (FE-45). (6) Errores añadidos a la tabla: `PRODUCT_DOCUMENT_TYPE_ALREADY_EXISTS`, `PRODUCT_ATTACHMENT_SETTINGS_ALREADY_EXISTS`, `FILE_NOT_FOUND_IN_STORAGE` y los de restauración. FE-45 se ajusta en el mismo cambio (nombres de campos de `ProductDocumentDto`, 201 y errores).
 
 ---
 
@@ -29,14 +30,14 @@
 3. `ProductDocumentType` (`BaseTenantEntity`): `Code` (máx. 30, mayúsculas), `Name` (máx. 100), `SortOrder`, `IsActive`. Índice único filtrado `(CompanyId, Code)` con `"gcrecord" = 0`.
 4. `ProductAttachmentSettings` (`BaseTenantEntity`, índice único filtrado por empresa): `AllowedDocumentTypes` (`DocumentType` flags), `MaxDocumentSizeBytes`, `MaxDocumentsPerProduct`, `AllowedImageFormats` (`ProductImageFormat` flags), `MaxImageSizeBytes`, `MaxImagesPerProduct` (1–5).
 5. Enum nuevo `ProductImageFormat` (`[Flags]`): `Jpeg = 1` (`.jpg`, `.jpeg`), `Png = 2`, `Webp = 4`. Es propio de las imágenes porque `DocumentType.Image` no incluye `.webp`.
-6. Migración `Spec70ProductImagesAndDocuments`: tablas, índices, seed de opciones y permisos.
+6. Migración `Spec70ProductImagesAndDocuments`: tablas e índices. La opción `ProductSettings` y sus permisos los siembra `DatabaseSeeder` (D.18–D.20).
 
 **B. Application** (`UseCases/Catalog/Products/Images`, `…/Documents`, `UseCases/Catalog/ProductDocumentTypes`, `UseCases/Catalog/ProductAttachmentSettings`)
-7. `UploadProductImageCommand`: aplica, en este orden: producto de la empresa, producto activo, límites configurados, formato (por extensión **y** por firma de los primeros bytes), tamaño y cantidad. Guarda el archivo y lee ancho y alto si el formato lo permite. Si es la primera imagen viva, queda como principal.
-8. `ProductImagePrimaryCoordinator` (invariante "una principal por producto", patrón de `PersonAddressDefaultCoordinator`): lo usan marcar principal, borrar la principal y restaurar.
+7. `UploadProductImageCommand`: aplica, en este orden: producto de la empresa, producto activo, límites configurados, formato (por extensión **y** por firma de los primeros bytes; deben coincidir), tamaño y cantidad. Guarda el archivo con el `Content-Type` que corresponde a la firma y lee ancho y alto de la cabecera (PNG, JPEG, WEBP `VP8`/`VP8L`/`VP8X`). Si ninguna imagen viva es principal, queda como principal.
+8. `ProductImagePrimaryCoordinator` (invariante "una principal por producto", patrón de `PersonAddressDefaultCoordinator`): lo usan subir, marcar principal, borrar la principal y restaurar. Guarda la baja de la principal anterior antes de marcar la nueva, porque PostgreSQL revisa el índice único en cada sentencia.
 9. `ReorderProductImagesCommand` `{ imageIds[] }`: debe traer exactamente las imágenes vivas del producto; reasigna `SortOrder` 1..n.
 10. `UploadProductDocumentCommand`: producto de la empresa y activo, tipo de documento activo, límites, tipo por extensión (la misma tabla que `UploadTicketDocumentCommandHandler.TryMapExtension`), tamaño y máximo por producto.
-11. Borrado y restauración de imágenes y documentos; la cascada del producto se suma a `DeleteProductCommand` y `RestoreProductCommand`.
+11. Borrado y restauración de imágenes y documentos; la cascada del producto (`ProductAttachmentCascadeCoordinator`) se suma a `DeleteProductCommand` y `RestoreProductCommand`. Restaurar una imagen o un documento: solo SuperAdmin, no con el producto borrado (`PARENT_DELETED`) y sin pasar el máximo por producto; la imagen restaurada va al final y es principal solo si ninguna viva lo es.
 12. Queries con Dapper: lista de imágenes y de documentos con autor; `GetProducts`, `GetProductById`, `Products/lookup` y `Leads/products-lookup` (SPEC 61) agregan `PrimaryImageId?` e `ImageCount`.
 13. CRUD de `ProductDocumentTypes` con bloqueo por uso (`PRODUCT_DOCUMENT_TYPE_IN_USE`, `"Active ProductDocuments: N"`).
 14. `ProductAttachmentSettings`: `GET`, `POST` (409 si existe) y `PUT`, como `LeadAttachmentSettings`.
@@ -44,14 +45,14 @@
 **C. Endpoints**
 15. Recurso `Products` (`ProductImagesController`, `ProductDocumentsController`):
     - `GET /api/v1/Products/{id}/images`
-    - `POST /api/v1/Products/{id}/images` (multipart, `CanUpdate`)
+    - `POST /api/v1/Products/{id}/images` (multipart, `CanUpdate`, responde 201)
     - `PUT /api/v1/Products/{id}/images/order` (`CanUpdate`)
     - `PUT /api/v1/Products/{id}/images/{imageId}/primary` (`CanUpdate`)
-    - `GET /api/v1/Products/{id}/images/{imageId}/content` (inline, `CanRead`, `Cache-Control: private, max-age=3600`)
+    - `GET /api/v1/Products/{id}/images/{imageId}/content` (`Content-Disposition: inline`, `CanRead`, `Cache-Control: private, max-age=3600`, `X-Content-Type-Options: nosniff`)
     - `DELETE /api/v1/Products/{id}/images/{imageId}` (`CanUpdate`)
     - `POST /api/v1/Products/{id}/images/{imageId}/restore` (SuperAdmin)
     - `GET /api/v1/Products/{id}/documents`
-    - `POST /api/v1/Products/{id}/documents` (multipart: archivo, `productDocumentTypeId`, `displayName`, `description?`; `CanUpdate`)
+    - `POST /api/v1/Products/{id}/documents` (multipart: archivo, `productDocumentTypeId`, `displayName?` —por defecto el nombre del archivo—, `description?`; `CanUpdate`, responde 201)
     - `GET /api/v1/Products/{id}/documents/{docId}/download` (`[RequirePermission(PermissionFlags.CanDownload)]`)
     - `DELETE /api/v1/Products/{id}/documents/{docId}` (`CanUpdate`) y `POST …/restore` (SuperAdmin)
 16. `Leads/products-lookup/{productId}/images/{imageId}/content` bajo el recurso `Leads`, para que un vendedor sin permiso `Products` vea la miniatura (patrón de la Decisión "Lectura para vendedores" de SPEC 57).
@@ -78,16 +79,20 @@
 | `PRODUCT_ATTACHMENT_SETTINGS_NOT_CONFIGURED` | 400 | La empresa no tiene fila de límites |
 | `PRODUCT_IMAGE_FORMAT_NOT_ALLOWED` | 400 | La extensión o la firma no es un formato permitido |
 | `PRODUCT_IMAGE_TOO_LARGE` | 400 | Supera `MaxImageSizeBytes` |
-| `PRODUCT_IMAGE_LIMIT` | 400 | El producto ya tiene `MaxImagesPerProduct` imágenes vivas |
+| `PRODUCT_IMAGE_LIMIT` | 400 | El producto ya tiene `MaxImagesPerProduct` imágenes vivas (al subir o al restaurar) |
 | `PRODUCT_IMAGE_NOT_FOUND` | 404 | Imagen de otra empresa, de otro producto o inexistente |
 | `INVALID_PRODUCT_IMAGE_ORDER` | 400 | El reordenamiento no trae exactamente las imágenes vivas |
 | `PRODUCT_DOCUMENT_FILE_TYPE_NOT_ALLOWED` | 400 | Extensión o tipo de archivo no permitido |
 | `PRODUCT_DOCUMENT_TOO_LARGE` | 400 | Supera `MaxDocumentSizeBytes` |
-| `PRODUCT_DOCUMENT_LIMIT` | 400 | Supera `MaxDocumentsPerProduct` |
+| `PRODUCT_DOCUMENT_LIMIT` | 400 | Supera `MaxDocumentsPerProduct` (al subir o al restaurar) |
 | `PRODUCT_DOCUMENT_NOT_FOUND` | 404 | Documento de otra empresa, de otro producto o inexistente |
 | `PRODUCT_DOCUMENT_TYPE_NOT_FOUND` | 404 | `productDocumentTypeId` inexistente, de otra empresa o inactivo |
 | `PRODUCT_DOCUMENT_TYPE_IN_USE` | 409 | Borrar un tipo de documento con documentos vivos |
+| `PRODUCT_DOCUMENT_TYPE_ALREADY_EXISTS` | 409 | Crear o renombrar un tipo de documento con un `Code` que ya usa otro tipo vivo de la empresa |
+| `PRODUCT_ATTACHMENT_SETTINGS_ALREADY_EXISTS` | 409 | `POST /ProductAttachmentSettings` cuando la empresa ya tiene la fila |
+| `PARENT_DELETED` / `NOT_DELETED` / `ACTIVE_DUPLICATE_EXISTS` | 409 | Restaurar con el producto borrado, algo que no está borrado o un tipo cuyo `Code` ya usa otro (SPEC 41-post) |
 | `STORAGE_PROVIDER_NOT_CONFIGURED` | 503 | Igual que tickets y leads |
+| `FILE_NOT_FOUND_IN_STORAGE` | 404 | La fila existe pero el archivo ya no está en el almacenamiento |
 
 ## Implementation plan
 

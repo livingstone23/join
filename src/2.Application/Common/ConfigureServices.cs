@@ -146,6 +146,9 @@ public static class ConfigureServices
         services.AddScoped<RolePermissionCacheInvalidator>();
         services.AddScoped<CompanyPermissionCacheInvalidator>();
         services.AddScoped<PersonCascadeCoordinator>();
+        services.AddScoped<JOIN.Application.UseCases.Catalog.Products.Common.ProductAttachmentCascadeCoordinator>();
+        // SPEC 70: one live primary image per product.
+        services.AddScoped<JOIN.Application.UseCases.Catalog.Products.Images.Commands.ProductImagePrimaryCoordinator>();
         services.AddScoped<SystemOptionCascadeCoordinator>();
         services.AddScoped<TicketCascadeCoordinator>();
 
@@ -177,7 +180,7 @@ public static class ConfigureServices
 
         // SPEC 71 — email templates: the renderer of the closed list of variables and the write guard.
         services.AddScoped<JOIN.Application.Interface.Email.IEmailTemplateRenderer, JOIN.Application.Services.Email.EmailTemplateRenderer>();
-        services.AddScoped<JOIN.Application.UseCases.Common.EmailTemplates.EmailTemplateWriteGuard>();
+        services.AddScoped<JOIN.Application.UseCases.Common.EmailTemplates.Commands.EmailTemplateWriteGuard>();
 
         // SPEC 45 — channel agent intake and pending persons.
         services.AddScoped<IntakeChannelReader>();

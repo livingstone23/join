@@ -19,6 +19,16 @@ internal static class ProductQuerySql
         LEFT JOIN finance.currencies bc ON bc.Id = bcc.CurrencyId
         """;
 
+    /// <summary>SPEC 70 — the live primary image (at most one, filtered unique index), for the thumbnail.</summary>
+    internal const string PrimaryImageJoin = """
+        LEFT JOIN catalog.productimages img ON img.ProductId = p.Id AND img.IsPrimary = TRUE AND img.GcRecord = 0
+        """;
+
+    /// <summary>SPEC 70 — live images of the row's product; correlated so it reads only that product's index range.</summary>
+    internal const string ImageCount = """
+        CAST((SELECT COUNT(*) FROM catalog.productimages ic WHERE ic.CompanyId = p.CompanyId AND ic.ProductId = p.Id AND ic.GcRecord = 0) AS int) AS ImageCount
+        """;
+
     internal const string Select = $"""
         SELECT
             p.Id,
@@ -33,10 +43,13 @@ internal static class ProductQuerySql
             p.ReferencePrice,
             COALESCE(bc.Code, '') AS BaseCurrencyCode,
             p.IsActive,
-            p.Created AS CreatedAt
+            p.Created AS CreatedAt,
+            img.Id AS PrimaryImageId,
+            {ImageCount}
         FROM catalog.products p
         LEFT JOIN catalog.productcategories pc ON pc.Id = p.ProductCategoryId
         {BaseCurrencyJoin}
+        {PrimaryImageJoin}
         """;
 }
 
@@ -180,9 +193,11 @@ public sealed class GetProductLookupQueryHandler(
         }
 
         var sql = $"""
-            SELECT p.Id, p.Code, p.Name, p.Kind, p.ReferencePrice, COALESCE(bc.Code, '') AS BaseCurrencyCode
+            SELECT p.Id, p.Code, p.Name, p.Kind, p.ReferencePrice, COALESCE(bc.Code, '') AS BaseCurrencyCode,
+                   img.Id AS PrimaryImageId, {ProductQuerySql.ImageCount}
             FROM catalog.products p
             {ProductQuerySql.BaseCurrencyJoin}
+            {ProductQuerySql.PrimaryImageJoin}
             WHERE p.CompanyId = @CompanyId
               AND p.GcRecord = 0
               AND p.IsActive = TRUE

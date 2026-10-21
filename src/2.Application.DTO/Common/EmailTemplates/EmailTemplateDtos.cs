@@ -1,9 +1,11 @@
+using JOIN.Application.DTO.Common;
+
 namespace JOIN.Application.DTO.Common.EmailTemplates;
 
 /// <summary>
 /// A classification of the company's email templates (SPEC 71, table <c>Admin.EmailTemplateTypes</c>).
 /// </summary>
-public sealed record EmailTemplateTypeDto
+public sealed record EmailTemplateTypeDto : SoftDeletableDto
 {
     public Guid Id { get; init; }
     public Guid CompanyId { get; init; }
@@ -19,7 +21,7 @@ public sealed record EmailTemplateTypeDto
 /// the sanitized HTML and the subject and the body hold the variables of
 /// <c>EmailTemplateVariables</c>.
 /// </summary>
-public sealed record EmailTemplateDto
+public sealed record EmailTemplateDto : SoftDeletableDto
 {
     public Guid Id { get; init; }
     public Guid CompanyId { get; init; }
@@ -31,6 +33,8 @@ public sealed record EmailTemplateDto
     public string BodyHtml { get; init; } = string.Empty;
     public bool IsActive { get; init; }
     public DateTime CreatedAt { get; init; }
+    /// <summary>Last change of the template, for the "modified" column of the list (FE-46).</summary>
+    public DateTime? ModifiedAt { get; init; }
 }
 
 /// <summary>

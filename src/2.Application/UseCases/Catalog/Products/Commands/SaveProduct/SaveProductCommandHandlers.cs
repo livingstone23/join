@@ -3,6 +3,7 @@ using JOIN.Application.DTO.Catalog;
 using JOIN.Application.Interface;
 using JOIN.Application.Interface.Persistence;
 using JOIN.Application.Services.Catalog;
+using JOIN.Application.UseCases.Catalog.Products.Common;
 using JOIN.Application.UseCases.Finance.CompanyCurrencies;
 using JOIN.Domain.Catalog;
 using JOIN.Domain.Finance;
@@ -92,11 +93,13 @@ public sealed class UpdateProductCommandHandler(
 }
 
 /// <summary>
-/// Handles <see cref="DeleteProductCommand"/>.
+/// Handles <see cref="DeleteProductCommand"/>. SPEC 70: the images and documents of the product are deleted with it,
+/// with the same <c>GcRecord</c> stamp so the restore can pair them.
 /// </summary>
 public sealed class DeleteProductCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    ProductAttachmentCascadeCoordinator cascade)
     : IRequestHandler<DeleteProductCommand, Response<Guid>>
 {
     public async Task<Response<Guid>> Handle(DeleteProductCommand request, CancellationToken cancellationToken)
@@ -123,6 +126,7 @@ public sealed class DeleteProductCommandHandler(
 
         entity.MarkAsDeleted();
         await repository.UpdateAsync(entity);
+        await cascade.MarkChildrenAsDeletedAsync(entity.Id, entity.GcRecord);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new Response<Guid> { IsSuccess = true, Message = "Product deleted successfully.", Data = entity.Id };
@@ -130,11 +134,13 @@ public sealed class DeleteProductCommandHandler(
 }
 
 /// <summary>
-/// Handles <see cref="RestoreProductCommand"/> with <see cref="SoftDeleteRestorer"/> (SPEC 41-post).
+/// Handles <see cref="RestoreProductCommand"/> with <see cref="SoftDeleteRestorer"/> (SPEC 41-post); SPEC 70 restores
+/// the images and documents deleted in the same cascade.
 /// </summary>
 public sealed class RestoreProductCommandHandler(
     ICurrentUserService currentUserService,
-    SoftDeleteRestorer restorer)
+    SoftDeleteRestorer restorer,
+    ProductAttachmentCascadeCoordinator cascade)
     : IRequestHandler<RestoreProductCommand, Response<Guid>>
 {
     public async Task<Response<Guid>> Handle(RestoreProductCommand request, CancellationToken cancellationToken)
@@ -154,6 +160,7 @@ public sealed class RestoreProductCommandHandler(
             request.CompanyId,
             activeDuplicateExists: (entity, _) => restorer.AnyAsync<Product>(
                 x => x.GcRecord == 0 && x.Id != entity.Id && x.CompanyId == entity.CompanyId && x.Code == entity.Code),
+            restoreCascade: (entity, stamp, _) => cascade.RestoreChildrenAsync(entity.Id, stamp),
             cancellationToken: cancellationToken);
     }
 }

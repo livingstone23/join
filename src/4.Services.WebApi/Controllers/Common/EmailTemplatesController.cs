@@ -1,9 +1,9 @@
 using Asp.Versioning;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Common.EmailTemplates;
-using JOIN.Application.UseCases.Common.EmailTemplates;
+using JOIN.Application.UseCases.Common.EmailTemplates.Commands;
+using JOIN.Application.UseCases.Common.EmailTemplates.Queries;
 using JOIN.Domain.Security;
-using JOIN.Services.WebApi.Controllers.Common;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -36,9 +36,10 @@ public class EmailTemplatesController(ISender sender) : ControllerBase
         [FromQuery] string? search = null,
         [FromQuery] Guid? emailTemplateTypeId = null,
         [FromQuery] bool? isActive = null,
+        [FromQuery] bool? includeDeleted = null,
         CancellationToken cancellationToken = default)
     {
-        var query = new GetEmailTemplatesQuery(search, emailTemplateTypeId, isActive, pageNumber, pageSize);
+        var query = new GetEmailTemplatesQuery(search, emailTemplateTypeId, isActive, pageNumber, pageSize, includeDeleted);
         return this.ToEmailTemplateResult(await sender.Send(query, cancellationToken));
     }
 
@@ -47,10 +48,13 @@ public class EmailTemplatesController(ISender sender) : ControllerBase
     [RequirePermission(PermissionFlags.CanRead)]
     [ProducesResponseType(typeof(Response<EmailTemplateDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default) =>
-        this.ToEmailTemplateResult(await sender.Send(new GetEmailTemplateByIdQuery(id), cancellationToken));
+    public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted = null, CancellationToken cancellationToken = default) =>
+        this.ToEmailTemplateResult(await sender.Send(new GetEmailTemplateByIdQuery(id, includeDeleted), cancellationToken));
 
-    /// <summary>The closed list of variables with its description, for the editor.</summary>
+    /// <summary>
+    /// The closed list of variables with its description, for the template editor and for the variables panel of
+    /// the sending modal (FE-47), so it is open like <c>lookup</c> and <c>render</c>.
+    /// </summary>
     [HttpGet("variables")]
     [SkipDynamicAuthorization]
     [ProducesResponseType(typeof(Response<IReadOnlyList<EmailTemplateVariableDto>>), StatusCodes.Status200OK)]
