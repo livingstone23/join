@@ -19,15 +19,14 @@ internal static class ProductQuerySql
         LEFT JOIN finance.currencies bc ON bc.Id = bcc.CurrencyId
         """;
 
-    /// <summary>SPEC 70 — joins the live primary image and a count of live images so list / detail can render the thumbnail without N+1 reads.</summary>
-    internal const string ImageJoin = """
-        LEFT JOIN catalog.productimages img ON img.ProductId = p.Id AND img.IsPrimary = TRUE AND img.GcRecord = 0 AND img.DeletedUtc IS NULL
-        LEFT JOIN (
-            SELECT ProductId, COUNT(*) AS ImageCount
-            FROM catalog.productimages
-            WHERE GcRecord = 0 AND DeletedUtc IS NULL
-            GROUP BY ProductId
-        ) ic ON ic.ProductId = p.Id
+    /// <summary>SPEC 70 — the live primary image (at most one, filtered unique index), for the thumbnail.</summary>
+    internal const string PrimaryImageJoin = """
+        LEFT JOIN catalog.productimages img ON img.ProductId = p.Id AND img.IsPrimary = TRUE AND img.GcRecord = 0
+        """;
+
+    /// <summary>SPEC 70 — live images of the row's product; correlated so it reads only that product's index range.</summary>
+    internal const string ImageCount = """
+        CAST((SELECT COUNT(*) FROM catalog.productimages ic WHERE ic.CompanyId = p.CompanyId AND ic.ProductId = p.Id AND ic.GcRecord = 0) AS int) AS ImageCount
         """;
 
     internal const string Select = $"""
@@ -46,11 +45,11 @@ internal static class ProductQuerySql
             p.IsActive,
             p.Created AS CreatedAt,
             img.Id AS PrimaryImageId,
-            COALESCE(ic.ImageCount, 0) AS ImageCount
+            {ImageCount}
         FROM catalog.products p
         LEFT JOIN catalog.productcategories pc ON pc.Id = p.ProductCategoryId
         {BaseCurrencyJoin}
-        {ImageJoin}
+        {PrimaryImageJoin}
         """;
 }
 
@@ -195,10 +194,10 @@ public sealed class GetProductLookupQueryHandler(
 
         var sql = $"""
             SELECT p.Id, p.Code, p.Name, p.Kind, p.ReferencePrice, COALESCE(bc.Code, '') AS BaseCurrencyCode,
-                   img.Id AS PrimaryImageId
+                   img.Id AS PrimaryImageId, {ProductQuerySql.ImageCount}
             FROM catalog.products p
             {ProductQuerySql.BaseCurrencyJoin}
-            {ProductQuerySql.ImageJoin}
+            {ProductQuerySql.PrimaryImageJoin}
             WHERE p.CompanyId = @CompanyId
               AND p.GcRecord = 0
               AND p.IsActive = TRUE

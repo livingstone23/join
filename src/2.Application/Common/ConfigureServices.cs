@@ -146,7 +146,9 @@ public static class ConfigureServices
         services.AddScoped<RolePermissionCacheInvalidator>();
         services.AddScoped<CompanyPermissionCacheInvalidator>();
         services.AddScoped<PersonCascadeCoordinator>();
-        services.AddScoped<JOIN.Application.UseCases.Catalog.ProductAttachments.ProductAttachmentCascadeCoordinator>();
+        services.AddScoped<JOIN.Application.UseCases.Catalog.Products.Common.ProductAttachmentCascadeCoordinator>();
+        // SPEC 70: one live primary image per product.
+        services.AddScoped<JOIN.Application.UseCases.Catalog.Products.Images.Commands.ProductImagePrimaryCoordinator>();
         services.AddScoped<SystemOptionCascadeCoordinator>();
         services.AddScoped<TicketCascadeCoordinator>();
 

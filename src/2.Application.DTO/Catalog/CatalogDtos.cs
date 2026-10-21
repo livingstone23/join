@@ -42,6 +42,8 @@ public sealed record ProductLookupItemDto
     public string BaseCurrencyCode { get; init; } = string.Empty;
     /// <summary>SPEC 70 — id of the primary image, or <c>null</c>.</summary>
     public Guid? PrimaryImageId { get; init; }
+    /// <summary>SPEC 70 — how many live images the product carries.</summary>
+    public int ImageCount { get; init; }
 }
 
 /// <summary>

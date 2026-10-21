@@ -4759,9 +4759,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // inside the activity detail tab); the resource is the only thing that matters for the permission gate.
         new("ActivityRecords", "/calendar/activity-records", "@Icons.Material.Filled.CommentBank", "Calendar", "Calendar", "CalendarActivityRecords", true, true, false, false, CanDownload: true, IsVisibleMenu: false),
 
-        // SPEC 70 — product catalog settings (attachment limits + document types). SuperAdmin / Admin / Manager
-        // can edit, Supervisor reads (CanUpdate == false para Supervisor).
-        new("ProductSettings", "/administration/product-settings", "@Icons.Material.Filled.SettingsApplications", "Administration", "Administration", "ProductSettings", true, true, false, true),
+        // SPEC 70 — product catalog settings (attachment limits + document types). The option supports every CRUD
+        // flag (PUT edits the limits and the types); the role grants decide who writes: SuperAdmin / Admin / Manager
+        // everything, Supervisor read only.
+        new("ProductSettings", "/administration/product-settings", "@Icons.Material.Filled.SettingsApplications", "Administration", "Administration", "ProductSettings", true, true, true, true),
 
         // SPEC 47 — endpoint para gestionar canales de ingesta inbound de tickets (Twilio WhatsApp, SendGrid email).
         // CanUpdate queda en false por diseño: rotar un token de webhook es soft-delete + create, no update in-place.

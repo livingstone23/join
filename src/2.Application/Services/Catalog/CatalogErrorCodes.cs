@@ -31,4 +31,6 @@ public static class CatalogErrorCodes
     public const string ProductDocumentTypeInUse = "PRODUCT_DOCUMENT_TYPE_IN_USE";
     public const string ProductDocumentTypeAlreadyExists = "PRODUCT_DOCUMENT_TYPE_ALREADY_EXISTS";
     public const string ProductAttachmentSettingsAlreadyExists = "PRODUCT_ATTACHMENT_SETTINGS_ALREADY_EXISTS";
+    public const string StorageProviderNotConfigured = "STORAGE_PROVIDER_NOT_CONFIGURED";
+    public const string FileNotFoundInStorage = "FILE_NOT_FOUND_IN_STORAGE";
 }

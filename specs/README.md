@@ -108,7 +108,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 67 | Calendario: "Relacionado con" de la actividad unificado en Persona/Cliente | Aprobado | 44-post, 45-post, 54, 55, 65 |
 | 68 | Calendario: índice de actividades con filtros y permiso por usuario para ver las de otros | Aprobado | 43-post, 44-post, 48-post, 67 |
 | 69 | Calendario: comentarios y documentos de la actividad, con límites de adjuntos por empresa | Aprobado | 36, 44-post, 49-post, 62, 68 |
-| 70 | Productos y servicios: imágenes (hasta 5) y documentos, con límites por empresa | Borrador | 36, 41-post, 43-post, 49-post, 57, 62 |
+| 70 | Productos y servicios: imágenes (hasta 5) y documentos, con límites por empresa | Aprobado | 36, 41-post, 43-post, 49-post, 57, 62 |
 | 71 | Plantillas de correo por empresa, agrupadas por tipo, con variables | Borrador | 41-post, 43-post, 61 |
 | 72 | Enviar correos a personas, clientes y leads, y registrarlos en el historial del lead | Borrador | 49-post, 55, 59, 60, 61, 62, 70, 71 |
 | 73 | WhatsApp (Meta Cloud API): esquema `Channel_Meta`, conexión por empresa, webhook firmado, perfil del negocio y módulo | Borrador | 05, 00-post, 43-post, 48-post, 49-post |

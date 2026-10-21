@@ -1992,9 +1992,14 @@ curl -s -X POST "$BASE_URL/api/v1/ProductCategories" \
 0–5 images per product (sorted, one live primary enforced by a filtered unique index). Documents classified by
 the company's `ProductDocumentTypes` catalog (seed: `TECH_SHEET`, `PROPOSAL`, `MANUAL`, `OTHER`). Image format is
 validated by extension **and** by signature of the first bytes — `PRODUCT_IMAGE_FORMAT_NOT_ALLOWED` when they
-disagree. Settings live on `ProductSettings` (separate resource: who edits products does not change limits).
-Uploads require the product to be active (`409 PRODUCT_NOT_ACTIVE`); listing and downloading keep working on
-inactive products. Restoring an image or document is SuperAdmin-only.
+disagree; the server sets the image `Content-Type` from the signature and reads its width and height. Uploads,
+reorder, primary and delete need `Products.CanUpdate`; uploads answer `201`. Limits and document types live on the
+separate `ProductSettings` resource (`/ProductAttachmentSettings`, `/ProductDocumentTypes`): who edits products does
+not change limits. Uploads require the product to be active (`409 PRODUCT_NOT_ACTIVE`); listing, viewing and
+downloading keep working on inactive products. Restoring an image or document is SuperAdmin-only and respects the
+per-product limits (`400 PRODUCT_IMAGE_LIMIT` / `PRODUCT_DOCUMENT_LIMIT`); a restored image goes last and only keeps
+the primary flag if no other live image holds it. `GET /Products`, `GET /Products/{id}`, `Products/lookup` and
+`Leads/products-lookup` return `primaryImageId` and `imageCount`.
 
 ```bash
 # Product images
@@ -2008,12 +2013,12 @@ curl -s -X PUT "$BASE_URL/api/v1/Products/<product-id>/images/order" \
 curl -s -X PUT "$BASE_URL/api/v1/Products/<product-id>/images/<image-id>/primary" \
   -H "Authorization: Bearer $TOKEN"
 curl -s -o photo.png "$BASE_URL/api/v1/Products/<product-id>/images/<image-id>/content" \
-  -H "Authorization: Bearer $TOKEN"  # Cache-Control: private, max-age=3600 + X-Content-Type-Options: nosniff
+  -H "Authorization: Bearer $TOKEN"  # Content-Disposition: inline, Cache-Control: private, max-age=3600, X-Content-Type-Options: nosniff
 curl -s -X DELETE "$BASE_URL/api/v1/Products/<product-id>/images/<image-id>" -H "Authorization: Bearer $TOKEN"
 curl -s -X POST "$BASE_URL/api/v1/Products/<product-id>/images/<image-id>/restore" \
   -H "Authorization: Bearer $TOKEN"
 
-# Product documents
+# Product documents (displayName is optional: it defaults to the file name)
 curl -s "$BASE_URL/api/v1/Products/<product-id>/documents" -H "Authorization: Bearer $TOKEN"
 curl -s -X POST "$BASE_URL/api/v1/Products/<product-id>/documents" \
   -H "Authorization: Bearer $TOKEN" \
@@ -2027,18 +2032,25 @@ curl -s -X DELETE "$BASE_URL/api/v1/Products/<product-id>/documents/<doc-id>" -H
 curl -s -X POST "$BASE_URL/api/v1/Products/<product-id>/documents/<doc-id>/restore" \
   -H "Authorization: Bearer $TOKEN"
 
-# ProductSettings (resource, not the Products menu): attachment limits + document type catalog.
-curl -s "$BASE_URL/api/v1/ProductSettings/attachment-settings" -H "Authorization: Bearer $TOKEN"
-curl -s -X PUT "$BASE_URL/api/v1/ProductSettings/attachment-settings" \
+# ProductSettings resource (not the Products menu): attachment limits + document type catalog.
+curl -s "$BASE_URL/api/v1/ProductAttachmentSettings" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/ProductAttachmentSettings" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "allowedDocumentTypes": 23, "maxDocumentSizeBytes": 10485760, "maxDocumentsPerProduct": 20,
+        "allowedImageFormats": 7, "maxImageSizeBytes": 5242880, "maxImagesPerProduct": 5 }'  # 409 when the row exists
+curl -s -X PUT "$BASE_URL/api/v1/ProductAttachmentSettings" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{ "allowedDocumentTypes": 31, "maxDocumentSizeBytes": 4194304, "maxDocumentsPerProduct": 10,
         "allowedImageFormats": 7, "maxImageSizeBytes": 2097152, "maxImagesPerProduct": 3 }'
-curl -s "$BASE_URL/api/v1/ProductSettings/document-types" -H "Authorization: Bearer $TOKEN"
-curl -s -X POST "$BASE_URL/api/v1/ProductSettings/document-types" \
+curl -s "$BASE_URL/api/v1/ProductDocumentTypes?includeInactive=true" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE_URL/api/v1/ProductDocumentTypes" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{ "code": "CONTRACT", "name": "Contrato", "sortOrder": 5, "isActive": true }'
-curl -s -X DELETE "$BASE_URL/api/v1/ProductSettings/document-types/<id>" -H "Authorization: Bearer $TOKEN"
-curl -s -X POST "$BASE_URL/api/v1/ProductSettings/document-types/<id>/restore" -H "Authorization: Bearer $TOKEN"
+curl -s -X PUT "$BASE_URL/api/v1/ProductDocumentTypes/<id>" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{ "code": "CONTRACT", "name": "Contrato firmado", "sortOrder": 5, "isActive": true }'
+curl -s -X DELETE "$BASE_URL/api/v1/ProductDocumentTypes/<id>" -H "Authorization: Bearer $TOKEN"  # 409 PRODUCT_DOCUMENT_TYPE_IN_USE
+curl -s -X POST "$BASE_URL/api/v1/ProductDocumentTypes/<id>/restore" -H "Authorization: Bearer $TOKEN"  # SuperAdmin
 
 # Thumbnail for sellers without Products permission (reuses the GET image content path)
 curl -s -o thumb.png "$BASE_URL/api/v1/Leads/products-lookup/<product-id>/images/<image-id>/content" \
