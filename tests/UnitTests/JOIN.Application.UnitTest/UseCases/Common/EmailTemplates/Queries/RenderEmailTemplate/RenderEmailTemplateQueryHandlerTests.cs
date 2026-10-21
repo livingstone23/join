@@ -21,12 +21,14 @@ public sealed class RenderEmailTemplateQueryHandlerTests
             ["Id"] = Guid.NewGuid(), ["Name"] = "Bienvenida", ["Subject"] = subject, ["BodyHtml"] = body
         });
 
-    private static FakeResultSet Person(string? commercialName = null, string? customerCode = "C-042", string? email = "ana@acme.test") =>
+    private static FakeResultSet Person(
+        string? commercialName = null, string? customerCode = "C-042", string? email = "ana@acme.test",
+        PersonType personType = PersonType.Physical, string? timeZone = null) =>
         FakeResultSet.FromRows(new Dictionary<string, object?>
         {
-            ["FirstName"] = "Ana", ["MiddleName"] = null, ["LastName"] = "López", ["SecondLastName"] = "Ruiz",
+            ["PersonType"] = (int)personType, ["FirstName"] = "Ana", ["MiddleName"] = null, ["LastName"] = "López", ["SecondLastName"] = "Ruiz",
             ["CommercialName"] = commercialName, ["CustomerCode"] = customerCode, ["Email"] = email,
-            ["CompanyName"] = "Acme & Co", ["UserName"] = "Remitente Acme ", ["UserEmail"] = "remitente@acme.test"
+            ["CompanyName"] = "Acme & Co", ["TimeZone"] = timeZone, ["UserName"] = "Remitente Acme ", ["UserEmail"] = "remitente@acme.test"
         });
 
     private static FakeResultSet LeadScope() =>
@@ -59,17 +61,45 @@ public sealed class RenderEmailTemplateQueryHandlerTests
     }
 
     [Fact]
-    public async Task Render_WithoutLeadOrCustomer_LeavesThoseVariablesEmpty_AndUsesTheCommercialName()
+    public async Task Render_WithoutLeadOrCustomer_LeavesThoseVariablesEmpty()
     {
         using var context = await EmailTemplateTestContext.CreateAsync();
         context.Sql.SetResults(Template("[{{Cliente.Codigo}}] {{Persona.Nombre}}", "<p>[{{Lead.Codigo}}] [{{Lead.Tema}}] [{{Persona.Correo}}]</p>"),
-            Person(commercialName: "Acme SRL", customerCode: null, email: null));
+            Person(customerCode: null, email: null));
 
         var response = await context.SendAsync(new RenderEmailTemplateQuery(Guid.NewGuid(), Guid.NewGuid()));
 
         response.IsSuccess.Should().BeTrue(response.Message);
-        response.Data!.Subject.Should().Be("[] Acme SRL");
+        response.Data!.Subject.Should().Be("[] Ana");
         response.Data.BodyHtml.Should().Be("<p>[] [] []</p>");
+    }
+
+    [Theory]
+    [InlineData(PersonType.Physical, "Comercial Ana", "Ana|Ana López Ruiz")]
+    [InlineData(PersonType.Legal, "Acme SRL", "Acme SRL|Acme SRL")]
+    [InlineData(PersonType.Legal, null, "Ana|Ana López Ruiz")]
+    public async Task Render_UsesTheBusinessNameOnlyForALegalPerson(PersonType personType, string? commercialName, string expected)
+    {
+        using var context = await EmailTemplateTestContext.CreateAsync();
+        context.Sql.SetResults(Template("{{Persona.Nombre}}|{{Persona.NombreCompleto}}", "<p></p>"), Person(commercialName, personType: personType));
+
+        var response = await context.SendAsync(new RenderEmailTemplateQuery(Guid.NewGuid(), Guid.NewGuid()));
+
+        response.Data!.Subject.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("Pacific/Kiritimati")] // UTC+14
+    [InlineData("Etc/GMT+12")]         // UTC-12
+    public async Task Render_TodayUsesTheTimeZoneOfTheCompanyCalendar(string timeZone)
+    {
+        using var context = await EmailTemplateTestContext.CreateAsync();
+        context.Sql.SetResults(Template("{{Fecha.Hoy}}", "<p></p>"), Person(timeZone: timeZone));
+
+        var response = await context.SendAsync(new RenderEmailTemplateQuery(Guid.NewGuid(), Guid.NewGuid()));
+
+        var expected = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById(timeZone)).ToString("dd/MM/yyyy");
+        response.Data!.Subject.Should().Be(expected);
     }
 
     [Fact]

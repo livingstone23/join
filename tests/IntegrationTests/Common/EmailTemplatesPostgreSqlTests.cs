@@ -457,7 +457,8 @@ public sealed class EmailTemplatesPostgreSqlTests : IClassFixture<CustomWebAppli
             SELECT p.FirstName,
                 (SELECT c.CustomerCode FROM customer.customers c WHERE c.CompanyId = @CompanyId AND c.PersonId = p.Id AND c.GcRecord = 0 AND c.IsActive = TRUE LIMIT 1),
                 (SELECT pc.ContactValue FROM admin.personcontacts pc WHERE pc.CompanyId = @CompanyId AND pc.PersonId = p.Id AND pc.GcRecord = 0 AND pc.IsActive = TRUE
-                   AND pc.ContactType IN (1, 2) ORDER BY CASE WHEN pc.ContactType = 1 THEN 0 ELSE 1 END, pc.IsPrimary DESC LIMIT 1)
+                   AND pc.ContactType IN (1, 2) ORDER BY CASE WHEN pc.ContactType = 1 THEN 0 ELSE 1 END, pc.IsPrimary DESC LIMIT 1),
+                (SELECT cc.TimeZone FROM calendar.calendarcompanies cc WHERE cc.CompanyId = @CompanyId AND cc.GcRecord = 0 LIMIT 1)
             FROM admin.persons p
             WHERE p.Id = @PersonId AND p.CompanyId = @CompanyId AND p.GcRecord = 0;
             """, companyId, ("PersonId", Guid.NewGuid()))).Should().Contain("Plan");

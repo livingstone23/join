@@ -6,6 +6,7 @@
 > **Objective:** Que cada empresa registre plantillas de correo (asunto y cuerpo con variables), agrupadas por un tipo de un catálogo propio, para usarlas al enviar correos a personas, clientes y leads (SPEC 72).
 > **Origen:** pedido del usuario (2026-10-19) al definir el envío de correos de SPEC 72: "crea un spec para poder registrar plantillas por empresa y poder agrupar por un tipo". Front: FE-46.
 > **Ajuste en implementación (2026-10-21):** precisa cómo quedó el código donde el texto era ambiguo; no cambia el alcance. (1) La migración `Spec71EmailTemplatesByCompany` crea solo tablas e índices; las opciones de menú y los permisos los siembra `DatabaseSeeder`, como en SPEC 62, 69 y 70 (el seed corre al aplicar la migración). (2) Código en `UseCases/Common/EmailTemplates` y `UseCases/Common/EmailTemplateTypes`, con `Commands/` y `Queries/` (convención CQRS). (3) `GET /EmailTemplates/variables` también lleva `[SkipDynamicAuthorization]`: FE-47 muestra el panel de variables en el modal de envío a quien no administra plantillas. (4) `lookup` devuelve una lista plana ordenada por tipo (`SortOrder`, nombre) con el código y el nombre del tipo en cada fila; el front la agrupa. (5) `render` lee con Dapper, como toda query; la visibilidad del lead usa el alcance de SPEC 60 (`LeadQuerySql.IsVisibleAsync`) y el lead debe ser de la persona; `{{Persona.Correo}}` es el correo pedido o, si no viene, el correo principal activo de la persona (luego el alternativo). (6) Borrado lógico y restauración como SPEC 41-post: el SuperAdmin ve los borrados con `includeDeleted=true` (lista y detalle de plantillas, lista de tipos; `isDeleted` en cada fila) y una plantilla no se restaura mientras su tipo esté borrado (`PARENT_DELETED`). La lista de plantillas devuelve `modifiedAt` (FE-46). (7) Un tipo inactivo no se puede asignar, pero una plantilla conserva el que ya tiene al editarla. FE-46 y FE-47 se ajustan en el mismo cambio.
+> **Ajuste por revisión de alcance (2026-10-21):** el alcance se confirma; se precisan tres puntos sin agregar funcionalidades. (8) `{{Persona.Nombre}}` y `{{Persona.NombreCompleto}}` según `PersonType`: persona física → nombre y nombres y apellidos; persona jurídica → `CommercialName` (la razón social, obligatoria para jurídicas) en ambas, y si falta, los nombres que tenga. (9) `{{Fecha.Hoy}}` es la fecha en la zona horaria de la empresa (`CalendarCompany.TimeZone`, SPEC 44-post) y, si la empresa no la tiene, la del servidor. (10) El contexto de las variables lo arma `EmailTemplateContextReader` (Application, Dapper), que usan `render` y el envío de SPEC 72 (regla 6 de SPEC 72) para que los valores sean los mismos.
 
 ---
 
@@ -17,8 +18,8 @@
 
    | Variable | Valor |
    |---|---|
-   | `{{Persona.Nombre}}` | Nombre de la persona (o razón social) |
-   | `{{Persona.NombreCompleto}}` | Nombres y apellidos |
+   | `{{Persona.Nombre}}` | Nombre de la persona física, o razón social (`CommercialName`) de la jurídica |
+   | `{{Persona.NombreCompleto}}` | Nombres y apellidos de la persona física, o razón social de la jurídica |
    | `{{Persona.Correo}}` | Correo destino elegido |
    | `{{Cliente.Codigo}}` | Código del cliente (vacío si no es cliente) |
    | `{{Lead.Codigo}}` | Código del lead asociado (vacío sin lead) |
@@ -26,7 +27,7 @@
    | `{{Usuario.Nombre}}` | Nombre del usuario que envía |
    | `{{Usuario.Correo}}` | Correo del usuario que envía |
    | `{{Empresa.Nombre}}` | Nombre de la empresa |
-   | `{{Fecha.Hoy}}` | Fecha de hoy en formato `dd/MM/yyyy` |
+   | `{{Fecha.Hoy}}` | Fecha de hoy en formato `dd/MM/yyyy`, en la zona horaria de la empresa (calendario, SPEC 44-post) o, sin ella, la del servidor |
 
    Una variable que no está en la lista invalida la plantilla al guardar (`EMAIL_TEMPLATE_UNKNOWN_VARIABLE`, con la lista de las desconocidas). Al renderizar, una variable sin valor se reemplaza por texto vacío.
 4. **La plantilla es un punto de partida:** el usuario la elige en el modal de envío (SPEC 72), se renderiza y él edita el texto antes de enviar.
@@ -43,7 +44,7 @@
 3. Migración `Spec71EmailTemplatesByCompany`: tablas e índices. Las opciones de menú y los permisos los siembra `DatabaseSeeder` (D.12–D.13).
 
 **B. Application**
-4. `IEmailTemplateRenderer` (Application, implementación en Application, sin dependencias externas): `ExtractVariables(text)`, `Validate(subject, body)` y `Render(subject, body, EmailTemplateContext)`. `EmailTemplateContext` lleva persona, correo destino, cliente, lead, usuario y empresa. La lista de variables vive en una sola clase (`EmailTemplateVariables`).
+4. `IEmailTemplateRenderer` (Application, implementación en Application, sin dependencias externas): `ExtractVariables(text)`, `Validate(subject, body)` y `Render(subject, body, EmailTemplateContext)`. `EmailTemplateContext` lleva persona, correo destino, cliente, lead, usuario y empresa, y lo arma `EmailTemplateContextReader` (Dapper; valida persona y lead), compartido con el envío de SPEC 72. La lista de variables vive en una sola clase (`EmailTemplateVariables`).
 5. `IHtmlSanitizer` (interfaz en Application, implementación en Infrastructure con `HtmlSanitizer`/Ganss.Xss): limpia `BodyHtml` al crear y editar.
 6. CRUD de tipos con bloqueo por uso (`EMAIL_TEMPLATE_TYPE_IN_USE`, `"Active EmailTemplates: N"`).
 7. CRUD de plantillas; queries con Dapper: lista paginada (filtros `search` con `ILIKE` sobre nombre y asunto, `emailTemplateTypeId`, `isActive` e `includeDeleted` para SuperAdmin) y detalle. Restaurar una plantilla exige que su tipo esté vivo (`PARENT_DELETED`).
@@ -108,12 +109,13 @@
 - **Sí: tipo como catálogo por empresa** (usuario, 2026-10-19).
 - **Sí: variables de lista cerrada** (usuario, 2026-10-19). Un error de tipeo se detecta al guardar y no le llega al cliente.
 - **Sí: esquema `Admin`.** Las plantillas sirven a personas, clientes y leads; no pertenecen solo al módulo de clientes.
-- **Sí: `lookup` y `render` con `[SkipDynamicAuthorization]`**, como el buscador de productos del lead (SPEC 57): los vendedores usan plantillas sin administrarlas.
+- **Sí: `lookup`, `render` y `variables` con `[SkipDynamicAuthorization]`**, como el buscador de productos del lead (SPEC 57): los vendedores usan plantillas sin administrarlas.
+- **Sí: un solo lector del contexto** (`EmailTemplateContextReader`) para `render` y para el envío de SPEC 72, así una variable vale lo mismo en la vista previa del modal y en el correo enviado.
 - **No: motor de plantillas (Scriban, Liquid).** Un reemplazo de una lista cerrada basta y no permite ejecutar lógica.
 
 ## Impacto en el frontend
 
-- **FE-46** (Borrador): pantallas Administración → Plantillas de correo y Tipos de plantilla, con un editor que inserta variables. FE-47 usa `lookup` y `render` en el modal de envío.
+- **FE-46** (Borrador): pantallas Administración → Plantillas de correo y Tipos de plantilla, con un editor que inserta variables. FE-47 usa `lookup`, `render` y `variables` en el modal de envío. Ambas llevan la nota "Ajuste por BE-71 (2026-10-21)".
 
 ## Lo que **no** entra en esta spec
 
