@@ -5,6 +5,7 @@
 > **Date:** 2026-10-19
 > **Objective:** Que cada empresa registre plantillas de correo (asunto y cuerpo con variables), agrupadas por un tipo de un catálogo propio, para usarlas al enviar correos a personas, clientes y leads (SPEC 72).
 > **Origen:** pedido del usuario (2026-10-19) al definir el envío de correos de SPEC 72: "crea un spec para poder registrar plantillas por empresa y poder agrupar por un tipo". Front: FE-46.
+> **Ajuste en implementación (2026-10-21):** precisa cómo quedó el código donde el texto era ambiguo; no cambia el alcance. (1) La migración `Spec71EmailTemplatesByCompany` crea solo tablas e índices; las opciones de menú y los permisos los siembra `DatabaseSeeder`, como en SPEC 62, 69 y 70 (el seed corre al aplicar la migración). (2) Código en `UseCases/Common/EmailTemplates` y `UseCases/Common/EmailTemplateTypes`, con `Commands/` y `Queries/` (convención CQRS). (3) `GET /EmailTemplates/variables` también lleva `[SkipDynamicAuthorization]`: FE-47 muestra el panel de variables en el modal de envío a quien no administra plantillas. (4) `lookup` devuelve una lista plana ordenada por tipo (`SortOrder`, nombre) con el código y el nombre del tipo en cada fila; el front la agrupa. (5) `render` lee con Dapper, como toda query; la visibilidad del lead usa el alcance de SPEC 60 (`LeadQuerySql.IsVisibleAsync`) y el lead debe ser de la persona; `{{Persona.Correo}}` es el correo pedido o, si no viene, el correo principal activo de la persona (luego el alternativo). (6) Borrado lógico y restauración como SPEC 41-post: el SuperAdmin ve los borrados con `includeDeleted=true` (lista y detalle de plantillas, lista de tipos; `isDeleted` en cada fila) y una plantilla no se restaura mientras su tipo esté borrado (`PARENT_DELETED`). La lista de plantillas devuelve `modifiedAt` (FE-46). (7) Un tipo inactivo no se puede asignar, pero una plantilla conserva el que ya tiene al editarla. FE-46 y FE-47 se ajustan en el mismo cambio.
 
 ---
 
@@ -39,21 +40,22 @@
 **A. Dominio y persistencia** (esquema `Admin`)
 1. `EmailTemplateType` (`BaseTenantEntity`): `Code` (máx. 30, mayúsculas), `Name` (máx. 100), `SortOrder`, `IsActive`. Índice único filtrado `(CompanyId, Code)` con `"gcrecord" = 0`.
 2. `EmailTemplate` (`BaseTenantEntity`): `EmailTemplateTypeId`, `Name` (máx. 150), `Subject` (máx. 200), `BodyHtml` (`text`, máx. 50 000 caracteres), `IsActive`. Índices: único filtrado `(CompanyId, Name)` con `"gcrecord" = 0`; `(CompanyId, EmailTemplateTypeId, IsActive)`.
-3. Migración `Spec71EmailTemplatesByCompany`: tablas, índices, opciones de menú y permisos.
+3. Migración `Spec71EmailTemplatesByCompany`: tablas e índices. Las opciones de menú y los permisos los siembra `DatabaseSeeder` (D.12–D.13).
 
 **B. Application**
 4. `IEmailTemplateRenderer` (Application, implementación en Application, sin dependencias externas): `ExtractVariables(text)`, `Validate(subject, body)` y `Render(subject, body, EmailTemplateContext)`. `EmailTemplateContext` lleva persona, correo destino, cliente, lead, usuario y empresa. La lista de variables vive en una sola clase (`EmailTemplateVariables`).
 5. `IHtmlSanitizer` (interfaz en Application, implementación en Infrastructure con `HtmlSanitizer`/Ganss.Xss): limpia `BodyHtml` al crear y editar.
 6. CRUD de tipos con bloqueo por uso (`EMAIL_TEMPLATE_TYPE_IN_USE`, `"Active EmailTemplates: N"`).
-7. CRUD de plantillas; queries con Dapper: lista paginada (filtros `search` con `ILIKE` sobre nombre y asunto, `emailTemplateTypeId`, `isActive`) y detalle.
-8. `RenderEmailTemplateQuery` `{ templateId, personId, emailAddress?, leadId? }`: devuelve `Subject` y `BodyHtml` renderizados. Valida que la persona, el lead (de esa persona y visible según SPEC 60) y la plantilla activa sean de la empresa.
+7. CRUD de plantillas; queries con Dapper: lista paginada (filtros `search` con `ILIKE` sobre nombre y asunto, `emailTemplateTypeId`, `isActive` e `includeDeleted` para SuperAdmin) y detalle. Restaurar una plantilla exige que su tipo esté vivo (`PARENT_DELETED`).
+8. `RenderEmailTemplateQuery` `{ templateId, personId, emailAddress?, leadId? }` (Dapper): devuelve `Subject` y `BodyHtml` renderizados. Valida que la persona, el lead (de esa persona y visible según SPEC 60) y la plantilla activa sean de la empresa. Sin `emailAddress`, `{{Persona.Correo}}` toma el correo principal activo de la persona (luego el alternativo).
 
 **C. Endpoints**
-9. Recurso `EmailTemplates`: `GET /api/v1/EmailTemplates` (paginado), `GET /{id}`, `POST`, `PUT /{id}`, `DELETE /{id}`, `POST /{id}/restore`, `GET /api/v1/EmailTemplates/variables` (lista de variables con su descripción, para el editor).
+9. Recurso `EmailTemplates`: `GET /api/v1/EmailTemplates` (paginado), `GET /{id}`, `POST`, `PUT /{id}`, `DELETE /{id}`, `POST /{id}/restore`.
 10. Recurso `EmailTemplateTypes`: `GET/POST/PUT/DELETE /api/v1/EmailTemplateTypes` + `POST /{id}/restore`.
 11. Para quien envía correos sin permiso de administrar plantillas (`[SkipDynamicAuthorization]`, solo autenticado y con empresa):
     - `GET /api/v1/EmailTemplates/lookup?emailTemplateTypeId=&search=` → plantillas activas agrupadas por tipo (id, nombre, tipo), máx. 50.
     - `POST /api/v1/EmailTemplates/{id}/render` → punto 8.
+    - `GET /api/v1/EmailTemplates/variables` → lista de variables con su descripción, para el editor (FE-46) y el panel de variables del modal de envío (FE-47).
     El envío en sí sigue protegido por los permisos de SPEC 72.
 
 **D. Menú, permisos y seed**
@@ -77,6 +79,7 @@
 | `EMAIL_TEMPLATE_TYPE_IN_USE` | 409 | Borrar un tipo con plantillas vivas |
 | `PERSON_NOT_FOUND` / `LEAD_NOT_FOUND` | 404 | En `render`: persona o lead de otra empresa, inexistente o fuera de alcance |
 | `DUPLICATE_KEY` | 409 | Nombre de plantilla o código de tipo repetido |
+| `PARENT_DELETED` / `NOT_DELETED` / `ACTIVE_DUPLICATE_EXISTS` | 409 | Restaurar una plantilla con el tipo borrado, algo que no está borrado o una fila cuyo nombre o código ya usa otra viva (SPEC 41-post) |
 
 ## Implementation plan
 

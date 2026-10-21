@@ -180,7 +180,7 @@ public static class ConfigureServices
 
         // SPEC 71 — email templates: the renderer of the closed list of variables and the write guard.
         services.AddScoped<JOIN.Application.Interface.Email.IEmailTemplateRenderer, JOIN.Application.Services.Email.EmailTemplateRenderer>();
-        services.AddScoped<JOIN.Application.UseCases.Common.EmailTemplates.EmailTemplateWriteGuard>();
+        services.AddScoped<JOIN.Application.UseCases.Common.EmailTemplates.Commands.EmailTemplateWriteGuard>();
 
         // SPEC 45 — channel agent intake and pending persons.
         services.AddScoped<IntakeChannelReader>();

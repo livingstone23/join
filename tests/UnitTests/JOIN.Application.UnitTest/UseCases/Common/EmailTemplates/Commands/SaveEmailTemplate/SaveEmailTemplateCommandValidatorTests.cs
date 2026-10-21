@@ -1,8 +1,11 @@
 using FluentAssertions;
 using FluentValidation;
-using JOIN.Application.UseCases.Common.EmailTemplates;
+using JOIN.Application.UseCases.Common.EmailTemplates.Commands;
+using JOIN.Application.UseCases.Common.EmailTemplates.Queries;
+using JOIN.Application.UseCases.Common.EmailTemplateTypes.Commands;
+using JOIN.Application.UseCases.Common.EmailTemplateTypes.Queries;
 
-namespace JOIN.Application.UnitTest.UseCases.Common.EmailTemplates;
+namespace JOIN.Application.UnitTest.UseCases.Common.EmailTemplates.Commands.SaveEmailTemplate;
 
 /// <summary>
 /// SPEC 71 — the validators of the commands: the identifiers, the names and the lengths of the fields.

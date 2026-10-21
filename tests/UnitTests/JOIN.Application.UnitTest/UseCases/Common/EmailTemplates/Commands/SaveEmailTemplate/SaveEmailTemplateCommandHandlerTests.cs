@@ -1,9 +1,13 @@
 using FluentAssertions;
 using JOIN.Application.Services.Email;
-using JOIN.Application.UseCases.Common.EmailTemplates;
+using JOIN.Application.UnitTest.UseCases.Common.EmailTemplates;
+using JOIN.Application.UseCases.Common.EmailTemplates.Commands;
+using JOIN.Application.UseCases.Common.EmailTemplates.Queries;
+using JOIN.Application.UseCases.Common.EmailTemplateTypes.Commands;
+using JOIN.Application.UseCases.Common.EmailTemplateTypes.Queries;
 using Microsoft.EntityFrameworkCore;
 
-namespace JOIN.Application.UnitTest.UseCases.Common.EmailTemplates;
+namespace JOIN.Application.UnitTest.UseCases.Common.EmailTemplates.Commands.SaveEmailTemplate;
 
 /// <summary>
 /// SPEC 71 — CRUD of the email templates of the company: the type must be an active type of the company,
@@ -277,5 +281,54 @@ public sealed class EmailTemplateCommandTests
         response.IsSuccess.Should().BeTrue(response.Message);
         var stored = await context.Db.EmailTemplates.IgnoreQueryFilters().SingleAsync();
         stored.GcRecord.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Update_KeepsAnInactiveTypeTheTemplateAlreadyHas_ButCannotAssignOne()
+    {
+        using var context = await EmailTemplateTestContext.CreateAsync();
+        var typeId = await context.AddTypeAsync();
+        var inactiveId = await context.AddTypeAsync("OLD", "Antiguo", isActive: false);
+        var templateId = await context.AddTemplateAsync(typeId, "Bienvenida");
+
+        (await context.SendAsync(new UpdateEmailTemplateCommand
+        {
+            Id = templateId, EmailTemplateTypeId = inactiveId, Name = "Bienvenida", Subject = "Hola", BodyHtml = "<p>Hola</p>"
+        })).Message.Should().Be(EmailTemplateErrorCodes.EmailTemplateTypeNotFound);
+
+        var type = await context.Db.EmailTemplateTypes.IgnoreQueryFilters().SingleAsync(t => t.Id == typeId);
+        type.IsActive = false;
+        await context.Db.SaveChangesAsync();
+        context.Db.ChangeTracker.Clear();
+
+        var response = await context.SendAsync(new UpdateEmailTemplateCommand
+        {
+            Id = templateId, EmailTemplateTypeId = typeId, Name = "Bienvenida", Subject = "Hola de nuevo", BodyHtml = "<p>Hola</p>"
+        });
+
+        response.IsSuccess.Should().BeTrue(response.Message);
+        response.Data!.Subject.Should().Be("Hola de nuevo");
+    }
+
+    [Fact]
+    public async Task Restore_WhileTheTypeIsDeleted_AnswersParentDeleted()
+    {
+        using var context = await EmailTemplateTestContext.CreateAsync();
+        context.IsSuperAdmin = true;
+        var typeId = await context.AddTypeAsync();
+        var templateId = await context.AddTemplateAsync(typeId);
+        await context.SendAsync(new DeleteEmailTemplateCommand(templateId));
+        (await context.SendAsync(new DeleteEmailTemplateTypeCommand(typeId))).IsSuccess.Should().BeTrue();
+
+        (await context.SendAsync(new RestoreEmailTemplateCommand(templateId))).Message.Should().Be("PARENT_DELETED");
+    }
+
+    [Fact]
+    public void DeleteAndRestoreValidators_RequireTheId()
+    {
+        new DeleteEmailTemplateCommandValidator().Validate(new DeleteEmailTemplateCommand(Guid.Empty)).IsValid.Should().BeFalse();
+        new RestoreEmailTemplateCommandValidator().Validate(new RestoreEmailTemplateCommand(Guid.NewGuid())).IsValid.Should().BeTrue();
+        new DeleteEmailTemplateTypeCommandValidator().Validate(new DeleteEmailTemplateTypeCommand(Guid.Empty)).IsValid.Should().BeFalse();
+        new RestoreEmailTemplateTypeCommandValidator().Validate(new RestoreEmailTemplateTypeCommand(Guid.NewGuid())).IsValid.Should().BeTrue();
     }
 }

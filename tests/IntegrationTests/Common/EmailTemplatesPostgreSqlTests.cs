@@ -304,6 +304,80 @@ public sealed class EmailTemplatesPostgreSqlTests : IClassFixture<CustomWebAppli
     }
 
     [Fact]
+    public async Task Render_UsesTheCustomerCodeThePrimaryEmailAndTheSender()
+    {
+        var (companyId, client, userId) = await CreateCompanyWithUserAsync(_factory);
+        var typeId = (await TypeIdsAsync(client))["INTRO"];
+        var templateId = (await NewTemplateAsync(
+            client, typeId, "Datos", "{{Cliente.Codigo}}", "<p>{{Persona.Correo}}|{{Usuario.Correo}}|{{Empresa.Nombre}}</p>"))
+            .GetProperty("id").GetGuid();
+        var personId = await NewPersonAsync(client, "Ana", "López");
+        string userEmail;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var stageId = await db.CustomerStages.IgnoreQueryFilters().Where(st => st.CompanyId == companyId && st.GcRecord == 0).Select(st => st.Id).FirstAsync();
+            db.Customers.Add(JOIN.Domain.Customers.Customer.Create(companyId, personId, userId, "C-777", stageId));
+            // The alternative e-mail goes first in the table: the render must still prefer the primary one.
+            db.PersonContacts.Add(JOIN.Domain.Admin.PersonContact.Create(companyId, personId, JOIN.Domain.Enums.ContactType.AlternativeEmail, "alterno@acme.test"));
+            db.PersonContacts.Add(JOIN.Domain.Admin.PersonContact.Create(companyId, personId, JOIN.Domain.Enums.ContactType.PrimaryEmail, "principal@acme.test"));
+            await db.SaveChangesAsync();
+            userEmail = await db.Users.Where(u => u.Id == userId).Select(u => u.Email!).SingleAsync();
+        }
+
+        var rendered = await DataAsync(await client.PostAsJsonAsync($"/api/v1/EmailTemplates/{templateId}/render", new { personId }));
+
+        rendered.GetProperty("subject").GetString().Should().Be("C-777");
+        rendered.GetProperty("bodyHtml").GetString().Should().StartWith($"<p>principal@acme.test|{userEmail}|COM-");
+        var chosen = await DataAsync(await client.PostAsJsonAsync($"/api/v1/EmailTemplates/{templateId}/render", new { personId, emailAddress = "alterno@acme.test" }));
+        chosen.GetProperty("bodyHtml").GetString().Should().StartWith("<p>alterno@acme.test|");
+    }
+
+    [Fact]
+    public async Task DeletedRows_AreVisibleOnlyToTheSuperAdmin_AndATemplateIsNotRestoredWhileItsTypeIsDeleted()
+    {
+        var (companyId, client, _) = await CreateCompanyWithUserAsync(_factory);
+        var typeResponse = await client.PostAsJsonAsync("/api/v1/EmailTemplateTypes", new { code = "NEWS", name = "Novedades", sortOrder = 9 });
+        var typeId = (await DataAsync(typeResponse)).GetProperty("id").GetGuid();
+        var templateId = (await NewTemplateAsync(client, typeId, "Boletín")).GetProperty("id").GetGuid();
+        (await client.DeleteAsync($"/api/v1/EmailTemplates/{templateId}")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.DeleteAsync($"/api/v1/EmailTemplateTypes/{typeId}")).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var withDeleted = (await DataAsync(await client.GetAsync("/api/v1/EmailTemplates?includeDeleted=true"))).GetProperty("items").EnumerateArray().ToList();
+        withDeleted.Single(t => t.GetProperty("id").GetGuid() == templateId).GetProperty("isDeleted").GetBoolean().Should().BeTrue();
+        (await DataAsync(await client.GetAsync("/api/v1/EmailTemplateTypes?includeDeleted=true"))).EnumerateArray()
+            .Should().Contain(t => t.GetProperty("id").GetGuid() == typeId);
+
+        var (supervisor, _) = await AddUserAsync(_factory, companyId, "Supervisor");
+        await GrantAsync(_factory, companyId, "Supervisor", "EmailTemplates", create: false, update: false, delete: false);
+        (await DataAsync(await supervisor.GetAsync("/api/v1/EmailTemplates?includeDeleted=true"))).GetProperty("items").EnumerateArray()
+            .Should().NotContain(t => t.GetProperty("id").GetGuid() == templateId);
+
+        var restore = await client.PostAsync($"/api/v1/EmailTemplates/{templateId}/restore", null);
+        restore.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await restore.Content.ReadAsStringAsync()).Should().Contain("PARENT_DELETED");
+        (await client.PostAsync($"/api/v1/EmailTemplateTypes/{typeId}/restore", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.PostAsync($"/api/v1/EmailTemplates/{templateId}/restore", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Update_KeepsAnInactiveType_ButCannotAssignOne()
+    {
+        var (_, client, _) = await CreateCompanyWithUserAsync(_factory);
+        var types = await TypeIdsAsync(client);
+        var templateId = (await NewTemplateAsync(client, types["INTRO"], "Intro")).GetProperty("id").GetGuid();
+        (await client.PutAsJsonAsync($"/api/v1/EmailTemplateTypes/{types["INTRO"]}", new { code = "INTRO", name = "Presentación", sortOrder = 1, isActive = false }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.PutAsJsonAsync($"/api/v1/EmailTemplateTypes/{types["THANKS"]}", new { code = "THANKS", name = "Agradecimiento", sortOrder = 4, isActive = false }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await client.PutAsJsonAsync($"/api/v1/EmailTemplates/{templateId}", new { emailTemplateTypeId = types["INTRO"], name = "Intro", subject = "Hola", bodyHtml = "<p>Hola</p>", isActive = true }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.PutAsJsonAsync($"/api/v1/EmailTemplates/{templateId}", new { emailTemplateTypeId = types["THANKS"], name = "Intro", subject = "Hola", bodyHtml = "<p>Hola</p>", isActive = true }))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task NewSql_ShouldPlanAgainstTheMigratedSchema()
     {
         var (companyId, client, _) = await CreateCompanyWithUserAsync(_factory);
@@ -365,6 +439,16 @@ public sealed class EmailTemplatesPostgreSqlTests : IClassFixture<CustomWebAppli
             ORDER BY tt.SortOrder, tt.Name, t.Name
             LIMIT @MaxResults;
             """, companyId, ("MaxResults", 50), ("EmailTemplateTypeId", typeId), ("Search", "%Bien%"))).Should().Contain("Plan");
+
+        // SPEC 71 B.8 — the render reads the person context in one statement.
+        (await ExplainAsync(conn, """
+            SELECT p.FirstName,
+                (SELECT c.CustomerCode FROM customer.customers c WHERE c.CompanyId = @CompanyId AND c.PersonId = p.Id AND c.GcRecord = 0 AND c.IsActive = TRUE LIMIT 1),
+                (SELECT pc.ContactValue FROM admin.personcontacts pc WHERE pc.CompanyId = @CompanyId AND pc.PersonId = p.Id AND pc.GcRecord = 0 AND pc.IsActive = TRUE
+                   AND pc.ContactType IN (1, 2) ORDER BY CASE WHEN pc.ContactType = 1 THEN 0 ELSE 1 END, pc.IsPrimary DESC LIMIT 1)
+            FROM admin.persons p
+            WHERE p.Id = @PersonId AND p.CompanyId = @CompanyId AND p.GcRecord = 0;
+            """, companyId, ("PersonId", Guid.NewGuid()))).Should().Contain("Plan");
     }
 
     private static async Task<string?> ExplainAsync(

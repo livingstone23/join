@@ -1,9 +1,9 @@
 using Asp.Versioning;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Common.EmailTemplates;
-using JOIN.Application.UseCases.Common.EmailTemplates;
+using JOIN.Application.UseCases.Common.EmailTemplateTypes.Commands;
+using JOIN.Application.UseCases.Common.EmailTemplateTypes.Queries;
 using JOIN.Domain.Security;
-using JOIN.Services.WebApi.Controllers.Common;
 using JOIN.Services.WebApi.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -27,8 +27,11 @@ public class EmailTemplateTypesController(ISender sender) : ControllerBase
     [RequirePermission(PermissionFlags.CanRead)]
     [ProducesResponseType(typeof(Response<IReadOnlyList<EmailTemplateTypeDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetAll([FromQuery] bool? includeInactive = null, CancellationToken cancellationToken = default) =>
-        this.ToEmailTemplateResult(await sender.Send(new GetEmailTemplateTypesQuery(includeInactive), cancellationToken));
+    public async Task<IActionResult> GetAll(
+        [FromQuery] bool? includeInactive = null,
+        [FromQuery] bool? includeDeleted = null,
+        CancellationToken cancellationToken = default) =>
+        this.ToEmailTemplateResult(await sender.Send(new GetEmailTemplateTypesQuery(includeInactive, includeDeleted), cancellationToken));
 
     /// <summary>Creates a classification.</summary>
     [HttpPost]

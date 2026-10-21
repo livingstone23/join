@@ -53,7 +53,7 @@ public sealed class SaveProductDocumentTypeCommandHandlerTests
         var blocked = await bed.Context.SendAsync(new DeleteProductDocumentTypeCommand(bed.TechSheetTypeId));
 
         blocked.Message.Should().Be(CatalogErrorCodes.ProductDocumentTypeInUse);
-        blocked.Errors.Should().ContainSingle(e => e.Contains("Active ProductDocuments: 1"));
+        blocked.Errors.Should().ContainSingle().Which.Should().Be("Active ProductDocuments: 1");
 
         var other = bed.Context.Db.ProductDocumentTypes.Single(t => t.Code == "OTHER").Id;
         (await bed.Context.SendAsync(new DeleteProductDocumentTypeCommand(other))).IsSuccess.Should().BeTrue();

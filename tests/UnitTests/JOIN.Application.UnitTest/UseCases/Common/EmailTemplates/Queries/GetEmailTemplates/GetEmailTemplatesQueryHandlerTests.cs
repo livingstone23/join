@@ -4,10 +4,13 @@ using Moq;
 using JOIN.Application.Common;
 using JOIN.Application.Services.Email;
 using JOIN.Application.UnitTest.Common.TestDoubles;
-using JOIN.Application.UseCases.Common.EmailTemplates;
+using JOIN.Application.UseCases.Common.EmailTemplates.Commands;
+using JOIN.Application.UseCases.Common.EmailTemplates.Queries;
+using JOIN.Application.UseCases.Common.EmailTemplateTypes.Commands;
+using JOIN.Application.UseCases.Common.EmailTemplateTypes.Queries;
 using Microsoft.Extensions.Options;
 
-namespace JOIN.Application.UnitTest.UseCases.Common.EmailTemplates;
+namespace JOIN.Application.UnitTest.UseCases.Common.EmailTemplates.Queries.GetEmailTemplates;
 
 /// <summary>
 /// SPEC 71 — the queries of the email templates (Dapper): the paged list, the detail, the catalog of
@@ -204,5 +207,39 @@ public sealed class EmailTemplateQueryTests
         response.Data.Should().HaveCount(10);
         response.Data.Should().Contain(v => v.Key == "Persona.Nombre");
         response.Data.Should().OnlyContain(v => v.Description.Length > 0);
+    }
+
+    [Fact]
+    public async Task DeletedRows_AreListedOnlyForASuperAdminWhoAsks()
+    {
+        var typeId = Guid.NewGuid();
+        var deletedRow = TemplateRow(typeId);
+        deletedRow["GcRecord"] = 20261021;
+        deletedRow["ModifiedAt"] = new DateTime(2026, 10, 21, 0, 0, 0, DateTimeKind.Utc);
+
+        var plain = new FakeSqlConnectionFactory();
+        plain.SetResults(FakeResultSet.FromRows(TemplateRow(typeId)), FakeResultSet.FromScalar(1));
+        await new GetEmailTemplatesQueryHandler(plain, _paging, _user.Object).Handle(new GetEmailTemplatesQuery(IncludeDeleted: true), CancellationToken.None);
+        plain.LastCommandText.Should().Contain("t.GcRecord = 0", "only a SuperAdmin sees deleted rows");
+
+        _user.Setup(x => x.IsInRole("SuperAdmin")).Returns(true);
+        var list = new FakeSqlConnectionFactory();
+        list.SetResults(FakeResultSet.FromRows(deletedRow), FakeResultSet.FromScalar(1));
+        var response = await new GetEmailTemplatesQueryHandler(list, _paging, _user.Object).Handle(new GetEmailTemplatesQuery(IncludeDeleted: true), CancellationToken.None);
+        list.LastCommandText.Should().NotContain("GcRecord = 0");
+        var item = response.Data!.Items.Should().ContainSingle().Subject;
+        item.IsDeleted.Should().BeTrue();
+        item.ModifiedAt.Should().NotBeNull();
+
+        var detail = new FakeSqlConnectionFactory();
+        detail.SetResults(FakeResultSet.FromRows(deletedRow));
+        (await new GetEmailTemplateByIdQueryHandler(detail, _user.Object).Handle(new GetEmailTemplateByIdQuery(Guid.NewGuid(), true), CancellationToken.None))
+            .Data!.IsDeleted.Should().BeTrue();
+        detail.LastCommandText.Should().NotContain("GcRecord = 0");
+
+        var types = new FakeSqlConnectionFactory();
+        types.SetResults(FakeResultSet.Empty("Id"));
+        await new GetEmailTemplateTypesQueryHandler(types, _user.Object).Handle(new GetEmailTemplateTypesQuery(IncludeDeleted: true), CancellationToken.None);
+        types.LastCommandText.Should().NotContain("GcRecord = 0");
     }
 }

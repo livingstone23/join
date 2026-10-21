@@ -1,9 +1,13 @@
 using FluentAssertions;
 using JOIN.Application.Services.Email;
-using JOIN.Application.UseCases.Common.EmailTemplates;
+using JOIN.Application.UnitTest.UseCases.Common.EmailTemplates;
+using JOIN.Application.UseCases.Common.EmailTemplates.Commands;
+using JOIN.Application.UseCases.Common.EmailTemplates.Queries;
+using JOIN.Application.UseCases.Common.EmailTemplateTypes.Commands;
+using JOIN.Application.UseCases.Common.EmailTemplateTypes.Queries;
 using Microsoft.EntityFrameworkCore;
 
-namespace JOIN.Application.UnitTest.UseCases.Common.EmailTemplates;
+namespace JOIN.Application.UnitTest.UseCases.Common.EmailTemplateTypes.Commands.SaveEmailTemplateType;
 
 /// <summary>
 /// SPEC 71 — CRUD of the email template types of the company: the code is normalized and unique,

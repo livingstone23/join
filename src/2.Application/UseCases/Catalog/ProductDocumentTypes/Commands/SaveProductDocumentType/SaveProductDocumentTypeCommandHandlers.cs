@@ -102,7 +102,7 @@ public sealed class DeleteProductDocumentTypeCommandHandler(
 
         var check = await new ActiveDependentsCheck(unitOfWork).CountAsync<ProductDocument>(
             x => x.GcRecord == 0 && x.ProductDocumentTypeId == entity.Id,
-            "Active ProductDocuments");
+            "ProductDocuments");
         if (check.HasDependents)
         {
             return Response<Guid>.Error(CatalogErrorCodes.ProductDocumentTypeInUse, [.. check.Details]);
