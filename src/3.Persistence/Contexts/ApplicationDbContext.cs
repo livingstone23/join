@@ -349,6 +349,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         // Catalog (SPEC 57): the company's products, services and categories.
         builder.Entity<ProductCategory>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
         builder.Entity<Product>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        // SPEC 70 — images, documents, document types and attachment limits of the products are tenant-owned.
+        builder.Entity<ProductImage>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<ProductDocument>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<ProductDocumentType>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
+        builder.Entity<ProductAttachmentSettings>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
 
         // Finance (SPEC 56): the company's currencies and dated exchange rates.
         builder.Entity<CompanyCurrency>().HasQueryFilter(e => e.GcRecord == 0 && e.CompanyId == _currentUserService.CompanyId);
