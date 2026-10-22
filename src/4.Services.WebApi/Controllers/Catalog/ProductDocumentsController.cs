@@ -31,6 +31,7 @@ public class ProductDocumentsController(IMediator mediator) : ControllerBase
 
     [HttpPost]
     [Consumes("multipart/form-data")]
+    [RequestSizeLimit(200L * 1024 * 1024)] // techo; el límite real lo marca ProductAttachmentSettings
     [RequirePermission(PermissionFlags.CanUpdate)]
     [ProducesResponseType(typeof(Response<ProductDocumentDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status400BadRequest)]
