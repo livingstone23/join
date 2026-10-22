@@ -1,6 +1,6 @@
 # SPEC 77 — WhatsApp: etapas del canal, pipeline por conversación y homologación con Leads y Clientes
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** **SPEC 74** (conversaciones), **SPEC 75** (visibilidad y tiempo real), SPEC 55 y SPEC 66 (etapas de cliente y su cambio con historial), SPEC 61 (etapas de lead y su cambio). Rama de trabajo: `spec-77-whatsapp-stages-pipeline-mapping`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Que cada conversación avance por etapas propias del canal (pipeline tipo kanban) y que cada etapa pueda homologarse con una etapa de Leads o de Clientes. JOIN **sugiere** al agente mover también el lead o el cliente; nunca los cambia solo.

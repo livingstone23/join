@@ -1,6 +1,6 @@
 # SPEC 79 — WhatsApp: automatizaciones básicas (bienvenida, fuera de horario, asignación automática, cierre por inactividad y aviso de ventana)
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** **SPEC 74** (conversaciones), **SPEC 75** (agentes, Cola, envío, notificaciones), **SPEC 76** (plantillas), SPEC 44-post (horario y días no laborables de la empresa). Rama de trabajo: `spec-79-whatsapp-basic-automations`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Cinco reglas fijas que se encienden, se apagan y se configuran, para que el canal funcione desde el primer día. Conviven con el asistente IA (BE-80): con la IA encendida, la IA da la bienvenida y el aviso fuera de horario.

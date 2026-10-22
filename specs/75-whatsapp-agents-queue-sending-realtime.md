@@ -1,6 +1,6 @@
 # SPEC 75 — WhatsApp: agentes y coordinadores, disponibilidad, Cola y En espera, notificaciones, envío de mensajes y tiempo real
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** **SPEC 73** (canal y cliente de Meta), **SPEC 74** (conversaciones, mensajes, estados y archivos), SPEC 49-post (storage, para los archivos que se envían). Rama de trabajo: `spec-75-whatsapp-agents-queue-sending-realtime`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Que los usuarios de la empresa atiendan WhatsApp como agentes o coordinadores. Cada agente ve lo que le corresponde, toma conversaciones de la Cola, el coordinador asigna las que esperan asesor, y todos responden con lo que Meta permite. La bandeja se actualiza en vivo con aviso sonoro.

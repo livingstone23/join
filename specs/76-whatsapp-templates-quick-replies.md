@@ -1,6 +1,6 @@
 # SPEC 76 — WhatsApp: plantillas vinculadas con Meta y respuestas rápidas
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** **SPEC 73** (canal, cliente de Meta, webhook), **SPEC 74** (mensajes), **SPEC 75** (envío y ventana de 24 h). Rama de trabajo: `spec-76-whatsapp-templates-quick-replies`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Crear, enviar a aprobación y sincronizar las plantillas de mensaje de Meta desde JOIN, vinculadas en ambos lados por su id, y usarlas al responder, sobre todo con la ventana de 24 h cerrada. Además, respuestas rápidas para el agente.

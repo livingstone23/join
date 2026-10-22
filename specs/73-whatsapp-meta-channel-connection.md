@@ -1,6 +1,6 @@
 # SPEC 73 — WhatsApp (Meta Cloud API): esquema `Channel_Meta`, conexión por empresa, webhook firmado, perfil del negocio y módulo
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 05 (resiliencia HTTP), SPEC 00-post (catálogo de canales, código `WHATSAPP`), SPEC 43-post (módulos y rutas en inglés), SPEC 48-post (bloqueo por módulo activo), SPEC 49-post (`IFileStorageResolver`, para la foto del perfil). Rama de trabajo: `spec-73-whatsapp-meta-channel-connection`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Que cada empresa conecte su propio número de WhatsApp a través de su propia App de Meta, que JOIN reciba y valide los webhooks de esa App, y que el administrador gestione el perfil de WhatsApp Business desde JOIN.

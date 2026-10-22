@@ -1,6 +1,6 @@
 # SPEC 80 — WhatsApp: asistente IA opcional vía un flujo de n8n (contexto, herramientas, escalado y transcripción)
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** **SPEC 74** (conversaciones, mensajes, archivos, personas pendientes), **SPEC 75** (Cola, En espera, notificaciones, envío), SPEC 76 (plantillas, solo para excluirlas), SPEC 79 (convivencia con las automatizaciones), SPEC 45-post (API del agente de canales: personas y citas), SPEC 57 (catálogo de productos), SPEC 61 y SPEC 63 (leads y leads ganados), SPEC 34 a 37 (tickets). Rama de trabajo: `spec-80-whatsapp-ai-assistant-n8n`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Un asistente IA, que el administrador del módulo enciende o apaga por empresa, atiende primero las conversaciones entrantes con un único flujo publicado de n8n. Responde sobre la empresa, sus productos, las últimas compras, los tickets y las citas, con el contexto de las últimas 3 conversaciones del contacto. Cuando no puede resolver, pasa la conversación a "En espera de asesor" con un resumen y avisa al coordinador.

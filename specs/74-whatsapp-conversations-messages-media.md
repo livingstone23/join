@@ -1,6 +1,6 @@
 # SPEC 74 — WhatsApp: conversaciones con código propio, mensajes, estados, marca de identificación, personas pendientes y archivos
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** **SPEC 73** (canal, webhook y `WebhookEvents`), SPEC 45-post (`IntakeRequesterResolver`, `PersonIntakeRegistrar`, personas pendientes), SPEC 49-post (`IFileStorageResolver`), SPEC 54 (`GET /Persons/lookup`), SPEC 55 (clientes), SPEC 58 (persona sin identificación), SPEC 61 (leads), SPEC 65 (personas pendientes → lead). Rama de trabajo: `spec-74-whatsapp-conversations-messages-media`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Convertir cada entrega de Meta en mensajes agrupados por conversación con un código propio (`AAAAMMDD-N`), vinculados a una persona o cliente (o al cliente genérico John Doe), con sus estados, sus archivos guardados en el storage como ruta y la identificación del contacto como una marca aparte.

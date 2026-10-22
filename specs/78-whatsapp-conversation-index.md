@@ -1,6 +1,6 @@
 # SPEC 78 — WhatsApp: índice de conversaciones por persona o cliente, con filtros y exportación
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** **SPEC 74** (conversaciones y mensajes), **SPEC 75** (visibilidad), SPEC 77 (etapas, para el filtro), SPEC 14 (exportación a Excel y PDF del frontend). Rama de trabajo: `spec-78-whatsapp-conversation-index`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Un índice general de conversaciones agrupado por persona o cliente. Cada fila despliega los códigos de sus conversaciones (`20261015-7`, `20260810-4`…), y cada código abre la conversación completa. Se filtra por rango de fechas, número, nombre o identificación, tipo, estado, agente, etapa y quién atendió.
