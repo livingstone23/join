@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using JOIN.Application.Common;
 using JOIN.Application.DTO.Catalog;
+using JOIN.Application.Services.Catalog;
 using JOIN.Application.UseCases.Catalog.Products.Documents.Commands;
 using JOIN.Application.UseCases.Catalog.Products.Documents.Queries;
 using JOIN.Domain.Security;
@@ -39,27 +40,33 @@ public class ProductDocumentsController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Upload(
         Guid productId,
-        IFormFile file,
-        [FromForm] Guid productDocumentTypeId,
-        [FromForm] string? displayName,
-        [FromForm] string? description,
+        [FromForm] UploadProductDocumentForm form,
         CancellationToken cancellationToken = default)
     {
-        if (file is null || file.Length == 0)
+        // Mismo patrón que CalendarEventRecords: un DTO [FromForm] evita el 400 de
+        // model binding cuando Refit manda las partes multipart con mayúsculas/minúsculas.
+        if (form.File is null || form.File.Length == 0)
         {
-            return this.ToCatalogResult(Response<ProductDocumentDto>.Error("INVALID_FILE", ["The 'file' form field is required."]));
+            return this.ToCatalogResult(Response<ProductDocumentDto>.Error("INVALID_FILE", ["The 'File' form field is required."]));
+        }
+
+        if (form.ProductDocumentTypeId == Guid.Empty)
+        {
+            return this.ToCatalogResult(Response<ProductDocumentDto>.Error(
+                CatalogErrorCodes.ProductDocumentTypeNotFound,
+                ["ProductDocumentTypeId is required."]));
         }
 
         await using var buffer = new MemoryStream();
-        await file.CopyToAsync(buffer, cancellationToken);
+        await form.File.CopyToAsync(buffer, cancellationToken);
         var command = new UploadProductDocumentCommand(
             productId,
-            productDocumentTypeId,
+            form.ProductDocumentTypeId,
             // FE-45: the display name defaults to the file name.
-            string.IsNullOrWhiteSpace(displayName) ? Path.GetFileNameWithoutExtension(file.FileName) : displayName,
-            description,
-            file.FileName,
-            file.ContentType ?? "application/octet-stream",
+            string.IsNullOrWhiteSpace(form.DisplayName) ? Path.GetFileNameWithoutExtension(form.File.FileName) : form.DisplayName,
+            form.Description,
+            form.File.FileName,
+            form.File.ContentType ?? "application/octet-stream",
             buffer.ToArray());
         return this.ToCatalogCreated(await mediator.Send(command, cancellationToken));
     }
@@ -93,4 +100,13 @@ public class ProductDocumentsController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Restore(Guid productId, Guid documentId, CancellationToken cancellationToken = default) =>
         this.ToCatalogResult(await mediator.Send(new RestoreProductDocumentCommand(productId, documentId), cancellationToken));
+}
+
+/// <summary>Multipart upload body for product documents (SPEC 70 / FE-45).</summary>
+public sealed class UploadProductDocumentForm
+{
+    public IFormFile? File { get; init; }
+    public Guid ProductDocumentTypeId { get; init; }
+    public string? DisplayName { get; init; }
+    public string? Description { get; init; }
 }
