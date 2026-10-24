@@ -1,6 +1,6 @@
 # SPEC 81 — Documentos comerciales del lead: tipos de documento, configuración por tipo y datos del emisor
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 41-post (borrado lógico, restauración y bloqueo por uso), SPEC 43-post (menú y rutas), SPEC 49-post (almacenamiento, para el logo), SPEC 55 (`ICustomerActivationService`), SPEC 59 (motivos de lead), SPEC 61 (leads), SPEC 63 (ganar un lead), SPEC 70 (validación de imágenes por firma), SPEC 71 (sintaxis de variables e `IHtmlSanitizer`). Rama de trabajo: `spec-81-lead-document-types-and-configuration`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Dar a Leads una función **básica** de documentos comerciales (cotizaciones, proformas, facturas, órdenes de compra…) que se parametriza en **Administración**: qué tipos de documento existen, cómo se numera cada uno, su encabezado y pie de página, sus leyendas y qué pasa al aprobarlo. Cuando existan los módulos completos (Ventas, Facturación, Productos), esta función se desconecta y se conectan aquellos.
