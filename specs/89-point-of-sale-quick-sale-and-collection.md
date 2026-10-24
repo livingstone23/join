@@ -5,11 +5,13 @@
 > **Date:** 2026-10-24
 > **Objective:** Una pantalla de **venta rápida** con forma de factura para vender en mostrador sin crear un lead, a un cliente identificado o al **consumidor final**. La misma pantalla carga una **cotización o proforma** (por número, código público o código de barras) y la convierte en factura si sigue vigente, o carga una **factura ya emitida en un lead** para cobrarla. La caja con apertura, cierre y arqueo es **opcional**: solo se exige si la empresa la activa.
 > **Origen:** pedido del usuario (2026-10-24): "una pantalla que pueda vender, que simule una factura, para realización de venta rápida, o pueda recibir un presupuesto que lo pueda volver factura si es válido, o una factura realizada en un lead para proceder al cobro"; "la opción de solo cobrar, pero que no sea obligatoria [la caja] a menos que la parametrice".
+> **Valores de enums (revisión de consistencia):** `Origin`: `Lead = 1`, `PointOfSale = 2`; `PosReceiptFormat`: `Document = 1`, `Ticket80mm = 2`; `CashSessions.Status`: `Open = 1`, `Closed = 2`; `CashMovements.MovementType`: `CashIn = 1`, `CashOut = 2`.
+> **Ajuste por revisión de consistencia (2026-10-24):** (1) Moneda de la venta: por defecto la moneda local del perfil fiscal (SPEC 88) o, sin perfil, la base; el cajero puede elegir otra moneda activa de la empresa. (2) El almacén sale de la caja o del predeterminado de la empresa (no hay almacén por usuario). (3) Recursos sin pantalla declarados. (4) Fuente de activación de cliente: `CustomerStatusSource.CommercialDocument = 6`. (5) Seed en `JOIN-NI-001` (SPEC 100).
 > **Ajuste por SPEC 98 (2026-10-24):** el límite de descuento es por rol, con solicitud de aprobación; se quitan `PosMaxDiscountPercent` y `PosDiscountOverride`.
 > **Ajuste por SPEC 94 (2026-10-24):** la venta sugiere la constancia vigente del cliente; aplicarla exige `TaxExemptionsApply`. El consumidor final no admite exención.
 > **Ajuste por SPEC 93 (2026-10-24):** la pantalla y el ticket muestran el bloque de totales de SPEC 93. Las retenciones del cliente se aplican solas; el consumidor final no tiene.
 > **Ajuste por SPEC 92 (2026-10-24):** el punto de venta registra devoluciones parciales (`POST /PointOfSale/returns`), con reembolso en efectivo desde la caja si está activa.
-> **Ajuste por SPEC 83:** los documentos dejan de exigir un lead. `LeadCommercialDocuments.LeadId` pasa a opcional y se agrega `Origin` (`Lead = 1`, `PointOfSale = 2`).
+> **Cambia SPEC 83:** los documentos dejan de exigir un lead. `LeadCommercialDocuments.LeadId` pasa a opcional y se agrega `Origin` (`Lead = 1`, `PointOfSale = 2`).
 
 ---
 
@@ -31,7 +33,7 @@
    - `false`: el punto de venta solo cobra. No hay apertura ni cierre.
    - `true`: para cobrar en el punto de venta, el usuario debe tener una **sesión de caja abierta** (`CashSessions`) en una **caja** (`CashRegisters`, por empresa, con su almacén predeterminado). La apertura registra el fondo inicial. El cierre registra lo contado por método de pago. El sistema compara lo esperado (fondo + cobros − vueltos − retiros) contra lo contado y guarda la diferencia. También se registran **entradas y retiros** de efectivo con concepto. Una sesión cerrada no se modifica.
    - Con la caja activa, los cobros hechos fuera del punto de venta (SPEC 86) no se exigen en caja, salvo que se marquen como cobro en caja.
-7. **Almacén del punto de venta:** la venta descuenta del almacén de la caja o, sin caja, del almacén predeterminado del usuario o de la empresa (SPEC 85). La línea muestra la existencia y avisa si está bajo el mínimo.
+7. **Almacén del punto de venta:** la venta descuenta del almacén de la caja o, sin caja, del almacén predeterminado de la empresa (SPEC 85). La línea muestra la existencia y avisa si está bajo el mínimo.
 8. **Impresión:** al cobrar, devuelve el PDF de la factura (SPEC 84) en tamaño carta o A4 y, opcionalmente, un **ticket** de 80 mm (`CompanyCustomers.PosReceiptFormat`: `Document` o `Ticket80mm`) con el mismo contenido resumido, el código público y el código de barras.
 9. **Permisos:** `PointOfSale` (vender y cobrar), `CashSessions` (abrir y cerrar su propia caja), `CashSessionsAdmin` (ver todas las sesiones y reabrir con motivo). Descuentos: límite por rol con solicitud de aprobación (SPEC 98).
 
@@ -53,7 +55,7 @@
 9. Punto de venta (permiso `PointOfSale`):
    - `GET /api/v1/PointOfSale/lookup?code=`: busca por número, código público o código de barras. Devuelve qué es (cotización, proforma, factura o producto), su estado y la acción posible (`Convert`, `Collect`, `AddLine`).
    - `POST /api/v1/PointOfSale/sales`: crea el borrador de venta directa `{ personId? (por defecto consumidor final), recipientDisplayName?, recipientDisplayTaxId?, warehouseId?, lines[] }`. `PUT /sales/{id}` lo actualiza.
-   - `POST /api/v1/PointOfSale/sales/from-document/{documentId}`: borrador de factura desde una cotización o proforma vigente. `POST /from-document/{documentId}/refresh-prices`: venta nueva con precios actuales.
+   - `POST /api/v1/PointOfSale/sales/from-document/{documentId}`: borrador de factura desde una cotización o proforma vigente. `POST /api/v1/PointOfSale/sales/from-document/{documentId}/refresh-prices`: venta nueva con precios actuales.
    - `POST /api/v1/PointOfSale/sales/{id}/checkout` `{ paymentTerms, payments[{ paymentMethodId, amount, receivedAmount?, reference? }], installmentPlan? }`: emite, aprueba, descuenta y cobra en una transacción. Devuelve la factura, el vuelto y los enlaces al PDF y al ticket.
    - `POST /api/v1/PointOfSale/invoices/{documentId}/collect` `{ payments[] }`: cobra el saldo de una factura emitida.
    - `GET /api/v1/PointOfSale/sales/{id}/ticket`: ticket de 80 mm (PDF).
@@ -61,7 +63,7 @@
 11. Administración: `GET/POST/PUT/DELETE /api/v1/CashRegisters`.
 
 **C. Menú**
-12. Clientes: `PointOfSale` → `/customers/point-of-sale`, `CashSessions` → `/customers/cash-sessions`. Administración: `CashRegisters` → `/administration/cash-registers`.
+12. Clientes: `PointOfSale` → `/customers/point-of-sale`, `CashSessions` → `/customers/cash-sessions`. Administración: `CashRegisters` → `/administration/cash-registers`. Recurso sin pantalla: `CashSessionsAdmin`. Seed de permisos: SuperAdmin, Admin y Manager con todo; Supervisor lectura; roles de venta con `PointOfSale` y `CashSessions`.
 
 **Out of scope:**
 - Funcionamiento sin conexión (offline) y hardware fiscal (impresoras fiscales, gavetas).
@@ -72,7 +74,7 @@
 | Código | HTTP | Cuándo |
 |---|---|---|
 | `DOCUMENT_EXPIRED` | 409 | Convertir una cotización o proforma vencida |
-| `DOCUMENT_NOT_CONVERTIBLE` | 409 | El documento no está vigente o su tipo no se convierte a factura |
+| `DOCUMENT_NOT_CONVERTIBLE` | 409 | El documento no está emitido o aprobado, o su tipo no se convierte a factura |
 | `INVOICE_NOT_COLLECTABLE` | 409 | Cobrar algo que no es una factura emitida con saldo |
 | `PAYMENT_INSUFFICIENT` | 400 | Los pagos al contado no cubren el total |
 | `FINAL_CONSUMER_CREDIT_NOT_ALLOWED` | 409 | Venta a crédito al consumidor final |
@@ -99,7 +101,7 @@
 
 ## Seed de desarrollo (Nicaragua, datos simulados)
 
-Solo en `Development`, solo para `JOIN-001`, idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
+Solo en `Development`, solo para la empresa de desarrollo `JOIN-NI-001` (SPEC 100), idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
 
 - Persona "Consumidor final" como `FinalConsumerPersonId`.
 - Cajas `CAJA-MGA-01` (almacén `BOD-MGA`) y `CAJA-LEO-01` (almacén `SUC-LEO`), con `RequireCashSession = false`.

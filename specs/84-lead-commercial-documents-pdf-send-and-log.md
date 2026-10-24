@@ -4,6 +4,7 @@
 > **Depends on:** SPEC 49-post (almacenamiento), SPEC 71 (`IHtmlSanitizer`, plantillas de correo), **SPEC 72** (envío de correos e historial de la persona), **SPEC 81** (configuración: encabezado, pie, leyendas, emisor y logo), **SPEC 83** (documentos, código público, código de barras y bitácora). Rama de trabajo: `spec-84-lead-commercial-documents-pdf-send-and-log`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Que cada documento comercial se descargue en PDF (con encabezado, pie, leyendas, logo, número, código público y código de barras) y se envíe al cliente por correo, tanto proformas y cotizaciones como facturas, y que cada descarga y envío quede en la bitácora del documento.
+> **Ajuste por revisión de consistencia (2026-10-24):** la entrada en la línea de tiempo del lead (regla 5) aplica solo a documentos con lead.
 > **Ajuste por SPEC 94 (2026-10-24):** el PDF de un documento exento imprime la leyenda con los datos de la constancia.
 > **Ajuste por SPEC 93 (2026-10-24):** el bloque de líneas y totales del PDF sigue la presentación de SPEC 93 (importe neto por línea, IVA por tasa, total con IVA, retenciones, total a pagar y monto en letras).
 > **Ajuste por SPEC 88 (2026-10-24):** el PDF imprime los datos de la numeración autorizada y el equivalente en moneda local cuando corresponde.
@@ -20,7 +21,7 @@
 5. **Registro de cada envío:**
    - en la **bitácora del documento** (`LeadCommercialDocumentEvents`, SPEC 83): `Sent` con destinatarios, asunto, id del correo y usuario, o `SendFailed` con el error;
    - en el **historial de correos de la persona** (`PersonEmailMessages`, SPEC 72), con el adjunto `SourceKind = LeadCommercialDocument = 3`;
-   - en la **línea de tiempo del lead** (SPEC 61).
+   - en la **línea de tiempo del lead** (SPEC 61), si el documento tiene lead.
 6. **Registro de cada descarga:** `PdfDownloaded` en la bitácora, con usuario y fecha. Las vistas previas de borradores no se registran.
 7. **El primer envío marca el documento** con `FirstSentAt` y `SendCount`, para filtrarlo en la lista ("enviado / no enviado").
 
@@ -84,6 +85,6 @@
 
 ## Seed de desarrollo (Nicaragua, datos simulados)
 
-Solo en `Development`, solo para `JOIN-001`, idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
+Solo en `Development`, solo para la empresa de desarrollo `JOIN-NI-001` (SPEC 100), idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
 
 - PDF ya generado para los documentos emitidos del seed y un evento `Sent` simulado a `compras@farmaciasanmartin.example` en la bitácora (sin envío real).

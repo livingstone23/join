@@ -4,6 +4,7 @@
 > **Depends on:** **SPEC 57** (productos), SPEC 81 (`CompanyCustomers`), **SPEC 82** (grupos fiscales y `TaxCalculator`), **SPEC 83** (documentos), SPEC 84 (PDF), SPEC 89 (punto de venta), SPEC 91 (libros), **SPEC 93** (presentación de totales), SPEC 94 (exenciones). Rama de trabajo: `spec-95-product-unit-of-measure-and-tax-inclusive-price`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Que cada empresa defina sus unidades de medida y que el producto tenga una unidad **opcional**. Que el precio del producto se registre **con o sin IVA**, según un parámetro del producto, y que el producto muestre y guarde su precio sin IVA, el valor del IVA y el precio con IVA, para usarlo en documentos, cobros e informes.
+> **Ajuste por revisión de consistencia (2026-10-24):** la lista de precios usa el recurso `Products` (`CanRead`, exportar con `CanExport`); seed en `JOIN-NI-001` con precios en NIO.
 > **Origen:** pedido del usuario (2026-10-24): "crear las unidades de medida por empresa y crearlo como una propiedad al registrar el producto, que no sea obligatoria"; "en la parametrización del producto se indica si se muestra con IVA o sin IVA, es decir, si se le registra IVA como precio de venta, al generar los documentos reflejarlo en las áreas correspondientes a precio y a cobros a aplicar"; "una sección, si se requiere, del valor del IVA del producto por si requiere llenar luego un informe".
 
 ---
@@ -71,7 +72,7 @@
 
 ## Seed de desarrollo (Nicaragua, datos simulados)
 
-Solo en `Development`, solo para `JOIN-001`, idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
+Solo en `Development`, solo para la empresa de desarrollo `JOIN-NI-001` (SPEC 100), idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
 
 - Unidades: Unidad (`UND`), Caja (`CJ`), Paquete (`PQ`), Kilogramo (`KG`, decimales), Libra (`LB`, decimales), Litro (`LT`, decimales), Galón (`GAL`, decimales), Metro (`M`, decimales), Hora (`H`, decimales), Servicio (`SERV`).
 - Productos de mostrador (`PAP-80`, `LEC-CB`, `GAV-DIN`) con `UND` y precio con IVA; equipos (`LAP-14`, `IMP-TER80`) con `UND` y precio sin IVA; servicios (`CAP-HR` en `H`, `SOP-12` y `MNT-PRE` en `SERV`) sin IVA incluido.

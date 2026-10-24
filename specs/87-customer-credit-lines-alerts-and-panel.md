@@ -4,6 +4,7 @@
 > **Depends on:** SPEC 43-post (menú y permisos por rol), SPEC 55 (clientes), SPEC 56 (moneda base), SPEC 72 (correo), **SPEC 81** (configuración en Administración), **SPEC 83** (documentos), **SPEC 85** (alertas de Leads compartidas: `LeadAlerts`, destinatarios y entregas), **SPEC 86** (ventas a crédito y pagos). Rama de trabajo: `spec-87-customer-credit-lines-alerts-and-panel`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Definir una línea de crédito por cliente que las ventas a crédito reducen y los pagos restituyen, con un saldo mínimo que genera una advertencia, un historial de todos sus movimientos, alertas que se envían a los usuarios configurados y un panel de crédito visible para un rol específico del módulo de Leads.
+> **Ajuste por revisión de consistencia (2026-10-24):** (1) **Primera venta a crédito a quien aún no es cliente:** se puede crear la línea de crédito desde la persona (`POST /Persons/{id}/credit-line`), lo que activa al cliente (`ICustomerActivationService`, fuente `CustomerStatusSource.CreditLine = 7`). (2) `EmailStatus` vive en `LeadAlertDeliveries` (SPEC 85). (3) Tipos de alerta con los valores de SPEC 85. (4) Líneas, movimientos y cargos registran su `IBaseCurrencyAmountSource`. (5) `CustomerCreditMovements.MovementType`: `Charge = 1`, `Payment = 2`, `PaymentReversal = 3`, `CreditNote = 4`, `LimitChange = 5`. (6) Seed en `JOIN-NI-001` (base NIO) con roles de desarrollo de SPEC 100.
 > **Ajuste (2026-10-24, decisión del usuario):** sin servicio en segundo plano por ahora. Solo alertas disparadas por acciones; las de cuotas por fecha pasan al proceso programado con Hangfire (`specs/PROCESSES.md`).
 > **Ajuste por SPEC 92 (2026-10-24):** el movimiento `CreditNote` solo ocurre cuando la nota de crédito se **aplica a la factura**. Una devolución reembolsada en efectivo no altera la línea de crédito.
 > **Ajuste por SPEC 85 (2026-10-24):** las alertas de crédito usan la infraestructura compartida de SPEC 85 (`LeadAlerts` con categoría `Credit`, `LeadAlertRecipientRules`, `LeadAlertDeliveries`) en lugar de tablas `CreditAlert…` propias.
@@ -25,7 +26,7 @@
 4. **Bloqueo al superar el disponible:** emitir una factura a crédito por más del disponible → 409 `CREDIT_LIMIT_EXCEEDED` (devuelve el disponible y el faltante). Un usuario con el permiso `CreditOverride` (`CanExecute`) puede emitirla igual indicando un motivo; queda registrado quién la autorizó y por qué, y se genera la alerta `LimitExceeded`.
 5. **Advertencia por saldo mínimo:** cuando un movimiento deja el disponible **en el umbral o por debajo** (ej. ≤ 10.000), se genera la alerta `ThresholdReached`. No se repite mientras el disponible siga por debajo; si vuelve a subir por encima del umbral, la siguiente bajada genera otra.
 6. **Alertas** (`LeadAlerts` con categoría `Credit`, SPEC 85): `ThresholdReached`, `LimitExceeded`, `InstallmentOverdue` (cuota vencida sin pagar, SPEC 86) e `InstallmentDueSoon` (vence en `N` días). Estados: `Open` → `Acknowledged` (vista por un usuario, con fecha) → `Resolved` (automática cuando la causa desaparece: el disponible supera el umbral o la cuota se paga).
-7. **Destinatarios configurables en Administración** (`LeadAlertRecipientRules`, SPEC 85), por tipo de alerta: usuarios concretos y/o un **rol**. Opción: incluir siempre al responsable de cobro de la factura (SPEC 86). Cada alerta nueva se registra para sus destinatarios y se les **envía un correo** (`IEmailService`) con el cliente, el motivo y los montos. El fallo del correo no bloquea la operación y queda en la alerta (`EmailStatus`).
+7. **Destinatarios configurables en Administración** (`LeadAlertRecipientRules`, SPEC 85), por tipo de alerta: usuarios concretos y/o un **rol**. Opción: incluir siempre al responsable de cobro de la factura (SPEC 86). Cada alerta nueva se registra para sus destinatarios y se les **envía un correo** (`IEmailService`) con el cliente, el motivo y los montos. El fallo del correo no bloquea la operación y queda en la entrega de la alerta (`LeadAlertDeliveries.EmailStatus`, SPEC 85).
 8. **Panel de crédito** (`CreditPanel`): una opción de menú del módulo Clientes. **Solo la ven los roles a los que la empresa da permiso** (mecanismo actual `RoleSystemOption`; el seed se lo da a SuperAdmin, Admin y Manager, y la empresa lo asigna a otro rol, ej. "Cobranza"). Muestra:
    - mis alertas abiertas (las del usuario y las de sus roles);
    - clientes en advertencia o sobre el límite (disponible, límite, umbral, % usado);
@@ -44,6 +45,7 @@
 
 **B. Endpoints**
 5. Clientes (permiso `CustomerCreditLines`): `GET /api/v1/Customers/{id}/credit-line`, `PUT` (crear o modificar límite y umbral, con `reason`, que genera `LimitChange`), `POST /deactivate`, `GET /api/v1/Customers/{id}/credit-line/movements` (historial paginado, exportable).
+5.1 `POST /api/v1/Persons/{id}/credit-line` (permiso `CustomerCreditLines`, `CanCreate`): crea la línea de crédito de una persona que todavía no es cliente y la activa como cliente (`CustomerStatusSource.CreditLine = 7`) en la misma transacción.
 6. Lista: `GET /api/v1/CustomerCreditLines?status=all|warning|exceeded&search=` (paginado).
 7. Panel (permiso `CreditPanel`): `GET /api/v1/CreditPanel/summary`. Las alertas se leen y se marcan como vistas con los endpoints compartidos de SPEC 85 (`GET /api/v1/LeadAlerts?category=credit`, `POST /api/v1/LeadAlerts/{id}/acknowledge`).
 8. Administración: las reglas de destinatarios de los tipos de crédito se configuran en `GET/PUT /api/v1/LeadAlertRecipientRules` (SPEC 85).
@@ -71,7 +73,7 @@
 
 1. Línea de 50.000 con umbral 10.000: una factura a crédito de 38.000 deja 12.000 disponibles y no alerta. Otra de 3.000 deja 9.000 y genera `ThresholdReached` para los destinatarios configurados, en el panel y por correo.
 2. Una factura de 15.000 con 9.000 disponibles → 409 `CREDIT_LIMIT_EXCEEDED`. Con `CreditOverride` y motivo se emite, y el historial registra quién la autorizó.
-3. Un pago de 5.000 sube el disponible a 14.000 y resuelve la alerta de umbral.
+3. Partiendo del estado del criterio 1 (9.000 disponibles, sin la factura del criterio 2), un pago de 5.000 sube el disponible a 14.000 y resuelve la alerta de umbral.
 4. El historial muestra cada cargo, pago, reversión, nota de crédito y cambio de límite con el disponible resultante.
 5. Un usuario con un rol sin permiso `CreditPanel` no ve la opción en el menú y la API responde 403. Al dar el permiso a ese rol, lo ve.
 6. Una cuota vencida aparece en el panel como vencida (calculado al leer). La alerta `InstallmentOverdue` se prueba con el proceso programado (pendiente).
@@ -85,8 +87,8 @@
 
 ## Seed de desarrollo (Nicaragua, datos simulados)
 
-Solo en `Development`, solo para `JOIN-001`, idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
+Solo en `Development`, solo para la empresa de desarrollo `JOIN-NI-001` (SPEC 100), idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
 
 - Líneas de crédito: Farmacia San Martín C$ 50.000 con umbral C$ 10.000 y plazo 30 días; Ferretería El Progreso C$ 60.000 con umbral C$ 12.000. El saldo de la factura de SPEC 86 deja a Ferretería El Progreso con su historial de cargo y pago.
-- Reglas de alerta de crédito: `ThresholdReached` y `LimitExceeded` al rol Manager; `InstallmentOverdue` al responsable de cobro.
-- Permiso `CreditPanel` para un rol de ejemplo "Cobranza" (si la empresa de desarrollo lo tiene).
+- Alertas de crédito: `ThresholdReached` y `LimitExceeded` con reglas al rol Manager; `InstallmentOverdue` con `IncludeResponsibleUser = true` en `LeadAlertTypeSettings` y regla al rol Cobranza.
+- Permiso `CreditPanel` para el rol de desarrollo "Cobranza" (SPEC 100).

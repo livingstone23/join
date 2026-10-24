@@ -4,6 +4,7 @@
 > **Depends on:** SPEC 49-post (almacenamiento), SPEC 55 (clientes), **SPEC 81** (`CompanyCustomers`), **SPEC 82** (impuestos y grupos fiscales), **SPEC 83** (documentos y bitácora), SPEC 84 (PDF), **SPEC 85** (alertas de Leads), SPEC 88 (perfil fiscal), SPEC 89 (punto de venta), SPEC 91 (libros), SPEC 92 (notas de crédito), **SPEC 93** (presentación de totales). Rama de trabajo: `spec-94-controlled-tax-exemptions`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Permitir facturas (y cotizaciones, proformas y notas de crédito) **exentas de impuestos** para clientes exonerados, solo con una **constancia de exoneración adjunta**, aprobada, vigente y aplicada por un usuario con permiso. Además, cerrar la vía de quitar el IVA cambiando el grupo fiscal de una línea sin control.
+> **Ajuste por revisión de consistencia (2026-10-24):** (1) La leyenda de exención es una leyenda del tipo factura con `Condition = WhenExempt` (SPEC 81) y variables `Exencion.*`. (2) Permisos: `CustomerTaxExemptions` (constancias, opción de menú), `TaxExemptionApprovals` (bandeja de aprobación, opción de menú; en este documento "`TaxExemptionsApprove`" = este recurso), `TaxExemptionsApply` y `TaxGroupOverride` (recursos sin pantalla, `CanExecute`). El reporte de ventas exentas usa `[PermissionResource("TaxBooks")]`. (3) Al aprobar o rechazar, quien registró recibe `ExemptionResolved` (SPEC 85). (4) `CustomerTaxExemptions.Status`: `Pending = 1`, `Approved = 2`, `Rejected = 3`, `Revoked = 4`. (5) Seed en `JOIN-NI-001`.
 > **Ajuste (2026-10-24, decisión del usuario):** el aviso de vencimiento por fecha pasa al proceso programado (Hangfire).
 > **Origen:** pedido del usuario (2026-10-24): "considera que algunas facturas podrán ser exentas de impuestos y que esto esté sujeto a un control y permiso con un documento que se adjunte".
 
@@ -50,7 +51,7 @@
 15. Administración: `GET/POST/PUT/DELETE /api/v1/TaxExemptionTypes` (`/administration/tax-exemption-types`).
 
 **C. Menú**
-16. Clientes: `TaxExemptions` → `/customers/tax-exemptions` (constancias por estado; bandeja de pendientes para quien aprueba).
+16. Clientes: `CustomerTaxExemptions` → `/customers/tax-exemptions` (constancias por estado), `TaxExemptionApprovals` → `/customers/tax-exemption-approvals` (bandeja de quien aprueba). Recursos sin pantalla: `TaxExemptionsApply`, `TaxGroupOverride`.
 
 **Out of scope:**
 - Verificar la constancia contra un servicio de la autoridad tributaria.
@@ -90,7 +91,7 @@
 
 ## Seed de desarrollo (Nicaragua, datos simulados)
 
-Solo en `Development`, solo para `JOIN-001`, idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
+Solo en `Development`, solo para la empresa de desarrollo `JOIN-NI-001` (SPEC 100), idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
 
 - Tipos de exoneración: "Exoneración del MHCP", "Zona franca", "Organización sin fines de lucro", "Misión diplomática", "Institución del Estado".
 - Cliente nuevo **Asociación Salud para Todos** (`J0310000000204`, ficticio, organización sin fines de lucro) con constancia aprobada `EXO-SIM-2026-0101` (archivo PDF de ejemplo, vigente hasta el 31/12/2026) y una factura exenta emitida.

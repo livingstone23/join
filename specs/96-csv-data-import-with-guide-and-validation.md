@@ -1,9 +1,11 @@
 # SPEC 96 — Carga de datos por CSV: guía descargable, plantillas, validación previa y carga confirmada
 
 > **Status:** Borrador
-> **Depends on:** SPEC 49-post (almacenamiento), SPEC 54 y 55 (personas y clientes), **SPEC 57** (productos), SPEC 58 (identificación), **SPEC 81** (`CompanyCustomers`), SPEC 82 (grupos fiscales), SPEC 84 (generación de PDF), **SPEC 85** (almacenes y ajustes de inventario), SPEC 87 (líneas de crédito), SPEC 88 (perfil fiscal: validación de RUC), SPEC 93 (retenciones del cliente), **SPEC 95** (unidades y precio con IVA). Rama de trabajo: `spec-96-csv-data-import-with-guide-and-validation`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
+> **Depends on:** SPEC 49-post (almacenamiento), SPEC 54 y 55 (personas y clientes), **SPEC 57** (productos), SPEC 58 (identificación), **SPEC 81** (`CompanyCustomers`), SPEC 82 (grupos fiscales), SPEC 84 (generación de PDF), **SPEC 85** (almacenes y ajustes de inventario), SPEC 87 (líneas de crédito), SPEC 88 (perfil fiscal: validación de RUC), SPEC 90 (costo inicial), **SPEC 95** (unidades y precio con IVA). Rama de trabajo: `spec-96-csv-data-import-with-guide-and-validation`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Que una empresa que empieza a operar cargue sus datos iniciales desde archivos CSV. Desde Administración descarga una **guía** y una **plantilla** por catálogo. En la sección de cada catálogo sube el archivo, el sistema lo **valida completo antes de cargar nada**, muestra los errores por fila y columna, y solo carga cuando el usuario confirma un archivo sin errores.
+> **Valores de enums (revisión de consistencia):** `DataImports.Status`: `Uploaded = 1`, `Validated = 2`, `ValidatedWithErrors = 3`, `Imported = 4`, `Failed = 5`, `Discarded = 6`; `Mode`: `CreateOnly = 1`, `CreateOrUpdate = 2`.
+> **Ajuste por revisión de consistencia (2026-10-24):** (1) Existencias iniciales admiten la columna opcional `UnitCost` (moneda base), que fija `LastCost` con `ProductCostHistory.Source = Import` (SPEC 90). (2) Se quita la dependencia de SPEC 93 (no se usa). (3) Seed en `JOIN-NI-001`.
 > **Origen:** pedido del usuario (2026-10-24): "desde parametrización se pueda bajar una guía de cómo deben ser los CSV por los catálogos posibles a llenar: Productos, Servicios, Personas y Clientes, a menos que me indiques otros, y que en esas secciones se puedan subir, y antes de subir los datos validar, claro, antes de hacer las cargas".
 
 ---
@@ -91,7 +93,7 @@
 
 ## Seed de desarrollo (Nicaragua, datos simulados)
 
-Solo en `Development`, solo para `JOIN-001`, idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
+Solo en `Development`, solo para la empresa de desarrollo `JOIN-NI-001` (SPEC 100), idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
 
 - Plantillas con filas de ejemplo de Nicaragua (productos de mostrador, servicios por hora, personas de Managua y León, clientes con RUC `J0310000000xxx`).
 - Una importación de ejemplo `Imported` (10 productos) y otra `ValidatedWithErrors` para mostrar el informe de errores.

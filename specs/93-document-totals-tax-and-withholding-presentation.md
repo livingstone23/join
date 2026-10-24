@@ -4,6 +4,7 @@
 > **Depends on:** **SPEC 81** (configuración por tipo de documento, `CompanyCustomers`), **SPEC 82** (impuestos, retenciones y `TaxCalculator`), **SPEC 83** (documentos), **SPEC 84** (PDF), SPEC 86 (saldo y pagos), SPEC 87 (crédito), **SPEC 88** (perfil fiscal), SPEC 89 (punto de venta), SPEC 91 (libros), SPEC 92 (notas de crédito). Rama de trabajo: `spec-93-document-totals-tax-and-withholding-presentation`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Que el cliente vea en la cotización, la proforma, la factura (PDF, pantalla y punto de venta) el valor de cada producto o servicio, y al final el IVA **cuantificado por tasa y sumado**, el total con IVA, cada **retención** que le corresponde aplicar y el **total a pagar**. Las retenciones dejan de depender del grupo fiscal del producto y pasan a ser **del cliente** (agente retenedor), aplicadas al documento completo.
+> **Ajuste por revisión de consistencia (2026-10-24):** ajuste por SPEC 95: el precio puede ingresarse con IVA incluido (SPEC 95); `GET` de retenciones del cliente con `CanRead`; "monto del impuesto" en lugar de "cuota"; seed en `JOIN-NI-001`.
 > **Ajuste por SPEC 94 (2026-10-24):** la fila "Exento" incluye las líneas exentas por constancia del cliente.
 > **Origen:** pedido del usuario (2026-10-24): "en la proforma y factura debe poderse ver el valor de los productos y al final, en dependencia del IVA, poder cuantificarse y sumarse para que el cliente a pagar tenga una visión del valor del producto o servicio y las diferentes retenciones que va a pagar".
 
@@ -21,7 +22,7 @@
    | Subtotal neto | Subtotal − descuentos |
    | Exento | Base de las líneas exentas o con tasa 0 |
    | Base gravada IVA 15 % | Una fila por cada tasa usada |
-   | IVA 15 % | Cuota por tasa, sobre la base acumulada (SPEC 82) |
+   | IVA 15 % | Monto del IVA por tasa, sobre la base acumulada (SPEC 82) |
    | **Total con IVA** | Subtotal neto + suma de IVA. Es el valor de la venta |
    | Retención IR 2 % (sobre C$ base) | Una fila por retención, negativa |
    | Retención municipal 1 % (sobre C$ base) | |
@@ -51,12 +52,12 @@
 6. `TaxCalculator` (SPEC 82) devuelve las filas de la regla 2: impuestos por línea (sin retenciones), desglose por tasa, exento, total con IVA, retenciones de documento con su base y total a pagar. Redondeo a 2 decimales por fila (`MidpointRounding.AwayFromZero`).
 
 **C. Endpoints**
-7. `GET/PUT /api/v1/Customers/{id}/withholdings` (permiso `Customers`, `CanUpdate`).
+7. `GET /api/v1/Customers/{id}/withholdings` (`Customers`, `CanRead`) y `PUT` (`Customers`, `CanUpdate`).
 8. `POST /api/v1/LeadCommercialDocuments/{id}/withholdings` y `DELETE /{id}/withholdings/{withholdingId}` (solo `Draft`).
 9. Los DTO de documento, `preview-totals` y el punto de venta devuelven el bloque `Totals` con las filas de la regla 2, y por línea `NetAmount`, `TaxRate`, `IsExempt` y, si el tipo lo pide, `UnitPriceWithTax` y `AmountWithTax`.
 
 **Out of scope:**
-- Ingresar precios con IVA incluido (el precio se ingresa neto; la vista con IVA es solo de presentación).
+- (Ingresar precios con IVA incluido: lo agrega SPEC 95.)
 
 ## Errores
 
@@ -68,7 +69,7 @@
 
 ## Criterios de aceptación
 
-1. Factura a Clínica Las Colinas (agente retenedor con IR 2 % e IMI 1 %, `All`): 2 laptops × C$ 25.000 + instalación C$ 5.000. Muestra subtotal neto C$ 55.000, base gravada IVA 15 % C$ 55.000, IVA C$ 8.250, **total con IVA C$ 63.250**, retención IR 2 % C$ 1.100, retención municipal 1 % C$ 550 y **total a pagar C$ 61.600**, con el monto en letras.
+1. Factura a Clínica Las Colinas (agente retenedor con IR 2 % e IMI 1 %, `All`): 2 laptops (`LAP-14`) × C$ 25.000 + implementación básica (`IMP-BAS`, servicio) C$ 5.000. Muestra subtotal neto C$ 55.000, base gravada IVA 15 % C$ 55.000, IVA C$ 8.250, **total con IVA C$ 63.250**, retención IR 2 % C$ 1.100, retención municipal 1 % C$ 550 y **total a pagar C$ 61.600**, con el monto en letras.
 2. La misma factura a un cliente sin retenciones muestra total con IVA = total a pagar = C$ 63.250.
 3. Una línea exenta aparece con "Exento" y su base en la fila Exento, sin IVA.
 4. Con `ShowLineAmountsWithTax = true`, cada línea muestra precio e importe con IVA (laptop C$ 28.750 por unidad).
@@ -83,7 +84,7 @@
 
 ## Seed de desarrollo (Nicaragua, datos simulados)
 
-Solo en `Development`, solo para `JOIN-001`, idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
+Solo en `Development`, solo para la empresa de desarrollo `JOIN-NI-001` (SPEC 100), idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
 
 - Clínica Médica Las Colinas con retenciones IR 2 % e IMI 1 % (`All`). Su factura del seed queda como el criterio 1.
 - `ShowLineAmountsWithTax = true` en la cotización y la proforma; `false` en la factura.

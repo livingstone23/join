@@ -5,8 +5,9 @@
 > **Date:** 2026-10-24
 > **Objective:** Controlar el estado de cobro de cada factura. Distinguir ventas al contado y a crédito, registrar los pagos con su historial y, en las facturas a crédito, definir un calendario de cuotas que crea recordatorios en el calendario para dar seguimiento a si la persona paga.
 > **Origen:** pedido del usuario (2026-10-24): "quiero llevar control de estados de facturas y, de ser de crédito, un historial… al recibir un pago pueda volver a incrementar la línea de crédito… las facturas de crédito podrán establecer un calendario para llevar controles si la persona paga".
+> **Ajuste por revisión de consistencia (2026-10-24):** (1) `Voided` cubre la factura anulada y la factura devuelta del todo con la nota aplicada (SPEC 92). (2) Anular una factura con pagos exige reembolso (SPEC 83 regla 9). (3) Pagos y cuotas registran su `IBaseCurrencyAmountSource` (SPEC 56). (4) `InvoiceInstallments.Status`: `Pending = 1`, `Partial = 2`, `Paid = 3`. (5) Seed en `JOIN-NI-001` (SPEC 100).
 > **Ajuste por SPEC 92 (2026-10-24):** la nota de crédito parcial aplicada a la factura reduce su saldo; la reembolsada en efectivo no lo cambia y se registra como reembolso (`InvoiceRefunds`).
-> **Ajuste por SPEC 83:** SPEC 83 dejaba "cobros y pagos" fuera de alcance; esta spec los agrega.
+> **Cambia SPEC 83:** SPEC 83 dejaba "cobros y pagos" fuera de alcance; esta spec los agrega.
 
 ---
 
@@ -21,7 +22,7 @@
    | `PartiallyPaid = 2` | Pagos menores que el saldo |
    | `Paid = 3` | Saldo cero |
    | `Overdue` | No se guarda: `Unpaid` o `PartiallyPaid` con alguna cuota vencida (o `DueDate` vencida sin cuotas) |
-   | `Voided = 4` | Factura anulada (nota de crédito, SPEC 83) |
+   | `Voided = 4` | Factura anulada (nota de crédito total, SPEC 83) o devuelta del todo con la nota aplicada a la factura (SPEC 92) |
 
    Una factura **al contado** se emite con un pago automático por el total (método indicado al emitir) y queda `Paid`.
 3. **Saldo** = total − pagos − notas de crédito aplicadas. Nunca negativo: un pago mayor que el saldo → 409 `PAYMENT_EXCEEDS_BALANCE`.
@@ -84,8 +85,8 @@
 
 ## Seed de desarrollo (Nicaragua, datos simulados)
 
-Solo en `Development`, solo para `JOIN-001`, idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
+Solo en `Development`, solo para la empresa de desarrollo `JOIN-NI-001` (SPEC 100), idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
 
 - Métodos de pago: Efectivo, Transferencia, Tarjeta, Cheque.
 - Factura a crédito a Ferretería El Progreso por C$ 45.000 en 3 cuotas mensuales, con un pago de C$ 15.000 por transferencia (referencia "BAC-000123", ficticia), y una cuota vencida para mostrar `Overdue`.
-- Factura al contado a Clínica Las Colinas pagada con tarjeta.
+- Factura al contado a Clínica Médica Las Colinas (criterio 1 de SPEC 93: total a pagar C$ 61.600) pagada con tarjeta.

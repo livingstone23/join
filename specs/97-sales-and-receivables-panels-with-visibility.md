@@ -1,9 +1,10 @@
 # SPEC 97 — Panel de ventas por período y vendedor, y panel de cuentas por cobrar con antigüedad de saldos, con visibilidad por usuario
 
 > **Status:** Borrador
-> **Depends on:** SPEC 43-post (permisos por rol), **SPEC 60** (grupos de venta, líder y alcance de visibilidad), **SPEC 83** (documentos), SPEC 86 (estado de cobro, cuotas, responsable de cobro), SPEC 87 (crédito), SPEC 89 (punto de venta), SPEC 90 (margen), SPEC 92 (devoluciones), SPEC 93 (totales). Rama de trabajo: `spec-97-sales-and-receivables-panels-with-visibility`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
+> **Depends on:** SPEC 43-post (permisos por rol), **SPEC 60** (grupos de trabajo, líder y alcance de visibilidad), **SPEC 83** (documentos), SPEC 86 (estado de cobro, cuotas, responsable de cobro), SPEC 87 (crédito), SPEC 89 (punto de venta), SPEC 90 (margen), SPEC 92 (devoluciones), SPEC 93 (totales). Rama de trabajo: `spec-97-sales-and-receivables-panels-with-visibility`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Dos paneles con reporte exportable: **ventas por período y vendedor**, y **cuentas por cobrar con antigüedad de saldos**. Cada usuario ve **solo lo suyo** (sus ventas o las cuentas que tiene asignadas). Un líder ve su grupo. Un supervisor o gerente, con el permiso adecuado, ve **todo**.
+> **Ajuste por revisión de consistencia (2026-10-24):** (1) `SellerUserId` lo define SPEC 83. (2) Alcance: el propio y el de grupo salen de `ILeadAccessScopeResolver` (SPEC 60: `Own`/`Team`/`Company` según el rol del usuario en su grupo de trabajo); `SalesPanelViewAll` y `ReceivablesViewAll` amplían a toda la empresa. (3) "Grupos de trabajo" (SPEC 60). (4) `ReceivablesAssignment`: `Seller = 1`, `CollectionUser = 2`, `Both = 3`. (5) Roles de desarrollo de SPEC 100. (6) Seed en `JOIN-NI-001`.
 > **Origen:** pedido del usuario (2026-10-24): "el panel y el reporte que un usuario pueda ver; parametrizar que un usuario pueda ver los que tenga asignados y un supervisor o gerente pueda ver todos"; "panel de ventas por período y vendedor, donde los que son vendedores puedan ver solo sus ventas y otros, con los permisos adecuados, ver el total de ventas".
 
 ---
@@ -16,7 +17,7 @@
    | Permiso (recurso) | Ve |
    |---|---|
    | `SalesPanel` | Sus ventas (`SellerUserId` = él) |
-   | `SalesPanel` + líder de un grupo de venta | Las de su grupo |
+   | `SalesPanel` + líder de un grupo de trabajo | Las de su grupo |
    | `SalesPanelViewAll` | Todas las de la empresa |
    | `ReceivablesPanel` | Las cuentas asignadas a él |
    | `ReceivablesPanel` + líder | Las de su grupo |
@@ -42,7 +43,7 @@
 **In:**
 
 **A. Esquema (`Customer`)**
-1. `LeadCommercialDocuments` suma `SellerUserId` (obligatorio en documentos de venta; migración de datos: dueño del lead o `IssuedByUserId`). Índice `(CompanyId, SellerUserId, IssueDate)`.
+1. `LeadCommercialDocuments.SellerUserId` (definido en SPEC 83): índice `(CompanyId, SellerUserId, IssueDate)`.
 2. `CompanyCustomers` suma `ReceivablesAssignment`.
 
 **B. Endpoints**
@@ -76,7 +77,7 @@
 
 ## Seed de desarrollo (Nicaragua, datos simulados)
 
-Solo en `Development`, solo para `JOIN-001`, idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
+Solo en `Development`, solo para la empresa de desarrollo `JOIN-NI-001` (SPEC 100), idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
 
 - Dos vendedores de ejemplo (si existen usuarios de prueba) con facturas del seed asignadas, para mostrar el alcance propio y el total.
 - Facturas a crédito con cuotas vencidas a 15, 45 y 95 días para poblar la antigüedad de saldos.

@@ -4,6 +4,7 @@
 > **Depends on:** SPEC 56 (moneda base y tasas), SPEC 57 (productos), **SPEC 81** (`CompanyCustomers`), **SPEC 83** (documentos), **SPEC 85** (existencias y kardex), SPEC 89 (punto de venta). Rama de trabajo: `spec-90-product-cost-and-margin`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Saber cuánto cuesta cada producto, cuánto se gana en cada venta y cuánto vale el inventario. El costo sale de la **última compra** (orden de compra recibida). Cada línea vendida guarda su costo y su margen.
+> **Ajuste por revisión de consistencia (2026-10-24):** (1) Costos (`LastCost`, `StandardCost`, historial) registran su `IBaseCurrencyAmountSource`. (2) Una línea bajo costo bloqueada responde `DISCOUNT_APPROVAL_REQUIRED` (SPEC 98) con el detalle `SALE_BELOW_COST` por línea. (3) El margen de la ficha se calcula sobre `NetReferencePrice` (SPEC 95). (4) Los reportes usan `[PermissionResource("ProductCosts")]`; sus opciones de menú tienen `ControllerName = "ProductCosts"`. (5) `ProductCostHistory.Source` suma `Import = 3` (SPEC 96). (6) Seed en `JOIN-NI-001` (base NIO).
 > **Ajuste por SPEC 98 (2026-10-24):** la venta bajo costo bloqueada se desbloquea con la solicitud de aprobación de descuento (SPEC 98).
 > **Origen:** pedido del usuario (2026-10-24), punto 3 de la revisión para empezar a operar: "costo de última compra (desde orden de compra) y margen por venta".
 
@@ -26,20 +27,20 @@
 
 **A. Esquema**
 1. `Catalog.Products` suma `LastCost?`, `LastCostDate?`, `LastCostSourceId?`, `StandardCost?` (todos `numeric(18,4)` salvo fecha y id).
-2. `Customer.ProductCostHistory` (solo inserción): `ProductId`, `PreviousCost?`, `NewCost`, `Source` (`PurchaseOrder = 1`, `Manual = 2`), `SourceDocumentId?`, `SourceNumber?`, `UserId`, `OccurredAt`.
+2. `Customer.ProductCostHistory` (solo inserción): `ProductId`, `PreviousCost?`, `NewCost`, `Source` (`PurchaseOrder = 1`, `Manual = 2`, `Import = 3`), `SourceDocumentId?`, `SourceNumber?`, `UserId`, `OccurredAt`.
 3. `Customer.LeadCommercialDocumentLines` suma `UnitCost?`, `CostAmount?`, `MarginAmount?`. `LeadCommercialDocuments` suma `CostTotal?` y `MarginTotal?`.
 4. `Customer.CompanyCustomers` suma `WarnSaleBelowCost` y `BlockSaleBelowCost`.
 
 **B. Endpoints**
 5. `PUT /api/v1/Products/{id}/standard-cost` `{ standardCost, reason? }` (permiso `ProductCosts`, `CanUpdate`).
 6. `GET /api/v1/Products/{id}/cost-history` (permiso `ProductCosts`).
-7. `GET /api/v1/Products` y `GET /{id}` suman `EffectiveCost`, `LastCost`, `LastCostDate`, `StandardCost` y el margen sobre `ReferencePrice`, solo si el usuario tiene `ProductCosts`.
+7. `GET /api/v1/Products` y `GET /{id}` suman `EffectiveCost`, `LastCost`, `LastCostDate`, `StandardCost` y el margen sobre `NetReferencePrice` (SPEC 95), solo si el usuario tiene `ProductCosts`.
 8. Reportes (permiso `ProductCosts`, exportables a CSV con `CanExport`):
    - `GET /api/v1/Reports/sales-margin?from=&to=&groupBy=product|category|seller|customer|warehouse|day`: ventas netas, costo, margen y % de margen (facturas menos notas de crédito).
    - `GET /api/v1/Reports/inventory-valuation?warehouseId=&asOf=`: existencia × costo efectivo por producto y almacén, con total. `asOf` reconstruye la existencia desde el kardex (SPEC 85) y usa el costo vigente en esa fecha según el historial.
 
 **C. Menú**
-9. Clientes: `SalesMarginReport` → `/customers/reports/sales-margin`, `InventoryValuationReport` → `/customers/reports/inventory-valuation`. Permiso nuevo `ProductCosts`: SuperAdmin, Admin y Manager.
+9. Clientes: `SalesMarginReport` → `/customers/reports/sales-margin`, `InventoryValuationReport` → `/customers/reports/inventory-valuation`. Permiso nuevo `ProductCosts`: SuperAdmin, Admin y Manager. Ambas opciones con `ControllerName = \"ProductCosts\"`; `ProductCosts` también es el recurso de los endpoints de costo.
 
 **Out of scope:**
 - Costo promedio ponderado, FIFO y costos de importación prorrateados (flete, aduana): módulo completo de Inventario.
@@ -49,11 +50,11 @@
 | Código | HTTP | Cuándo |
 |---|---|---|
 | `INVALID_COST` | 400 | Costo negativo |
-| `SALE_BELOW_COST` | 409 | Línea bajo costo con `BlockSaleBelowCost` y sin autorización |
+| `DISCOUNT_APPROVAL_REQUIRED` | 409 | Línea bajo costo con `BlockSaleBelowCost` sin aprobación (detalle por línea `SALE_BELOW_COST`, SPEC 98) |
 
 ## Criterios de aceptación
 
-1. Recibir una orden de compra en USD con precio 10,00 y tasa 36,6243 deja `LastCost` = C$ 366,24 y un registro en el historial.
+1. Recibir una orden de compra en USD con precio 10,00 y tasa 36,6243 deja `LastCost` = C$ 366,2430 (se muestra 366,24; base NIO de `JOIN-NI-001`) y un registro en el historial.
 2. Una factura emitida guarda el costo y el margen por línea. Cambiar el costo después no altera esa factura.
 3. Un usuario sin `ProductCosts` no ve costos en productos, documentos, punto de venta ni reportes (las columnas no vienen en la respuesta).
 4. El reporte de margen de un período cuadra con la suma de las líneas de facturas menos notas de crédito.
@@ -66,6 +67,6 @@
 
 ## Seed de desarrollo (Nicaragua, datos simulados)
 
-Solo en `Development`, solo para `JOIN-001`, idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
+Solo en `Development`, solo para la empresa de desarrollo `JOIN-NI-001` (SPEC 100), idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
 
 - `LastCost` de los productos con existencias tomado de la orden de compra del seed (en USD convertidos a NIO), `StandardCost` en los servicios (`CAP-HR`, `SOP-12`, `MNT-PRE`) y las facturas del seed con costo y margen por línea.

@@ -5,7 +5,7 @@ Procesos automáticos que generan las specs 81–98. Se dividen en dos grupos (d
 - **Disparados por una acción:** ocurren dentro de la misma operación del usuario (o justo después del commit, en el caso del correo). Se implementan con cada spec.
 - **Programados por tiempo:** dependen del paso del tiempo, no de una acción. **Pendientes:** se prepararán con Hangfire (pendiente abierto de SPEC 44). Mientras tanto, las pantallas calculan el estado al leer (vencido, días que faltan) sin generar alertas.
 
-Las alertas usan la infraestructura compartida de SPEC 85 (`LeadAlerts`, destinatarios por usuario o rol, panel + correo).
+Las alertas usan la infraestructura compartida de SPEC 85 (`LeadAlerts`, tabla única de tipos y categorías en su regla 13, destinatarios por reglas o calculados, panel + correo).
 
 ## 1. Disparados por una acción
 
@@ -28,6 +28,9 @@ Las alertas usan la infraestructura compartida de SPEC 85 (`LeadAlerts`, destina
 | A15 | Resolver una solicitud de descuento | Aplica o revierte los descuentos | `DiscountApprovalResolved` al solicitante | 98 |
 | A16 | Cambiar la tasa de un impuesto | Recalcula la sección de precio de los productos con ese impuesto | — | 95 |
 | A17 | Cobrar en el punto de venta | Emite, aprueba, descuenta existencias y registra pagos en una transacción (A2–A5) | Las de A2, A3 y A5 | 89 |
+| A18a | Emitir una nota de entrega con `StockEffect = Out` | Salida de almacén (`DeliveryIssue`) | `LowStock`/`OutOfStock` | 85 |
+| A18b | Aprobar o rechazar una constancia de exoneración | Cambia su estado | `ExemptionResolved` a quien la registró | 94 |
+| A18c | Anular una orden de compra aprobada o una nota de entrega con salida | Movimiento inverso (`PurchaseReversal`/`DeliveryReversal`) | `LowStock`/`OutOfStock` o su resolución | 85 |
 | A18 | Cualquier alerta nueva | Correo a sus destinatarios después del commit | — | 85 |
 
 ## 2. Programados por tiempo (pendientes, Hangfire)
@@ -38,7 +41,7 @@ Las alertas usan la infraestructura compartida de SPEC 85 (`LeadAlerts`, destina
 | T2 | Cuotas por vencer | Cuotas que vencen en los próximos `N` días | `InstallmentDueSoon` | 86, 87 |
 | T3 | Numeración por vencer | Autorizaciones con fecha límite en `D` días | `NumberingRangeExpiring` | 88 |
 | T4 | Constancias por vencer | Constancias aprobadas que vencen en `N` días | `ExemptionExpiring` | 94 |
-| T5 | Solicitudes de descuento vencidas | Solicitudes sin resolver después de `DiscountRequestExpiryHours` | Aviso al solicitante | 98 |
-| T6 | Documentos vencidos | Cotizaciones y proformas cuya vigencia venció | Opcional: aviso al vendedor | 83 |
+| T5 | Solicitudes de descuento vencidas | Solicitudes sin resolver después de `DiscountRequestExpiryHours` | `DiscountRequestExpired` al solicitante | 98 |
+| T6 | Documentos vencidos | Cotizaciones y proformas cuya vigencia venció | `DocumentExpired` al vendedor (opcional, `IsEnabled` del tipo) | 83 |
 
 Al preparar Hangfire, cada proceso programado debe ser idempotente (no duplicar alertas abiertas, gracias al índice único de `LeadAlerts`) y ejecutarse una sola vez aunque haya varias instancias de la API.

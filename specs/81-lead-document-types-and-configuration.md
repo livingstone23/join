@@ -5,6 +5,7 @@
 > **Date:** 2026-10-24
 > **Objective:** Dar a Leads una función **básica** de documentos comerciales (cotizaciones, proformas, facturas, órdenes de compra…) que se parametriza en **Administración**: qué tipos de documento existen, cómo se numera cada uno, su encabezado y pie de página, sus leyendas y qué pasa al aprobarlo. Cuando existan los módulos completos (Ventas, Facturación, Productos), esta función se desconecta y se conectan aquellos.
 > **Origen:** pedido del usuario (2026-10-24): "quiero que todo lo que creemos nuevo esté dentro de la sección de Leads y parametrizable en la sección de Administración, pero que una vez que estén los módulos nuevos esto lo podamos desconectar y conectar los sistemas más completos… creemos una entidad `DocumentTypes` y luego una entidad `LeadDocumentTypeConfiguration`". Serie: **81** (tipos y configuración) → **82** (impuestos) → **83** (documentos en el lead) → **84** (PDF, envío y bitácora) → **85** (almacenes y existencias), **87** (línea de crédito) y **86** (estados de factura, crédito y pagos). **999** (`Pospuesto`, no se implementa): módulo Productos con catálogo propio. Front: pendiente (FE-57 en adelante).
+> **Ajuste por revisión de consistencia (2026-10-24):** (1) `LeadCompanySettings` (SPEC 59) se mantiene para lo propio de los leads (códigos, duplicados, identificación al ganar); `CompanyCustomers` reúne la parametrización comercial y fiscal de la empresa; no se fusionan. (2) La clase de dominio se llama `CommercialDocumentType` (tabla `DocumentTypes`) para no chocar con el enum existente `JOIN.Domain.Enums.DocumentType`. (3) Son **siete** tipos (incluido `TRANSFER`, que siembra esta spec; SPEC 85 le suma `StockEffect`). (4) La orden de compra se siembra con `RequiresApproval = true` (aprobar = recibir). (5) Variables y leyendas condicionales para SPEC 88 y 94. (6) El seed de desarrollo va a la empresa `JOIN-NI-001` (SPEC 100).
 > **Ajuste (2026-10-24, decisión del usuario):** la parametrización por empresa vive en `Customer.CompanyCustomers`, extensión 1:1 de la empresa (antes `LeadDocumentSettings`).
 > **Ajuste por SPEC 88 (2026-10-24):** lo que depende del país (impuestos base, identificación tributaria, numeración autorizada por rangos, moneda de referencia, factura electrónica) lo define el perfil fiscal por país de SPEC 88. Con un perfil que exige numeración autorizada, el número sale del rango autorizado y no del correlativo de esta spec.
 > **Ajuste por SPEC 85, 86 y 87 (2026-10-24):** `BaseKind` suma `WarehouseTransfer = 7`. La configuración por tipo suma `StockEffect` (SPEC 85). `CompanyCustomers` suma `AllowNegativeStock` (SPEC 85) e `InstallmentReminderDays` (SPEC 86). Cada campo se define en su spec.
@@ -46,20 +47,20 @@
      - `CanBeSentToCustomer`: se puede enviar por correo (SPEC 84).
      - `ShowsTaxes`: calcula e imprime impuestos (SPEC 82). Por defecto sí, excepto en la nota de entrega.
      - `ConvertibleTo`: a qué tipos se puede convertir (ej. Cotización → Proforma → Factura; Factura → Nota de crédito).
-   - Seed con valores razonables por `BaseKind`: la factura tiene `RequiresApproval`, `ApprovalCompletesLead`, `ApprovalConfirmsCustomer` y `CountsInCustomerHistory`; la cotización tiene `ValidityDays = 15` y las leyendas de ejemplo.
+   - Seed con valores razonables por `BaseKind`: la factura tiene `RequiresApproval`, `ApprovalCompletesLead`, `ApprovalConfirmsCustomer` y `CountsInCustomerHistory`; la **orden de compra** tiene `RequiresApproval` (aprobar = mercancía recibida, SPEC 85) sin efectos sobre el lead ni el cliente; la cotización tiene `ValidityDays = 15` y las leyendas de ejemplo.
 5. **Datos del emisor** (`CompanyCustomers`): razón social, identificación fiscal, dirección, contacto, logo y datos de pago de la empresa que imprimen los documentos. Sin los datos obligatorios no se emite (`LEAD_DOCUMENT_ISSUER_INCOMPLETE`).
-6. **Variables del encabezado, el pie y las leyendas** (sintaxis de SPEC 71, `{{Grupo.Campo}}`): `Emisor.*` (`RazonSocial`, `IdentificacionFiscal`, `Direccion`, `Ciudad`, `Pais`, `Telefono`, `Correo`, `Web`, `Logo`, `InstruccionesPago`), `Receptor.*` (`Nombre`, `Identificacion`, `Direccion`, `Correo`, `CodigoCliente`), `Documento.*` (`Tipo`, `Numero`, `CodigoPublico`, `CodigoBarras`, `FechaEmision`, `ValidoHasta`, `DiasValidez`, `Vencimiento`, `Moneda`, `Total`), `Lead.Codigo`, `Usuario.Nombre`, `Fecha.Hoy`. Una variable desconocida invalida el texto al guardar (`LEAD_DOCUMENT_UNKNOWN_VARIABLE`). El cuerpo del documento (líneas, impuestos y totales) lo arma siempre el sistema (SPEC 84).
+6. **Variables del encabezado, el pie y las leyendas** (sintaxis de SPEC 71, `{{Grupo.Campo}}`): `Emisor.*` (`RazonSocial`, `IdentificacionFiscal`, `Direccion`, `Ciudad`, `Pais`, `Telefono`, `Correo`, `Web`, `Logo`, `InstruccionesPago`), `Receptor.*` (`Nombre`, `Identificacion`, `Direccion`, `Correo`, `CodigoCliente`), `Documento.*` (`Tipo`, `Numero`, `CodigoPublico`, `CodigoBarras`, `FechaEmision`, `ValidoHasta`, `DiasValidez`, `Vencimiento`, `Moneda`, `Total`), `Lead.Codigo`, `Usuario.Nombre`, `Fecha.Hoy`; y, con sus specs, `Autorizacion.*` (`Numero`, `Fecha`, `Rango`, `Vence`; SPEC 88) y `Exencion.*` (`Tipo`, `Numero`, `Entidad`, `Vence`; SPEC 94). Una variable desconocida invalida el texto al guardar (`LEAD_DOCUMENT_UNKNOWN_VARIABLE`). El cuerpo del documento (líneas, impuestos y totales) lo arma siempre el sistema (SPEC 84).
 
 ## Scope
 
 **In:**
 
 **A. Esquema (`Customer`, junto a los leads)**
-1. `DocumentTypes` (`BaseTenantEntity`): `Code` (máx. 30, mayúsculas sin espacios), `Name` (máx. 100), `BaseKind`, `Direction` (`Sale = 1`, `Purchase = 2`, `Internal = 3`), `IsSystem`, `IsActive`, `SortOrder`. Índice único filtrado `(CompanyId, Code)` con `"gcrecord" = 0`.
+1. `DocumentTypes` (`BaseTenantEntity`, clase `CommercialDocumentType`): `Code` (máx. 30, mayúsculas sin espacios), `Name` (máx. 100), `BaseKind`, `Direction` (`Sale = 1`, `Purchase = 2`, `Internal = 3`), `IsSystem`, `IsActive`, `SortOrder`. Índice único filtrado `(CompanyId, Code)` con `"gcrecord" = 0`.
 2. `LeadDocumentTypeConfigurations` (`BaseTenantEntity`): `DocumentTypeId` (índice único filtrado por empresa y tipo), `NumberPrefix` (máx. 20), `NumberLength` (1–10), `NextNumber`, `HeaderHtml?` (`text`), `FooterHtml?` (`text`), `ValidityDays?`, `DueDays?`, `RequiresApproval`, `ApprovalCompletesLead`, `WinLeadReasonId?` (obligatorio si `ApprovalCompletesLead`), `ApprovalConfirmsCustomer`, `CountsInCustomerHistory`, `CanBeSentToCustomer`, `ShowsTaxes`, `IsActive`.
 3. `LeadDocumentTypeYearCounters`: `ConfigurationId`, `Year`, `NextNumber` (con `{YYYY}` el correlativo se reinicia cada año). Índice único `(ConfigurationId, Year)`.
 4. `LeadDocumentTypeConversions`: `FromDocumentTypeId`, `ToDocumentTypeId` (índice único).
-5. `LeadDocumentLegends` (`BaseTenantEntity`): `DocumentTypeId`, `Text` (máx. 300, con variables), `IsDefault`, `SortOrder`, `IsActive`.
+5. `LeadDocumentLegends` (`BaseTenantEntity`): `DocumentTypeId`, `Text` (máx. 300, con variables), `Condition` (`Always = 1`; `WhenExempt = 2`, SPEC 94; `WhenAuthorizedNumbering = 3`, SPEC 88), `IsDefault`, `SortOrder`, `IsActive`. Las leyendas condicionales se imprimen solo si se cumple su condición.
 6. `CompanyCustomers` (`BaseTenantEntity`, **extensión 1:1 de `Common.Companies`** en el esquema `Customer`, índice único por `CompanyId`): toda la parametrización comercial y fiscal de la empresa, para que cambiar de país o de configuración se haga en un solo lugar. Esta spec crea `DocumentsMode`, `IssuerLegalName`, `IssuerTaxId`, `IssuerTaxRegimeId?`, `IssuerAddressLine`, `IssuerCity`, `IssuerRegion?`, `IssuerPostalCode?`, `IssuerCountryCode`, `IssuerPhone?`, `IssuerEmail?`, `IssuerWebsite?`, `LogoStorageKey?`, `LogoContentType?`, `PaymentInstructions?`, `PageSize` (`A4 = 1`, `Letter = 2`). Las specs siguientes le suman sus parámetros (inventario, cobro, país, punto de venta).
 
 **B. Endpoints (Administración)**
@@ -71,7 +72,7 @@
 
 **C. Menú, permisos y seed**
 12. Opciones en el módulo Administración (SPEC 43): `DocumentTypes` → `/administration/document-types`, `LeadDocumentTypeConfigurations` → `/administration/lead-document-configurations`, `LeadDocumentLegends` → `/administration/lead-document-legends`, `CompanyCustomer` → `/administration/company-customer`. Permisos: SuperAdmin y Admin con todo; Manager lectura.
-13. Seed por empresa en `SeedDefaultCatalogsForCompanyAsync` y, para las empresas existentes, en el arranque (solo filas que faltan): los seis tipos, su configuración, las conversiones (`QUOTE→PROFORMA`, `QUOTE→INVOICE`, `PROFORMA→INVOICE`, `INVOICE→CREDIT_NOTE`, `QUOTE→DELIVERY_NOTE`, `INVOICE→DELIVERY_NOTE`), las leyendas de ejemplo de la cotización y `CompanyCustomers` en `Disabled`. Prefijos: `COT-{YYYY}-`, `PRF-{YYYY}-`, `FAC-{YYYY}-`, `NC-{YYYY}-`, `OC-{YYYY}-`, `NE-{YYYY}-`, largo 6. En desarrollo, ver "Seed de desarrollo (Nicaragua, datos simulados)".
+13. Seed por empresa en `SeedDefaultCatalogsForCompanyAsync` y, para las empresas existentes, en el arranque (solo filas que faltan): los siete tipos, su configuración, las conversiones (`QUOTE→PROFORMA`, `QUOTE→INVOICE`, `PROFORMA→INVOICE`, `INVOICE→CREDIT_NOTE`, `QUOTE→DELIVERY_NOTE`, `INVOICE→DELIVERY_NOTE`), las leyendas de ejemplo de la cotización y `CompanyCustomers` en `Disabled`. Prefijos: `COT-{YYYY}-`, `PRF-{YYYY}-`, `FAC-{YYYY}-`, `NC-{YYYY}-`, `OC-{YYYY}-`, `NE-{YYYY}-`, `TRA-{YYYY}-`, largo 6. En desarrollo, ver "Seed de desarrollo (Nicaragua, datos simulados)".
 
 **Out of scope:**
 - El modo `External` (spec futura junto con los módulos completos).
@@ -94,7 +95,7 @@
 
 ## Criterios de aceptación
 
-1. Una empresa nueva recibe los seis tipos con su configuración y queda en `Disabled`. En ese modo, Leads funciona igual que hoy.
+1. Una empresa nueva recibe los siete tipos con su configuración y queda en `Disabled`. En ese modo, Leads funciona igual que hoy.
 2. Una configuración con `{{Documento.Inventado}}` en el pie → 400 con la variable. Un `<script>` → 400.
 3. `ApprovalCompletesLead = true` sin motivo, o con un motivo de uso `Lost` → 400.
 4. Pasar a `Disabled` con documentos creados no borra nada (lo prueba SPEC 83).
@@ -105,7 +106,8 @@
 
 - **Comportamiento por `BaseKind`, no por nombre:** la empresa renombra o crea tipos sin romper las reglas (mismo criterio que `CommunicationChannel.Code`, SPEC 00).
 - **Tablas en el esquema `Customer`** y nombres con prefijo `Lead…`: la función pertenece a Leads y no choca con los módulos futuros. `LeadDocument` ya existe (adjuntos del lead, SPEC 62), por eso los documentos comerciales se llaman `LeadCommercialDocument` (SPEC 83).
-- **Desconexión por modo y no por módulo de menú:** la función vive en el módulo Clientes. El interruptor `Mode` deja preparada la conexión con los módulos completos sin mover datos.
+- **Desconexión por modo y no por módulo de menú:** la función vive en el módulo Clientes. El interruptor `DocumentsMode` deja preparada la conexión con los módulos completos sin mover datos.
+- **`CompanyCustomer` en singular** en la ruta y el recurso: hay una sola fila por empresa (la de la empresa actual); la tabla se llama `CompanyCustomers` como todas.
 
 ## Impacto en el frontend
 
@@ -113,8 +115,8 @@ FE nueva (número pendiente): cuatro pantallas de Administración (tipos de docu
 
 ## Seed de desarrollo (Nicaragua, datos simulados)
 
-Solo en `Development`, solo para `JOIN-001`, idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
+Solo en `Development`, solo para la empresa de desarrollo `JOIN-NI-001` (SPEC 100), idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
 
-- `CompanyCustomers` de `JOIN-001`: `DocumentsMode = Leads`; emisor **JOIN Soluciones Empresariales, S.A.**, RUC `J0310000000001` (ficticio), Km 4 Carretera a Masaya, Managua, `NI`; teléfono +505 2222-0000; correo `facturacion@join.example`; logo de ejemplo; instrucciones de pago "Transferencia a BAC Credomatic C$ 000-000000-0 / USD 000-000000-1 (cuentas ficticias)"; `PageSize = Letter`.
+- `CompanyCustomers` de `JOIN-NI-001`: `DocumentsMode = Leads`; emisor **JOIN Soluciones Empresariales, S.A.**, RUC `J0310000000001` (ficticio), Km 4 Carretera a Masaya, Managua, `NI`; teléfono +505 2222-0000; correo `facturacion@join.example`; logo de ejemplo; instrucciones de pago "Transferencia a BAC Credomatic C$ 000-000000-0 / USD 000-000000-1 (cuentas ficticias)"; `PageSize = Letter`.
 - Leyendas: cotización "Cotización válida por {{Documento.DiasValidez}} días", "Sujeto a existencia", "Precios no incluyen IVA"; factura "Gracias por su compra"; orden de compra "Favor indicar el número de orden en su factura".
-- Encabezado y pie de ejemplo en las seis configuraciones, con logo, RUC y dirección.
+- Encabezado y pie de ejemplo en las siete configuraciones, con logo, RUC y dirección.

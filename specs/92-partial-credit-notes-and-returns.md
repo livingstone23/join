@@ -4,8 +4,9 @@
 > **Depends on:** **SPEC 81** (`CompanyCustomers`, tipos y configuración), **SPEC 83** (documentos y nota de crédito), SPEC 84 (PDF y envío), **SPEC 85** (existencias), **SPEC 86** (pagos y saldo), **SPEC 87** (línea de crédito), SPEC 88 (numeración autorizada), SPEC 89 (punto de venta y caja), SPEC 90 (costo y margen), SPEC 91 (libros). Rama de trabajo: `spec-92-partial-credit-notes-and-returns`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Registrar devoluciones de mercancía (o de servicios no prestados) contra una factura emitida, con una **nota de crédito parcial** por las líneas y cantidades devueltas. Quien la registra elige cómo se liquida: **aplicada a la factura** (baja su saldo y, si la venta fue a crédito, devuelve disponible a la línea de crédito) o **reembolsada en efectivo** (no toca el saldo ni la línea de crédito, y queda indicado que se devolvió en efectivo).
+> **Ajuste por revisión de consistencia (2026-10-24):** (1) **Retenciones en la nota parcial:** la nota copia las retenciones de documento de la factura (SPEC 93) con la misma tasa, aplicada a la base neta devuelta (sin volver a evaluar la base mínima). El monto que baja el saldo (`ApplyToInvoice`) es el total a pagar de la nota (`Total`, neto de retenciones). (2) `RestockAction`: `Restock = 1`, `Discard = 2`. (3) Recurso sin pantalla `CashRefunds` (`CanExecute`). (4) Depende también de SPEC 93. (5) Seed en `JOIN-NI-001`.
 > **Origen:** pedido del usuario (2026-10-24): "crea la opción de poder generar notas de crédito parcial al recibir una devolución, y poder indicar si la nota de crédito parcial reduce el valor de la venta en la factura y permite e incrementa, si tiene línea de crédito, esta; si la devolución es en efectivo no altera la línea de crédito y se indica que fue bajo efectivo la devolución".
-> **Ajuste por SPEC 83:** SPEC 83 solo generaba la nota de crédito total al anular una factura. Esta spec agrega la parcial; la anulación total no cambia.
+> **Cambia SPEC 83:** SPEC 83 solo generaba la nota de crédito total al anular una factura. Esta spec agrega la parcial; la anulación total no cambia.
 
 ---
 
@@ -47,7 +48,7 @@
 9. Administración: `GET/POST/PUT/DELETE /api/v1/ReturnReasons` (`/administration/return-reasons`).
 
 **C. Menú**
-10. Clientes: `SalesReturns` → `/customers/sales-returns` (lista de devoluciones con filtros por fecha, cliente, motivo y forma de liquidación).
+10. Clientes: `SalesReturns` → `/customers/sales-returns` (lista de devoluciones con filtros por fecha, cliente, motivo y forma de liquidación). Recurso sin pantalla: `CashRefunds`.
 
 **Out of scope:**
 - Cambio de producto en el mismo acto (devolver y llevar otro): se hace como devolución más una venta nueva.
@@ -85,7 +86,7 @@
 
 ## Seed de desarrollo (Nicaragua, datos simulados)
 
-Solo en `Development`, solo para `JOIN-001`, idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
+Solo en `Development`, solo para la empresa de desarrollo `JOIN-NI-001` (SPEC 100), idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
 
 - Los cinco motivos de devolución.
 - Devolución parcial de Ferretería El Progreso aplicada a su factura a crédito (criterio 1) y devolución del consumidor final reembolsada en efectivo (criterio 2).
