@@ -1,6 +1,6 @@
 # SPEC 72 — Enviar correos a personas, clientes y leads, y registrarlos en el historial del lead
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 49-post (almacenamiento, para leer adjuntos), SPEC 55 (clientes), SPEC 59 (tipo de contacto `EMAIL`), SPEC 60 (alcance de visibilidad de leads), **SPEC 61** (leads, contactos y línea de tiempo), SPEC 62 (documentos del lead), **SPEC 70** (documentos de producto), **SPEC 71** (plantillas y `IHtmlSanitizer`). Rama de trabajo: `spec-72-person-customer-lead-emails`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-19
 > **Objective:** Que un usuario envíe correos desde la persona, el cliente o el lead a una persona que tenga un correo válido registrado, y que cada envío quede en el historial de correos de la persona y, si se asocia a un lead abierto, en su línea de tiempo.

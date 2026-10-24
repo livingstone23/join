@@ -108,17 +108,17 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 67 | Calendario: "Relacionado con" de la actividad unificado en Persona/Cliente | Aprobado | 44-post, 45-post, 54, 55, 65 |
 | 68 | Calendario: índice de actividades con filtros y permiso por usuario para ver las de otros | Aprobado | 43-post, 44-post, 48-post, 67 |
 | 69 | Calendario: comentarios y documentos de la actividad, con límites de adjuntos por empresa | Aprobado | 36, 44-post, 49-post, 62, 68 |
-| 70 | Productos y servicios: imágenes (hasta 5) y documentos, con límites por empresa | Aprobado | 36, 41-post, 43-post, 49-post, 57, 62 |
-| 71 | Plantillas de correo por empresa, agrupadas por tipo, con variables | Aprobado | 41-post, 43-post, 61 |
-| 72 | Enviar correos a personas, clientes y leads, y registrarlos en el historial del lead | Aprobado | 49-post, 55, 59, 60, 61, 62, 70, 71 |
-| 73 | WhatsApp (Meta Cloud API): esquema `Channel_Meta`, conexión por empresa, webhook firmado, perfil del negocio y módulo | Borrador | 05, 00-post, 43-post, 48-post, 49-post |
-| 74 | WhatsApp: conversaciones con código propio, mensajes, estados, marca de identificación, personas pendientes y archivos | Borrador | 73, 45-post, 49-post, 54, 55, 58, 61, 65 |
-| 75 | WhatsApp: agentes y coordinadores, disponibilidad, Cola y En espera, notificaciones, envío de mensajes y tiempo real | Borrador | 73, 74, 49-post |
-| 76 | WhatsApp: plantillas vinculadas con Meta y respuestas rápidas | Borrador | 73, 74, 75 |
-| 77 | WhatsApp: etapas del canal, pipeline por conversación y homologación con Leads y Clientes | Borrador | 74, 75, 55, 61, 66 |
-| 78 | WhatsApp: índice de conversaciones por persona o cliente, con filtros y exportación | Borrador | 74, 75, 77 |
-| 79 | WhatsApp: automatizaciones básicas | Borrador | 74, 75, 76, 44-post |
-| 80 | WhatsApp: asistente IA opcional vía un flujo de n8n | Borrador | 74, 75, 76, 79, 45-post, 57, 61, 63 |
+| 70 | Productos y servicios: imágenes (hasta 5) y documentos, con límites por empresa | Implementado | 36, 41-post, 43-post, 49-post, 57, 62 |
+| 71 | Plantillas de correo por empresa, agrupadas por tipo, con variables | Implementado | 41-post, 43-post, 61 |
+| 72 | Enviar correos a personas, clientes y leads, y registrarlos en el historial del lead | Implementado | 49-post, 55, 59, 60, 61, 62, 70, 71 |
+| 73 | WhatsApp (Meta Cloud API): esquema `Channel_Meta`, conexión por empresa, webhook firmado, perfil del negocio y módulo | Aprobado | 05, 00-post, 43-post, 48-post, 49-post |
+| 74 | WhatsApp: conversaciones con código propio, mensajes, estados, marca de identificación, personas pendientes y archivos | Aprobado | 73, 45-post, 49-post, 54, 55, 58, 61, 65 |
+| 75 | WhatsApp: agentes y coordinadores, disponibilidad, Cola y En espera, notificaciones, envío de mensajes y tiempo real | Aprobado | 73, 74, 49-post |
+| 76 | WhatsApp: plantillas vinculadas con Meta y respuestas rápidas | Aprobado | 73, 74, 75 |
+| 77 | WhatsApp: etapas del canal, pipeline por conversación y homologación con Leads y Clientes | Aprobado | 74, 75, 55, 61, 66 |
+| 78 | WhatsApp: índice de conversaciones por persona o cliente, con filtros y exportación | Aprobado | 74, 75, 77 |
+| 79 | WhatsApp: automatizaciones básicas | Aprobado | 74, 75, 76, 44-post |
+| 80 | WhatsApp: asistente IA opcional vía un flujo de n8n | Aprobado | 74, 75, 76, 79, 45-post, 57, 61, 63 |
 
 ### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)
 
