@@ -20,10 +20,10 @@
    | Servicios (`Kind = Service`) | `Catalog.Products` | `Code` |
    | Personas | `Admin.Persons` (+ dirección y contacto principal) | tipo + número de identificación; sin identificación, siempre crea |
    | Clientes | Persona (si no existe) + `Customer.Customers` | identificación de la persona |
-   | **Existencias iniciales** (propuesto) | Ajuste de inventario de entrada (SPEC 85); columna opcional `UnitCost` que fija el costo (SPEC 90) | — (solo crea) |
-   | **Líneas de crédito** (propuesto) | `CustomerCreditLines` (SPEC 87) | cliente |
+   | **Existencias iniciales** | Ajuste de inventario de entrada (SPEC 85); columna opcional `UnitCost` que fija el costo (SPEC 90) | — (solo crea) |
+   | **Líneas de crédito** | `CustomerCreditLines` (SPEC 87) | cliente |
 
-   Productos y Servicios tienen plantillas separadas para que cada una muestre solo sus columnas (los servicios no llevan existencias ni código de barras). Existencias iniciales y Líneas de crédito se proponen porque sin ellas no se puede empezar a vender a crédito ni con stock. Se pueden quitar al aprobar la spec.
+   Productos y Servicios tienen plantillas separadas para que cada una muestre solo sus columnas (los servicios no llevan existencias ni código de barras). Existencias iniciales y Líneas de crédito se mantienen por decisión del usuario (2026-10-24). **Disponibilidad:** cada catálogo aparece en la guía y en la pantalla solo si su función está habilitada: Existencias iniciales exige el modo de documentos `Leads` (`CompanyCustomers.DocumentsMode`, SPEC 81) y al menos un almacén activo (SPEC 85); Líneas de crédito exige el modo `Leads` y SPEC 87 implementada. Si no lo están, `GET /DataImports/catalogs` los devuelve con `IsAvailable = false` y el motivo (por ejemplo, "Crea un almacén en Administración → Almacenes").
 2. **Guía descargable** por catálogo (PDF generado con el renderizador de SPEC 84, y la misma información en JSON para el front): columnas en orden, si son obligatorias, tipo, largo máximo, formato, valores permitidos y ejemplo. Los valores que dependen de la empresa (categorías, unidades de medida, grupos fiscales, almacenes, tipos de identificación, monedas) se listan **con los códigos actuales de la empresa** al momento de descargar.
 3. **Plantilla CSV** por catálogo: encabezados exactos y dos filas de ejemplo (datos simulados de Nicaragua).
 4. **Formato del archivo:** UTF-8 (con o sin BOM), separador `,` o `;` (detección automática), decimales con punto, fechas `yyyy-MM-dd`, booleanos `true`/`false` o `si`/`no`. Máximo **5.000 filas** y **5 MB** por archivo.
@@ -50,7 +50,7 @@
 3. Las tablas destino suman `DataImportId?` (`Catalog.Products`, `Admin.Persons`, `Customer.Customers`, `Customer.CustomerCreditLines`).
 
 **B. Endpoints**
-4. `GET /api/v1/DataImports/catalogs`: catálogos disponibles y si el usuario puede importarlos.
+4. `GET /api/v1/DataImports/catalogs`: catálogos con `IsAvailable`, `UnavailableReason` y si el usuario puede importarlos.
 5. `GET /api/v1/DataImports/{catalog}/guide?format=pdf|json` y `GET /{catalog}/template` (CSV).
 6. `POST /api/v1/DataImports/{catalog}` (multipart, `mode`): sube y valida. Devuelve el resumen y la primera página de errores.
 7. `GET /api/v1/DataImports/{id}`, `GET /{id}/errors` (paginado, exportable a CSV), `POST /{id}/confirm` (carga), `POST /{id}/discard`.
