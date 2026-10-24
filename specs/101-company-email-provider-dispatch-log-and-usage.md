@@ -114,6 +114,24 @@
 - Otros proveedores (SMTP, Amazon SES): el modelo los admite agregando un `ProviderType`; esta spec solo implementa SendGrid.
 - Facturar el uso a las empresas.
 
+## Implementation plan
+
+Orden pensado para que cada paso compile y tenga sus tests antes del siguiente. Leer antes las notas "Ajuste" del encabezado y las de SPEC 72, 84 y 85 (convención de correo saliente en `specs/README.md`).
+
+1. **Cifrado de secretos.** Paquete `Microsoft.AspNetCore.DataProtection.EntityFrameworkCore`; `ApplicationDbContext` implementa `IDataProtectionKeyContext` (tabla `Security.DataProtectionKeys`); `AddDataProtection().PersistKeysToDbContext<ApplicationDbContext>().SetApplicationName("JOIN")` en `3.Infrastructure/DependencyInjection.cs`. `ISecretProtector` (Application) y `DataProtectionSecretProtector` (Infrastructure) con el propósito `JOIN.EmailProvider.ApiKey`.
+2. **Esquema y migración** `Spec101CompanyEmailProvider`: columnas nuevas de `EmailCompanySettings`, `EmailDispatchLogs`, `EmailDispatchRecipients`, `EmailProviderSettingsEvents` y `DataProtectionKeys`. Enums `EmailModule`, `EmailProviderMode`, `EmailProviderAccount`, `EmailDispatchStatus`, `EmailDeliveryStatus`, `EmailRecipientType`, `EmailQuotaAction` en `1.Domain`. Constantes de `Feature` en `2.Application/Common/Email/EmailFeatures.cs`.
+3. **Adaptador.** `SendGridEmailAdapter.SendAsync` recibe la key y los `custom_args` (`join_dispatch_id`, `join_company_id`, `join_module`) y devuelve siempre `X-Message-Id`. Un `SendGridClient` por key cacheado (no un `HttpClient` por envío). `LoggingEmailAdapter` devuelve un id simulado (`log-<guid>`).
+4. **Despachador.** `IEmailDispatcher` / `EmailDispatcher` (Application): genera el `Id`, resuelve la cuenta (`EmailAccountResolver`), aplica `EmailQuotaGuard` (con `SELECT … FOR UPDATE` sobre la fila de configuración), envía, guarda `EmailDispatchLogs` + `EmailDispatchRecipients` y, si corresponde, dispara el aviso de cuota (una vez por período, `LastQuotaWarningPeriod`).
+5. **Migrar los ocho puntos** de la tabla "Estado actual" a `IEmailDispatcher` con su `Module` y `Feature`. `IEmailService.SendEmailAsync` deja de usarse en Application (queda solo para el adaptador o se elimina). `PersonEmailSender` guarda `PersonEmailMessages` como hoy, con el `ProviderMessageId` que devuelve el despachador.
+6. **Endpoints** de configuración (cuenta, key, prueba), uso de la empresa y vista de plataforma (Dapper para los reportes).
+7. **Menú, permisos y seed** (`EmailUsage`, `PlatformEmailUsage`; seed de desarrollo).
+8. **Documentación:** agregar a `CLAUDE.md` la regla "todo correo sale por `IEmailDispatcher` con `Module` y `Feature`"; nota "Ajuste por SPEC 101" ya presente en SPEC 72, 84 y 85.
+
+**Tests** (regla `/spec-impl`: solo los nuevos y los de clases tocadas):
+- Unitarios nuevos: `EmailDispatcherTests`, `EmailAccountResolverTests`, `EmailQuotaGuardTests`, `DataProtectionSecretProtectorTests`, validadores y handlers de configuración y reportes, masking de destinatarios.
+- Existentes a correr: los de cada handler migrado del paso 5 (`ForgotPasswordCommandHandlerTests`, `InviteUserCommandHandlerTests`, `SendMfaChallengeCommandHandlerTests`, `EmailOtpSendCodeCommandHandlerTests`, `RequestEmailChangeCommandHandlerTests`, `ForceUserPasswordResetCommandHandlerTests`, `PersonEmailSenderTests` o equivalentes).
+- Integración: envío con `Log` registrado, cuotas con bloqueo y excepción de seguridad, reportes por permiso, descifrado tras recrear el host.
+
 ## Errores
 
 | Código | HTTP | Cuándo |
