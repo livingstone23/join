@@ -46,8 +46,10 @@ public sealed class TicketInboundIngestionPostgreSqlTests : IClassFixture<Custom
         option.Route.Should().Be("/tickets/ticket-inbound-channels");
         option.ControllerName.Should().Be("TicketInboundChannels");
 
+        // SPEC 100: JOIN-NI-001 receives the same permissions in Development; the check is on JOIN-001.
+        var joinCompanyId = await JoinCompanyIdAsync();
         var permissions = await db.RoleSystemOptions.IgnoreQueryFilters()
-            .Where(p => p.SystemOptionId == option.Id)
+            .Where(p => p.SystemOptionId == option.Id && p.CompanyId == joinCompanyId)
             .Join(db.ApplicationRoles, p => p.RoleId, r => r.Id, (p, r) => new { r.Name, p.CanRead, p.CanCreate, p.CanUpdate, p.CanDelete, p.CanExecute })
             .ToListAsync();
         permissions.Single(p => p.Name == "Manager").Should().BeEquivalentTo(new { Name = "Manager", CanRead = true, CanCreate = true, CanUpdate = false, CanDelete = true, CanExecute = true });
