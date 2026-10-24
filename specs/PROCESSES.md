@@ -31,7 +31,8 @@ Las alertas usan la infraestructura compartida de SPEC 85 (`LeadAlerts`, tabla �
 | A18 | Emitir una nota de entrega con `StockEffect = Out` | Salida de almacén (`DeliveryIssue`) | `LowStock`/`OutOfStock` | 85 |
 | A19 | Aprobar o rechazar una constancia de exoneración | Cambia su estado | `ExemptionResolved` a quien la registró | 94 |
 | A20 | Anular una orden de compra aprobada o una nota de entrega con salida | Movimiento inverso (`PurchaseReversal`/`DeliveryReversal`) | `LowStock`/`OutOfStock` o su resolución | 85 |
-| A21 | Cualquier alerta nueva | Correo a sus destinatarios después del commit | — | 85 |
+| A21 | Enviar cualquier correo | Registro en `EmailDispatchLogs`; cuota diaria y mensual de la empresa | Aviso a la plataforma y a la empresa al cruzar `WarningPercent` y al 100 % (una vez por período) | 101 |
+| A22 | Cualquier alerta nueva | Correo a sus destinatarios después del commit | — | 85 |
 
 ## 2. Programados por tiempo (pendientes, Hangfire)
 
@@ -43,5 +44,6 @@ Las alertas usan la infraestructura compartida de SPEC 85 (`LeadAlerts`, tabla �
 | T4 | Constancias por vencer | Constancias aprobadas que vencen en `N` días | `ExemptionExpiring` | 94 |
 | T5 | Solicitudes de descuento vencidas | Solicitudes sin resolver después de `DiscountRequestExpiryHours` | `DiscountRequestExpired` al solicitante | 98 |
 | T6 | Documentos vencidos | Cotizaciones y proformas cuya vigencia venció | `DocumentExpired` al vendedor (opcional, `IsEnabled` del tipo) | 83 |
+| T7 | Purga del registro de correos | Registros de `EmailDispatchLogs` más antiguos que `Email:DispatchLogRetentionMonths` | — | 101 |
 
 Al preparar Hangfire, cada proceso programado debe ser idempotente (no duplicar alertas abiertas, gracias al índice único de `LeadAlerts`) y ejecutarse una sola vez aunque haya varias instancias de la API.

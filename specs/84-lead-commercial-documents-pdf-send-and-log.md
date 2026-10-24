@@ -4,6 +4,7 @@
 > **Depends on:** SPEC 49-post (almacenamiento), SPEC 71 (`IHtmlSanitizer`, plantillas de correo), **SPEC 72** (envío de correos e historial de la persona), **SPEC 81** (configuración: encabezado, pie, leyendas, emisor y logo), **SPEC 83** (documentos, código público, código de barras y bitácora). Rama de trabajo: `spec-84-lead-commercial-documents-pdf-send-and-log`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Que cada documento comercial se descargue en PDF (con encabezado, pie, leyendas, logo, número, código público y código de barras) y se envíe al cliente por correo, tanto proformas y cotizaciones como facturas, y que cada descarga y envío quede en la bitácora del documento.
+> **Ajuste por SPEC 101 (2026-10-24):** el envío al cliente sale por `IEmailDispatcher` con `Module = CommercialDocuments` y `Feature = Documents.Send`, y queda en `EmailDispatchLogs` además de la bitácora del documento; respeta la cuota de la empresa.
 > **Ajuste por revisión de consistencia (2026-10-24):** la entrada en la línea de tiempo del lead (regla 5) aplica solo a documentos con lead.
 > **Ajuste por SPEC 94 (2026-10-24):** el PDF de un documento exento imprime la leyenda con los datos de la constancia.
 > **Ajuste por SPEC 93 (2026-10-24):** el bloque de líneas y totales del PDF sigue la presentación de SPEC 93 (importe neto por línea, IVA por tasa, total con IVA, retenciones, total a pagar y monto en letras).

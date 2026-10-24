@@ -4,6 +4,7 @@
 > **Depends on:** SPEC 72 (envío de correos y `attachment-candidates`), SPEC 70 (tipos de documento de producto), SPEC 41-post (visibilidad de borrados y restauración para SuperAdmin). Front: **FE-47.1**.
 > **Date:** 2026-10-24
 > **Objective:** Que el modal "Enviar correo" conozca el tope de adjuntos de la empresa sin el permiso `EmailSettings`, y que un SuperAdmin pueda listar y restaurar los tipos de documento de producto borrados.
+> **Ajuste por SPEC 101 (2026-10-24):** `PersonEmailSender` envía por `IEmailDispatcher` (`Module = Customers`, `Feature = Customers.PersonEmail`/`CustomerEmail`/`LeadEmail`); `EmailCompanySettings` suma la cuenta de SendGrid propia y las cuotas. Sin cambio de alcance de esta spec.
 > **Origen:** pendientes de la revisión de FE-45 y FE-47 (2026-10-24). Es un ajuste de SPEC 72 y SPEC 70 que no cambia su alcance; no consume número (sub-número `72.1`).
 
 ---
