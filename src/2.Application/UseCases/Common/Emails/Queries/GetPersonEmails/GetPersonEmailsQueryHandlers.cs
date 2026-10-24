@@ -130,23 +130,23 @@ public sealed class GetPersonEmailAttachmentCandidatesQueryHandler(
     ISqlConnectionFactory connectionFactory,
     ICurrentUserService currentUserService,
     LeadAccessGuard guard)
-    : IRequestHandler<GetPersonEmailAttachmentCandidatesQuery, Response<IReadOnlyList<PersonEmailAttachmentCandidateDto>>>
+    : IRequestHandler<GetPersonEmailAttachmentCandidatesQuery, Response<PersonEmailAttachmentCandidatesDto>>
 {
     /// <summary>Maximum number of product documents returned (SPEC 72 C.10).</summary>
     private const int MaxProductDocuments = 50;
 
-    public async Task<Response<IReadOnlyList<PersonEmailAttachmentCandidateDto>>> Handle(GetPersonEmailAttachmentCandidatesQuery request, CancellationToken cancellationToken)
+    public async Task<Response<PersonEmailAttachmentCandidatesDto>> Handle(GetPersonEmailAttachmentCandidatesQuery request, CancellationToken cancellationToken)
     {
         if (currentUserService.CompanyId == Guid.Empty)
         {
-            return PersonEmailQuerySql.CompanyRequired<IReadOnlyList<PersonEmailAttachmentCandidateDto>>();
+            return PersonEmailQuerySql.CompanyRequired<PersonEmailAttachmentCandidatesDto>();
         }
 
         var companyId = currentUserService.CompanyId;
         using var connection = connectionFactory.CreateConnection();
         if (!await PersonEmailQuerySql.PersonExistsAsync(connection, request.PersonId, companyId, cancellationToken))
         {
-            return Response<IReadOnlyList<PersonEmailAttachmentCandidateDto>>.Error(PersonEmailErrorCodes.PersonNotFound, ["Person not found."]);
+            return Response<PersonEmailAttachmentCandidatesDto>.Error(PersonEmailErrorCodes.PersonNotFound, ["Person not found."]);
         }
 
         var parameters = new DynamicParameters();
@@ -179,7 +179,7 @@ public sealed class GetPersonEmailAttachmentCandidatesQueryHandler(
             var access = await guard.ResolveAsync(companyId, userId, cancellationToken);
             if (userId == Guid.Empty || !await LeadQuerySql.IsVisibleAsync(connection, leadId, companyId, access, cancellationToken))
             {
-                return Response<IReadOnlyList<PersonEmailAttachmentCandidateDto>>.Error(PersonEmailErrorCodes.LeadNotFound, ["Lead not found."]);
+                return Response<PersonEmailAttachmentCandidatesDto>.Error(PersonEmailErrorCodes.LeadNotFound, ["Lead not found."]);
             }
 
             const string leadSql = """
@@ -197,12 +197,35 @@ public sealed class GetPersonEmailAttachmentCandidatesQueryHandler(
                 leadSql, new { LeadId = leadId, CompanyId = companyId, request.PersonId }, cancellationToken: cancellationToken)));
         }
 
-        return new Response<IReadOnlyList<PersonEmailAttachmentCandidateDto>>
+        return new Response<PersonEmailAttachmentCandidatesDto>
         {
             IsSuccess = true,
             Message = "Attachment candidates retrieved successfully.",
-            Data = items
+            Data = new PersonEmailAttachmentCandidatesDto
+            {
+                Items = items,
+                MaxAttachmentsTotalBytes = await ReadMaxAttachmentsTotalBytesAsync(connection, companyId, cancellationToken)
+            }
         };
+    }
+
+    /// <summary>
+    /// The limit of the total size of the attachments of the company (SPEC 72.1): the
+    /// <c>MaxAttachmentsTotalBytes</c> of its <c>EmailCompanySettings</c> row, or the default of SPEC 72 when the
+    /// company has no row. It travels with the candidates so the sending modal does not need the
+    /// <c>EmailSettings</c> permission to know it.
+    /// </summary>
+    private static async Task<long> ReadMaxAttachmentsTotalBytesAsync(IDbConnection connection, Guid companyId, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT MaxAttachmentsTotalBytes
+            FROM admin.emailcompanysettings
+            WHERE CompanyId = @CompanyId AND GcRecord = 0;
+            """;
+
+        var value = await connection.QueryFirstOrDefaultAsync<long?>(new CommandDefinition(
+            sql, new { CompanyId = companyId }, cancellationToken: cancellationToken));
+        return value ?? EmailCompanySettings.DefaultMaxAttachmentsTotalBytes;
     }
 }
 

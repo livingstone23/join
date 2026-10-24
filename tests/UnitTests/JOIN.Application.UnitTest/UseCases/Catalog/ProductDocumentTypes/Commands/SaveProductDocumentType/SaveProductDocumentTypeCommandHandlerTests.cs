@@ -65,6 +65,28 @@ public sealed class SaveProductDocumentTypeCommandHandlerTests
     }
 
     [Fact]
+    public async Task Restore_WithADuplicateCode_AnswersTheCatalogConflict()
+    {
+        using var bed = await ProductAttachmentTestBed.CreateAsync();
+        bed.Context.IsSuperAdmin = true;
+
+        var duplicate = new ProductDocumentType
+        {
+            CompanyId = bed.CompanyId, Code = "TECH_SHEET", Name = "Ficha duplicada", SortOrder = 9, IsActive = true
+        };
+        bed.Context.Db.ProductDocumentTypes.Add(duplicate);
+        await bed.Context.Db.SaveChangesAsync();
+        bed.Context.Db.ChangeTracker.Clear();
+
+        (await bed.Context.SendAsync(new DeleteProductDocumentTypeCommand(duplicate.Id))).IsSuccess.Should().BeTrue();
+
+        var response = await bed.Context.SendAsync(new RestoreProductDocumentTypeCommand(duplicate.Id));
+
+        response.IsSuccess.Should().BeFalse();
+        response.Message.Should().Be(CatalogErrorCodes.ProductDocumentTypeAlreadyExists);
+    }
+
+    [Fact]
     public async Task EveryCommand_WithoutCompany_RespondsCompanyRequired()
     {
         using var bed = await ProductAttachmentTestBed.CreateAsync();

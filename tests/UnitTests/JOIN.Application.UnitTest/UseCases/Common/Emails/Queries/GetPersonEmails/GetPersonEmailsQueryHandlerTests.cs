@@ -3,6 +3,7 @@ using JOIN.Application.Services.Email;
 using JOIN.Application.UnitTest.Common.TestDoubles;
 using JOIN.Application.UnitTest.UseCases.Common.Emails;
 using JOIN.Application.UseCases.Common.Emails.Queries;
+using JOIN.Domain.Admin;
 using JOIN.Domain.Enums;
 using LeadStatus = JOIN.Domain.Customers.Leads.LeadStatus;
 
@@ -63,13 +64,35 @@ public sealed class GetPersonEmailsQueryHandlerTests
             ["SizeBytes"] = 3L, ["OriginName"] = "CRM — Ficha"
         };
         var lead = new Dictionary<string, object?>(product) { ["SourceKind"] = "LeadDocument", ["OriginName"] = "LD-1" };
-        context.Sql.SetResults(Exists(), FakeResultSet.FromRows(product), LeadScope(context.CurrentUserId), FakeResultSet.FromRows(lead));
+        context.Sql.SetResults(
+            Exists(),
+            FakeResultSet.FromRows(product),
+            LeadScope(context.CurrentUserId),
+            FakeResultSet.FromRows(lead),
+            FakeResultSet.FromRows(new Dictionary<string, object?> { ["MaxAttachmentsTotalBytes"] = 8L * 1024 * 1024 }));
 
         var response = await context.SendAsync(new GetPersonEmailAttachmentCandidatesQuery(Guid.NewGuid(), Guid.NewGuid(), " crm "));
 
         response.IsSuccess.Should().BeTrue(response.Message);
-        response.Data!.Select(c => c.SourceKind).Should().Equal("ProductDocument", "LeadDocument");
+        response.Data!.Items.Select(c => c.SourceKind).Should().Equal("ProductDocument", "LeadDocument");
+        response.Data.MaxAttachmentsTotalBytes.Should().Be(8L * 1024 * 1024);
         context.Sql.CapturedParameters["Search"].Should().Be("%crm%");
+    }
+
+    [Fact]
+    public async Task AttachmentCandidates_WithoutTheCompanySettings_UsesTheDefaultLimit()
+    {
+        using var context = await PersonEmailTestContext.CreateAsync();
+        context.Sql.SetResults(
+            Exists(),
+            FakeResultSet.Empty("SourceKind"),
+            FakeResultSet.Empty("MaxAttachmentsTotalBytes"));
+
+        var response = await context.SendAsync(new GetPersonEmailAttachmentCandidatesQuery(Guid.NewGuid()));
+
+        response.IsSuccess.Should().BeTrue(response.Message);
+        response.Data!.Items.Should().BeEmpty();
+        response.Data.MaxAttachmentsTotalBytes.Should().Be(EmailCompanySettings.DefaultMaxAttachmentsTotalBytes);
     }
 
     [Fact]

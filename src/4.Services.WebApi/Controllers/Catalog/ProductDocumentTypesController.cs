@@ -21,10 +21,14 @@ namespace JOIN.Services.WebApi.Controllers.Catalog;
 [PermissionResource("ProductSettings")]
 public class ProductDocumentTypesController(IMediator mediator) : ControllerBase
 {
+    /// <summary>The company's catalog of document types. <c>includeDeleted</c> only reaches a SuperAdmin (SPEC 72.1).</summary>
     [HttpGet]
     [ProducesResponseType(typeof(Response<IReadOnlyList<ProductDocumentTypeDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> List([FromQuery] bool? includeInactive = null, CancellationToken cancellationToken = default) =>
-        this.ToCatalogResult(await mediator.Send(new GetProductDocumentTypesQuery(includeInactive), cancellationToken));
+    public async Task<IActionResult> List(
+        [FromQuery] bool? includeInactive = null,
+        [FromQuery] bool? includeDeleted = null,
+        CancellationToken cancellationToken = default) =>
+        this.ToCatalogResult(await mediator.Send(new GetProductDocumentTypesQuery(includeInactive, includeDeleted), cancellationToken));
 
     [HttpPost]
     [ProducesResponseType(typeof(Response<ProductDocumentTypeDto>), StatusCodes.Status201Created)]

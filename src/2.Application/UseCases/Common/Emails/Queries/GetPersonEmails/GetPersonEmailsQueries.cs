@@ -10,9 +10,10 @@ public sealed record GetPersonEmailAddressesQuery(Guid PersonId) : IRequest<Resp
 /// <summary>
 /// <c>GET /Persons/{id}/emails/attachment-candidates</c> (SPEC 72): live documents of the products of the company
 /// (<c>ILIKE</c> on the product or the document, max. 50) and, with <c>leadId</c>, the live documents of that lead.
+/// SPEC 72.1 wraps them with the limit of attachments of the company.
 /// </summary>
 public sealed record GetPersonEmailAttachmentCandidatesQuery(Guid PersonId, Guid? LeadId = null, string? Search = null)
-    : IRequest<Response<IReadOnlyList<PersonEmailAttachmentCandidateDto>>>;
+    : IRequest<Response<PersonEmailAttachmentCandidatesDto>>;
 
 /// <summary>Whose history is listed: a person, the person of a customer, or a lead.</summary>
 public enum PersonEmailHistoryScope

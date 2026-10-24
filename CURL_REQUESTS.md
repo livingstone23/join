@@ -2043,6 +2043,7 @@ curl -s -X PUT "$BASE_URL/api/v1/ProductAttachmentSettings" \
   -d '{ "allowedDocumentTypes": 31, "maxDocumentSizeBytes": 4194304, "maxDocumentsPerProduct": 10,
         "allowedImageFormats": 7, "maxImageSizeBytes": 2097152, "maxImagesPerProduct": 3 }'
 curl -s "$BASE_URL/api/v1/ProductDocumentTypes?includeInactive=true" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE_URL/api/v1/ProductDocumentTypes?includeInactive=true&includeDeleted=true" -H "Authorization: Bearer $TOKEN"  # SuperAdmin only; the deleted types carry isDeleted and deletedOn
 curl -s -X POST "$BASE_URL/api/v1/ProductDocumentTypes" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{ "code": "CONTRACT", "name": "Contrato", "sortOrder": 5, "isActive": true }'
@@ -2050,7 +2051,7 @@ curl -s -X PUT "$BASE_URL/api/v1/ProductDocumentTypes/<id>" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{ "code": "CONTRACT", "name": "Contrato firmado", "sortOrder": 5, "isActive": true }'
 curl -s -X DELETE "$BASE_URL/api/v1/ProductDocumentTypes/<id>" -H "Authorization: Bearer $TOKEN"  # 409 PRODUCT_DOCUMENT_TYPE_IN_USE
-curl -s -X POST "$BASE_URL/api/v1/ProductDocumentTypes/<id>/restore" -H "Authorization: Bearer $TOKEN"  # SuperAdmin
+curl -s -X POST "$BASE_URL/api/v1/ProductDocumentTypes/<id>/restore" -H "Authorization: Bearer $TOKEN"  # SuperAdmin; 409 PRODUCT_DOCUMENT_TYPE_ALREADY_EXISTS when the code is taken
 
 # Thumbnail for sellers without Products permission (reuses the GET image content path)
 curl -s -o thumb.png "$BASE_URL/api/v1/Leads/products-lookup/<product-id>/images/<image-id>/content" \
@@ -2322,6 +2323,10 @@ answers: `404` (`PERSON_NOT_FOUND`, `CUSTOMER_NOT_FOUND`, `LEAD_NOT_FOUND`, `EMA
 `EMAIL_ATTACHMENT_NOT_FOUND`), `409` (`PERSON_NOT_ACTIVE`, `LEAD_NOT_OPEN`), `429 EMAIL_DAILY_LIMIT_REACHED`, `400` for the
 rest (`PERSON_EMAIL_NOT_AVAILABLE`, `INVALID_EMAIL_ADDRESS`, `INVALID_LEAD_PERSON`, `EMAIL_CONTACT_TYPE_NOT_CONFIGURED`,
 `EMAIL_TEMPLATE_UNKNOWN_VARIABLE`, `EMAIL_ATTACHMENTS_TOO_LARGE`, `EMAIL_SETTINGS_NOT_CONFIGURED`).
+
+The attachment candidates answer an object (SPEC 72.1): `{ items: [ { sourceKind, sourceId, fileName, contentType,
+sizeBytes, originName } ], maxAttachmentsTotalBytes }`. `maxAttachmentsTotalBytes` is the limit of the company (15 MB by
+default), so the sending modal does not need the `EmailSettings` permission to know it.
 
 ```bash
 # Person (resource Persons): valid addresses, attachment candidates, send (CanExecute), history and detail

@@ -21,11 +21,12 @@ public sealed class GetProductDocumentTypesQueryHandler(
                 CatalogErrorCodes.CompanyRequired, ["The authenticated token must contain a valid CompanyId claim."]);
         }
 
-        const string sql = """
-            SELECT Id, CompanyId, Code, Name, SortOrder, IsActive, Created AS CreatedAt
+        var deleted = SoftDeleteVisibility.IncludeDeleted(currentUserService, request.IncludeDeleted) ? string.Empty : "AND GcRecord = 0";
+        var sql = $"""
+            SELECT Id, GcRecord, CompanyId, Code, Name, SortOrder, IsActive, Created AS CreatedAt
             FROM catalog.productdocumenttypes
             WHERE CompanyId = @CompanyId
-              AND GcRecord = 0
+              {deleted}
               AND (@IncludeInactive = TRUE OR IsActive = TRUE)
             ORDER BY SortOrder, Name;
             """;

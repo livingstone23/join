@@ -47,9 +47,13 @@ public class PersonEmailsController(IMediator mediator) : ControllerBase
     public async Task<IActionResult> List(Guid personId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default) =>
         this.ToPersonEmailResult(await mediator.Send(new GetPersonEmailsQuery(PersonEmailHistoryScope.Person, personId, pageNumber, pageSize), cancellationToken));
 
-    /// <summary>Documents that can be attached: product documents (search, max. 50) and, with <c>leadId</c>, the lead documents.</summary>
+    /// <summary>
+    /// Documents that can be attached: product documents (search, max. 50) and, with <c>leadId</c>, the lead
+    /// documents. The answer carries the limit of attachments of the company (SPEC 72.1), so the modal does not
+    /// need the <c>EmailSettings</c> permission.
+    /// </summary>
     [HttpGet("emails/attachment-candidates")]
-    [ProducesResponseType(typeof(Response<IReadOnlyList<PersonEmailAttachmentCandidateDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Response<PersonEmailAttachmentCandidatesDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(Response<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AttachmentCandidates(Guid personId, [FromQuery] Guid? leadId = null, [FromQuery] string? search = null, CancellationToken cancellationToken = default) =>
         this.ToPersonEmailResult(await mediator.Send(new GetPersonEmailAttachmentCandidatesQuery(personId, leadId, search), cancellationToken));

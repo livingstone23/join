@@ -112,7 +112,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 70 | Productos y servicios: imágenes (hasta 5) y documentos, con límites por empresa | Implementado | 36, 41-post, 43-post, 49-post, 57, 62 |
 | 71 | Plantillas de correo por empresa, agrupadas por tipo, con variables | Implementado | 41-post, 43-post, 61 |
 | 72 | Enviar correos a personas, clientes y leads, y registrarlos en el historial del lead | Implementado | 49-post, 55, 59, 60, 61, 62, 70, 71 |
-| 72.1 | Ajuste: tope de adjuntos sin permiso `EmailSettings` y tipos de documento de producto borrados (FE-47.1) | Borrador | 41-post, 70, 72 |
+| 72.1 | Ajuste: tope de adjuntos sin permiso `EmailSettings` y tipos de documento de producto borrados (FE-47.1) | Aprobado | 41-post, 70, 72 |
 | 73 | WhatsApp (Meta Cloud API): esquema `Channel_Meta`, conexión por empresa, webhook firmado, perfil del negocio y módulo | Aprobado | 05, 00-post, 43-post, 48-post, 49-post |
 | 74 | WhatsApp: conversaciones con código propio, mensajes, estados, marca de identificación, personas pendientes y archivos | Aprobado | 73, 45-post, 49-post, 54, 55, 58, 61, 65 |
 | 75 | WhatsApp: agentes y coordinadores, disponibilidad, Cola y En espera, notificaciones, envío de mensajes y tiempo real | Aprobado | 73, 74, 49-post |

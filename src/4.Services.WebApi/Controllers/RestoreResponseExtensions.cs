@@ -1,4 +1,5 @@
 using JOIN.Application.Common;
+using JOIN.Application.Services.Catalog;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JOIN.Services.WebApi.Controllers;
@@ -21,7 +22,8 @@ public static class RestoreResponseExtensions
         return response.Message switch
         {
             "NOT_FOUND" => controller.NotFound(response),
-            "NOT_DELETED" or "PARENT_DELETED" or "ACTIVE_DUPLICATE_EXISTS" or "MAX_FILES_PER_TICKET_REACHED" => controller.Conflict(response),
+            "NOT_DELETED" or "PARENT_DELETED" or "ACTIVE_DUPLICATE_EXISTS" or "MAX_FILES_PER_TICKET_REACHED"
+                or CatalogErrorCodes.ProductDocumentTypeAlreadyExists => controller.Conflict(response),
             "SUPERADMIN_REQUIRED" => controller.StatusCode(StatusCodes.Status403Forbidden, response),
             _ => controller.BadRequest(response)
         };

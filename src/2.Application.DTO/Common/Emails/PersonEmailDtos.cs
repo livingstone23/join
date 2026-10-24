@@ -30,6 +30,23 @@ public sealed record PersonEmailAttachmentCandidateDto
     public string? OriginName { get; init; }
 }
 
+/// <summary>
+/// SPEC 72.1 — the answer of <c>GET /Persons/{id}/emails/attachment-candidates</c>: the candidates and the
+/// limit of the total size of the attachments of the company. The limit travels with the candidates so the
+/// sending modal knows it without the <c>EmailSettings</c> permission.
+/// </summary>
+public sealed record PersonEmailAttachmentCandidatesDto
+{
+    /// <summary>The documents that can be attached, already filtered by <c>leadId</c> and <c>search</c>.</summary>
+    public IReadOnlyList<PersonEmailAttachmentCandidateDto> Items { get; init; } = [];
+
+    /// <summary>
+    /// The limit of the company: the <c>MaxAttachmentsTotalBytes</c> of its <c>EmailCompanySettings</c> row, or
+    /// the default of SPEC 72 (15 MB) when the company has no row.
+    /// </summary>
+    public long MaxAttachmentsTotalBytes { get; init; }
+}
+
 /// <summary>An attachment of a sent email (SPEC 72).</summary>
 public sealed record PersonEmailAttachmentDto
 {

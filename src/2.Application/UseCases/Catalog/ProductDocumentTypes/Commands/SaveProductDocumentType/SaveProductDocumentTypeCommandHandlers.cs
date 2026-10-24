@@ -134,12 +134,17 @@ public sealed class RestoreProductDocumentTypeCommandHandler(
             return Response<Guid>.Error(CatalogErrorCodes.SuperAdminRequired, ["Only a SuperAdmin can restore deleted records."]);
         }
 
-        return await restorer.RestoreAsync<ProductDocumentType>(
+        var response = await restorer.RestoreAsync<ProductDocumentType>(
             request.Id,
             request.CompanyId,
             activeDuplicateExists: (entity, _) => restorer.AnyAsync<ProductDocumentType>(
                 x => x.GcRecord == 0 && x.Id != entity.Id && x.CompanyId == entity.CompanyId && x.Code == entity.Code),
             cancellationToken: cancellationToken);
+
+        // SPEC 72.1: the conflict of the code answers the error of the catalog, not the generic one of the restorer.
+        return response.IsSuccess || response.Message != "ACTIVE_DUPLICATE_EXISTS"
+            ? response
+            : Response<Guid>.Error(CatalogErrorCodes.ProductDocumentTypeAlreadyExists, response.Errors);
     }
 }
 
@@ -164,6 +169,7 @@ internal static class ProductDocumentTypeRules
     internal static ProductDocumentTypeDto ToDto(ProductDocumentType s) => new()
     {
         Id = s.Id,
+        GcRecord = s.GcRecord,
         CompanyId = s.CompanyId,
         Code = s.Code,
         Name = s.Name,

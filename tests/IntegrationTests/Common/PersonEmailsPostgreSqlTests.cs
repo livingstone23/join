@@ -160,9 +160,11 @@ public sealed class PersonEmailsPostgreSqlTests(CustomWebApplicationFactory fact
         var leadDocumentId = await NewLeadDocumentAsync(client, leadId);
         var otherLeadDocumentId = await NewLeadDocumentAsync(client, otherLeadId);
 
-        var candidates = (await DataAsync(await client.GetAsync($"/api/v1/Persons/{personId}/emails/attachment-candidates?leadId={leadId}&search=producto")))
-            .EnumerateArray().Select(c => c.GetProperty("sourceId").GetGuid()).ToList();
+        // SPEC 72.1: the candidates travel wrapped with the limit of attachments of the company.
+        var payload = await DataAsync(await client.GetAsync($"/api/v1/Persons/{personId}/emails/attachment-candidates?leadId={leadId}&search=producto"));
+        var candidates = payload.GetProperty("items").EnumerateArray().Select(c => c.GetProperty("sourceId").GetGuid()).ToList();
         candidates.Should().Contain([productDocumentId, leadDocumentId]).And.NotContain(otherLeadDocumentId);
+        payload.GetProperty("maxAttachmentsTotalBytes").GetInt64().Should().Be(15L * 1024 * 1024);
 
         var response = await client.PostAsJsonAsync($"/api/v1/Leads/{leadId}/emails",
             Mail(attachments: [new { sourceKind = 1, sourceId = productDocumentId }, new { sourceKind = 2, sourceId = leadDocumentId }]));

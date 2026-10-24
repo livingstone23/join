@@ -130,9 +130,10 @@ public sealed record ProductImageContentResult(Stream Content, string ContentTyp
 
 /// <summary>
 /// SPEC 70 — one entry of the company's product document type catalog. <see cref="Code"/> is upper-case
-/// without spaces and unique per company among live rows.
+/// without spaces and unique per company among live rows. SPEC 72.1 adds the soft-delete fields, so a
+/// SuperAdmin can list the deleted types (<c>includeDeleted=true</c>) and restore them.
 /// </summary>
-public sealed record ProductDocumentTypeDto
+public sealed record ProductDocumentTypeDto : SoftDeletableDto
 {
     public Guid Id { get; init; }
     public Guid CompanyId { get; init; }
