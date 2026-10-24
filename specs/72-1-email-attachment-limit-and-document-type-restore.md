@@ -1,6 +1,6 @@
 # SPEC 72.1 — Ajuste: tope de adjuntos sin permiso `EmailSettings` y tipos de documento de producto borrados
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 72 (envío de correos y `attachment-candidates`), SPEC 70 (tipos de documento de producto), SPEC 41-post (visibilidad de borrados y restauración para SuperAdmin). Front: **FE-47.1**.
 > **Date:** 2026-10-24
 > **Objective:** Que el modal "Enviar correo" conozca el tope de adjuntos de la empresa sin el permiso `EmailSettings`, y que un SuperAdmin pueda listar y restaurar los tipos de documento de producto borrados.
