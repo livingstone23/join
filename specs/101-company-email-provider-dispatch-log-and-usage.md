@@ -129,7 +129,7 @@ Orden pensado para que cada paso compile y tenga sus tests antes del siguiente. 
 
 **Tests** (regla `/spec-impl`: solo los nuevos y los de clases tocadas):
 - Unitarios nuevos: `EmailDispatcherTests`, `EmailAccountResolverTests`, `EmailQuotaGuardTests`, `DataProtectionSecretProtectorTests`, validadores y handlers de configuración y reportes, masking de destinatarios.
-- Existentes a correr: los de cada handler migrado del paso 5 (`ForgotPasswordCommandHandlerTests`, `InviteUserCommandHandlerTests`, `SendMfaChallengeCommandHandlerTests`, `EmailOtpSendCodeCommandHandlerTests`, `RequestEmailChangeCommandHandlerTests`, `ForceUserPasswordResetCommandHandlerTests`, `PersonEmailSenderTests` o equivalentes).
+- Existentes a correr: los de cada handler migrado del paso 5 (`ForgotPasswordCommandHandlerTests`, `InviteUserCommandHandlerTests`, `SendMfaChallengeCommandHandlerTests`, `EmailOtpSendCodeCommandHandlerTests`, `ForceUserPasswordResetCommandHandlerTests`, `SendPersonEmailCommandHandlerTests` (cubre `PersonEmailSender`). `RequestEmailChangeCommandHandler` no tiene tests hoy: se crea `RequestEmailChangeCommandHandlerTests`.
 - Integración: envío con `Log` registrado, cuotas con bloqueo y excepción de seguridad, reportes por permiso, descifrado tras recrear el host.
 
 ## Errores
