@@ -20,6 +20,7 @@ using JOIN.Domain.Finance;
 using JOIN.Domain.Messaging;
 using JOIN.Domain.Security;
 using JOIN.Persistence.Contexts;
+using JOIN.Persistence.Seed;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -111,8 +112,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
     /// <summary>
     /// SPEC 49-post: aplica en una base ya migrada el valor por defecto de
-    /// <see cref="TicketAttachmentSettings"/> para las empresas sembradas (JOIN-001 y
-    /// PRIV-001). <see cref="SeedAsync"/> solo corre cuando hay migraciones pendientes,
+    /// <see cref="TicketAttachmentSettings"/> para las empresas sembradas (JOIN-001,
+    /// PRIV-001 y, SPEC 100, JOIN-NI-001). <see cref="SeedAsync"/> solo corre cuando hay migraciones pendientes,
     /// y esta spec no trae migración: sin este paso las bases existentes nunca
     /// recibirían el cambio. Idempotente; solo escribe si la fila falta o conserva
     /// exactamente el valor del seed anterior.
@@ -121,7 +122,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     {
         var companyIds = await _context.Companies
             .IgnoreQueryFilters()
-            .Where(c => c.TaxId == "JOIN-001" || c.TaxId == "PRIV-001")
+            .Where(c => c.TaxId == "JOIN-001" || c.TaxId == "PRIV-001" || c.TaxId == "JOIN-NI-001")
             .Select(c => c.Id)
             .ToListAsync(cancellationToken);
 
@@ -363,9 +364,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     }
 
     /// <summary>
-    /// Re-runs system option and role permission seeds idempotently for the master tenant.
-    /// Skipped when <paramref name="forceReseed"/> is <c>false</c> and the checksum of the
-    /// in-code seed definitions still matches the one stored in <c>Security.SeedState</c>.
+    /// Re-runs system option and role permission seeds idempotently for the development companies (SPEC 100:
+    /// JOIN-001 and, when it exists, JOIN-NI-001), each with its own row in <c>Security.SeedState</c>.
+    /// A company is skipped when <paramref name="forceReseed"/> is <c>false</c> and the checksum of the
+    /// in-code seed definitions still matches the one stored for it.
     /// </summary>
     /// <param name="forceReseed">
     /// When <c>true</c>, ignores any cached checksum and always runs the full seed pipeline.
@@ -374,45 +376,82 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     /// <param name="cancellationToken">Cancellation token propagated to EF Core calls.</param>
     public async Task SeedMenuAndPermissionsAsync(bool forceReseed = false, CancellationToken cancellationToken = default)
     {
-        var joinCompanyId = await _context.Companies
-            .IgnoreQueryFilters()
-            .Where(c => c.TaxId == "JOIN-001")
-            .Select(c => c.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var developmentTaxIds = DevelopmentCompanyProfiles.All.Select(p => p.TaxId).ToList();
+        var companyIdsByTaxId = (await _context.Companies
+                .IgnoreQueryFilters()
+                .Where(c => developmentTaxIds.Contains(c.TaxId))
+                .Select(c => new { c.TaxId, c.Id })
+                .ToListAsync(cancellationToken))
+            .GroupBy(c => c.TaxId)
+            .ToDictionary(g => g.Key, g => g.First().Id);
 
-        if (joinCompanyId == Guid.Empty)
+        if (!companyIdsByTaxId.TryGetValue(DevelopmentCompanyProfiles.Join001.TaxId, out var joinCompanyId))
         {
             _logger.LogWarning("Menu and permissions seed skipped. Master company JOIN-001 was not found.");
             return;
         }
 
         var currentChecksum = ComputeMenuPermissionsSeedChecksum();
+        var pendingCompanies = new List<(DevelopmentCompanyProfile Profile, Guid CompanyId)>();
 
-        if (!forceReseed)
+        foreach (var profile in DevelopmentCompanyProfiles.All)
         {
-            var existingState = await _context.SeedStates
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(s => s.CompanyId == joinCompanyId, cancellationToken);
-
-            if (existingState is not null && existingState.Checksum == currentChecksum)
+            if (!companyIdsByTaxId.TryGetValue(profile.TaxId, out var companyId))
             {
-                _logger.LogInformation("Menu and permissions seed skipped for company {CompanyId}: no changes detected.", joinCompanyId);
-                return;
+                continue;
             }
+
+            if (!forceReseed)
+            {
+                var existingState = await _context.SeedStates
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(s => s.CompanyId == companyId, cancellationToken);
+
+                if (existingState is not null && existingState.Checksum == currentChecksum)
+                {
+                    _logger.LogInformation("Menu and permissions seed skipped for company {CompanyId}: no changes detected.", companyId);
+                    continue;
+                }
+            }
+
+            pendingCompanies.Add((profile, companyId));
+        }
+
+        if (pendingCompanies.Count == 0)
+        {
+            return;
         }
 
         await SeedRolesAsync();
         await SeedDefaultUsersAsync();
-        await SeedUserAccessAsync(joinCompanyId);
+        if (pendingCompanies.Any(c => c.CompanyId == joinCompanyId))
+        {
+            await SeedUserAccessAsync(joinCompanyId);
+        }
+
         // SPEC 43: modules first, so an existing database gets the renames and IsBase before the options
         // are re-pointed at their real module.
         await SeedSystemModulesAsync();
         await SeedSystemOptionsAsync();
-        await SeedRoleSystemOptionsAsync(joinCompanyId);
 
-        await UpsertSeedStateAsync(joinCompanyId, currentChecksum, cancellationToken);
+        foreach (var (profile, companyId) in pendingCompanies)
+        {
+            if (companyId != joinCompanyId)
+            {
+                // SPEC 100: the other development companies mirror the access and permissions of JOIN-001.
+                await SeedUserAccessForDevelopmentCompanyAsync(joinCompanyId, companyId, profile, cancellationToken);
+            }
 
-        _logger.LogInformation("Menu and permissions seed completed for company {CompanyId}.", joinCompanyId);
+            await SeedRoleSystemOptionsAsync(companyId);
+            if (companyId != joinCompanyId)
+            {
+                await CopyRoleSystemOptionsAsync(joinCompanyId, companyId, cancellationToken);
+            }
+
+            await UpsertSeedStateAsync(companyId, currentChecksum, cancellationToken);
+
+            _logger.LogInformation("Menu and permissions seed completed for company {CompanyId}.", companyId);
+        }
     }
 
     /// <summary>
@@ -487,7 +526,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedRolesAsync();
 
             // 2. Organizaciones (Tenants)
-            var joinCompanyId = await SeedDefaultCompanyAsync();
+            var join = DevelopmentCompanyProfiles.Join001;
+            var joinCompanyId = await EnsureDevelopmentCompanyAsync(join);
             var privateCompanyId = await SeedPrivateCompanyAsync();
 
             // 3. Catálogos administrativos
@@ -527,21 +567,21 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedTicketUserCompaniesAsync(joinCompanyId);
             await SeedTicketAttachmentSettingsAsync(joinCompanyId);
             await SeedTicketAttachmentSettingsAsync(privateCompanyId);
-            await SeedJoinCalendarAsync(joinCompanyId);
+            await SeedCalendarForDevelopmentCompanyAsync(joinCompanyId, join);
             // SPEC 55: each company's customer stages, before any customer is seeded.
             await SeedCustomerStagesForCompanyAsync(joinCompanyId);
             await SeedCustomerStagesForCompanyAsync(privateCompanyId);
             // SPEC 56: global ISO catalog, USD base for every existing company and sample parallel currencies in JOIN-001.
             await SeedCurrenciesAsync();
             await SeedCompanyCurrenciesForAllCompaniesAsync();
-            await SeedJoinParallelCurrenciesAsync(joinCompanyId);
+            await SeedParallelCurrenciesForDevelopmentCompanyAsync(joinCompanyId, join);
             // SPEC 57: sample categories and products of the commercial proposal in JOIN-001 (development data).
-            await SeedJoinProductCatalogAsync(joinCompanyId);
+            await SeedProductCatalogForDevelopmentCompanyAsync(joinCompanyId, join);
             // SPEC 59: global contact types and the commercial settings of every live company.
             await SeedContactTypesAsync();
             await SeedLeadSettingsForAllCompaniesAsync();
             // SPEC 60: development sales teams of JOIN-001 (the roles are seeded with the lead settings above).
-            await SeedJoinSalesTeamsAsync(joinCompanyId);
+            await SeedSalesTeamsForDevelopmentCompanyAsync(joinCompanyId, join);
             // SPEC 71: the four seed email template types of every company and the development templates of JOIN-001.
             await SeedEmailTemplateTypesForCompanyAsync(joinCompanyId);
             await SeedEmailTemplateTypesForCompanyAsync(privateCompanyId);
@@ -551,15 +591,15 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await SeedEmailCompanySettingsDefaultsAsync();
 
             // 7. Entidades operacionales (Clientes)
-            await SeedJoinPersonsAsync(joinCompanyId, idTypeId);
+            await SeedPersonsForDevelopmentCompanyAsync(joinCompanyId, join, idTypeId);
             await SeedPrivatePersonsAsync(privateCompanyId, idTypeId);
-            await SeedJoinPersonAddressesAndContactsAsync(joinCompanyId);
+            await SeedPersonAddressesAndContactsForDevelopmentCompanyAsync(joinCompanyId, join);
             // SPEC 54: 40 persons for the "Cliente/Persona" lookup, 30 of them registered as customers.
-            await SeedJoinLookupPersonsAsync(joinCompanyId, idTypes);
-            await SeedJoinCustomersAsync(joinCompanyId);
-            await SeedJoinTicketsAsync(joinCompanyId);
+            await SeedLookupPersonsForDevelopmentCompanyAsync(joinCompanyId, join, idTypes);
+            await SeedCustomersForDevelopmentCompanyAsync(joinCompanyId, join);
+            await SeedTicketsForDevelopmentCompanyAsync(joinCompanyId, join);
             // SPEC 61: sample leads of the proposal (open, inactive, one in DOP) with contacts and products.
-            await SeedJoinLeadsAsync(joinCompanyId);
+            await SeedLeadsForDevelopmentCompanyAsync(joinCompanyId, join);
 
             // Guardado final para asegurar consistencia
             await _context.SaveChangesAsync();
@@ -615,29 +655,396 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         }
     }
 
-    private async Task<Guid> SeedDefaultCompanyAsync()
+    /// <summary>
+    /// SPEC 100: the company of a development profile (JOIN-001 or JOIN-NI-001), found by <c>TaxId</c> and created
+    /// active when it is missing. Returns its id.
+    /// </summary>
+    private async Task<Guid> EnsureDevelopmentCompanyAsync(DevelopmentCompanyProfile profile)
     {
         // Se usa IgnoreQueryFilters para detectar la empresa aunque no haya contexto de usuario
         var existing = await _context.Companies
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(c => c.TaxId == "JOIN-001");
+            .FirstOrDefaultAsync(c => c.TaxId == profile.TaxId);
 
         if (existing == null)
         {
-            _logger.LogDebug("Inserting Master Company...");
-            var company = new Company 
-            { 
-                Name = "JOIN Software Group", 
-                TaxId = "JOIN-001",
+            _logger.LogDebug("Inserting development company {TaxId}...", profile.TaxId);
+            var company = new Company
+            {
+                Name = profile.CompanyName,
+                TaxId = profile.TaxId,
                 IsActive = true,
                 Created = DateTime.UtcNow,
-                GcRecord = 0 
+                GcRecord = 0
             };
             _context.Companies.Add(company);
             await _context.SaveChangesAsync(); 
             return company.Id;
         }
         return existing.Id;
+    }
+
+    /// <summary>
+    /// SPEC 100 (Development only): creates the development companies other than JOIN-001 (today JOIN-NI-001) and
+    /// gives each one everything JOIN-001 receives from the seed, with the amounts, currencies and geography of its
+    /// <see cref="DevelopmentCompanyProfile"/>. Idempotent ("missing rows only"): runs on every Development start-up,
+    /// with or without pending migrations, after <see cref="SeedAsync"/>. Returns the ids of the companies it seeded,
+    /// so the caller can drop their cached permissions.
+    /// </summary>
+    public async Task<IReadOnlyList<Guid>> SeedDevelopmentCompaniesAsync(CancellationToken cancellationToken = default)
+    {
+        var master = DevelopmentCompanyProfiles.Join001;
+        var joinCompanyId = await _context.Companies
+            .IgnoreQueryFilters()
+            .Where(c => c.TaxId == master.TaxId)
+            .Select(c => c.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (joinCompanyId == Guid.Empty)
+        {
+            _logger.LogWarning("Development companies seed skipped. Master company {TaxId} was not found.", master.TaxId);
+            return [];
+        }
+
+        // NIO joins the global catalog before any company uses it.
+        await SeedCurrenciesAsync(cancellationToken);
+
+        var seeded = new List<Guid>();
+        foreach (var profile in DevelopmentCompanyProfiles.All.Where(p => p != master))
+        {
+            var companyId = await EnsureDevelopmentCompanyAsync(profile);
+            await SeedDevelopmentCompanyDataAsync(joinCompanyId, companyId, profile, cancellationToken);
+            seeded.Add(companyId);
+            _logger.LogInformation("Development company {TaxId} seed completed ({CompanyId}).", profile.TaxId, companyId);
+        }
+
+        return seeded;
+    }
+
+    /// <summary>
+    /// SPEC 100 rule 4: the same seed methods JOIN-001 receives in <see cref="SeedAsync"/>, run for another development
+    /// company with its profile. Global catalogs are not repeated.
+    /// </summary>
+    private async Task SeedDevelopmentCompanyDataAsync(Guid joinCompanyId, Guid companyId, DevelopmentCompanyProfile profile, CancellationToken cancellationToken)
+    {
+        // Currencies first: the per-company catalogs below would otherwise give the company a USD base.
+        await SeedCompanyCurrenciesForCompanyAsync(companyId, profile.BaseCurrencyCode, cancellationToken);
+        await SeedParallelCurrenciesForDevelopmentCompanyAsync(companyId, profile, cancellationToken);
+
+        // Per-company catalogs: messaging, calendar, customer stages, commercial settings, attachments and email.
+        await SeedDefaultCatalogsForCompanyAsync(companyId, cancellationToken);
+        var defaultTimeUnitId = await SeedMessagingCatalogsForCompanyAsync(companyId, cancellationToken);
+        await CopyCompanyModulesAsync(joinCompanyId, companyId, cancellationToken);
+
+        // Access (every start-up, rule 5) and permissions (only when the in-code definitions changed, rule 10).
+        await SeedUserAccessForDevelopmentCompanyAsync(joinCompanyId, companyId, profile, cancellationToken);
+        var checksum = ComputeMenuPermissionsSeedChecksum();
+        var state = await _context.SeedStates.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.CompanyId == companyId, cancellationToken);
+        if (state is null || state.Checksum != checksum)
+        {
+            await SeedRoleSystemOptionsAsync(companyId);
+            await CopyRoleSystemOptionsAsync(joinCompanyId, companyId, cancellationToken);
+            await UpsertSeedStateAsync(companyId, checksum, cancellationToken);
+        }
+
+        // Admin catalogs.
+        var activeStatusId = await SeedActiveEntityStatusAsync();
+        await SeedAreasByCompanyAsync(companyId, null, activeStatusId);
+        await SeedProjectsByCompanyAsync(companyId, null, activeStatusId);
+        await SeedGendersAsync(companyId);
+        await SeedTaxRegimesAsync(companyId);
+        await SeedIndustriesAsync(companyId);
+        // SPEC 100 rule 12: the income ranges stay in USD (reference ranges, each one declares its currency).
+        await SeedIncomeRangesAsync(companyId);
+
+        // Tickets and calendar.
+        await SeedTicketCompanyDefaultsAsync(companyId, defaultTimeUnitId, updateExisting: false);
+        await SeedTicketUserCompaniesAsync(companyId);
+        await SeedTicketAttachmentSettingsAsync(companyId);
+        await SeedCalendarForDevelopmentCompanyAsync(companyId, profile);
+
+        // Commercial data.
+        await SeedProductCatalogForDevelopmentCompanyAsync(companyId, profile, cancellationToken);
+        await SeedSalesTeamsForDevelopmentCompanyAsync(companyId, profile, cancellationToken);
+        await SeedJoinEmailTemplatesAsync(companyId, cancellationToken);
+
+        // Persons, customers, tickets and leads.
+        var idTypes = await SeedIdentificationTypesAsync();
+        await SeedPersonsForDevelopmentCompanyAsync(companyId, profile, idTypes[CedulaIdentificationType]);
+        await SeedPersonAddressesAndContactsForDevelopmentCompanyAsync(companyId, profile);
+        await SeedLookupPersonsForDevelopmentCompanyAsync(companyId, profile, idTypes);
+        await SeedCustomersForDevelopmentCompanyAsync(companyId, profile);
+        // The sample ticket codes carry the month (TICK-yyyyMM-0001): seeding them on every start-up would add seven
+        // more each month, so a company that already has tickets is left alone.
+        if (!await _context.Tickets.IgnoreQueryFilters().AnyAsync(t => t.CompanyId == companyId, cancellationToken))
+        {
+            await SeedTicketsForDevelopmentCompanyAsync(companyId, profile);
+        }
+
+        await SeedLeadsForDevelopmentCompanyAsync(companyId, profile, cancellationToken);
+    }
+
+    /// <summary>
+    /// SPEC 100 rule 5: every live membership of JOIN-001 (seeded or created at runtime) gets its copy in the target
+    /// development company with the same roles, ticket settings and default calendar. The copy is never the user's
+    /// default company (<c>IsDefault = false</c>). Access removed by hand comes back on the next Development start-up
+    /// (accepted risk of the spec).
+    /// </summary>
+    private async Task SeedUserAccessForDevelopmentCompanyAsync(Guid joinCompanyId, Guid companyId, DevelopmentCompanyProfile profile, CancellationToken cancellationToken)
+    {
+        var userIds = await _context.UserCompanies
+            .IgnoreQueryFilters()
+            .Where(uc => uc.CompanyId == joinCompanyId && uc.GcRecord == 0)
+            .Select(uc => uc.UserId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var now = DateTime.UtcNow;
+
+        // Memberships (unique (UserId, CompanyId) among all rows: a deleted copy is revived).
+        var memberships = await _context.UserCompanies
+            .IgnoreQueryFilters()
+            .Where(uc => uc.CompanyId == companyId && userIds.Contains(uc.UserId))
+            .ToDictionaryAsync(uc => uc.UserId, cancellationToken);
+        var membershipsAdded = 0;
+        foreach (var userId in userIds)
+        {
+            if (!memberships.TryGetValue(userId, out var membership))
+            {
+                _context.UserCompanies.Add(new UserCompany
+                {
+                    UserId = userId,
+                    CompanyId = companyId,
+                    IsDefault = false,
+                    Created = now,
+                    CreatedBy = "System_Seeder",
+                    GcRecord = 0
+                });
+                membershipsAdded++;
+            }
+            else if (membership.GcRecord != 0)
+            {
+                membership.GcRecord = 0;
+                membership.IsDefault = false;
+                membership.LastModified = now;
+                membership.LastModifiedBy = "System_Seeder";
+                membershipsAdded++;
+            }
+        }
+
+        // Roles (unique (UserId, RoleId, CompanyId) among all rows).
+        var sourceRoles = await _context.UserRoleCompanies
+            .IgnoreQueryFilters()
+            .Where(urc => urc.CompanyId == joinCompanyId && urc.GcRecord == 0 && userIds.Contains(urc.UserId))
+            .Select(urc => new { urc.UserId, urc.RoleId })
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var targetRoles = await _context.UserRoleCompanies
+            .IgnoreQueryFilters()
+            .Where(urc => urc.CompanyId == companyId)
+            .ToListAsync(cancellationToken);
+        var rolesAdded = 0;
+        foreach (var source in sourceRoles)
+        {
+            var target = targetRoles.FirstOrDefault(urc => urc.UserId == source.UserId && urc.RoleId == source.RoleId);
+            if (target is null)
+            {
+                _context.UserRoleCompanies.Add(new UserRoleCompany
+                {
+                    UserId = source.UserId,
+                    RoleId = source.RoleId,
+                    CompanyId = companyId,
+                    Created = now,
+                    CreatedBy = "System_Seeder",
+                    GcRecord = 0
+                });
+                rolesAdded++;
+            }
+            else if (target.GcRecord != 0)
+            {
+                target.GcRecord = 0;
+                target.LastModified = now;
+                target.LastModifiedBy = "System_Seeder";
+                rolesAdded++;
+            }
+        }
+
+        // Ticket settings of the user (unique among live rows).
+        var sourceTicketUsers = await _context.TicketUserCompanies
+            .IgnoreQueryFilters()
+            .Where(t => t.CompanyId == joinCompanyId && t.GcRecord == 0 && userIds.Contains(t.UserId))
+            .ToListAsync(cancellationToken);
+        var targetTicketUserIds = await _context.TicketUserCompanies
+            .IgnoreQueryFilters()
+            .Where(t => t.CompanyId == companyId && t.GcRecord == 0)
+            .Select(t => t.UserId)
+            .ToListAsync(cancellationToken);
+        var ticketUsersAdded = 0;
+        foreach (var source in sourceTicketUsers.Where(t => !targetTicketUserIds.Contains(t.UserId)).GroupBy(t => t.UserId).Select(g => g.First()))
+        {
+            _context.TicketUserCompanies.Add(new TicketUserCompany
+            {
+                CompanyId = companyId,
+                UserId = source.UserId,
+                IsSuperAdminTicket = source.IsSuperAdminTicket,
+                CanFinishTicket = source.CanFinishTicket,
+                CanResolveTicket = source.CanResolveTicket,
+                Created = now,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            });
+            ticketUsersAdded++;
+        }
+
+        // Calendar of the user: its default calendar and its configuration (unique among live rows).
+        var sourceCalendars = await (from cfg in _context.CalendarUserConfigurations.IgnoreQueryFilters()
+                                     join cal in _context.UserCalendars.IgnoreQueryFilters() on cfg.DefaultCalendarId equals cal.Id
+                                     where cfg.CompanyId == joinCompanyId && cfg.GcRecord == 0 && userIds.Contains(cfg.UserId)
+                                     select new { Configuration = cfg, Calendar = cal }).ToListAsync(cancellationToken);
+        var targetConfiguredUserIds = await _context.CalendarUserConfigurations
+            .IgnoreQueryFilters()
+            .Where(cfg => cfg.CompanyId == companyId && cfg.GcRecord == 0)
+            .Select(cfg => cfg.UserId)
+            .ToListAsync(cancellationToken);
+        var targetCalendars = await _context.UserCalendars
+            .IgnoreQueryFilters()
+            .Where(cal => cal.CompanyId == companyId && cal.GcRecord == 0)
+            .ToListAsync(cancellationToken);
+        var calendarsAdded = 0;
+        foreach (var source in sourceCalendars.Where(x => !targetConfiguredUserIds.Contains(x.Configuration.UserId)).GroupBy(x => x.Configuration.UserId).Select(g => g.First()))
+        {
+            var calendar = targetCalendars.FirstOrDefault(cal => cal.OwnerUserId == source.Configuration.UserId && cal.Name == source.Calendar.Name);
+            if (calendar is null)
+            {
+                calendar = new UserCalendar
+                {
+                    CompanyId = companyId,
+                    OwnerUserId = source.Configuration.UserId,
+                    Name = source.Calendar.Name,
+                    Description = source.Calendar.Description,
+                    Color = source.Calendar.Color,
+                    IsActive = true,
+                    SortOrder = source.Calendar.SortOrder,
+                    CreatedBy = "System_Seeder"
+                };
+                _context.UserCalendars.Add(calendar);
+                targetCalendars.Add(calendar);
+            }
+
+            _context.CalendarUserConfigurations.Add(new CalendarUserConfiguration
+            {
+                CompanyId = companyId,
+                UserId = source.Configuration.UserId,
+                DefaultCalendarId = calendar.Id,
+                BusinessHoursStart = source.Configuration.BusinessHoursStart,
+                BusinessHoursEnd = source.Configuration.BusinessHoursEnd,
+                WorkDays = source.Configuration.WorkDays,
+                DefaultView = source.Configuration.DefaultView,
+                WeekStartsOn = source.Configuration.WeekStartsOn,
+                CanViewOthersActivities = source.Configuration.CanViewOthersActivities,
+                CreatedBy = "System_Seeder"
+            });
+            calendarsAdded++;
+        }
+
+        if (membershipsAdded > 0 || rolesAdded > 0 || ticketUsersAdded > 0 || calendarsAdded > 0)
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        _logger.LogInformation(
+            "{TaxId} user access seed finished. UserCompanies: {Memberships}, UserRoleCompanies: {Roles}, TicketUserCompanies: {TicketUsers}, Calendars: {Calendars}",
+            profile.TaxId, membershipsAdded, rolesAdded, ticketUsersAdded, calendarsAdded);
+    }
+
+    /// <summary>
+    /// SPEC 100 rule 4: the permissions of JOIN-001 that the target company does not have yet (for instance the ones a
+    /// user added by hand in JOIN-001), copied with the same flags. Rows the target already has, live or deleted, are
+    /// left as they are (unique (CompanyId, RoleId, SystemOptionId) among all rows).
+    /// </summary>
+    private async Task CopyRoleSystemOptionsAsync(Guid joinCompanyId, Guid companyId, CancellationToken cancellationToken)
+    {
+        var source = await _context.RoleSystemOptions
+            .IgnoreQueryFilters()
+            .Where(rso => rso.CompanyId == joinCompanyId && rso.GcRecord == 0)
+            .ToListAsync(cancellationToken);
+        var existing = (await _context.RoleSystemOptions
+                .IgnoreQueryFilters()
+                .Where(rso => rso.CompanyId == companyId)
+                .Select(rso => new { rso.RoleId, rso.SystemOptionId })
+                .ToListAsync(cancellationToken))
+            .Select(x => (x.RoleId, x.SystemOptionId))
+            .ToHashSet();
+
+        var now = DateTime.UtcNow;
+        var inserted = 0;
+        foreach (var permission in source.Where(p => !existing.Contains((p.RoleId, p.SystemOptionId))))
+        {
+            _context.RoleSystemOptions.Add(new RoleSystemOption
+            {
+                RoleId = permission.RoleId,
+                SystemOptionId = permission.SystemOptionId,
+                CompanyId = companyId,
+                CanRead = permission.CanRead,
+                CanCreate = permission.CanCreate,
+                CanUpdate = permission.CanUpdate,
+                CanDelete = permission.CanDelete,
+                CanDownload = permission.CanDownload,
+                CanExport = permission.CanExport,
+                CanExecute = permission.CanExecute,
+                IsVisibleMenu = permission.IsVisibleMenu,
+                OrderMenu = permission.OrderMenu,
+                Created = now,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            });
+            existing.Add((permission.RoleId, permission.SystemOptionId));
+            inserted++;
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        _logger.LogInformation("Role system options copied from JOIN-001 to company {CompanyId}. Inserted: {Inserted}", companyId, inserted);
+    }
+
+    /// <summary>
+    /// SPEC 100 rule 4: the modules of JOIN-001 (base modules and the optional ones, such as <c>Calendar</c>) copied to
+    /// the target company with the same <c>IsActive</c>. A module the target already has, live or deleted, is left alone.
+    /// </summary>
+    private async Task CopyCompanyModulesAsync(Guid joinCompanyId, Guid companyId, CancellationToken cancellationToken)
+    {
+        var source = await _context.CompanyModules
+            .IgnoreQueryFilters()
+            .Where(cm => cm.CompanyId == joinCompanyId && cm.GcRecord == 0)
+            .ToListAsync(cancellationToken);
+        var existingModuleIds = await _context.CompanyModules
+            .IgnoreQueryFilters()
+            .Where(cm => cm.CompanyId == companyId)
+            .Select(cm => cm.ModuleId)
+            .ToListAsync(cancellationToken);
+
+        var inserted = 0;
+        foreach (var module in source.Where(m => !existingModuleIds.Contains(m.ModuleId)).GroupBy(m => m.ModuleId).Select(g => g.First()))
+        {
+            _context.CompanyModules.Add(new CompanyModule
+            {
+                CompanyId = companyId,
+                ModuleId = module.ModuleId,
+                IsActive = module.IsActive,
+                Created = DateTime.UtcNow,
+                CreatedBy = "System_Seeder",
+                GcRecord = 0
+            });
+            inserted++;
+        }
+
+        if (inserted > 0)
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private async Task<Guid> SeedPrivateCompanyAsync()
@@ -984,14 +1391,14 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     }
 
     /// <summary>
-    /// SPEC 60 D.14 (development data): the three teams of the proposal in JOIN-001 with the seeded users, including
-    /// the commercial supervisor in two teams. Only users bound to JOIN-001 are used; a team that already exists is
-    /// left alone.
+    /// SPEC 60 D.14 (development data): the three teams of the proposal in a development company (SPEC 100: JOIN-001
+    /// and JOIN-NI-001) with the seeded users, including the commercial supervisor in two teams. Only users bound to
+    /// the company are used; a team that already exists is left alone.
     /// </summary>
-    private async Task SeedJoinSalesTeamsAsync(Guid joinCompanyId, CancellationToken cancellationToken = default)
+    private async Task SeedSalesTeamsForDevelopmentCompanyAsync(Guid companyId, DevelopmentCompanyProfile profile, CancellationToken cancellationToken = default)
     {
         var roles = await _context.TeamRoles.IgnoreQueryFilters()
-            .Where(r => r.CompanyId == joinCompanyId && r.GcRecord == 0)
+            .Where(r => r.CompanyId == companyId && r.GcRecord == 0)
             .ToDictionaryAsync(r => r.Code, cancellationToken);
         if (!roles.ContainsKey(TeamRole.Codes.Member))
         {
@@ -999,7 +1406,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         }
 
         var memberIds = await _context.UserCompanies.IgnoreQueryFilters()
-            .Where(uc => uc.CompanyId == joinCompanyId && uc.GcRecord == 0)
+            .Where(uc => uc.CompanyId == companyId && uc.GcRecord == 0)
             .Select(uc => uc.UserId)
             .ToListAsync(cancellationToken);
         var users = await _context.ApplicationUsers.IgnoreQueryFilters()
@@ -1014,7 +1421,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         ];
 
         var existing = await _context.SalesTeams.IgnoreQueryFilters()
-            .Where(t => t.CompanyId == joinCompanyId && t.GcRecord == 0)
+            .Where(t => t.CompanyId == companyId && t.GcRecord == 0)
             .Select(t => t.Name)
             .ToListAsync(cancellationToken);
         var validFrom = new DateOnly(2026, 3, 1);
@@ -1025,7 +1432,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 continue;
             }
 
-            var team = new SalesTeam { CompanyId = joinCompanyId, Name = name, Description = description };
+            var team = new SalesTeam { CompanyId = companyId, Name = name, Description = description };
             _context.SalesTeams.Add(team);
             foreach (var (email, role, primary) in members)
             {
@@ -1036,28 +1443,36 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
                 _context.SalesTeamMembers.Add(new SalesTeamMember
                 {
-                    CompanyId = joinCompanyId, SalesTeamId = team.Id, UserId = userId, TeamRoleId = roles[role].Id, IsPrimary = primary, ValidFrom = validFrom
+                    CompanyId = companyId, SalesTeamId = team.Id, UserId = userId, TeamRoleId = roles[role].Id, IsPrimary = primary, ValidFrom = validFrom
                 });
             }
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation("Sales teams seed finished for {TaxId}.", profile.TaxId);
     }
 
     /// <summary>
-    /// SPEC 61 D.33 (development data): sample leads of JOIN-001 on the seeded persons, users, teams and products —
-    /// open leads in several stages, one in DOP and one inactive — with their first contact, lines and histories.
-    /// Skipped when the company already has leads.
+    /// SPEC 61 D.33 (development data): sample leads of a development company on the seeded persons, users, teams and
+    /// products — open leads in several stages, one in the first parallel currency of the profile and one inactive —
+    /// with their first contact, lines and histories. Skipped when the company already has leads.
     /// </summary>
-    private async Task SeedJoinLeadsAsync(Guid joinCompanyId, CancellationToken cancellationToken = default)
+    /// <remarks>
+    /// SPEC 100 rule 11: no lead is pinned to USD. The leads of the base currency use <c>profile.BaseCurrencyCode</c> with
+    /// rate 1 (USD in JOIN-001, NIO in JOIN-NI-001) and their manual amounts go through <see cref="DevelopmentCompanyProfile.ToBaseAmount"/>.
+    /// The lead in the parallel currency (DOP in JOIN-001, USD in JOIN-NI-001) reads its seed rate by currency code; its
+    /// lines stay <c>ReferencePrice / rate</c>, never multiplied by the factor again, because the reference price is already
+    /// in the base currency (3.662,00 NIO → 100,00 USD).
+    /// </remarks>
+    private async Task SeedLeadsForDevelopmentCompanyAsync(Guid companyId, DevelopmentCompanyProfile profile, CancellationToken cancellationToken = default)
     {
-        if (await _context.Leads.IgnoreQueryFilters().AnyAsync(l => l.CompanyId == joinCompanyId, cancellationToken))
+        if (await _context.Leads.IgnoreQueryFilters().AnyAsync(l => l.CompanyId == companyId, cancellationToken))
         {
             return;
         }
 
         var persons = await _context.Persons.IgnoreQueryFilters()
-            .Where(p => p.CompanyId == joinCompanyId && p.GcRecord == 0 && p.IsActive)
+            .Where(p => p.CompanyId == companyId && p.GcRecord == 0 && p.IsActive)
             .OrderBy(p => p.Created).ThenBy(p => p.Id)
             .Select(p => p.Id)
             .Take(8)
@@ -1065,43 +1480,48 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         var users = await _context.ApplicationUsers.IgnoreQueryFilters()
             .Where(u => u.Email != null)
             .ToDictionaryAsync(u => u.Email!, u => u.Id, StringComparer.OrdinalIgnoreCase, cancellationToken);
-        var stages = await _context.LeadStages.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, cancellationToken);
-        var sources = await _context.LeadSources.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken);
-        var relationships = await _context.RelationshipTypes.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken);
-        var reasons = await _context.LeadReasons.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken);
+        var stages = await _context.LeadStages.IgnoreQueryFilters().Where(x => x.CompanyId == companyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, cancellationToken);
+        var sources = await _context.LeadSources.IgnoreQueryFilters().Where(x => x.CompanyId == companyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken);
+        var relationships = await _context.RelationshipTypes.IgnoreQueryFilters().Where(x => x.CompanyId == companyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken);
+        var reasons = await _context.LeadReasons.IgnoreQueryFilters().Where(x => x.CompanyId == companyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken);
         var contactTypes = await (from c in _context.ContactTypeCompanies.IgnoreQueryFilters()
                                   join t in _context.ContactTypes.IgnoreQueryFilters() on c.ContactTypeId equals t.Id
-                                  where c.CompanyId == joinCompanyId && c.GcRecord == 0
+                                  where c.CompanyId == companyId && c.GcRecord == 0
                                   select new { t.Code, c.Id }).ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken);
-        var products = await _context.Products.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, cancellationToken);
-        var teams = await _context.SalesTeams.IgnoreQueryFilters().Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken);
+        var products = await _context.Products.IgnoreQueryFilters().Where(x => x.CompanyId == companyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Code, cancellationToken);
+        var teams = await _context.SalesTeams.IgnoreQueryFilters().Where(x => x.CompanyId == companyId && x.GcRecord == 0).ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken);
         var currencies = await _context.Currencies.IgnoreQueryFilters().Where(c => c.GcRecord == 0).ToDictionaryAsync(c => c.Code, c => c.Id, cancellationToken);
-        if (persons.Count < 8 || !stages.ContainsKey("NEW") || !currencies.ContainsKey("USD")
+        var baseCurrency = profile.BaseCurrencyCode;
+        if (persons.Count < 8 || !stages.ContainsKey("NEW") || !currencies.ContainsKey(baseCurrency)
             || !users.ContainsKey("manager@join.com") || !users.ContainsKey("simpleuser@join.com") || !users.ContainsKey("livingstone23@gmail.com"))
         {
             return;
         }
 
-        var dopRate = await _context.ExchangeRates.IgnoreQueryFilters()
-            .Where(r => r.CompanyId == joinCompanyId && r.CurrencyId == currencies["DOP"] && r.GcRecord == 0)
-            .OrderByDescending(r => r.RateDate)
-            .Select(r => (decimal?)r.Rate)
-            .FirstOrDefaultAsync(cancellationToken);
+        var parallelCurrency = profile.ParallelCurrencies.FirstOrDefault()?.Code;
+        var parallelRate = parallelCurrency is not null && currencies.TryGetValue(parallelCurrency, out var parallelCurrencyId)
+            ? await _context.ExchangeRates.IgnoreQueryFilters()
+                .Where(r => r.CompanyId == companyId && r.CurrencyId == parallelCurrencyId && r.GcRecord == 0)
+                .OrderByDescending(r => r.RateDate)
+                .Select(r => (decimal?)r.Rate)
+                .FirstOrDefaultAsync(cancellationToken)
+            : null;
+        var leadParallelCurrency = parallelRate is null ? baseCurrency : parallelCurrency!;
 
         (string Topic, string Owner, string Team, string Stage, string Source, string Relationship, string Currency, decimal Manual,
             (string Code, decimal Qty)[] Lines, (string Type, int? Minutes, string Summary) Contact, string? InactiveReason)[] seeds =
         [
-            ("Punto de venta para 3 sucursales", "manager@join.com", "Equipo Capital", "NEW", "REFERRAL", "PROSPECT_CUSTOMER", "USD", 0m,
+            ("Punto de venta para 3 sucursales", "manager@join.com", "Equipo Capital", "NEW", "REFERRAL", "PROSPECT_CUSTOMER", baseCurrency, 0m,
                 [("POS-01", 3m), ("IMP-BAS", 1m)], ("CALL", 15, "Primer contacto: necesitan POS para tres sucursales."), null),
-            ("CRM para admisiones y cobros", "simpleuser@join.com", "Equipo Capital", "NEGOTIATION", "EVENT", "PROSPECT_CUSTOMER", "USD", 0m,
+            ("CRM para admisiones y cobros", "simpleuser@join.com", "Equipo Capital", "NEGOTIATION", "EVENT", "PROSPECT_CUSTOMER", baseCurrency, 0m,
                 [("CRM-USR", 25m), ("CAP-HR", 1m)], ("VISIT", 60, "Visita al colegio; revisamos el flujo de admisiones."), null),
-            ("Reventa de licencias en la zona este", "manager@join.com", "Equipo Capital", "QUALIFIED", "WEB", "DISTRIBUTOR", "USD", 2650m,
+            ("Reventa de licencias en la zona este", "manager@join.com", "Equipo Capital", "QUALIFIED", "WEB", "DISTRIBUTOR", baseCurrency, profile.ToBaseAmount(2650m),
                 [], ("EMAIL", null, "Enviada la propuesta de distribución."), null),
-            ("Licencias para consultorio", "simpleuser@join.com", "Equipo Capital", "CONTACTED", "WA_IN", "PROSPECT_CUSTOMER", "USD", 500m,
+            ("Licencias para consultorio", "simpleuser@join.com", "Equipo Capital", "CONTACTED", "WA_IN", "PROSPECT_CUSTOMER", baseCurrency, profile.ToBaseAmount(500m),
                 [], ("WHATSAPP", null, "Pidió precios por WhatsApp."), null),
-            ("Licencias y soporte", "livingstone23@gmail.com", "Equipo Norte", "PROPOSAL", "REFERRAL", "PROSPECT_CUSTOMER", dopRate is null ? "USD" : "DOP", 0m,
+            ("Licencias y soporte", "livingstone23@gmail.com", "Equipo Norte", "PROPOSAL", "REFERRAL", "PROSPECT_CUSTOMER", leadParallelCurrency, 0m,
                 [("CRM-USR", 10m), ("SOP-12", 1m)], ("ONLINE_MEETING", 45, "Reunión online con la gerencia."), null),
-            ("Caja registradora", "livingstone23@gmail.com", "Equipo Norte", "CONTACTED", "COLD", "PROSPECT_CUSTOMER", "USD", 420m,
+            ("Caja registradora", "livingstone23@gmail.com", "Equipo Norte", "CONTACTED", "COLD", "PROSPECT_CUSTOMER", baseCurrency, profile.ToBaseAmount(420m),
                 [], ("CALL", 10, "No contestan desde hace dos semanas."), "NO_ANSWER")
         ];
 
@@ -1113,10 +1533,10 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             var personId = persons[number];
             number++;
             var ownerId = users[seed.Owner];
-            var rate = seed.Currency == "DOP" ? dopRate!.Value : 1m;
+            var rate = seed.Currency == baseCurrency ? 1m : parallelRate!.Value;
             var lead = new Lead
             {
-                CompanyId = joinCompanyId,
+                CompanyId = companyId,
                 Code = $"LD-{number:D6}",
                 PersonId = personId,
                 Topic = seed.Topic,
@@ -1135,7 +1555,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             var contactAt = now.AddDays(-number);
             var interaction = new LeadInteraction
             {
-                CompanyId = joinCompanyId, LeadId = lead.Id, ContactTypeCompanyId = contactTypes[seed.Contact.Type], OccurredAt = contactAt,
+                CompanyId = companyId, LeadId = lead.Id, ContactTypeCompanyId = contactTypes[seed.Contact.Type], OccurredAt = contactAt,
                 DurationMinutes = seed.Contact.Minutes, UserId = ownerId, Outcome = InteractionOutcome.Interested, Summary = seed.Contact.Summary
             };
             _context.LeadInteractions.Add(interaction);
@@ -1151,7 +1571,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
                 var line = new LeadProduct
                 {
-                    CompanyId = joinCompanyId, LeadId = lead.Id, ProductId = product.Id, Quantity = qty,
+                    CompanyId = companyId, LeadId = lead.Id, ProductId = product.Id, Quantity = qty,
                     UnitPrice = Math.Round(product.ReferencePrice / rate, 2, MidpointRounding.AwayFromZero), OfferedInInteractionId = interaction.Id
                 };
                 line.Recalculate();
@@ -1163,20 +1583,20 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             lead.EstimatedValueBase = Math.Round(lead.EstimatedValue * rate, 2, MidpointRounding.AwayFromZero);
 
             var createdAt = contactAt.AddHours(-1);
-            _context.LeadStageHistory.Add(new LeadStageHistory { CompanyId = joinCompanyId, LeadId = lead.Id, ToStageId = stages["NEW"].Id, UserId = ownerId, ChangedAt = createdAt });
+            _context.LeadStageHistory.Add(new LeadStageHistory { CompanyId = companyId, LeadId = lead.Id, ToStageId = stages["NEW"].Id, UserId = ownerId, ChangedAt = createdAt });
             if (seed.Stage != "NEW")
             {
                 _context.LeadStageHistory.Add(new LeadStageHistory
                 {
-                    CompanyId = joinCompanyId, LeadId = lead.Id, FromStageId = stages["NEW"].Id, ToStageId = lead.LeadStageId, UserId = ownerId, ChangedAt = contactAt
+                    CompanyId = companyId, LeadId = lead.Id, FromStageId = stages["NEW"].Id, ToStageId = lead.LeadStageId, UserId = ownerId, ChangedAt = contactAt
                 });
             }
 
             _context.LeadOwnershipHistory.Add(new LeadOwnershipHistory
             {
-                CompanyId = joinCompanyId, LeadId = lead.Id, ToUserId = ownerId, ToTeamId = lead.SalesTeamId, Cause = LeadOwnershipCause.Created, UserId = ownerId, At = createdAt
+                CompanyId = companyId, LeadId = lead.Id, ToUserId = ownerId, ToTeamId = lead.SalesTeamId, Cause = LeadOwnershipCause.Created, UserId = ownerId, At = createdAt
             });
-            _context.LeadStatusHistory.Add(new LeadStatusHistory { CompanyId = joinCompanyId, LeadId = lead.Id, ToStatus = LeadStatus.Open, UserId = ownerId, At = createdAt });
+            _context.LeadStatusHistory.Add(new LeadStatusHistory { CompanyId = companyId, LeadId = lead.Id, ToStatus = LeadStatus.Open, UserId = ownerId, At = createdAt });
 
             if (seed.InactiveReason is { } reasonCode && reasons.TryGetValue(reasonCode, out var reasonId))
             {
@@ -1185,7 +1605,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 lead.InactivatedAt = now;
                 _context.LeadStatusHistory.Add(new LeadStatusHistory
                 {
-                    CompanyId = joinCompanyId, LeadId = lead.Id, FromStatus = LeadStatus.Open, ToStatus = LeadStatus.Inactive, LeadReasonId = reasonId, UserId = ownerId, At = now
+                    CompanyId = companyId, LeadId = lead.Id, FromStatus = LeadStatus.Open, ToStatus = LeadStatus.Inactive, LeadReasonId = reasonId, UserId = ownerId, At = now
                 });
             }
         }
@@ -1201,16 +1621,16 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             var closedAt = now;
             var lead = new Lead
             {
-                CompanyId = joinCompanyId, Code = $"LD-{number:D6}", PersonId = personId, Topic = closeTopic, OwnerUserId = ownerId,
+                CompanyId = companyId, Code = $"LD-{number:D6}", PersonId = personId, Topic = closeTopic, OwnerUserId = ownerId,
                 SalesTeamId = teams.TryGetValue("Equipo Capital", out var capital) ? capital : null,
                 LeadStageId = stages[isWon ? "WON" : "LOST"].Id, LeadSourceId = sources["REFERRAL"], RelationshipTypeId = relationships["PROSPECT_CUSTOMER"],
-                CurrencyId = currencies["USD"], ExchangeRate = 1m, ExchangeRateDate = today, Status = isWon ? LeadStatus.Won : LeadStatus.Lost,
+                CurrencyId = currencies[baseCurrency], ExchangeRate = 1m, ExchangeRateDate = today, Status = isWon ? LeadStatus.Won : LeadStatus.Lost,
                 LeadReasonId = reasons[isWon ? "BEST_PRICE" : "HIGH_PRICE"], ClosedAt = closedAt
             };
             _context.Leads.Add(lead);
             var contact = new LeadInteraction
             {
-                CompanyId = joinCompanyId, LeadId = lead.Id, ContactTypeCompanyId = contactTypes["ONLINE_MEETING"], OccurredAt = closedAt.AddHours(-1),
+                CompanyId = companyId, LeadId = lead.Id, ContactTypeCompanyId = contactTypes["ONLINE_MEETING"], OccurredAt = closedAt.AddHours(-1),
                 DurationMinutes = 45, UserId = ownerId, Outcome = InteractionOutcome.ProposalRequested, Summary = "Revisión de la propuesta."
             };
             _context.LeadInteractions.Add(contact);
@@ -1220,7 +1640,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             {
                 var line = new LeadProduct
                 {
-                    CompanyId = joinCompanyId, LeadId = lead.Id, ProductId = crm.Id, Quantity = 10, UnitPrice = crm.ReferencePrice,
+                    CompanyId = companyId, LeadId = lead.Id, ProductId = crm.Id, Quantity = 10, UnitPrice = crm.ReferencePrice,
                     Status = LeadProductStatus.Accepted, OfferedInInteractionId = contact.Id
                 };
                 line.Recalculate();
@@ -1231,16 +1651,16 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                 lead.WonValueBase = line.LineTotal;
                 lead.WonExchangeRate = 1m;
 
-                var existing = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.CompanyId == joinCompanyId && c.PersonId == personId, cancellationToken);
+                var existing = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.CompanyId == companyId && c.PersonId == personId, cancellationToken);
                 var defaultStageId = await _context.CustomerStages.IgnoreQueryFilters()
-                    .Where(st => st.CompanyId == joinCompanyId && st.GcRecord == 0 && st.IsDefault).Select(st => st.Id).FirstAsync(cancellationToken);
+                    .Where(st => st.CompanyId == companyId && st.GcRecord == 0 && st.IsDefault).Select(st => st.Id).FirstAsync(cancellationToken);
                 Customer customer;
                 CustomerStatusAction action;
                 if (existing is null)
                 {
-                    var lastSequence = (await _context.Customers.IgnoreQueryFilters().Where(c => c.CompanyId == joinCompanyId).Select(c => c.CustomerCode).ToListAsync(cancellationToken))
+                    var lastSequence = (await _context.Customers.IgnoreQueryFilters().Where(c => c.CompanyId == companyId).Select(c => c.CustomerCode).ToListAsync(cancellationToken))
                         .Select(CustomerCodeGenerator.TryParseSequence).Where(n => n.HasValue).Select(n => n!.Value).DefaultIfEmpty(0).Max();
-                    customer = Customer.Create(joinCompanyId, personId, ownerId, CustomerCodeGenerator.Format(lastSequence + 1), defaultStageId);
+                    customer = Customer.Create(companyId, personId, ownerId, CustomerCodeGenerator.Format(lastSequence + 1), defaultStageId);
                     _context.Customers.Add(customer);
                     action = CustomerStatusAction.Created;
                 }
@@ -1250,23 +1670,23 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                     action = customer.Reactivate() ? CustomerStatusAction.Activated : CustomerStatusAction.Confirmed;
                 }
 
-                _context.CustomerStatusHistory.Add(CustomerStatusHistory.Create(joinCompanyId, customer.Id, action, CustomerStatusSource.Lead, ownerId, lead.Id, occurredAtUtc: closedAt));
+                _context.CustomerStatusHistory.Add(CustomerStatusHistory.Create(companyId, customer.Id, action, CustomerStatusSource.Lead, ownerId, lead.Id, occurredAtUtc: closedAt));
                 lead.CustomerId = customer.Id;
             }
 
-            _context.LeadStageHistory.Add(new LeadStageHistory { CompanyId = joinCompanyId, LeadId = lead.Id, ToStageId = stages["NEW"].Id, UserId = ownerId, ChangedAt = closedAt.AddHours(-2) });
+            _context.LeadStageHistory.Add(new LeadStageHistory { CompanyId = companyId, LeadId = lead.Id, ToStageId = stages["NEW"].Id, UserId = ownerId, ChangedAt = closedAt.AddHours(-2) });
             _context.LeadStageHistory.Add(new LeadStageHistory
             {
-                CompanyId = joinCompanyId, LeadId = lead.Id, FromStageId = stages["NEW"].Id, ToStageId = lead.LeadStageId, UserId = ownerId, ChangedAt = closedAt
+                CompanyId = companyId, LeadId = lead.Id, FromStageId = stages["NEW"].Id, ToStageId = lead.LeadStageId, UserId = ownerId, ChangedAt = closedAt
             });
             _context.LeadOwnershipHistory.Add(new LeadOwnershipHistory
             {
-                CompanyId = joinCompanyId, LeadId = lead.Id, ToUserId = ownerId, ToTeamId = lead.SalesTeamId, Cause = LeadOwnershipCause.Created, UserId = ownerId, At = closedAt.AddHours(-2)
+                CompanyId = companyId, LeadId = lead.Id, ToUserId = ownerId, ToTeamId = lead.SalesTeamId, Cause = LeadOwnershipCause.Created, UserId = ownerId, At = closedAt.AddHours(-2)
             });
-            _context.LeadStatusHistory.Add(new LeadStatusHistory { CompanyId = joinCompanyId, LeadId = lead.Id, ToStatus = LeadStatus.Open, UserId = ownerId, At = closedAt.AddHours(-2) });
+            _context.LeadStatusHistory.Add(new LeadStatusHistory { CompanyId = companyId, LeadId = lead.Id, ToStatus = LeadStatus.Open, UserId = ownerId, At = closedAt.AddHours(-2) });
             _context.LeadStatusHistory.Add(new LeadStatusHistory
             {
-                CompanyId = joinCompanyId, LeadId = lead.Id, FromStatus = LeadStatus.Open, ToStatus = lead.Status, LeadReasonId = lead.LeadReasonId, UserId = ownerId, At = closedAt
+                CompanyId = companyId, LeadId = lead.Id, FromStatus = LeadStatus.Open, ToStatus = lead.Status, LeadReasonId = lead.LeadReasonId, UserId = ownerId, At = closedAt
             });
         }
 
@@ -1274,7 +1694,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         var funnel = GetJoinLookupPersonSeeds().Where(x => IsLegacyFunnelStage(x.CustomerStageCode)).ToList();
         var funnelNumbers = funnel.Select(x => x.IdentificationNumber).ToList();
         var funnelPersons = await _context.Persons.IgnoreQueryFilters()
-            .Where(p => p.CompanyId == joinCompanyId && p.GcRecord == 0 && p.IdentificationNumber != null && funnelNumbers.Contains(p.IdentificationNumber))
+            .Where(p => p.CompanyId == companyId && p.GcRecord == 0 && p.IdentificationNumber != null && funnelNumbers.Contains(p.IdentificationNumber))
             .ToDictionaryAsync(p => p.IdentificationNumber!, p => p.Id, cancellationToken);
         var registrar = users["livingstone23@gmail.com"];
         foreach (var seed in funnel)
@@ -1288,17 +1708,17 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             var stage = stages[seed.CustomerStageCode == CustomerStage.LegacyCodes.Prospect && stages.ContainsKey("QUALIFIED") ? "QUALIFIED" : "NEW"];
             var lead = new Lead
             {
-                CompanyId = joinCompanyId, Code = $"LD-{number:D6}", PersonId = personId, Topic = "Interés en JOIN CRM", OwnerUserId = registrar,
+                CompanyId = companyId, Code = $"LD-{number:D6}", PersonId = personId, Topic = "Interés en JOIN CRM", OwnerUserId = registrar,
                 SalesTeamId = teams.TryGetValue("Equipo Norte", out var norte) ? norte : null, LeadStageId = stage.Id, LeadSourceId = sources["WEB"],
-                RelationshipTypeId = relationships["PROSPECT_CUSTOMER"], CurrencyId = currencies["USD"], ExchangeRate = 1m, ExchangeRateDate = today
+                RelationshipTypeId = relationships["PROSPECT_CUSTOMER"], CurrencyId = currencies[baseCurrency], ExchangeRate = 1m, ExchangeRateDate = today
             };
             _context.Leads.Add(lead);
-            _context.LeadStageHistory.Add(new LeadStageHistory { CompanyId = joinCompanyId, LeadId = lead.Id, ToStageId = stage.Id, UserId = registrar, ChangedAt = now });
+            _context.LeadStageHistory.Add(new LeadStageHistory { CompanyId = companyId, LeadId = lead.Id, ToStageId = stage.Id, UserId = registrar, ChangedAt = now });
             _context.LeadOwnershipHistory.Add(new LeadOwnershipHistory
             {
-                CompanyId = joinCompanyId, LeadId = lead.Id, ToUserId = registrar, ToTeamId = lead.SalesTeamId, Cause = LeadOwnershipCause.Created, UserId = registrar, At = now
+                CompanyId = companyId, LeadId = lead.Id, ToUserId = registrar, ToTeamId = lead.SalesTeamId, Cause = LeadOwnershipCause.Created, UserId = registrar, At = now
             });
-            _context.LeadStatusHistory.Add(new LeadStatusHistory { CompanyId = joinCompanyId, LeadId = lead.Id, ToStatus = LeadStatus.Open, UserId = registrar, At = now });
+            _context.LeadStatusHistory.Add(new LeadStatusHistory { CompanyId = companyId, LeadId = lead.Id, ToStatus = LeadStatus.Open, UserId = registrar, At = now });
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -1545,7 +1965,9 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             ("CLP", "Peso chileno", "CLP$", 0),
             ("ARS", "Peso argentino", "AR$", 2),
             ("GTQ", "Quetzal", "Q", 2),
-            ("CRC", "Colón costarricense", "₡", 2)
+            ("CRC", "Colón costarricense", "₡", 2),
+            // SPEC 100: base currency of the development company JOIN-NI-001; available to any company.
+            ("NIO", "Córdoba nicaragüense", "C$", 2)
         ];
 
         var liveCodes = await _context.Currencies
@@ -1579,20 +2001,27 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     /// SPEC 56 D.14: <c>USD</c> as the base currency of a company that has no live base yet. Idempotent; seeds the
     /// global catalog first when it is empty (new company created before the catalog existed).
     /// </summary>
-    public async Task SeedCompanyCurrenciesForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    public Task SeedCompanyCurrenciesForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+        SeedCompanyCurrenciesForCompanyAsync(companyId, "USD", cancellationToken);
+
+    /// <summary>
+    /// SPEC 100: same as <see cref="SeedCompanyCurrenciesForCompanyAsync(Guid, CancellationToken)"/> with the base
+    /// currency of a development profile (NIO for JOIN-NI-001). A company that already has a live base keeps it.
+    /// </summary>
+    private async Task SeedCompanyCurrenciesForCompanyAsync(Guid companyId, string baseCurrencyCode, CancellationToken cancellationToken)
     {
-        var usdId = await _context.Currencies
+        var baseCurrencyId = await _context.Currencies
             .IgnoreQueryFilters()
-            .Where(c => c.GcRecord == 0 && c.Code == "USD")
+            .Where(c => c.GcRecord == 0 && c.Code == baseCurrencyCode)
             .Select(c => c.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (usdId == Guid.Empty)
+        if (baseCurrencyId == Guid.Empty)
         {
             await SeedCurrenciesAsync(cancellationToken);
-            usdId = await _context.Currencies
+            baseCurrencyId = await _context.Currencies
                 .IgnoreQueryFilters()
-                .Where(c => c.GcRecord == 0 && c.Code == "USD")
+                .Where(c => c.GcRecord == 0 && c.Code == baseCurrencyCode)
                 .Select(c => c.Id)
                 .FirstAsync(cancellationToken);
         }
@@ -1607,13 +2036,13 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             return;
         }
 
-        var usd = live.FirstOrDefault(c => c.CurrencyId == usdId);
-        if (usd is null)
+        var baseCurrency = live.FirstOrDefault(c => c.CurrencyId == baseCurrencyId);
+        if (baseCurrency is null)
         {
             _context.CompanyCurrencies.Add(new CompanyCurrency
             {
                 CompanyId = companyId,
-                CurrencyId = usdId,
+                CurrencyId = baseCurrencyId,
                 IsBase = true,
                 IsActive = true,
                 CreatedBy = "System_Seeder"
@@ -1621,41 +2050,43 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         }
         else
         {
-            usd.IsBase = true;
-            usd.IsActive = true;
+            baseCurrency.IsBase = true;
+            baseCurrency.IsActive = true;
         }
 
         await _context.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>
-    /// SPEC 56 D.14: applies <see cref="SeedCompanyCurrenciesForCompanyAsync"/> to every live company, so the
-    /// companies created with <c>POST /Companies</c> before this spec also get a base currency.
+    /// SPEC 56 D.14: applies <see cref="SeedCompanyCurrenciesForCompanyAsync(Guid, CancellationToken)"/> to every live
+    /// company, so the companies created with <c>POST /Companies</c> before this spec also get a base currency. SPEC 100:
+    /// a development company gets the base of its profile (NIO for JOIN-NI-001).
     /// </summary>
     private async Task SeedCompanyCurrenciesForAllCompaniesAsync(CancellationToken cancellationToken = default)
     {
-        var companyIds = await _context.Companies
+        var companies = await _context.Companies
             .IgnoreQueryFilters()
             .Where(c => c.GcRecord == 0)
-            .Select(c => c.Id)
+            .Select(c => new { c.Id, c.TaxId })
             .ToListAsync(cancellationToken);
 
-        foreach (var companyId in companyIds)
+        foreach (var company in companies)
         {
-            await SeedCompanyCurrenciesForCompanyAsync(companyId, cancellationToken);
+            var baseCurrencyCode = DevelopmentCompanyProfiles.FindByTaxId(company.TaxId)?.BaseCurrencyCode ?? "USD";
+            await SeedCompanyCurrenciesForCompanyAsync(company.Id, baseCurrencyCode, cancellationToken);
         }
     }
 
     /// <summary>
-    /// SPEC 56 D.14 (development data): JOIN-001 also uses DOP and EUR, each with a sample rate in USD
-    /// (1 unit = Rate USD) dated the seed day. Idempotent: a currency that already has any rate is left alone.
+    /// SPEC 56 D.14 (development data): the parallel currencies of a development company, each with a sample rate in
+    /// its base currency (1 unit = Rate base) dated the seed day: DOP and EUR in JOIN-001 (USD base), USD 36,62 in
+    /// JOIN-NI-001 (NIO base, SPEC 100). Idempotent: a currency that already has any rate is left alone.
     /// </summary>
-    private async Task SeedJoinParallelCurrenciesAsync(Guid joinCompanyId, CancellationToken cancellationToken = default)
+    private async Task SeedParallelCurrenciesForDevelopmentCompanyAsync(Guid companyId, DevelopmentCompanyProfile profile, CancellationToken cancellationToken = default)
     {
-        (string Code, decimal Rate)[] seeds = [("DOP", 0.016846m), ("EUR", 1.080000m)];
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        foreach (var seed in seeds)
+        foreach (var seed in profile.ParallelCurrencies)
         {
             var currencyId = await _context.Currencies
                 .IgnoreQueryFilters()
@@ -1669,12 +2100,12 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
             var exists = await _context.CompanyCurrencies
                 .IgnoreQueryFilters()
-                .AnyAsync(c => c.CompanyId == joinCompanyId && c.CurrencyId == currencyId && c.GcRecord == 0, cancellationToken);
+                .AnyAsync(c => c.CompanyId == companyId && c.CurrencyId == currencyId && c.GcRecord == 0, cancellationToken);
             if (!exists)
             {
                 _context.CompanyCurrencies.Add(new CompanyCurrency
                 {
-                    CompanyId = joinCompanyId,
+                    CompanyId = companyId,
                     CurrencyId = currencyId,
                     IsBase = false,
                     IsActive = true,
@@ -1684,12 +2115,12 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
             var hasRate = await _context.ExchangeRates
                 .IgnoreQueryFilters()
-                .AnyAsync(r => r.CompanyId == joinCompanyId && r.CurrencyId == currencyId && r.GcRecord == 0, cancellationToken);
+                .AnyAsync(r => r.CompanyId == companyId && r.CurrencyId == currencyId && r.GcRecord == 0, cancellationToken);
             if (!hasRate)
             {
                 _context.ExchangeRates.Add(new ExchangeRate
                 {
-                    CompanyId = joinCompanyId,
+                    CompanyId = companyId,
                     CurrencyId = currencyId,
                     RateDate = today,
                     Rate = seed.Rate,
@@ -1702,22 +2133,24 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     }
 
     /// <summary>
-    /// SPEC 57 D.9 (development data): the categories and the six products of the commercial proposal in JOIN-001,
-    /// idempotent by category name and product code among live rows. Prices are in the company's base currency (USD).
+    /// SPEC 57 D.9 (development data): the categories and the six products of the commercial proposal in a development
+    /// company, idempotent by category name and product code among live rows. Prices are in the company's base currency:
+    /// the USD prices of JOIN-001 go through <see cref="DevelopmentCompanyProfile.ToBaseAmount"/> (SPEC 100: ×36,62 in
+    /// JOIN-NI-001, 2 decimals).
     /// </summary>
-    private async Task SeedJoinProductCatalogAsync(Guid joinCompanyId, CancellationToken cancellationToken = default)
+    private async Task SeedProductCatalogForDevelopmentCompanyAsync(Guid companyId, DevelopmentCompanyProfile profile, CancellationToken cancellationToken = default)
     {
         string[] categoryNames = ["Software", "Servicios profesionales", "Soporte", "Equipos"];
         var categories = await _context.ProductCategories
             .IgnoreQueryFilters()
-            .Where(c => c.CompanyId == joinCompanyId && c.GcRecord == 0 && c.ParentId == null)
+            .Where(c => c.CompanyId == companyId && c.GcRecord == 0 && c.ParentId == null)
             .ToListAsync(cancellationToken);
 
         for (var i = 0; i < categoryNames.Length; i++)
         {
             if (categories.All(c => c.Name != categoryNames[i]))
             {
-                var category = new ProductCategory { CompanyId = joinCompanyId, Name = categoryNames[i], SortOrder = i + 1, IsActive = true, CreatedBy = "System_Seeder" };
+                var category = new ProductCategory { CompanyId = companyId, Name = categoryNames[i], SortOrder = i + 1, IsActive = true, CreatedBy = "System_Seeder" };
                 _context.ProductCategories.Add(category);
                 categories.Add(category);
             }
@@ -1738,7 +2171,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var liveCodes = await _context.Products
             .IgnoreQueryFilters()
-            .Where(p => p.CompanyId == joinCompanyId && p.GcRecord == 0)
+            .Where(p => p.CompanyId == companyId && p.GcRecord == 0)
             .Select(p => p.Code)
             .ToListAsync(cancellationToken);
 
@@ -1746,12 +2179,12 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         {
             _context.Products.Add(new Product
             {
-                CompanyId = joinCompanyId,
+                CompanyId = companyId,
                 Code = product.Code,
                 Name = product.Name,
                 Kind = product.Kind,
                 ProductCategoryId = CategoryId(product.Category),
-                ReferencePrice = product.Price,
+                ReferencePrice = profile.ToBaseAmount(product.Price),
                 IsActive = product.IsActive,
                 CreatedBy = "System_Seeder"
             });
@@ -2019,7 +2452,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         return existingStatuses.First(s => s.Code == 1).Id;
     }
 
-    private async Task SeedAreasByCompanyAsync(Guid joinCompanyId, Guid privateCompanyId, Guid entityStatusId)
+    /// <remarks>SPEC 100: <paramref name="joinCompanyId"/> is any development company; PRIV-001 is passed only by <see cref="SeedAsync"/>.</remarks>
+    private async Task SeedAreasByCompanyAsync(Guid joinCompanyId, Guid? privateCompanyId, Guid entityStatusId)
     {
         var seeds = new List<(Guid CompanyId, string Name)>
         {
@@ -2029,14 +2463,14 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             (joinCompanyId, "IT"),
             (joinCompanyId, "Ventas"),
             (joinCompanyId, "Contabilidad"),
-            (joinCompanyId, "Atencion al Cliente"),
-
-            // Private Company
-            (privateCompanyId, "Contabilidad"),
-            (privateCompanyId, "Ventas"),
-            (privateCompanyId, "AtencionCliente"),
-            (privateCompanyId, "IT")
+            (joinCompanyId, "Atencion al Cliente")
         };
+
+        if (privateCompanyId is { } privateId)
+        {
+            // Private Company
+            seeds.AddRange([(privateId, "Contabilidad"), (privateId, "Ventas"), (privateId, "AtencionCliente"), (privateId, "IT")]);
+        }
 
         var inserted = 0;
 
@@ -2072,7 +2506,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         _logger.LogInformation("Areas seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
     }
 
-    private async Task SeedProjectsByCompanyAsync(Guid joinCompanyId, Guid privateCompanyId, Guid entityStatusId)
+    /// <remarks>SPEC 100: <paramref name="joinCompanyId"/> is any development company; PRIV-001 is passed only by <see cref="SeedAsync"/>.</remarks>
+    private async Task SeedProjectsByCompanyAsync(Guid joinCompanyId, Guid? privateCompanyId, Guid entityStatusId)
     {
         var seeds = new List<(Guid CompanyId, string Name)>
         {
@@ -2084,13 +2519,14 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             (joinCompanyId, "Compras"),
             (joinCompanyId, "Contabilidad"),
             (joinCompanyId, "MejorasIT"),
-            (joinCompanyId, "SoporteIt"),
-
-            // Private Company
-            (privateCompanyId, "Soporte"),
-            (privateCompanyId, "AtencionCliente"),
-            (privateCompanyId, "NewSystem")
+            (joinCompanyId, "SoporteIt")
         };
+
+        if (privateCompanyId is { } privateId)
+        {
+            // Private Company
+            seeds.AddRange([(privateId, "Soporte"), (privateId, "AtencionCliente"), (privateId, "NewSystem")]);
+        }
 
         var inserted = 0;
 
@@ -2312,7 +2748,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             seeds.Count - inserted - updated);
     }
 
-    private async Task SeedJoinPersonsAsync(Guid companyId, Guid idTypeId)
+    private async Task SeedPersonsForDevelopmentCompanyAsync(Guid companyId, DevelopmentCompanyProfile profile, Guid idTypeId)
     {
         var seeds = GetJoinPersonSeeds();
         var gendersByName = await GetGenderIdsByNameAsync(companyId);
@@ -2349,14 +2785,14 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         if (inserted > 0)
             await _context.SaveChangesAsync();
 
-        _logger.LogInformation("JOIN customers seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
+        _logger.LogInformation("{TaxId} persons seed finished. Inserted: {Inserted}, Existing: {Existing}", profile.TaxId, inserted, seeds.Count - inserted);
     }
 
     /// <summary>
-    /// SPEC 54: the 40 persons of <see cref="GetJoinLookupPersonSeeds"/> in JOIN-001, idempotent by
-    /// <c>(CompanyId, IdentificationNumber)</c> like <see cref="SeedJoinPersonsAsync"/>.
+    /// SPEC 54: the 40 persons of <see cref="GetJoinLookupPersonSeeds"/> in a development company (SPEC 100), idempotent
+    /// by <c>(CompanyId, IdentificationNumber)</c> like <see cref="SeedPersonsForDevelopmentCompanyAsync"/>.
     /// </summary>
-    private async Task SeedJoinLookupPersonsAsync(Guid companyId, IReadOnlyDictionary<string, Guid> idTypes)
+    private async Task SeedLookupPersonsForDevelopmentCompanyAsync(Guid companyId, DevelopmentCompanyProfile profile, IReadOnlyDictionary<string, Guid> idTypes)
     {
         var seeds = GetJoinLookupPersonSeeds();
         var gendersByName = await GetGenderIdsByNameAsync(companyId);
@@ -2402,16 +2838,16 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         if (inserted > 0)
             await _context.SaveChangesAsync();
 
-        _logger.LogInformation("JOIN lookup persons seed finished (SPEC 54). Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
+        _logger.LogInformation("{TaxId} lookup persons seed finished (SPEC 54). Inserted: {Inserted}, Existing: {Existing}", profile.TaxId, inserted, seeds.Count - inserted);
     }
 
     /// <summary>
-    /// SPEC 54: registers 30 of the lookup persons as customers of JOIN-001, registered by
+    /// SPEC 54: registers 30 of the lookup persons as customers of a development company (SPEC 100), registered by
     /// <c>livingstone23@gmail.com</c>, with the stage of the list (by code) and a <c>Created</c> history row (source
     /// <c>Seed</c>); two are left inactive with a <c>Deactivated</c> row. Idempotent by <c>(CompanyId, PersonId)</c>.
     /// Writes straight to the context: <see cref="ICustomerActivationService"/> lives in Application.
     /// </summary>
-    private async Task SeedJoinCustomersAsync(Guid companyId)
+    private async Task SeedCustomersForDevelopmentCompanyAsync(Guid companyId, DevelopmentCompanyProfile profile)
     {
         const string registeringUserEmail = "livingstone23@gmail.com";
         var user = await _context.Users
@@ -2429,7 +2865,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             .Where(s => s.CompanyId == companyId && s.GcRecord == 0)
             .ToDictionaryAsync(s => s.Code, s => s.Id);
 
-        // SPEC 63: the persons that were funnel customers (LEAD/PROSPECT) become open leads in SeedJoinLeadsAsync.
+        // SPEC 63: the persons that were funnel customers (LEAD/PROSPECT) become open leads in SeedLeadsForDevelopmentCompanyAsync.
         var customerSeeds = GetJoinLookupPersonSeeds()
             .Where(s => s.CustomerStageCode is not null && !IsLegacyFunnelStage(s.CustomerStageCode))
             .ToList();
@@ -2491,7 +2927,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         if (inserted > 0)
             await _context.SaveChangesAsync();
 
-        _logger.LogInformation("JOIN customers seed finished (SPEC 54). Inserted: {Inserted}, Existing: {Existing}", inserted, customerSeeds.Count - inserted);
+        _logger.LogInformation("{TaxId} customers seed finished (SPEC 54). Inserted: {Inserted}, Existing: {Existing}", profile.TaxId, inserted, customerSeeds.Count - inserted);
     }
 
     private static bool IsLegacyFunnelStage(string? code) =>
@@ -2535,7 +2971,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         _logger.LogInformation("Private Company customers seed finished. Inserted: {Inserted}, Existing: {Existing}", inserted, seeds.Count - inserted);
     }
 
-    private async Task SeedJoinPersonAddressesAndContactsAsync(Guid companyId)
+    private async Task SeedPersonAddressesAndContactsForDevelopmentCompanyAsync(Guid companyId, DevelopmentCompanyProfile profile)
     {
         var joinSeeds = GetJoinPersonSeeds().Take(30).ToList();
         var identificationNumbers = joinSeeds
@@ -2549,22 +2985,27 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var country = await _context.Countries
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(c => c.IsoCode == "HN");
+            .FirstOrDefaultAsync(c => c.IsoCode == profile.CountryIsoCode);
 
-        var province = await _context.Provinces
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(p => p.Code == "HN-CR");
-
-        var municipality = await _context.Municipalities
-            .IgnoreQueryFilters()
-            .Where(m => m.ProvinceId == (province == null ? Guid.Empty : province.Id))
-            .FirstOrDefaultAsync(m => m.Name == "San Pedro Sula");
+        // SPEC 100: the municipalities of the profile (San Pedro Sula in JOIN-001, the 20 of Nicaragua in JOIN-NI-001),
+        // in the order of the profile, each with its province.
+        var municipalityNames = profile.MunicipalityNames.ToList();
+        var countryId = country?.Id ?? Guid.Empty;
+        var countryMunicipalities = await (from m in _context.Municipalities.IgnoreQueryFilters()
+                                           join p in _context.Provinces.IgnoreQueryFilters() on m.ProvinceId equals p.Id
+                                           where p.CountryId == countryId && municipalityNames.Contains(m.Name)
+                                           select new { m.Id, m.Name, m.ProvinceId }).ToListAsync();
+        var municipalities = municipalityNames
+            .Select(name => countryMunicipalities.FirstOrDefault(m => m.Name == name))
+            .Where(m => m is not null)
+            .Select(m => m!)
+            .ToList();
 
         var streetType = await _context.StreetTypes
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(s => s.Name == "Avenida");
 
-        if (country == null || province == null || municipality == null || streetType == null)
+        if (country == null || municipalities.Count == 0 || streetType == null)
         {
             _logger.LogWarning("Address/contact seeds skipped because required catalogs (Country/Province/Municipality/StreetType) were not found.");
             return;
@@ -2602,6 +3043,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             var currentAddressCount = existingAddressCounts.TryGetValue(customer.Id, out var addressCount) ? addressCount : 0;
             var currentContactCount = existingContactCounts.TryGetValue(customer.Id, out var contactCount) ? contactCount : 0;
 
+            // SPEC 100: round-robin over the municipalities of the profile, one per person.
+            var municipality = municipalities[i % municipalities.Count];
             for (var j = currentAddressCount; j < targetCount; j++)
             {
                 var address = new PersonAddress
@@ -2613,7 +3056,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
                     ZipCode = $"21{i + 1:D2}{j + 1:D2}",
                     StreetTypeId = streetType.Id,
                     CountryId = country.Id,
-                    ProvinceId = province.Id,
+                    ProvinceId = municipality.ProvinceId,
                     MunicipalityId = municipality.Id,
                     Created = DateTime.UtcNow,
                     CreatedBy = "System_Seeder",
@@ -2672,7 +3115,8 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         }
 
         _logger.LogInformation(
-            "JOIN customer address/contact seed finished. Addresses inserted: {AddressesInserted}, Contacts inserted: {ContactsInserted}",
+            "{TaxId} customer address/contact seed finished. Addresses inserted: {AddressesInserted}, Contacts inserted: {ContactsInserted}",
+            profile.TaxId,
             insertedAddresses,
             insertedContacts);
     }
@@ -3253,7 +3697,12 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         }
     }
 
-    private async Task SeedTicketCompanyDefaultsAsync(Guid joinCompanyId, Guid defaultTimeUnitId)
+    /// <param name="updateExisting">
+    /// <c>true</c> (<see cref="SeedAsync"/>) re-applies the seed values to the active configuration, as before SPEC 100;
+    /// <c>false</c> (<see cref="SeedDevelopmentCompaniesAsync"/>, every Development start-up) only creates it when missing,
+    /// so the configuration the user edits is never overwritten.
+    /// </param>
+    private async Task SeedTicketCompanyDefaultsAsync(Guid joinCompanyId, Guid defaultTimeUnitId, bool updateExisting = true)
     {
         var openStatusId = await _context.TicketStatuses
             .IgnoreQueryFilters()
@@ -3328,6 +3777,11 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
             await _context.SaveChangesAsync();
             _logger.LogInformation("JOIN ticket company defaults seed finished. Inserted: 1, Updated: 0");
+            return;
+        }
+
+        if (!updateExisting)
+        {
             return;
         }
 
@@ -3484,7 +3938,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             companyId, currentSeedValue);
     }
 
-    private async Task SeedJoinTicketsAsync(Guid joinCompanyId)
+    private async Task SeedTicketsForDevelopmentCompanyAsync(Guid companyId, DevelopmentCompanyProfile profile)
     {
         var managerUser = await _context.ApplicationUsers
             .IgnoreQueryFilters()
@@ -3502,7 +3956,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var statusByCode = (await _context.TicketStatuses
             .IgnoreQueryFilters()
-            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0)
             .OrderByDescending(x => x.LastModified ?? x.Created)
             .ToListAsync())
             .GroupBy(x => x.Code)
@@ -3512,7 +3966,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         // hand JOIN tickets another company's complexity / time unit.
         var complexityByCode = (await _context.TicketComplexities
             .IgnoreQueryFilters()
-            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0)
             .OrderByDescending(x => x.LastModified ?? x.Created)
             .ToListAsync())
             .GroupBy(x => x.Code)
@@ -3520,7 +3974,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var defaultTimeUnit = await _context.TimeUnits
             .IgnoreQueryFilters()
-            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0)
             .OrderBy(x => x.Code)
             .FirstOrDefaultAsync();
 
@@ -3528,21 +3982,21 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var customers = await _context.Persons
             .IgnoreQueryFilters()
-            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0)
             .OrderBy(x => x.Created)
             .Take(3)
             .ToListAsync();
 
         var projects = await _context.Projects
             .IgnoreQueryFilters()
-            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0)
             .OrderBy(x => x.Created)
             .Take(3)
             .ToListAsync();
 
         var areas = await _context.Areas
             .IgnoreQueryFilters()
-            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0)
             .OrderBy(x => x.Created)
             .Take(3)
             .ToListAsync();
@@ -3575,7 +4029,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var existingCodes = await _context.Tickets
             .IgnoreQueryFilters()
-            .Where(t => t.CompanyId == joinCompanyId)
+            .Where(t => t.CompanyId == companyId)
             .Select(t => t.Code)
             .ToListAsync();
 
@@ -3590,7 +4044,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
             var ticket = new Ticket
             {
-                CompanyId = joinCompanyId,
+                CompanyId = companyId,
                 Name = seed.Name,
                 Description = seed.Description,
                 EstimatedTime = seed.EstimatedTime,
@@ -3640,12 +4094,12 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         var seedCodes = seeds.Select(x => x.Code).ToList();
         var seededTickets = await _context.Tickets
             .IgnoreQueryFilters()
-            .Where(t => t.CompanyId == joinCompanyId && t.GcRecord == 0 && seedCodes.Contains(t.Code))
+            .Where(t => t.CompanyId == companyId && t.GcRecord == 0 && seedCodes.Contains(t.Code))
             .ToListAsync();
 
         var ticketsWithLogs = await _context.TicketLogs
             .IgnoreQueryFilters()
-            .Where(tl => tl.CompanyId == joinCompanyId && tl.GcRecord == 0)
+            .Where(tl => tl.CompanyId == companyId && tl.GcRecord == 0)
             .Select(tl => tl.TicketId)
             .Distinct()
             .ToListAsync();
@@ -3678,7 +4132,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             await _context.SaveChangesAsync();
         }
 
-        _logger.LogInformation("JOIN tickets seed finished. Inserted: {Inserted}, Existing: {Existing}, LogsAdded: {LogsAdded}", inserted, seeds.Count - inserted, logsAdded);
+        _logger.LogInformation("{TaxId} tickets seed finished. Inserted: {Inserted}, Existing: {Existing}, LogsAdded: {LogsAdded}", profile.TaxId, inserted, seeds.Count - inserted, logsAdded);
     }
 
     /// <summary>
@@ -3858,11 +4312,11 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
     }
 
     /// <summary>
-    /// Development data of the master company JOIN-001 (SPEC 44): the Calendar module enabled, its
-    /// <see cref="CalendarCompany"/> (default user = the company's SuperAdmin, 08:00–17:00, America/Managua,
-    /// reschedule status RESCHEDULED) and the default calendar of every seeded user. Idempotent.
+    /// Development data of a development company (SPEC 44; SPEC 100: JOIN-001 and JOIN-NI-001): the Calendar module
+    /// enabled, its <see cref="CalendarCompany"/> (default user = the company's SuperAdmin, 08:00–17:00, the time zone
+    /// of the profile, reschedule status RESCHEDULED) and the default calendar of every seeded user. Idempotent.
     /// </summary>
-    private async Task SeedJoinCalendarAsync(Guid joinCompanyId)
+    private async Task SeedCalendarForDevelopmentCompanyAsync(Guid companyId, DevelopmentCompanyProfile profile)
     {
         var calendarModuleId = await _context.SystemModules
             .IgnoreQueryFilters()
@@ -3872,19 +4326,19 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         if (calendarModuleId == Guid.Empty)
         {
-            _logger.LogWarning("Calendar seed for JOIN-001 skipped: the Calendar system module was not found.");
+            _logger.LogWarning("Calendar seed for {TaxId} skipped: the Calendar system module was not found.", profile.TaxId);
             return;
         }
 
         var companyModule = await _context.CompanyModules
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(cm => cm.CompanyId == joinCompanyId && cm.ModuleId == calendarModuleId && cm.GcRecord == 0);
+            .FirstOrDefaultAsync(cm => cm.CompanyId == companyId && cm.ModuleId == calendarModuleId && cm.GcRecord == 0);
 
         if (companyModule is null)
         {
             _context.CompanyModules.Add(new CompanyModule
             {
-                CompanyId = joinCompanyId,
+                CompanyId = companyId,
                 ModuleId = calendarModuleId,
                 IsActive = true,
                 CreatedBy = "System_Seeder"
@@ -3902,13 +4356,13 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var calendarCompany = await _context.CalendarCompanies
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.CompanyId == joinCompanyId && x.GcRecord == 0);
+            .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.GcRecord == 0);
 
         if (calendarCompany is null)
         {
             var rescheduledStatusId = await _context.CalendarStatusCompanies
                 .IgnoreQueryFilters()
-                .Where(x => x.CompanyId == joinCompanyId
+                .Where(x => x.CompanyId == companyId
                     && x.GcRecord == 0
                     && x.CalendarStatus.Code == CalendarCodes.Statuses.Rescheduled)
                 .Select(x => x.Id)
@@ -3916,16 +4370,16 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
             if (defaultUser is null || rescheduledStatusId == Guid.Empty)
             {
-                _logger.LogWarning("Calendar seed for JOIN-001 skipped: default user or RESCHEDULED status not found.");
+                _logger.LogWarning("Calendar seed for {TaxId} skipped: default user or RESCHEDULED status not found.", profile.TaxId);
                 await _context.SaveChangesAsync();
                 return;
             }
 
             calendarCompany = new CalendarCompany
             {
-                CompanyId = joinCompanyId,
+                CompanyId = companyId,
                 DefaultActivityUserId = defaultUser.Id,
-                TimeZone = "America/Managua",
+                TimeZone = profile.TimeZoneId,
                 IsOpen24Hours = false,
                 BusinessHoursStart = new TimeOnly(8, 0),
                 BusinessHoursEnd = new TimeOnly(17, 0),
@@ -3938,13 +4392,13 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
 
         var memberIds = await _context.UserCompanies
             .IgnoreQueryFilters()
-            .Where(uc => uc.CompanyId == joinCompanyId && uc.GcRecord == 0)
+            .Where(uc => uc.CompanyId == companyId && uc.GcRecord == 0)
             .Select(uc => uc.UserId)
             .ToListAsync();
 
         var provisionedIds = await _context.CalendarUserConfigurations
             .IgnoreQueryFilters()
-            .Where(x => x.CompanyId == joinCompanyId && x.GcRecord == 0)
+            .Where(x => x.CompanyId == companyId && x.GcRecord == 0)
             .Select(x => x.UserId)
             .ToListAsync();
 
@@ -3953,7 +4407,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         {
             var calendar = new UserCalendar
             {
-                CompanyId = joinCompanyId,
+                CompanyId = companyId,
                 OwnerUserId = user.Id,
                 Name = calendarCompany.DefaultCalendarName,
                 Color = "#1E88E5",
@@ -3964,7 +4418,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
             _context.UserCalendars.Add(calendar);
             _context.CalendarUserConfigurations.Add(new CalendarUserConfiguration
             {
-                CompanyId = joinCompanyId,
+                CompanyId = companyId,
                 UserId = user.Id,
                 DefaultCalendarId = calendar.Id,
                 WorkDays = CalendarWorkDays.Weekdays,
@@ -3976,7 +4430,7 @@ public class DatabaseSeeder : ICompanyCatalogSeeder
         }
 
         await _context.SaveChangesAsync();
-        _logger.LogInformation("Calendar seed for JOIN-001 finished. Users provisioned: {Provisioned}", provisioned);
+        _logger.LogInformation("Calendar seed for {TaxId} finished. Users provisioned: {Provisioned}", profile.TaxId, provisioned);
     }
 
     private sealed record CalendarActivitySeed(

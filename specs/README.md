@@ -139,7 +139,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 96 | Carga de datos por CSV: guía descargable, plantillas, validación previa y carga confirmada | Borrador | 49-post, 54, 55, 57, 58, 81, 82, 84, 85, 87, 88, 90, 95 |
 | 97 | Panel de ventas por período y vendedor, y panel de cuentas por cobrar con antigüedad de saldos, con visibilidad por usuario | Borrador | 43-post, 60, 83, 86, 87, 89, 90, 92, 93 |
 | 98 | Límite de descuento por rol, con solicitud de aprobación que otro usuario toma y resuelve | Borrador | 43-post, 81, 83, 85, 89, 90 |
-| 100 | Empresa de desarrollo Nicaragua (`JOIN-NI-001`): todo el seed existente, base en córdoba y acceso de los usuarios actuales | Borrador | 19, 28, 43-post, 44-post, 45-post, 48-post, 54, 55, 56, 57, 59–65, 70–72 |
+| 100 | Empresa de desarrollo Nicaragua (`JOIN-NI-001`): todo el seed existente, base en córdoba y acceso de los usuarios actuales | Aprobado | 19, 28, 43-post, 44-post, 45-post, 48-post, 54, 55, 56, 57, 59–65, 70–72 |
 | 101 | Correo por empresa: cuenta de SendGrid propia o de la plataforma, salida única con registro de cada envío, cuotas y reportes de uso por módulo | Borrador | 41-post, 43-post, 72 |
 | 999 | Módulo Productos ampliado: catálogo propio del módulo y origen de productos en Leads (**no se implementa**, decisión del usuario 2026-10-24) | Pospuesto | 41-post, 43-post, 48-post, 56, 57, 61, 64, 81–84 |
 

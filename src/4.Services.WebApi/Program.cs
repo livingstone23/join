@@ -250,16 +250,28 @@ using (var scope = app.Services.CreateScope())
                 var forceReseed = builder.Configuration.GetValue<bool>("Seeding:ForceMenuPermissionsReseed");
                 await seeder.SeedMenuAndPermissionsAsync(forceReseed);
 
-                // SPEC 71: the development templates of JOIN-001 (one per seed type).
-                var joinCompanyId = await context.Companies
+                // SPEC 71: the development templates (one per seed type) of JOIN-001 and, SPEC 100, JOIN-NI-001.
+                var developmentCompanyIds = await context.Companies
                     .IgnoreQueryFilters()
-                    .Where(c => c.TaxId == "JOIN-001")
+                    .Where(c => c.TaxId == "JOIN-001" || c.TaxId == "JOIN-NI-001")
                     .Select(c => c.Id)
-                    .FirstOrDefaultAsync();
-                if (joinCompanyId != Guid.Empty)
+                    .ToListAsync();
+                foreach (var developmentCompanyId in developmentCompanyIds)
                 {
-                    await seeder.SeedJoinEmailTemplatesAsync(joinCompanyId);
+                    await seeder.SeedJoinEmailTemplatesAsync(developmentCompanyId);
                 }
+            }
+        }
+
+        if (app.Environment.IsDevelopment())
+        {
+            // SPEC 100: JOIN-NI-001 receives everything JOIN-001 has (with or without pending migrations, missing rows
+            // only), then the cached menu and permissions of its users are dropped so they see it right away.
+            var seededCompanyIds = await seeder.SeedDevelopmentCompaniesAsync();
+            var cacheInvalidator = services.GetRequiredService<JOIN.Application.Common.CompanyPermissionCacheInvalidator>();
+            foreach (var seededCompanyId in seededCompanyIds)
+            {
+                await cacheInvalidator.InvalidateAsync(seededCompanyId);
             }
         }
 
