@@ -4,6 +4,7 @@
 > **Depends on:** SPEC 43-post (menú y permisos), SPEC 72 (`EmailCompanySettings`, `PersonEmailSender`, `IEmailService.SendAsync`), SPEC 41-post (borrado lógico). Rama de trabajo: `spec-101-company-email-provider`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Que cada empresa de JOIN envíe sus correos con **su propia cuenta de SendGrid** (o con la de la plataforma si no tiene), que **todo correo** del sistema salga por **un único punto** que lo registra (empresa, módulo, función, usuario, resultado), que la plataforma controle **cuántos correos envía cada empresa** con cuotas, y que haya **reportes por período, módulo y función** con un resumen de uso. Los módulos futuros (documentos, alertas, WhatsApp, tickets…) quedan medidos sin trabajo extra.
+> **Ajuste (2026-10-24, pedido del usuario):** cada correo lleva **nuestro id** (`DispatchId`) enviado a SendGrid como argumento propio y guarda el **id de SendGrid**, para que una spec futura reciba el webhook de eventos y conozca el estado de cada correo (regla 11).
 > **Origen:** pedido del usuario (2026-10-24): "centralizar la configuración de SendGrid por empresa, porque cada API que se genere será orientada a una empresa que se cree en JOIN, y controlar cuántos correos envía cada empresa… generar reportes por período de los correos que se envíen, por módulos o secciones, para hacer un agrupamiento y un resumen de cómo se utiliza, con el fin de que los próximos módulos igual se puedan medir".
 > **Etapa:** el usuario la pide **antes de arrancar** la serie 81–100. SPEC 84 (envío de documentos), 85 (correo de alertas) y 87, 94 y 98 envían correos y deben usar la salida única de esta spec.
 
@@ -72,7 +73,14 @@
 7. **Correos sin empresa** (`ForgotPassword`, OTP, MFA, cambio de correo, health check): salen siempre por la cuenta de la plataforma y se registran con `CompanyId = null` (visibles solo en la vista de plataforma).
 8. **Retención:** los registros se conservan `Email:DispatchLogRetentionMonths` (por defecto 24). La purga es un proceso programado (Hangfire, `PROCESSES.md`).
 9. **Cifrado de secretos:** `ISecretProtector` (Application) con implementación sobre **ASP.NET Core Data Protection** en Infrastructure, con el anillo de claves **persistido en la base** (`Security.DataProtectionKeys`) para que funcione con varias instancias y reinicios. Propósito `JOIN.EmailProvider.ApiKey`. Lo podrán usar otros secretos por empresa (por ejemplo, el token de Meta de SPEC 73 o Google de SPEC 46-post).
-10. **Seguridad de la configuración:** cambiar la cuenta o la API key exige `EmailSettings` con `CanUpdate`; el envío de prueba, `CanExecute`. Cada cambio queda en `EmailProviderSettingsEvents` (quién, cuándo, qué cambió; nunca la key).
+10. **Doble identificador, preparado para el webhook de SendGrid:**
+   - **Nuestro id:** el `Id` (`Guid`) de `EmailDispatchLogs` se genera **antes** de enviar y se manda a SendGrid en `custom_args` (`join_dispatch_id`, `join_company_id`, `join_module`). SendGrid devuelve esos argumentos en **cada evento** del webhook, sin depender de su id.
+   - **Id de SendGrid:** el encabezado `X-Message-Id` de la respuesta se guarda en `ProviderMessageId` en **todos** los envíos (hoy solo lo capturan los de SPEC 72). Los eventos del webhook traen `sg_message_id`, que empieza con ese valor; sirve como segunda vía de correlación.
+   - **Un registro por destinatario:** SendGrid emite eventos por cada dirección (para y CC). `EmailDispatchRecipients` guarda cada destinatario del envío (dirección, tipo para/CC, enmascarada en seguridad), para que el webhook futuro actualice el estado de cada uno.
+   - **Estado de entrega reservado:** `EmailDispatchRecipients` y `EmailDispatchLogs` suman `DeliveryStatus` (`Unknown = 0` hasta que exista el webhook; luego `Processed`, `Delivered`, `Deferred`, `Bounced`, `Dropped`, `Opened`, `Clicked`, `SpamReport`, `Unsubscribed`) y `DeliveryStatusAt?`. Esta spec solo los crea en `Unknown`.
+   - **Límites de lo que se puede saber** (de la documentación de SendGrid): se informa procesado, entregado al servidor del destinatario, diferido, rebotado, descartado, abierto (si el cliente de correo carga imágenes; Apple Mail y otros lo distorsionan), clic, spam y baja. **No existe un evento de "eliminado"**: SendGrid no puede saber si el destinatario borró el correo.
+   - **Webhook por cuenta:** con cuenta propia (`Own`), cada empresa configura en su SendGrid la URL del webhook de JOIN; la spec del webhook guardará por empresa su clave de verificación de firma (cifrada con `ISecretProtector`).
+11. **Seguridad de la configuración:** cambiar la cuenta o la API key exige `EmailSettings` con `CanUpdate`; el envío de prueba, `CanExecute`. Cada cambio queda en `EmailProviderSettingsEvents` (quién, cuándo, qué cambió; nunca la key).
 
 ## Scope
 
@@ -80,14 +88,15 @@
 
 **A. Esquema**
 1. `Admin.EmailCompanySettings` (SPEC 72) suma: `ProviderMode`, `ApiKeyEncrypted?` (`text`), `ApiKeyLast4?`, `VerifiedAt?`, `VerificationError?` (máx. 500), `FallbackToPlatform` (por defecto `false`), `MonthlyQuota?`, `DailyQuota?`, `QuotaAction`, `WarningPercent`, `QuotaAlertEmail?` (máx. 320), `LastQuotaWarningPeriod?` (para no repetir avisos).
-2. `Admin.EmailDispatchLogs` (solo inserción, `CompanyId?`): `Module`, `Feature`, `UserId?`, `SourceKind?` (máx. 50), `SourceId?`, `ProviderAccount` (`Platform = 1`, `Own = 2`, `Log = 3`), `ToAddress` (máx. 320), `RecipientCount`, `Subject?`, `AttachmentCount`, `TotalBytes`, `Status`, `ProviderMessageId?`, `Error?`, `OccurredAt`, `DurationMs`. Índices `(CompanyId, OccurredAt)`, `(CompanyId, Module, OccurredAt)`, `(Status, OccurredAt)`.
+2. `Admin.EmailDispatchLogs` (solo inserción, `CompanyId?`): `Module`, `Feature`, `UserId?`, `SourceKind?` (máx. 50), `SourceId?`, `ProviderAccount` (`Platform = 1`, `Own = 2`, `Log = 3`), `ToAddress` (máx. 320), `RecipientCount`, `Subject?`, `AttachmentCount`, `TotalBytes`, `Status`, `ProviderMessageId?` (máx. 200), `Error?`, `OccurredAt`, `DurationMs`, `DeliveryStatus` (`Unknown = 0`), `DeliveryStatusAt?`. `Id` generado antes del envío (regla 11). Índice `(ProviderMessageId)` filtrado `"providermessageid" IS NOT NULL`.
+2.1 `Admin.EmailDispatchRecipients` (solo inserción salvo el estado de entrega): `DispatchLogId`, `Address` (máx. 320, enmascarada en `Security`), `RecipientType` (`To = 1`, `Cc = 2`), `DeliveryStatus` (`Unknown = 0`), `DeliveryStatusAt?`. Índice `(DispatchLogId)`. Índices `(CompanyId, OccurredAt)`, `(CompanyId, Module, OccurredAt)`, `(Status, OccurredAt)`.
 3. `Admin.EmailProviderSettingsEvents` (solo inserción): `CompanyId`, `EventType`, `UserId`, `OccurredAt`, `Details?` (`jsonb`, sin secretos).
 4. `Security.DataProtectionKeys` (tabla estándar de `Microsoft.AspNetCore.DataProtection.EntityFrameworkCore`).
 
 **B. Aplicación e infraestructura**
 5. `IEmailDispatcher.DispatchAsync(EmailDispatchRequest)` → `EmailDispatchResult` (`Sent`/`Failed`/`Blocked`, id del proveedor, error). `EmailDispatchRequest` = `EmailMessage` (SPEC 72) + clasificación de la regla 2.
 6. `EmailAccountResolver`: devuelve la cuenta de la empresa (key descifrada) o la de la plataforma. Caché por empresa de 5 minutos, invalidada al cambiar la configuración.
-7. `SendGridEmailAdapter` recibe la key por envío (cliente por key, sin crear un `HttpClient` por envío). `LoggingEmailAdapter` también registra en `EmailDispatchLogs` con `ProviderAccount = Log`.
+7. `SendGridEmailAdapter` recibe la key por envío (cliente por key, sin crear un `HttpClient` por envío), agrega `custom_args` con `join_dispatch_id`, `join_company_id` y `join_module`, y devuelve siempre el `X-Message-Id`. `LoggingEmailAdapter` también registra en `EmailDispatchLogs` con `ProviderAccount = Log`.
 8. **Migración de los puntos existentes** al despachador con su `Module`/`Feature`: los ocho de la tabla "Estado actual". `PersonEmailSender` sigue guardando `PersonEmailMessages` y además pasa por el despachador (sin doble envío).
 9. `EmailQuotaGuard`: cuenta el período con `SELECT … FOR UPDATE` sobre la fila de configuración de la empresa para que envíos simultáneos no superen la cuota.
 
@@ -101,7 +110,7 @@
 14. Seed: todas las empresas en `Platform`, sin cuotas. En desarrollo, `JOIN-001` y `JOIN-NI-001` (SPEC 100) con cuota mensual de ejemplo 5.000 y `WarnOnly`, y registros de ejemplo del último mes por módulo.
 
 **Out of scope:**
-- Eventos de entrega de SendGrid (entregado, rebotado, abierto) por webhook: spec futura; `ProviderMessageId` queda para correlacionarlos.
+- Recibir el webhook de eventos de SendGrid (entregado, rebotado, abierto…) y mostrar el estado: spec futura. Esta spec deja listos nuestro id en `custom_args`, el id de SendGrid, los destinatarios y el campo `DeliveryStatus`.
 - Otros proveedores (SMTP, Amazon SES): el modelo los admite agregando un `ProviderType`; esta spec solo implementa SendGrid.
 - Facturar el uso a las empresas.
 
@@ -125,8 +134,9 @@
 6. El reporte de la empresa agrupa el mes por módulo y función, y el total cuadra con el detalle exportado.
 7. Un Admin de empresa no ve otras empresas; el SuperAdmin ve todas y los correos de sistema.
 8. Dos envíos simultáneos con un correo de cuota restante: uno sale y el otro queda `Blocked`.
-9. Tras reiniciar la API (y con dos instancias), las keys cifradas se siguen descifrando (anillo de claves en la base).
-10. Unitarios: resolución de cuenta, cuotas y excepciones por módulo, enmascarado, clasificación de cada punto migrado, protector de secretos. Integración: flujo de envío con `Log`, cuotas, reportes y permisos.
+9. Un envío registra su `Id` antes de salir, SendGrid lo recibe en `custom_args` (verificable con el registro del adaptador en pruebas) y `ProviderMessageId` queda guardado en todos los módulos, también en seguridad y usuarios. Un correo con 1 destinatario y 2 CC deja 3 filas en `EmailDispatchRecipients`.
+10. Tras reiniciar la API (y con dos instancias), las keys cifradas se siguen descifrando (anillo de claves en la base).
+11. Unitarios: resolución de cuenta, cuotas y excepciones por módulo, enmascarado, clasificación de cada punto migrado, protector de secretos. Integración: flujo de envío con `Log`, cuotas, reportes y permisos.
 
 ## Decisiones
 
