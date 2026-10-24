@@ -1,6 +1,6 @@
 # SPEC 100 — Empresa de desarrollo Nicaragua (`JOIN-NI-001`): todo el seed existente, base en córdobas y acceso de los usuarios actuales
 
-> **Status:** Borrador
+> **Status:** Aprobado
 > **Depends on:** SPEC 19 y 28 (roles por empresa y membresía multiempresa), SPEC 43-post y 48-post (módulos, menú y permisos por empresa), SPEC 44-post (calendario), SPEC 45-post (cambio de empresa con `POST /workspaces/switch-company`), SPEC 54 y 55 (personas y clientes de ejemplo), **SPEC 56** (monedas por empresa), SPEC 57 (productos de ejemplo), SPEC 59–65 (comercial), SPEC 70–72 (adjuntos y correo). Rama de trabajo: `spec-100-development-company-nicaragua`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Crear en desarrollo una segunda empresa, **JOIN Nicaragua** (`JOIN-NI-001`), con moneda base **córdoba (NIO)**, que reciba **todo lo que hoy siembra `JOIN-001`** (módulos, menú, permisos, catálogos, tickets, calendario, personas, clientes, leads, productos, plantillas) y en la que **todos los usuarios existentes** tengan acceso con los mismos roles, para que `livingstone23@gmail.com` cambie a ella y trabaje sin problemas. Es la empresa donde se siembran los datos simulados de Nicaragua de SPEC 81–98.
