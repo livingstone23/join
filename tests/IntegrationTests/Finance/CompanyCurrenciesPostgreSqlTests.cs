@@ -43,13 +43,15 @@ public sealed class CompanyCurrenciesPostgreSqlTests : IClassFixture<FinancePost
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var bases = await (from cc in db.CompanyCurrencies.IgnoreQueryFilters()
                                join c in db.Currencies.IgnoreQueryFilters() on cc.CurrencyId equals c.Id
+                               join co in db.Companies.IgnoreQueryFilters() on cc.CompanyId equals co.Id
                                where cc.IsBase && cc.GcRecord == 0
-                               select new { cc.CompanyId, c.Code }).ToListAsync();
+                               select new { cc.CompanyId, co.TaxId, c.Code }).ToListAsync();
             var companies = await db.Companies.IgnoreQueryFilters().Where(c => c.GcRecord == 0).Select(c => c.Id).ToListAsync();
 
             bases.GroupBy(b => b.CompanyId).Should().OnlyContain(g => g.Count() == 1);
             bases.Select(b => b.CompanyId).Should().BeEquivalentTo(companies);
-            bases.Should().OnlyContain(b => b.Code == "USD");
+            // SPEC 100: the development company JOIN-NI-001 (Development only) is the one born with NIO.
+            bases.Should().OnlyContain(b => b.Code == (b.TaxId == "JOIN-NI-001" ? "NIO" : "USD"));
         }
 
         var (companyId, _) = await CreateCompanyWithAdminAsync();
