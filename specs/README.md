@@ -9,7 +9,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 ## Reglas
 
 ### Numeración
-- Una spec nueva toma el **siguiente número libre** (hoy: **81**; la 51 es de `main` —su copia en el fork es `51-post`— y de la 52 a la 80 son propias del fork).
+- Una spec nueva toma el **siguiente número libre** (hoy: **87**; la 51 es de `main` —su copia en el fork es `51-post`— y de la 52 a la 86 son propias del fork).
 - Los números **no se reutilizan ni se reordenan**. Si una spec se divide, la parte que sale toma un número nuevo y ambas lo dicen en su encabezado (ejemplo: SPEC 00 → SPEC 47).
 - **Excepción autorizada (2026-10-05):** por decisión del usuario se renumeró una sola vez: la 37 (canales `WEB`/`APP`) pasó a **99** y las 38–49 bajaron un número (38→37 … 49→48). Las referencias se actualizaron en ambos repositorios. Una spec citada con su número anterior en un commit o conversación previa a esa fecha debe traducirse con esta tabla.
 - **Excepción autorizada (2026-10-18):** por decisión del usuario, la 99 y la 99-post (canales `WEB`/`APP`) pasaron a **00** y **00-post**. Las referencias se actualizaron en ambos repositorios (BE-99 → BE-00); los nombres ya aplicados no cambian (migración `Spec99InternalCommunicationChannels`, usuario `Spec99_Migration`, rama `spec-99-post-ticket-inbound-channels`). En `main` la spec sigue numerada 99. Una cita a "SPEC 99" anterior a esa fecha se lee como SPEC 00.
@@ -111,6 +111,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 70 | Productos y servicios: imágenes (hasta 5) y documentos, con límites por empresa | Implementado | 36, 41-post, 43-post, 49-post, 57, 62 |
 | 71 | Plantillas de correo por empresa, agrupadas por tipo, con variables | Implementado | 41-post, 43-post, 61 |
 | 72 | Enviar correos a personas, clientes y leads, y registrarlos en el historial del lead | Implementado | 49-post, 55, 59, 60, 61, 62, 70, 71 |
+| 72.1 | Ajuste: tope de adjuntos sin permiso `EmailSettings` y tipos de documento de producto borrados | Borrador | 72, 70, 41-post |
 | 73 | WhatsApp (Meta Cloud API): esquema `Channel_Meta`, conexión por empresa, webhook firmado, perfil del negocio y módulo | Aprobado | 05, 00-post, 43-post, 48-post, 49-post |
 | 74 | WhatsApp: conversaciones con código propio, mensajes, estados, marca de identificación, personas pendientes y archivos | Aprobado | 73, 45-post, 49-post, 54, 55, 58, 61, 65 |
 | 75 | WhatsApp: agentes y coordinadores, disponibilidad, Cola y En espera, notificaciones, envío de mensajes y tiempo real | Aprobado | 73, 74, 49-post |
@@ -119,6 +120,12 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 78 | WhatsApp: índice de conversaciones por persona o cliente, con filtros y exportación | Aprobado | 74, 75, 77 |
 | 79 | WhatsApp: automatizaciones básicas | Aprobado | 74, 75, 76, 44-post |
 | 80 | WhatsApp: asistente IA opcional vía un flujo de n8n | Aprobado | 74, 75, 76, 79, 45-post, 57, 61, 63 |
+| 81 | Módulo Facturación: activación por empresa y datos fiscales del emisor | Borrador | 43-post, 48-post, 49-post, 57, 70 |
+| 82 | Impuestos, retenciones y grupos fiscales por empresa; grupo fiscal en el catálogo actual de productos | Borrador | 41-post, 43-post, 57, 61, 81 |
+| 83 | Series de numeración y proformas, con origen en un lead o directas | Borrador | 55, 56, 57, 61, 81, 82 |
+| 84 | Facturas: emisión, rectificativas y estado de cobro | Borrador | 55, 61, 63, 81, 82, 83 |
+| 85 | Plantillas de proformas y facturas por empresa, generación de PDF y envío por correo | Borrador | 49-post, 71, 72, 81, 83, 84 |
+| 86 | Módulo Productos ampliado: catálogo propio del módulo y origen de productos en Leads | Pospuesto | 41-post, 43-post, 48-post, 56, 57, 61, 64, 81–85 |
 
 ### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)
 
@@ -211,6 +218,7 @@ Decisión del usuario (2026-10-09): las specs 40–49, 51 y 99 (hoy 00) de `main
 7. **55** → **54**: propias del fork. 55 deja un cliente por persona y empresa (sin borrado, activo/inactivo, activación idempotente con `ICustomerActivationService` e historial `CustomerStatusHistory`, catálogo de etapas por empresa `CustomerStages` con su opción de menú `/customers/customer-stages`); 54 agrega `GET /Persons/lookup`, que pide FE-27 (y cierra la brecha de FE-22), y el seed de 40 personas y 30 clientes registrados por `livingstone23@gmail.com`. 54 necesita 55; pueden ir en el mismo cambio.
 8. **56 – 65**: propias del fork. Módulo de clientes al estilo Dynamics 365 (diseño del 2026-10-16, propuesta visual "Clientes JOIN"): el lead es su propia entidad sobre `Admin.Persons` y el cliente se crea al ganar. Orden: **56** (monedas), **57** (productos) y **58** (identificación opcional) son independientes entre sí y van primero; luego **59** (parametrización) → **60** (grupos) → **61** (leads) → **62** (documentos) y **63** (ganar, perder, migración) → **64** (reportes) y **65** (calendario y personas pendientes). 63 cambia el significado de `CustomerStages` (SPEC 55) a etapas post-venta.
 9. **73 – 80**: propias del fork. Canal WhatsApp con la Meta Cloud API, una App y un número por empresa, esquema `Channel_Meta` (diseño del 2026-10-18/19, propuesta visual "WhatsApp JOIN" en `join_frontb/SpecPropuestaWhatsApp/`). Orden: **73** → **74** → **75** → **76** → (**77**, **78**, **79** en cualquier orden) → **80** (asistente IA vía n8n). Reemplaza la ingesta por Twilio (47-post) para WhatsApp, que queda para el futuro. 74 ajusta 45-post: personas pendientes con `AssignedUserId` y `ConversationId`.
+10. **81 – 85**: propias del fork. Facturación interna sobre el catálogo actual (pedido del 2026-10-24): módulo `Billing` activable por empresa, perfil fiscal del emisor, impuestos y retenciones en grupos fiscales asignados a `Catalog.Products`, proformas (también desde un lead), facturas con rectificativas, plantillas por empresa y PDF. Orden: **81** → **82** → **83** → **84** → **85**. La facturación electrónica por país queda fuera. **86** (`Pospuesto`, decisión del usuario): módulo Productos de mayor tamaño con catálogo propio y origen de productos en Leads, después de 81–85.
 
 ---
 
@@ -236,4 +244,5 @@ Decisiones o verificaciones que no tienen spec propia todavía:
 | ~~41-post~~ | ~~`GetPersonByIdQueryHandler` lee direcciones y contactos como `dynamic`~~ Resuelto (2026-10-09, en `main_postgresql`): se leen con filas tipadas (`AddressRow`, `ContactRow`), que Dapper mapea sin distinguir mayúsculas; `GET /Persons/{id}` con direcciones y contactos responde 200. Test de regresión con columnas en minúsculas. |
 | 59, 61 | Inactivación automática de leads tras N días sin contacto: una tarea programada por módulo (decisión del usuario, 2026-10-16: por ahora la inactivación es manual). Conviene resolverla junto con la de SPEC 44 (Hangfire). |
 | 56, 57, 63 | Módulos futuros (Inventario, Compras, Ventas, Presupuestos): se conectan por `Catalog.Products` (SPEC 57), `Finance` (monedas y tasas, SPEC 56), `Leads` y sus líneas aceptadas (SPEC 61, 63) y `Customers`; "Posible proveedor" (SPEC 59) espera al módulo de Compras para tener destino al ganar. |
+| 84 | Facturación electrónica por país (Verifactu, SUNAT, SAT, DIAN…): spec propia sobre `BillingDocuments` cuando el usuario elija el país; también cobros parciales, facturas recurrentes y conciliación. |
 | Proceso | Script de verificación de consistencia de specs (referencias inexistentes, nombres retirados, dependencias de specs pospuestas, specs fuera del índice). |
