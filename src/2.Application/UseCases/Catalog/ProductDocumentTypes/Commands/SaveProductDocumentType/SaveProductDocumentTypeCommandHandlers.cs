@@ -142,7 +142,7 @@ public sealed class RestoreProductDocumentTypeCommandHandler(
             cancellationToken: cancellationToken);
 
         // SPEC 72.1: the conflict of the code answers the error of the catalog, not the generic one of the restorer.
-        return response.IsSuccess || response.Message != "ACTIVE_DUPLICATE_EXISTS"
+        return response.IsSuccess || response.Message != SoftDeleteRestorer.ActiveDuplicateExists
             ? response
             : Response<Guid>.Error(CatalogErrorCodes.ProductDocumentTypeAlreadyExists, response.Errors);
     }

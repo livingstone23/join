@@ -18,6 +18,9 @@ namespace JOIN.Application.Common;
 /// </summary>
 public sealed class SoftDeleteRestorer(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
 {
+    /// <summary>Error code when an active row already holds the entity's natural key.</summary>
+    public const string ActiveDuplicateExists = "ACTIVE_DUPLICATE_EXISTS";
+
     /// <summary>
     /// Restores the entity <paramref name="id"/> by resetting its <c>GcRecord</c> to active.
     /// </summary>
@@ -74,7 +77,7 @@ public sealed class SoftDeleteRestorer(IUnitOfWork unitOfWork, ICurrentUserServi
         if (activeDuplicateExists is not null && await activeDuplicateExists(entity, cancellationToken))
         {
             return Response<Guid>.Error(
-                "ACTIVE_DUPLICATE_EXISTS",
+                ActiveDuplicateExists,
                 [$"An active {entityName} with the same unique key already exists."]);
         }
 

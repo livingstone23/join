@@ -1,6 +1,6 @@
 # SPEC 72.1 — Ajuste: tope de adjuntos sin permiso `EmailSettings` y tipos de documento de producto borrados
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 72 (envío de correos y `attachment-candidates`), SPEC 70 (tipos de documento de producto), SPEC 41-post (visibilidad de borrados y restauración para SuperAdmin). Front: **FE-47.1**.
 > **Date:** 2026-10-24
 > **Objective:** Que el modal "Enviar correo" conozca el tope de adjuntos de la empresa sin el permiso `EmailSettings`, y que un SuperAdmin pueda listar y restaurar los tipos de documento de producto borrados.
@@ -60,7 +60,7 @@ Sin cambios de tablas ni migraciones.
 
 ## Implementation plan
 
-1. `PersonEmailAttachmentCandidatesDto` y el handler de `attachment-candidates`: lee `MaxAttachmentsTotalBytes` con la misma lógica que `PersonEmailSender` (fila de la empresa o valor por defecto). Actualizar `ProducesResponseType`.
+1. `PersonEmailAttachmentCandidatesDto` y el handler de `attachment-candidates`: lee `MaxAttachmentsTotalBytes` de la fila viva de `EmailCompanySettings` de la empresa o, sin fila, el valor por defecto de SPEC 72 (`EmailCompanySettings.DefaultMaxAttachmentsTotalBytes`). A diferencia de `PersonEmailSender`, que sin fila responde `EMAIL_SETTINGS_NOT_CONFIGURED`, este endpoint no falla: el selector de adjuntos debe abrir igual y el error de configuración lo informa el envío. Actualizar `ProducesResponseType`.
 2. `ProductDocumentTypeDto : SoftDeletableDto`; `GetProductDocumentTypesQuery` con `IncludeDeleted` y filtro por `GcRecord` solo si el actor es SuperAdmin; parámetro `includeDeleted` en el controller.
 3. Restaurar: verificar el 409 por código duplicado.
 4. Tests y nota "Ajuste por SPEC 72.1" en SPEC 72 y SPEC 70; fila en `specs/README.md`.
