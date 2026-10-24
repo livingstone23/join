@@ -35,7 +35,7 @@
 1. `RoleDiscountLimits` (`BaseTenantEntity`): `RoleId`, `MaxLineDiscountPercent`. Índice único `(CompanyId, RoleId)`.
 2. `DiscountApprovalRequests` (`BaseTenantEntity`): `DocumentId`, `RequestedByUserId`, `RequestedAt`, `Reason`, `Status` (`Pending`, `Taken`, `Approved`, `Rejected`, `Cancelled`), `TakenByUserId?`, `TakenAt?`, `ResolvedByUserId?`, `ResolvedAt?`, `ResolutionComment?`, `ExpiresAt`.
 3. `DiscountApprovalRequestLines`: `RequestId`, `LineId`, `RequestedPercent`, `ApprovedPercent?`.
-4. `LeadCommercialDocumentLines` suma `DiscountStatus` (`Applied`, `PendingApproval`) y `ApprovedDiscountPercent?`.
+4. `LeadCommercialDocumentLines` suma `DiscountStatus` (`Applied = 1`, `PendingApproval = 2`) y `ApprovedDiscountPercent?`.
 5. `CompanyCustomers` suma `DefaultMaxDiscountPercent` y `DiscountRequestExpiryHours`.
 6. `LeadAlerts` (SPEC 85) suma `DiscountApprovalRequested` y `DiscountApprovalResolved`.
 

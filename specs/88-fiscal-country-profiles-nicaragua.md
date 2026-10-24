@@ -1,7 +1,7 @@
 # SPEC 88 — Perfil fiscal por país (estándar), primero Nicaragua: impuestos y retenciones base, numeración autorizada, moneda de referencia y punto de conexión para factura electrónica
 
 > **Status:** Borrador
-> **Depends on:** SPEC 56 (monedas y tasas), SPEC 58 (identificación de la persona), **SPEC 81** (tipos de documento, configuración y `CompanyCustomers`), **SPEC 82** (impuestos y grupos fiscales), **SPEC 83** (emisión), **SPEC 84** (PDF), **SPEC 85** (alertas de Leads). Rama de trabajo: `spec-88-fiscal-country-profiles-nicaragua`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
+> **Depends on:** SPEC 56 (monedas y tasas), SPEC 58 (identificación de la persona), **SPEC 81** (tipos de documento, configuración y `CompanyCustomers`), **SPEC 82** (impuestos y grupos fiscales), **SPEC 83** (emisión), **SPEC 84** (PDF), **SPEC 85** (alertas de Leads), SPEC 91 (layout del libro en la lista de verificación). Rama de trabajo: `spec-88-fiscal-country-profiles-nicaragua`, creada desde **`main_postgresql`**, con PR hacia `main_postgresql`. Aplican todas las "Convenciones PostgreSQL" de `specs/README.md`.
 > **Date:** 2026-10-24
 > **Objective:** Separar del núcleo todo lo que depende del país. Cada empresa elige un **perfil fiscal por país** que siembra sus impuestos y retenciones base, valida la identificación tributaria, controla la **numeración autorizada** por la autoridad tributaria y fija la moneda de referencia. El primer perfil es **Nicaragua**. Agregar otro país (Costa Rica, Honduras, El Salvador, Guatemala, Panamá…) es sembrar su perfil y, si exige factura electrónica, implementar su proveedor, sin cambiar el modelo.
 > **Valores de enums (revisión de consistencia):** `ElectronicStatus`: `NotRequired = 0`, `Pending = 1`, `Accepted = 2`, `Rejected = 3`.
@@ -38,7 +38,7 @@
 6. **Moneda de referencia en el documento:** si el documento está en una moneda distinta de la local, se guarda y se imprime el **equivalente en moneda local** (total, impuestos y retenciones) con la tasa del día de emisión. En Nicaragua: factura en USD con su equivalente en NIO.
 7. **Punto de conexión estándar para factura electrónica:** `IElectronicInvoicingProvider` (Application) con `SubmitAsync`, `GetStatusAsync` y `CancelAsync`, elegido por la clave del perfil. Los documentos guardan `ElectronicStatus` (`NotRequired`, `Pending`, `Accepted`, `Rejected`), `ElectronicId?`, `ElectronicResponse?` (`jsonb`) y la fecha. Sin proveedor, todo documento queda `NotRequired` y no cambia nada del flujo. Los países con factura electrónica obligatoria (Costa Rica, Guatemala, El Salvador, Panamá, Honduras según el caso) se agregan con su proveedor, cada uno en su spec.
 
-8. **Puesta en marcha con contador (obligatoria):** antes de emitir la primera factura o nota de crédito, la empresa completa una **lista de verificación fiscal** y un usuario con el permiso `FiscalSetupConfirm` (rol de contador o administrador) la **confirma** (`CompanyCustomers.FiscalSetupConfirmedAt` y `FiscalSetupConfirmedByUserId`). Sin confirmar, solo se bloquea emitir facturas y notas de crédito (los demás tipos se emiten normal); emitir facturas o notas de crédito → 409 `FISCAL_SETUP_NOT_CONFIRMED`. Ítems de la lista (cada uno con estado y enlace a su pantalla):
+8. **Puesta en marcha con contador (obligatoria):** antes de emitir la primera factura o nota de crédito, la empresa completa una **lista de verificación fiscal** y un usuario con el recurso `FiscalSetup` y `CanExecute` (rol de contador o administrador) la **confirma** (`CompanyCustomers.FiscalSetupConfirmedAt` y `FiscalSetupConfirmedByUserId`). Sin confirmar, solo se bloquea emitir facturas y notas de crédito (los demás tipos se emiten normal); emitir facturas o notas de crédito → 409 `FISCAL_SETUP_NOT_CONFIRMED`. Ítems de la lista (cada uno con estado y enlace a su pantalla):
    - datos del emisor completos (razón social, RUC válido, dirección);
    - perfil fiscal elegido;
    - impuestos y retenciones **revisados** por el contador (marca de revisión con usuario y fecha en `Taxes`);
@@ -47,14 +47,14 @@
    - layout del libro de ventas revisado (SPEC 91);
    - moneda local y tasa de cambio del día cargada.
 
-   Cambiar después cualquiera de esos datos **no** quita la confirmación, pero queda en la bitácora de la lista con usuario y fecha. Un usuario con `FiscalSetupConfirm` puede revocar la confirmación.
+   Cambiar después cualquiera de esos datos **no** quita la confirmación, pero queda en la bitácora de la lista con usuario y fecha. Un usuario con `FiscalSetup` y `CanExecute` puede revocar la confirmación.
 
 ## Scope
 
 **In:**
 
 **A. Esquema**
-1. `Customer.FiscalCountryProfiles` (global, sin empresa): `CountryCode` (único), `TaxAuthorityName`, `TaxIdLabel` (ej. "RUC"), `TaxIdIdentificationTypeCode?` (código de `Admin.IdentificationTypes`), `AuthorizedNumberingKinds` (`jsonb`: `BaseKind` que exigen numeración autorizada; `NI`: `Invoice`, `CreditNote`), `LocalCurrencyCode`, `ReferenceCurrencyCode?`, `RequiresAuthorizedNumbering`, `ElectronicInvoicingProvider?`, `SeedDefinition` (`jsonb`: impuestos, grupos y leyendas a sembrar), `IsActive`.
+1. `Customer.FiscalCountryProfiles` (global, sin empresa): `CountryCode` (único), `TaxAuthorityName`, `TaxIdLabel` (ej. "RUC"), `TaxIdIdentificationTypeCode?` (código de `Admin.IdentificationTypes`), `AuthorizedNumberingKinds` (`jsonb`: `BaseKind` que exigen numeración autorizada; `NI`: `Invoice`, `CreditNote`), `LocalCurrencyCode`, `ReferenceCurrencyCode?`, `ElectronicInvoicingProvider?`, `SeedDefinition` (`jsonb`: impuestos, grupos y leyendas a sembrar), `IsActive`.
 2. `Customer.CompanyCustomers` (SPEC 81) suma `FiscalCountryCode?`, `NumberingAlertRemaining` (por defecto 50) y `NumberingAlertDays` (por defecto 15).
 3. `Customer.LeadDocumentNumberingAuthorizations` (`BaseTenantEntity`): `DocumentTypeId`, `AuthorizationNumber` (máx. 100), `AuthorizationDate`, `Series?` (máx. 20), `RangeFrom`, `RangeTo`, `NextNumber`, `ValidUntil?`, `IsActive`. Un solo rango activo por tipo (índice único filtrado); los rangos de un tipo no se solapan (`NUMBERING_RANGE_OVERLAP`).
 4. `Customer.LeadCommercialDocuments` (SPEC 83) suma `NumberingAuthorizationId?`, `LocalCurrencyTotal?`, `LocalCurrencyTaxTotal?`, `LocalCurrencyTotalWithTaxes?`, `LocalCurrencyWithholdingTotal?`, `LocalCurrencyRate?`, `ElectronicStatus`, `ElectronicId?`, `ElectronicResponse?`, `ElectronicStatusAt?`.
@@ -65,16 +65,16 @@
 **B. Endpoints (Administración)**
 8. `GET /api/v1/FiscalCountryProfiles` (activos; `[SkipDynamicAuthorization]`).
 9. `PUT /api/v1/CompanyCustomer/fiscal-country` `{ countryCode }`: fija el país y siembra lo que falte. Responde qué sembró.
-10. Puesta en marcha (recurso `FiscalSetup`: `CanRead` para ver la lista; confirmar, revocar y marcar impuestos revisados con `[RequirePermission(CanExecute)]`; en este documento "permiso `FiscalSetupConfirm`" = `FiscalSetup` + `CanExecute`): `GET /api/v1/FiscalSetup/checklist`, `POST /api/v1/FiscalSetup/confirm`, `POST /api/v1/FiscalSetup/revoke` `{ reason }`, `POST /api/v1/Taxes/{id}/mark-reviewed`.
+10. Puesta en marcha (recurso `FiscalSetup`: `CanRead` para ver la lista; confirmar, revocar y marcar impuestos revisados con `[RequirePermission(CanExecute)]`): `GET /api/v1/FiscalSetup/checklist`, `POST /api/v1/FiscalSetup/confirm`, `POST /api/v1/FiscalSetup/revoke` `{ reason }`, `POST /api/v1/Taxes/{id}/mark-reviewed`.
 11. `GET/POST/PUT /api/v1/LeadDocumentNumberingAuthorizations?documentTypeId=` + `POST /{id}/deactivate`. No se edita el rango de una autorización que ya numeró documentos (solo `ValidUntil` y `IsActive`).
 12. La emisión (SPEC 83) toma el número del rango activo con `SELECT … FOR UPDATE` cuando el perfil lo exige, y valida la identificación tributaria del receptor según el perfil en los tipos que la piden (factura y nota de crédito; el consumidor final de SPEC 89 queda exento de la validación).
 13. El PDF (SPEC 84) imprime los datos de la autorización y el equivalente en moneda local.
 
 **C. Menú y permisos**
-13.1 Administración: `FiscalSetup` → `/administration/fiscal-setup` (lista de verificación y país; recurso `FiscalSetup`), `NumberingAuthorizations` → `/administration/numbering-authorizations` (`ControllerName = "LeadDocumentNumberingAuthorizations"`). Permisos: SuperAdmin y Admin con todo; un rol de contador puede recibir `FiscalSetup` con `CanExecute`.
+14. Administración: `FiscalSetup` → `/administration/fiscal-setup` (lista de verificación y país; recurso `FiscalSetup`), `NumberingAuthorizations` → `/administration/numbering-authorizations` (`ControllerName = "LeadDocumentNumberingAuthorizations"`). Permisos: SuperAdmin y Admin con todo; un rol de contador puede recibir `FiscalSetup` con `CanExecute`.
 
 **D. Factura electrónica (solo el punto de conexión)**
-14. `IElectronicInvoicingProvider` y `ElectronicInvoicingProviderResolver` (por clave). Implementación `NoElectronicInvoicingProvider` para los perfiles sin clave. Ningún proveedor real en esta spec.
+15. `IElectronicInvoicingProvider` y `ElectronicInvoicingProviderResolver` (por clave). Implementación `NoElectronicInvoicingProvider` para los perfiles sin clave. Ningún proveedor real en esta spec.
 
 **Out of scope:**
 - Proveedores reales de factura electrónica de cualquier país.
@@ -119,6 +119,6 @@
 Solo en `Development`, solo para la empresa de desarrollo `JOIN-NI-001` (SPEC 100), idempotente (inserta lo que falte). Todos los nombres, RUC, cuentas y referencias son **ficticios** (ver "Datos de ejemplo de Nicaragua" en `specs/README.md`).
 
 - Perfil `NI` activo en `FiscalCountryProfiles` y `JOIN-NI-001` con `FiscalCountryCode = NI`, `NIO` local y `USD` referencia.
-- Tasas USD → NIO de los últimos 30 días en `Finance.ExchangeRates`, simuladas alrededor de 36,62.
+- Tasas USD → NIO: las siembra SPEC 100.
 - Autorizaciones de numeración simuladas: factura `DGI-SIM-2026-0001`, rango 1–5000; nota de crédito `DGI-SIM-2026-0002`, rango 1–1000; ambas vigentes hasta el 31/12/2027.
 - Tipo de identificación `RUC` con su patrón.

@@ -53,7 +53,7 @@
 
 **C. Endpoints**
 7. `GET /api/v1/Customers/{id}/withholdings` (`Customers`, `CanRead`) y `PUT` (`Customers`, `CanUpdate`).
-8. `POST /api/v1/LeadCommercialDocuments/{id}/withholdings` y `DELETE /{id}/withholdings/{withholdingId}` (solo `Draft`).
+8. `POST /api/v1/LeadCommercialDocuments/{id}/withholdings` y `DELETE /{id}/withholdings/{withholdingId}` (solo `Draft`). Excepción: en órdenes de compra aprobadas, las retenciones efectuadas se registran con la factura del proveedor (SPEC 91, `PUT /supplier-invoice`).
 9. Los DTO de documento, `preview-totals` y el punto de venta devuelven el bloque `Totals` con las filas de la regla 2, y por línea `NetAmount`, `TaxRate`, `IsExempt` y, si el tipo lo pide, `UnitPriceWithTax` y `AmountWithTax`.
 
 **Out of scope:**
@@ -69,7 +69,7 @@
 
 ## Criterios de aceptación
 
-1. Factura a Clínica Las Colinas (agente retenedor con IR 2 % e IMI 1 %, `All`): 2 laptops (`LAP-14`) × C$ 25.000 + implementación básica (`IMP-BAS`, servicio) C$ 5.000. Muestra subtotal neto C$ 55.000, base gravada IVA 15 % C$ 55.000, IVA C$ 8.250, **total con IVA C$ 63.250**, retención IR 2 % C$ 1.100, retención municipal 1 % C$ 550 y **total a pagar C$ 61.600**, con el monto en letras.
+1. Factura a Clínica Las Colinas (agente retenedor con IR 2 % e IMI 1 %, `All`): 2 laptops (`LAP-14`) × C$ 25.000 + implementación básica (`IMP-BAS`, servicio) con precio manual de la línea C$ 5.000 (su precio de referencia convertido es mayor). Muestra subtotal neto C$ 55.000, base gravada IVA 15 % C$ 55.000, IVA C$ 8.250, **total con IVA C$ 63.250**, retención IR 2 % C$ 1.100, retención municipal 1 % C$ 550 y **total a pagar C$ 61.600**, con el monto en letras.
 2. La misma factura a un cliente sin retenciones muestra total con IVA = total a pagar = C$ 63.250.
 3. Una línea exenta aparece con "Exento" y su base en la fila Exento, sin IVA.
 4. Con `ShowLineAmountsWithTax = true`, cada línea muestra precio e importe con IVA (laptop C$ 28.750 por unidad).

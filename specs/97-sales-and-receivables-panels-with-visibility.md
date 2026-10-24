@@ -16,12 +16,10 @@
 
    | Permiso (recurso) | Ve |
    |---|---|
-   | `SalesPanel` | Sus ventas (`SellerUserId` = él) |
-   | `SalesPanel` + líder de un grupo de trabajo | Las de su grupo |
-   | `SalesPanelViewAll` | Todas las de la empresa |
-   | `ReceivablesPanel` | Las cuentas asignadas a él |
-   | `ReceivablesPanel` + líder | Las de su grupo |
-   | `ReceivablesViewAll` | Todas |
+   | `SalesPanel` | Según su alcance de SPEC 60 (`ILeadAccessScopeResolver`): `Own` = sus ventas (`SellerUserId` = él); `Team` = las de su grupo de trabajo; `Company` = todas |
+   | `SalesPanelViewAll` | Todas las de la empresa (amplía cualquier alcance) |
+   | `ReceivablesPanel` | Según su alcance de SPEC 60: `Own` = las cuentas asignadas a él; `Team` = las de su grupo; `Company` = todas |
+   | `ReceivablesViewAll` | Todas (amplía cualquier alcance) |
 
    Los permisos se dan por rol en Administración (mecanismo actual). Seed: vendedores con `SalesPanel` y `ReceivablesPanel`; Supervisor y Manager también con `…ViewAll`.
 3. **Cuenta asignada** (`CompanyCustomers.ReceivablesAssignment`): `Seller` (el vendedor de la factura), `CollectionUser` (el responsable de cobro, SPEC 86) o `Both` (cualquiera de los dos; por defecto).
@@ -68,7 +66,7 @@
 ## Criterios de aceptación
 
 1. Un vendedor con solo `SalesPanel` ve sus ventas del mes; pedir las de otro vendedor → 403.
-2. Un líder de grupo ve las de su grupo. Un gerente con `SalesPanelViewAll` ve todas y el ranking completo.
+2. Un usuario con alcance `Team` (coordinador del grupo, SPEC 60) ve las de su grupo; uno con `Company` o con `SalesPanelViewAll` ve todas y el ranking completo.
 3. Las ventas del panel cuadran con el libro de ventas del período (SPEC 91) para el usuario con `ViewAll`.
 4. La antigüedad de saldos clasifica una cuota vencida hace 45 días en 31–60.
 5. Con `ReceivablesAssignment = CollectionUser`, un vendedor sin cobranzas asignadas no ve saldos.

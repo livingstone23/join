@@ -31,7 +31,7 @@
 
 **A. Esquema**
 1. `LeadCommercialDocuments` suma `PdfStorageKey?`, `PdfGeneratedAt?`, `FirstSentAt?` y `SendCount`.
-2. `LeadCommercialDocumentPdfVersions`: `DocumentId`, `StorageKey`, `Reason` (`Issued`, `Approved`, `Cancelled`, `Regenerated`), `GeneratedAt`.
+2. `LeadCommercialDocumentPdfVersions`: `DocumentId`, `StorageKey`, `Reason` (`Issued = 1`, `Approved = 2`, `Cancelled = 3`, `Regenerated = 4`), `GeneratedAt`.
 3. `PersonEmailMessageAttachment.SourceKind` suma `LeadCommercialDocument = 3`.
 
 **B. Generación del PDF**

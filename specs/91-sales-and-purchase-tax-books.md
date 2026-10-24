@@ -36,7 +36,7 @@
 5. `GET /api/v1/TaxBooks/purchases?from=&to=&format=…`.
 6. `GET /api/v1/TaxBooks/summary?year=&month=`: resumen del período.
 7. `GET /api/v1/TaxBooks/withholdings?from=&to=&kind=suffered|applied`.
-8. `PUT /api/v1/LeadCommercialDocuments/{id}/supplier-invoice` (órdenes de compra recibidas) y `PUT /{id}/withholding-certificate` (ventas). Respetan el cierre de período.
+8. `PUT /api/v1/LeadCommercialDocuments/{id}/supplier-invoice` `{ supplierInvoiceNumber, supplierInvoiceDate, supplierTaxId?, withholdings?[{ taxId, baseAmount }] }` (órdenes de compra aprobadas; las retenciones efectuadas se cargan aquí) y `PUT /{id}/withholding-certificate` (ventas). Respetan el cierre de período.
 9. Cierre (recurso `TaxPeriods`; cerrar y reabrir con `[RequirePermission(CanExecute)]`): `GET /api/v1/TaxPeriods`, `POST /{year}/{month}/lock`, `POST /{year}/{month}/reopen` `{ reason }`.
 10. Todas las consultas con Dapper sobre los datos **copiados al emitir** (desglose guardado de SPEC 83), no recalculados.
 

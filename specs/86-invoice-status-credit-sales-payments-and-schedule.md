@@ -49,7 +49,7 @@
 8. `GET /{id}/installments`, `PUT /{id}/installments` (reprogramar fechas o montos de las cuotas pendientes; suman el saldo; queda en la bitácora y mueve los eventos del calendario).
 9. `GET /api/v1/LeadCommercialDocuments` suma los filtros `paymentTerms` y `paymentStatus` (incluye `Overdue`) y devuelve los totales del filtro (facturado, cobrado, pendiente, vencido) en moneda base.
 10. Histórico del cliente (SPEC 83) suma, por factura, la condición, el estado de cobro y el saldo, y la ficha muestra **total pendiente y vencido**.
-11. `GET /api/v1/Customers/{id}/statement?from=&to=`: estado de cuenta (facturas, notas de crédito y pagos en orden, con saldo acumulado), exportable a CSV.
+11. `GET /api/v1/Customers/{id}/statement?from=&to=` (`[PermissionResource("Leads")]`, `CanRead`; CSV con `CanExport`): estado de cuenta (facturas, notas de crédito y pagos en orden, con saldo acumulado), exportable a CSV.
 12. Administración: `GET/POST/PUT/DELETE /api/v1/PaymentMethods` (`/administration/payment-methods`).
 
 **Out of scope:**

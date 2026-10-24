@@ -20,7 +20,7 @@
    | Servicios (`Kind = Service`) | `Catalog.Products` | `Code` |
    | Personas | `Admin.Persons` (+ dirección y contacto principal) | tipo + número de identificación; sin identificación, siempre crea |
    | Clientes | Persona (si no existe) + `Customer.Customers` | identificación de la persona |
-   | **Existencias iniciales** (propuesto) | Ajuste de inventario de entrada (SPEC 85) | — (solo crea) |
+   | **Existencias iniciales** (propuesto) | Ajuste de inventario de entrada (SPEC 85); columna opcional `UnitCost` que fija el costo (SPEC 90) | — (solo crea) |
    | **Líneas de crédito** (propuesto) | `CustomerCreditLines` (SPEC 87) | cliente |
 
    Productos y Servicios tienen plantillas separadas para que cada una muestre solo sus columnas (los servicios no llevan existencias ni código de barras). Existencias iniciales y Líneas de crédito se proponen porque sin ellas no se puede empezar a vender a crédito ni con stock. Se pueden quitar al aprobar la spec.

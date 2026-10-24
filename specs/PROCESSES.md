@@ -28,10 +28,10 @@ Las alertas usan la infraestructura compartida de SPEC 85 (`LeadAlerts`, tabla �
 | A15 | Resolver una solicitud de descuento | Aplica o revierte los descuentos | `DiscountApprovalResolved` al solicitante | 98 |
 | A16 | Cambiar la tasa de un impuesto | Recalcula la sección de precio de los productos con ese impuesto | — | 95 |
 | A17 | Cobrar en el punto de venta | Emite, aprueba, descuenta existencias y registra pagos en una transacción (A2–A5) | Las de A2, A3 y A5 | 89 |
-| A18a | Emitir una nota de entrega con `StockEffect = Out` | Salida de almacén (`DeliveryIssue`) | `LowStock`/`OutOfStock` | 85 |
-| A18b | Aprobar o rechazar una constancia de exoneración | Cambia su estado | `ExemptionResolved` a quien la registró | 94 |
-| A18c | Anular una orden de compra aprobada o una nota de entrega con salida | Movimiento inverso (`PurchaseReversal`/`DeliveryReversal`) | `LowStock`/`OutOfStock` o su resolución | 85 |
-| A18 | Cualquier alerta nueva | Correo a sus destinatarios después del commit | — | 85 |
+| A18 | Emitir una nota de entrega con `StockEffect = Out` | Salida de almacén (`DeliveryIssue`) | `LowStock`/`OutOfStock` | 85 |
+| A19 | Aprobar o rechazar una constancia de exoneración | Cambia su estado | `ExemptionResolved` a quien la registró | 94 |
+| A20 | Anular una orden de compra aprobada o una nota de entrega con salida | Movimiento inverso (`PurchaseReversal`/`DeliveryReversal`) | `LowStock`/`OutOfStock` o su resolución | 85 |
+| A21 | Cualquier alerta nueva | Correo a sus destinatarios después del commit | — | 85 |
 
 ## 2. Programados por tiempo (pendientes, Hangfire)
 

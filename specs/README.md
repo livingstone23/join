@@ -129,7 +129,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 86 | Estados de la factura, venta a crédito, pagos e historial, con calendario de cobro | Borrador | 44-post, 48-post, 65, 72, 81, 83, 84, 87 |
 | 87 | Línea de crédito del cliente: límite, saldo mínimo de advertencia, historial, alertas configurables y panel de crédito | Borrador | 43-post, 55, 56, 72, 81, 83, 85, 86 |
 | 88 | Perfil fiscal por país (estándar), primero Nicaragua: impuestos y retenciones base, numeración autorizada, moneda de referencia y punto de conexión para factura electrónica | Borrador | 56, 58, 81, 82, 83, 84, 85, 91 |
-| 89 | Punto de venta: venta rápida sin lead, consumidor final, convertir cotizaciones y cobrar facturas, con caja opcional | Borrador | 55, 57, 81, 82, 83, 84, 85, 86, 87, 88 |
+| 89 | Punto de venta: venta rápida sin lead, consumidor final, convertir cotizaciones y cobrar facturas, con caja opcional | Borrador | 55, 57, 81, 82, 83, 84, 85, 86, 87, 88, 90 |
 | 90 | Costo del producto y margen: costo de última compra, historial de costos, margen por venta e inventario valorizado | Borrador | 56, 57, 81, 83, 85, 89 |
 | 91 | Libro de ventas, libro de compras y resumen de impuestos y retenciones por período, con formato por país | Borrador | 82, 83, 85, 88, 89 |
 | 92 | Devoluciones con nota de crédito parcial: aplicada a la factura (y a la línea de crédito) o reembolsada en efectivo | Borrador | 81, 83, 84, 85, 86, 87, 88, 89, 90, 91, 93 |
@@ -139,7 +139,7 @@ Las specs del frontend viven en `join_frontb/specs` y tienen su propia numeraci�
 | 96 | Carga de datos por CSV: guía descargable, plantillas, validación previa y carga confirmada | Borrador | 49-post, 54, 55, 57, 58, 81, 82, 84, 85, 87, 88, 90, 95 |
 | 97 | Panel de ventas por período y vendedor, y panel de cuentas por cobrar con antigüedad de saldos, con visibilidad por usuario | Borrador | 43-post, 60, 83, 86, 87, 89, 90, 92, 93 |
 | 98 | Límite de descuento por rol, con solicitud de aprobación que otro usuario toma y resuelve | Borrador | 43-post, 81, 83, 85, 89, 90 |
-| 100 | Empresa de desarrollo Nicaragua (`JOIN-NI-001`): todo el seed existente, base en córdobas y acceso de los usuarios actuales | Borrador | 38, 43-post, 44-post, 45-post, 48-post, 54, 55, 56, 57, 59–65, 70–72 |
+| 100 | Empresa de desarrollo Nicaragua (`JOIN-NI-001`): todo el seed existente, base en córdobas y acceso de los usuarios actuales | Borrador | 19, 28, 43-post, 44-post, 45-post, 48-post, 54, 55, 56, 57, 59–65, 70–72 |
 | 999 | Módulo Productos ampliado: catálogo propio del módulo y origen de productos en Leads (**no se implementa**, decisión del usuario 2026-10-24) | Pospuesto | 41-post, 43-post, 48-post, 56, 57, 61, 64, 81–84 |
 
 ### Serie `-post` (specs de `main` adaptadas a PostgreSQL, 2026-10-09)
